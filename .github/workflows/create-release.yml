@@ -56,7 +56,7 @@ jobs:
 
       - name: "@slack Release process started"
         id: slack
-        uses: slackapi/slack-github-action@v2.0.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -107,7 +107,7 @@ jobs:
 
       - name: "@slack Share release process completion"
         if: ${{ !cancelled() }}
-        uses: slackapi/slack-github-action@v2.0.0
+        uses: slackapi/slack-github-action@v2.1.1
         env:
           ON_SUCCESS: |-
             *${{ env.VERSION_NAME }}* has been published to PyPI ! :python: :tada:
