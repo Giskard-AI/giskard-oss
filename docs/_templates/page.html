@@ -25,6 +25,157 @@
 </div>
 {%- endif %}
 
+<!-- Legacy Documentation Notice -->
+<style>
+#legacy-notice {
+    background-color: #ff6b6b !important;
+    border-left: 4px solid #d63031 !important;
+    margin-bottom: 0 !important;
+    position: relative !important;
+    z-index: 1000 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    height: auto !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    transition: height 0.3s ease-in-out;
+}
+#legacy-notice .announcement-content {
+    color: white;
+    text-align: center;
+    padding: 1rem 2rem 1rem 1rem;
+    margin: 0;
+    line-height: 1.5;
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+    position: relative;
+    font-size: 1rem;
+}
+#toggle-legacy-notice {
+    position: absolute;
+    top: 50%;
+    right: 1rem;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 3px;
+    color: white;
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0.3rem 0.5rem;
+    line-height: 1;
+    opacity: 0.8;
+    transition: all 0.2s ease;
+    font-weight: 400;
+    min-width: 24px;
+    text-align: center;
+}
+#toggle-legacy-notice:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.4);
+    opacity: 1;
+}
+#legacy-notice-content, #legacy-notice-content-2 {
+    display: block !important;
+    transition: all 0.3s ease-in-out;
+    opacity: 1;
+    max-height: none;
+    overflow: visible;
+}
+#legacy-notice.collapsed #legacy-notice-content,
+#legacy-notice.collapsed #legacy-notice-content-2 {
+    max-height: 0 !important;
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+@media (max-width: 600px) {
+    #legacy-notice .announcement-content {
+        padding: 0.75rem 1rem;
+        font-size: 0.98rem;
+        text-align: center;
+    }
+    #toggle-legacy-notice {
+        top: 50%;
+        right: 0.75rem;
+        transform: translateY(-50%);
+        font-size: 0.75rem;
+        padding: 0.25rem 0.4rem;
+        min-width: 20px;
+    }
+}
+</style>
+
+
+
+<div id="legacy-notice" class="announcement">
+    <aside class="announcement-content">
+        <button id="toggle-legacy-notice" title="Collapse/Expand notice">▼</button>
+        <div>
+            <strong>⚠️ Legacy Documentation Notice</strong>
+        </div>
+        <div id="legacy-notice-content">
+            Thank you for your interest in Giskard. <br> You're viewing our legacy documentation pages, which are no longer actively updated.
+        </div>
+        <div id="legacy-notice-content-2">
+            We have shifted our focus to core GenAI capabilities, like LLM San and RAGET. <br> For the latest information and features, please visit our
+            <a href="https://docs.giskard.ai" style="color: #ffeaa7; text-decoration: underline; word-break: break-all;">current documentation</a>.
+        </div>
+    </aside>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded - looking for legacy notice elements');
+
+    const toggleButton = document.getElementById('toggle-legacy-notice');
+    const legacyNotice = document.getElementById('legacy-notice');
+
+    console.log('Found elements:', {
+        toggleButton: !!toggleButton,
+        legacyNotice: !!legacyNotice
+    });
+
+    if (toggleButton && legacyNotice) {
+        console.log('Legacy notice initialized');
+        // Set default state: expanded (show full message)
+        toggleButton.textContent = '▼';
+        console.log('Default state: expanded');
+
+        // Check if user previously collapsed the notice
+        if (localStorage.getItem('legacy-notice-collapsed') === 'true') {
+            console.log('User previously collapsed, applying collapsed state');
+            legacyNotice.classList.add('collapsed');
+            toggleButton.textContent = '▶';
+        } else {
+            console.log('User has not collapsed before, keeping expanded state');
+        }
+
+        toggleButton.addEventListener('click', function() {
+            console.log('Toggle button clicked');
+            if (legacyNotice.classList.contains('collapsed')) {
+                // Expand - show full message
+                console.log('Expanding notice');
+                legacyNotice.classList.remove('collapsed');
+                toggleButton.textContent = '▼';
+                localStorage.setItem('legacy-notice-collapsed', 'false');
+            } else {
+                // Collapse - show only header
+                console.log('Collapsing notice');
+                legacyNotice.classList.add('collapsed');
+                toggleButton.textContent = '▶';
+                localStorage.setItem('legacy-notice-collapsed', 'true');
+            }
+        });
+    }
+});
+</script>
+
 <div class="page">
     <header class="mobile-header">
         <div class="header-left">
