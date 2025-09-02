@@ -4,7 +4,7 @@
     "watch": "tailwindcss -i ./src/scan-widget/style.css -o ./giskard/scanner/templates/static/style.css --watch"
   },
   "devDependencies": {
-    "@babel/core": "^7.26.9",
+    "@babel/core": "^7.28.3",
     "@babel/preset-env": "^7.26.9",
     "autoprefixer": "^10.4.21",
     "cssnano": "^7.0.6",
