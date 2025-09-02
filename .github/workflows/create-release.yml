@@ -35,7 +35,7 @@ jobs:
           echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-tags: true
           ref: main
