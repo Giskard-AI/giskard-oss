@@ -46,7 +46,7 @@ jobs:
         id: extract_branch
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           token: ${{ secrets.RELEASE_PAT_TOKEN }} # Needed to trigger other actions
           ref: ${{ steps.extract_branch.outputs.branch }}
