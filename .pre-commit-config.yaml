@@ -1,0 +1,59 @@
+repos:
+  # General pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+
+  # Python hooks
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.12.5
+    hooks:
+      # Run the linter.
+      - id: ruff-check
+        args: [--fix, --exit-non-zero-on-fix]
+      # Run the formatter.
+      - id: ruff-format
+
+  # Python type checking
+  - repo: local
+    hooks:
+     - id: basedpyright
+       name: basedpyright
+       entry: bash -c 'uv run basedpyright .'
+       language: system
+
+  # Python compatibility checking
+  - repo: https://github.com/netromdk/vermin
+    rev: v1.6.0
+    hooks:
+      - id: vermin
+        args: ['-t=3.11-', '--violations']
+
+  # Security and secrets scanning
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: |
+          (?x)^(
+            .*\.lock$|
+            .*\.log$|
+            .*\.dump$|
+            .*/\.venv/.*|
+            .*/\.uv/.*|
+            .*/dist/.*|
+            .*/build/.*|
+            \.secrets\.baseline$|
+            \.python-version$|
+            venv\.lock$|
+            version\.json$
+          )$
