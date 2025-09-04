@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field, SkipValidation, field_validator
 
 from giskard_checks.core.check import Check
 from giskard_checks.core.interactions import Interaction
+
+if TYPE_CHECKING:
+    from giskard_checks.testing.runner import TestCaseResult
+
 
 """Test case model and runner integration.
 
@@ -50,7 +54,7 @@ class TestCase(BaseModel, Generic[InteractionT]):
                 f"Wrong type for 'checks', must be subclass of Check[{InteractionT}], got {type(chk)}"
             )
 
-    async def run(self):
+    async def run(self) -> TestCaseResult:
         """Execute the test case using the configured `TestRunner`."""
         # Lazy import to avoid circular dependency with runner importing TestCase
         from giskard_checks.testing.runner import get_runner
