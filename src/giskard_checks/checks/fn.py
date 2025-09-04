@@ -28,11 +28,21 @@ class FnCheck(Check[InteractionT]):
     Parameters are modeled as pydantic fields. At runtime, the `run` method will
     invoke `fn` with the provided interaction and translate the result into a
     `CheckResult` when a boolean is returned.
+
+    Note: The `fn` field is not serializable and will not be included in
+    serialization. As a result, `FnCheck` instances cannot be reliably
+    serialized/deserialized. This is intended for programmatic/test use only.
     """
 
     KIND: ClassVar[str | None] = "fn"
 
-    fn: Callable[[InteractionT], Awaitable[bool | CheckResult] | bool | CheckResult]
+    fn: Callable[[InteractionT], Awaitable[bool | CheckResult] | bool | CheckResult] = (
+        Field(
+            exclude=True,
+            repr=False,
+            description="Function to execute for the check. Not serializable.",
+        )
+    )
     success_message: str | None = None
     failure_message: str | None = None
     severity: CheckSeverity = CheckSeverity.ERROR

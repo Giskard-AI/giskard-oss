@@ -47,9 +47,8 @@ class TestCase(BaseModel, Generic[InteractionT]):
     @field_validator("checks")
     def validate_checks(cls, val):
         for chk in val:
-            if not issubclass(type(chk), Check):
+            if not isinstance(chk, Check):
                 raise TypeError("Wrong type for 'checks', must be subclass of Check")
-
         return val
 
     async def run(self) -> TestCaseResult:
@@ -111,6 +110,10 @@ class TestCase(BaseModel, Generic[InteractionT]):
         module_name, class_name = type_path.rsplit(".", 1)
         mod = import_module(module_name)
         inter_cls = getattr(mod, class_name)
+
+        if not issubclass(inter_cls, Interaction):
+            raise ValueError("Invalid interaction type")
+
         interaction = inter_cls.model_validate(inter_info.get("data", {}))
 
         checks_data = payload.get("checks")
@@ -118,4 +121,4 @@ class TestCase(BaseModel, Generic[InteractionT]):
             raise ValueError("Invalid checks serialization format")
         checks = [Check.from_dict(cd) for cd in checks_data]
 
-        return cls(name=name, interaction=interaction, checks=checks)
+        return cls(name=name, interaction=interaction, checks=checks)  # pyright: ignore

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from giskard_checks.core import Check, CheckResult, CheckSeverity, CheckStatus
 from giskard_checks.interactions import StructuredInteraction
 from giskard_checks.testing.testcase import TestCase
@@ -96,3 +98,45 @@ async def test_testcase_roundtrip_serialization_custom_checks():
     after = await tc2.run()
     after_statuses = [r.status for r in after.results]
     assert after_statuses == before_statuses
+
+
+def _minimal_interaction_payload() -> dict[str, Any]:
+    return {
+        "__type__": "giskard_checks.interactions.structured.StructuredInteraction",
+        "data": {"input": "hello", "output": None, "metadata": None},
+    }
+
+
+def test_deserialize_rejects_check_without_kind_and_no_type():
+    payload: dict[str, Any] = {
+        "name": "tc-bad-missing-kind",
+        "interaction": _minimal_interaction_payload(),
+        "checks": [
+            {
+                # no 'kind' and no '__type__'
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError) as err:
+        TestCase.deserialize(payload)
+
+    assert "Serialized check must include non-empty 'kind'" in str(err.value)
+
+
+def test_deserialize_rejects_check_with_empty_kind_and_no_type():
+    payload: dict[str, Any] = {
+        "name": "tc-bad-empty-kind",
+        "interaction": _minimal_interaction_payload(),
+        "checks": [
+            {
+                "kind": "",
+                # explicitly no '__type__'
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError) as err:
+        TestCase.deserialize(payload)
+
+    assert "Serialized check must include non-empty 'kind'" in str(err.value)

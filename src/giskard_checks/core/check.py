@@ -218,9 +218,7 @@ class Check(BaseModel, Generic[InteractionT]):
 
     # Preferred usage: set a class-level KIND on subclasses, e.g. KIND = "my_check".
     # This removes the need to pass `kind` to each instance and allows registry validation.
-    KIND: ClassVar[str | None] = Field(
-        default=None, description="Check type identifier"
-    )
+    KIND: ClassVar[str | None] = None
     name: str | None = Field(default=None, description="Check name")
     description: str | None = Field(default=None, description="Check description")
     params: dict[str, Any] = Field(default_factory=dict)
