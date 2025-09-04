@@ -46,7 +46,7 @@ class TestCaseResult(BaseModel):
     @property
     def skipped(self) -> bool:
         """True when all checks were skipped."""
-        return all(result.skipped for result in self.results)
+        return all(result.skipped for result in self.results) and len(self.results) > 0
 
 
 class TestRunner:
