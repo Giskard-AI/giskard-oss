@@ -35,7 +35,7 @@ class TestCase(BaseModel, Generic[InteractionT]):
     interaction: InteractionT = Field(..., description="Test case interaction")
     checks: Sequence[SkipValidation[Check[InteractionT]]] = Field(
         ..., description="Test case checks"
-    )  # pyright: ignore
+    )
 
     @field_validator("checks")
     def validate_checks(cls, val):
