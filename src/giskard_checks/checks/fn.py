@@ -8,10 +8,28 @@ from pydantic import Field
 from giskard_checks.core.check import Check, CheckResult, CheckSeverity
 from giskard_checks.core.interactions import Interaction
 
+"""Function-backed check implementation.
+
+This module provides `FnCheck`, a concrete `Check` implementation that delegates
+its logic to a user-provided callable, and a convenience `from_fn` factory to
+instantiate it.
+
+The callable can be synchronous or asynchronous and must return either:
+- a `bool`: True -> success, False -> failure, or
+- a `CheckResult`: used as-is
+"""
+
 InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
 
 
 class FnCheck(Check[InteractionT]):
+    """A `Check` whose logic is a Python callable.
+
+    Parameters are modeled as pydantic fields. At runtime, the `run` method will
+    invoke `fn` with the provided interaction and translate the result into a
+    `CheckResult` when a boolean is returned.
+    """
+
     KIND: ClassVar[str | None] = "fn"
 
     fn: Callable[[InteractionT], Awaitable[bool | CheckResult] | bool | CheckResult]
@@ -21,6 +39,7 @@ class FnCheck(Check[InteractionT]):
     details: dict[str, Any] = Field(default_factory=dict)
 
     async def run(self, interaction: InteractionT) -> CheckResult:
+        """Execute the function and normalize its result to a `CheckResult`."""
         result = self.fn(interaction)
         if inspect.isawaitable(result):
             result = await result
@@ -62,6 +81,16 @@ def from_fn(
     failure_message: str | None = None,
     details: dict[str, Any] | None = None,
 ) -> Check[InteractionT]:
+    """Create an `FnCheck` from a callable.
+
+    Example
+    -------
+    ```python
+    from giskard_checks.checks import from_fn
+
+    chk = from_fn(lambda inter: inter.output is not None, name="has_output")
+    ```
+    """
     return FnCheck(
         name=name,
         description=description,

@@ -13,29 +13,45 @@ if TYPE_CHECKING:
     from giskard_checks.testing.testcase import TestCase
 
 
+"""Test runner and results aggregation.
+
+This module contains a minimal `TestRunner` that executes checks, captures
+exceptions as error results, measures durations, and aggregates everything into
+an immutable `TestCaseResult` with convenience properties.
+"""
+
+
 class TestCaseResult(BaseModel):
+    """Immutable summary of a test case execution."""
+
     model_config = {"frozen": True}
     results: list[CheckResult]
     duration_ms: int
 
     @property
     def passed(self) -> bool:
+        """True when all checks passed."""
         return all(result.passed for result in self.results)
 
     @property
     def failed(self) -> bool:
+        """True when at least one check failed and none errored."""
         return not self.errored and any(result.failed for result in self.results)
 
     @property
     def errored(self) -> bool:
+        """True when at least one check errored."""
         return any(result.errored for result in self.results)
 
     @property
     def skipped(self) -> bool:
+        """True when all checks were skipped."""
         return all(result.skipped for result in self.results)
 
 
 class TestRunner:
+    """Execute checks for a `TestCase` and produce a `TestCaseResult`."""
+
     async def run(self, tc: "TestCase[Any]") -> TestCaseResult:
         results: list[CheckResult] = []
 
@@ -76,4 +92,5 @@ _default_runner = TestRunner()
 
 
 def get_runner() -> TestRunner:
+    """Return the default process-wide `TestRunner` instance."""
     return _default_runner

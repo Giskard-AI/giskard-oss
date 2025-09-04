@@ -1,3 +1,5 @@
+"""Testing subpackage public API."""
+
 from .runner import get_runner
 from .testcase import TestCase
 

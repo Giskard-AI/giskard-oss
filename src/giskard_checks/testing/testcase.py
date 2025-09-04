@@ -8,15 +8,35 @@ from pydantic import BaseModel, Field, SkipValidation, field_validator
 from giskard_checks.core.check import Check
 from giskard_checks.core.interactions import Interaction
 
+"""Test case model and runner integration.
+
+`TestCase` binds a specific `Interaction` instance with a sequence of `Check`s
+and delegates execution to a `TestRunner`. It offers a single `run()` method
+that returns a `TestCaseResult` summarizing the outcomes.
+"""
+
 InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
 
 
 class TestCase(BaseModel, Generic[InteractionT]):
+    """Bundle a single interaction with a set of checks to execute.
+
+    Attributes
+    ----------
+    name:
+        Optional label for the test case.
+    interaction:
+        The interaction under test.
+    checks:
+        Sequence of checks to run against the interaction.
+    """
+
     name: str | None = Field(None, description="Test case name")
     interaction: InteractionT = Field(..., description="Test case interaction")
     checks: Sequence[Check] = Field(..., description="Test case checks")  # pyright: ignore
 
     async def run(self):
+        """Execute the test case using the configured `TestRunner`."""
         # Lazy import to avoid circular dependency with runner importing TestCase
         from giskard_checks.testing.runner import get_runner
 
