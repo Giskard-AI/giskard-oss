@@ -77,6 +77,12 @@ class TestCase(BaseModel, Generic[InteractionT]):
 
         checks_payload = [chk.model_dump() for chk in self.checks]
 
+        # Include class paths for checks to enable lazy import during deserialization
+        for i, chk in enumerate(self.checks):
+            checks_payload[i]["__type__"] = (
+                f"{chk.__class__.__module__}.{chk.__class__.__name__}"
+            )
+
         return {
             "name": self.name,
             "interaction": interaction_payload,
@@ -87,8 +93,8 @@ class TestCase(BaseModel, Generic[InteractionT]):
     def deserialize(cls, payload: dict[str, Any]) -> "TestCase[Any]":
         """Reconstruct a TestCase from a dict produced by `serialize()`.
 
-        Requires that check classes have been imported so that their kinds are
-        registered in the global registry.
+        Check classes can be lazily imported if the serialized payload contains
+        a `__type__` field for each check with the fully-qualified class path.
         """
         from importlib import import_module
 

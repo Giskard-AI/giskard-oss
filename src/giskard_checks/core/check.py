@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import warnings
 from enum import Enum
+from importlib import import_module
 from typing import Any, ClassVar, Generic, TypeVar
 
 from pydantic import BaseModel, Field, computed_field, model_validator
@@ -274,6 +275,20 @@ class Check(BaseModel, Generic[InteractionT]):
         if not isinstance(kind, str) or not kind:
             raise ValueError("Serialized check must include non-empty 'kind'")
         target_cls = _CHECK_KIND_REGISTRY.get(kind)
+        if target_cls is None:
+            # Try lazy import when a fully-qualified class path is provided
+            type_path = data.get("__type__")
+            if isinstance(type_path, str) and "." in type_path:
+                module_name, class_name = type_path.rsplit(".", 1)
+                try:
+                    mod = import_module(module_name)
+                    # Access the class to ensure module side-effects (registry) occur
+                    getattr(mod, class_name)
+                except Exception:
+                    # Fall through to unknown kind error below
+                    pass
+                else:
+                    target_cls = _CHECK_KIND_REGISTRY.get(kind)
         if target_cls is None:
             raise ValueError(f"Unknown check kind '{kind}'; is the class imported?")
         return target_cls.model_validate(data)
