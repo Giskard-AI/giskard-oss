@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Awaitable, Callable, ClassVar, Generic, TypeVar
+from typing import Any, Awaitable, Callable, ClassVar, TypeVar
 
 from pydantic import Field
 

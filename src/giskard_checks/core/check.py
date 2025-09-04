@@ -5,7 +5,7 @@ import warnings
 from enum import Enum
 from typing import Any, ClassVar, Generic, TypeVar
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 from .interactions import Interaction
 
@@ -220,8 +220,8 @@ class Check(BaseModel, Generic[InteractionT]):
     KIND: ClassVar[str | None] = Field(
         default=None, description="Check type identifier"
     )
-    name: str | None = Field(None, description="Check name")
-    description: str | None = Field(None, description="Check description")
+    name: str | None = Field(default=None, description="Check name")
+    description: str | None = Field(default=None, description="Check description")
     params: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="before")
@@ -250,13 +250,33 @@ class Check(BaseModel, Generic[InteractionT]):
         if isinstance(class_kind, str) and class_kind:
             _register_check_kind(class_kind, cls)
 
+    @computed_field(return_type=str)
     @property
     def kind(self) -> str:
-        """Return the check type identifier from the class `KIND`."""
+        """Return the check type identifier from the class `KIND`.
+
+        Marked as a computed field so it's included in serialization via
+        `model_dump()` and JSON dumps, enabling generic deserialization.
+        """
         class_kind = getattr(self.__class__, "KIND", None)
         if not (isinstance(class_kind, str) and class_kind):
             raise ValueError(f"KIND must be set for {self.__class__.__name__}")
         return class_kind
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Check[Any]":
+        """Instantiate a concrete `Check` from serialized data.
+
+        Expects a `kind` field to resolve the target subclass using the global
+        registry. Extra fields not defined on the subclass are ignored by default.
+        """
+        kind = data.get("kind")
+        if not isinstance(kind, str) or not kind:
+            raise ValueError("Serialized check must include non-empty 'kind'")
+        target_cls = _CHECK_KIND_REGISTRY.get(kind)
+        if target_cls is None:
+            raise ValueError(f"Unknown check kind '{kind}'; is the class imported?")
+        return target_cls.model_validate(data)
 
     async def run(self, interaction: InteractionT) -> CheckResult:
         """Execute the check against the provided interaction.

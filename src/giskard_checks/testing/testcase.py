@@ -47,12 +47,10 @@ class TestCase(BaseModel, Generic[InteractionT]):
     @field_validator("checks")
     def validate_checks(cls, val):
         for chk in val:
-            if issubclass(type(chk), Check):
-                return val
+            if not issubclass(type(chk), Check):
+                raise TypeError("Wrong type for 'checks', must be subclass of Check")
 
-            raise TypeError(
-                f"Wrong type for 'checks', must be subclass of Check[{InteractionT}], got {type(chk)}"
-            )
+        return val
 
     async def run(self) -> TestCaseResult:
         """Execute the test case using the configured `TestRunner`."""
@@ -61,3 +59,57 @@ class TestCase(BaseModel, Generic[InteractionT]):
 
         runner = get_runner()
         return await runner.run(self)
+
+    # --- Serialization helpers -------------------------------------------------
+    def serialize(self) -> dict[str, Any]:
+        """Serialize the TestCase into a JSON-friendly dict.
+
+        The interaction is annotated with its fully-qualified class path to
+        allow generic deserialization. Checks include their computed `kind` so
+        they can be reconstructed via the global registry.
+        """
+        interaction_obj = self.interaction
+        interaction_cls = interaction_obj.__class__
+        interaction_payload = {
+            "__type__": f"{interaction_cls.__module__}.{interaction_cls.__name__}",
+            "data": interaction_obj.model_dump(),
+        }
+
+        checks_payload = [chk.model_dump() for chk in self.checks]
+
+        return {
+            "name": self.name,
+            "interaction": interaction_payload,
+            "checks": checks_payload,
+        }
+
+    @classmethod
+    def deserialize(cls, payload: dict[str, Any]) -> "TestCase[Any]":
+        """Reconstruct a TestCase from a dict produced by `serialize()`.
+
+        Requires that check classes have been imported so that their kinds are
+        registered in the global registry.
+        """
+        from importlib import import_module
+
+        from giskard_checks.core.check import Check
+
+        name = payload.get("name")
+
+        inter_info = payload.get("interaction")
+        if not isinstance(inter_info, dict) or "__type__" not in inter_info:
+            raise ValueError("Invalid interaction serialization format")
+        type_path: str = inter_info["__type__"]
+        if "." not in type_path:
+            raise ValueError("Invalid interaction type path")
+        module_name, class_name = type_path.rsplit(".", 1)
+        mod = import_module(module_name)
+        inter_cls = getattr(mod, class_name)
+        interaction = inter_cls.model_validate(inter_info.get("data", {}))
+
+        checks_data = payload.get("checks")
+        if not isinstance(checks_data, list):
+            raise ValueError("Invalid checks serialization format")
+        checks = [Check.from_dict(cd) for cd in checks_data]
+
+        return cls(name=name, interaction=interaction, checks=checks)
