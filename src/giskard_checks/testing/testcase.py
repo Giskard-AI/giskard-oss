@@ -33,7 +33,19 @@ class TestCase(BaseModel, Generic[InteractionT]):
 
     name: str | None = Field(None, description="Test case name")
     interaction: InteractionT = Field(..., description="Test case interaction")
-    checks: Sequence[Check] = Field(..., description="Test case checks")  # pyright: ignore
+    checks: Sequence[SkipValidation[Check[InteractionT]]] = Field(
+        ..., description="Test case checks"
+    )  # pyright: ignore
+
+    @field_validator("checks")
+    def validate_checks(cls, val):
+        for chk in val:
+            if issubclass(type(chk), Check):
+                return val
+
+            raise TypeError(
+                f"Wrong type for 'checks', must be subclass of Check[{InteractionT}], got {type(chk)}"
+            )
 
     async def run(self):
         """Execute the test case using the configured `TestRunner`."""
