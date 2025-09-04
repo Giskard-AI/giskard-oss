@@ -31,6 +31,9 @@ class TestCase(BaseModel, Generic[InteractionT]):
         Sequence of checks to run against the interaction.
     """
 
+    # Prevent pytest from attempting to collect this class as a test
+    __test__ = False
+
     name: str | None = Field(None, description="Test case name")
     interaction: InteractionT = Field(..., description="Test case interaction")
     checks: Sequence[SkipValidation[Check[InteractionT]]] = Field(
