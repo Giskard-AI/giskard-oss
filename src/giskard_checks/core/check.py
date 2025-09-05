@@ -221,7 +221,6 @@ class Check(BaseModel, Generic[InteractionT]):
     KIND: ClassVar[str | None] = None
     name: str | None = Field(default=None, description="Check name")
     description: str | None = Field(default=None, description="Check description")
-    params: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="before")
     @classmethod

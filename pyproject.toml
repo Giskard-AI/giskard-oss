@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "counterpoint>=0.1.2",
     "pydantic~=2.11.7",
 ]
 
@@ -41,3 +42,6 @@ include = [
   "README.md",
   "pyproject.toml",
 ]
+
+[tool.uv.sources]
+counterpoint = { git = "ssh://git@github.com/Giskard-AI/counterpoint.git", tag="v0.1.2" }

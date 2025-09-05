@@ -39,10 +39,21 @@ class TestCase(BaseModel, Generic[InteractionT]):
     __test__ = False
 
     name: str | None = Field(None, description="Test case name")
-    interaction: InteractionT = Field(..., description="Test case interaction")
+    # Validation is skipped for the interaction field to allow for generic deserialization
+    interaction: SkipValidation[InteractionT] = Field(
+        ..., description="Test case interaction"
+    )
     checks: Sequence[SkipValidation[Check[InteractionT]]] = Field(
         ..., description="Test case checks"
     )
+
+    @field_validator("interaction")
+    def validate_interaction(cls, val):
+        if not isinstance(val, Interaction):
+            raise TypeError(
+                "Wrong type for 'interaction', must be subclass of Interaction"
+            )
+        return val
 
     @field_validator("checks")
     def validate_checks(cls, val):
