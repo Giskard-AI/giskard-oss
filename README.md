@@ -71,7 +71,6 @@ API Overview
 ------------
 
 Core
-~~~~
 
 - `giskard_checks.core.Interaction[InputT, OutputT]`: generic interaction model.
 - `giskard_checks.core.Check[InteractionT]`: base class for checks.
@@ -79,20 +78,17 @@ Core
   convenience boolean properties (`passed`, `failed`, `errored`, `skipped`).
 
 Checks
-~~~~~~
 
 - `giskard_checks.checks.from_fn(fn, ...)` → `Check`: convenience factory that
   turns a callable into a check. The callable can return a `bool` or a
   `CheckResult` and may be async.
 
 Interactions
-~~~~~~~~~~~~
 
 - `giskard_checks.interactions.StructuredInteraction[In, Out]`: specialization
   of `Interaction` for structured inputs/outputs.
 
 Testing
-~~~~~~~
 
 - `giskard_checks.testing.TestCase`: bundle an interaction with checks.
 - `giskard_checks.testing.runner.TestRunner`: default runner used by `TestCase`.
@@ -119,5 +115,5 @@ uv run pytest -q
 Type checking:
 
 ```bash
-uv run pyright
+uv run basedpyright
 ```
