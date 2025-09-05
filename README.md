@@ -82,11 +82,15 @@ Checks
 - `giskard_checks.checks.from_fn(fn, ...)` → `Check`: convenience factory that
   turns a callable into a check. The callable can return a `bool` or a
   `CheckResult` and may be async.
+ - `giskard_checks.checks.chat.StringMatchingCheck`: content matcher for chat
+   transcripts; verifies a message by role contains a substring.
 
 Interactions
 
 - `giskard_checks.interactions.StructuredInteraction[In, Out]`: specialization
   of `Interaction` for structured inputs/outputs.
+ - `giskard_checks.interactions.ChatInteraction`: specialization for chat-style
+   interactions using `counterpoint.Message` as items.
 
 Testing
 
@@ -100,8 +104,47 @@ Usage Notes
 
 - Define your own `Check` subclasses with a unique class-level `KIND` string.
 - You can customize severity and messages with `CheckResult` or via `from_fn`.
-- Environment variable `GISKARD_CHECK_KIND_ENFORCEMENT_UNIQUENESS` controls
+- Environment variable `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` controls
   whether duplicate `KIND`s raise (default: enabled).
+
+Chat quickstart
+---------------
+
+Evaluate chat transcripts using `ChatInteraction` and the built-in
+`StringMatchingCheck`:
+
+```python
+from counterpoint import Message
+from giskard_checks.interactions import ChatInteraction
+from giskard_checks.checks.chat import StringMatchingCheck
+from giskard_checks.testing import TestCase
+
+interaction = ChatInteraction(
+    input=[Message(role="user", content="Say hello")],
+    output=[Message(role="assistant", content="Hello world!")],
+)
+
+checks = [
+    StringMatchingCheck(
+        name="contains_hello",
+        content="Hello",
+        role="assistant",
+        case_sensitive=True,
+    ),
+]
+
+tc = TestCase(interaction=interaction, checks=checks, name="chat-example")
+result = await tc.run()  # in async context
+
+assert result.passed
+```
+
+Notes:
+
+- `ChatInteraction` uses `counterpoint.Message` for messages; the `counterpoint`
+  package is declared as a dependency.
+- `StringMatchingCheck` inspects messages by `role` and supports
+  case-insensitive matching via `case_sensitive=False`.
 
 Development
 -----------
