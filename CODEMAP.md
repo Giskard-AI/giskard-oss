@@ -1,0 +1,152 @@
+# CODEMAP
+
+This codemap provides a high-level overview of the `giskard-checks` repository: purpose, architecture, modules, key types, and typical workflows. It is intended for contributors and advanced users.
+
+### What is this library?
+- Lightweight primitives to define and run checks against model interactions.
+- Small, explicit, and type-safe with Pydantic v2 models.
+- Async-friendly: checks can be sync or async.
+- Results are immutable and easy to serialize.
+
+### Repository layout
+
+```
+/ (repo root)
+├─ pyproject.toml              # Build, tooling, dependencies
+├─ README.md                   # End-user quickstart and API overview
+├─ CODEMAP.md                  # This file
+├─ src/giskard_checks/         # Package source (src-layout)
+│  ├─ __init__.py              # Public re-exports: core, interactions, testing, checks
+│  ├─ core/                    # Core abstractions: Check, CheckResult, enums
+│  │  ├─ __init__.py
+│  │  ├─ check.py
+│  │  └─ interactions.py
+│  ├─ interactions/            # Interaction specializations
+│  │  ├─ __init__.py
+│  │  ├─ structured.py         # StructuredInteraction[In, Out]
+│  │  └─ chat.py               # ChatInteraction using counterpoint.Message
+│  ├─ checks/                  # Built-in checks and helpers
+│  │  ├─ __init__.py
+│  │  ├─ fn.py                 # from_fn and FnCheck
+│  │  └─ chat.py               # StringMatchingCheck for chat transcripts
+│  └─ testing/                 # TestCase, TestRunner, samples
+│     ├─ __init__.py
+│     ├─ testcase.py           # TestCase model + serialization helpers
+│     ├─ runner.py             # TestRunner + TestCaseResult
+│     └─ _samples/             # Example custom checks/interactions
+└─ tests/
+   └─ integration/             # Serialization and E2E tests
+```
+
+### Core concepts and types
+
+- Interaction[InputT, OutputT] (in `core/interactions.py`)
+  - Container for an input, optional output, and optional metadata.
+  - Specialized as `StructuredInteraction[In, Out]` and `ChatInteraction`.
+
+- Check[InteractionT] (in `core/check.py`)
+  - Base class to implement concrete checks. Subclasses must define a class-level `KIND: str`.
+  - Key fields: `name`, `description`. `kind` is a computed field derived from `KIND`.
+  - Global registry keyed by `KIND` to support deserialization and uniqueness validation.
+
+- CheckResult (in `core/check.py`)
+  - Immutable result model for a single check execution.
+  - Convenience constructors: `success`, `failure`, `skip`, `error`.
+  - Convenience booleans: `passed`, `failed`, `errored`, `skipped`.
+  - Severity enum: `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
+
+- TestCase and TestRunner (in `testing/`)
+  - `TestCase` bundles an `Interaction` and a sequence of `Check`s and exposes `await run()`.
+  - `TestRunner` executes checks sequentially, measures per-check/total durations, and returns a `TestCaseResult` aggregate (immutable, with .passed/.failed/.errored/.skipped).
+
+### Built-in checks and helpers
+
+- FnCheck and from_fn (in `checks/fn.py`)
+  - Turn a callable into a `Check`. The callable may be sync/async and return `bool` or `CheckResult`.
+  - `FnCheck` is not serializable (function excluded) and is intended for programmatic/test use.
+
+- StringMatchingCheck (in `checks/chat.py`)
+  - KIND: `string_matching`.
+  - Validates that output messages by role contain a substring (supports case sensitivity toggling).
+
+### Interaction specializations
+
+- StructuredInteraction[In, Out] (in `interactions/structured.py`)
+  - Typed interaction for structured payloads.
+
+- ChatInteraction (in `interactions/chat.py`)
+  - Specialization of `StructuredInteraction[list[Message], list[Message]]` using `counterpoint.Message`.
+
+### Serialization model
+
+- Checks
+  - Each `Check` exposes a computed `kind` used during serialization.
+  - Deserialization uses the global `KIND` registry and may lazily import classes when `__type__` is provided.
+
+- TestCase
+  - `serialize()` embeds the fully-qualified class path of the `Interaction` in `interaction.__type__` and its data in `interaction.data`.
+  - Each check payload includes `__type__` for lazy import during deserialization.
+  - `deserialize()` reconstructs `Interaction` and checks using the above information.
+
+### Typical workflows
+
+- Define an interaction
+  - Use `StructuredInteraction` for typed input/output models (Pydantic `BaseModel` recommended) or `ChatInteraction` for chat transcripts.
+
+- Author checks
+  - Implement a concrete `Check` subclass with a unique `KIND`, or use `from_fn` for quick function-based checks.
+  - Return `CheckResult` explicitly or a `bool` from `from_fn` callables.
+
+- Run tests
+  - Create a `TestCase(interaction=..., checks=[...], name=...)` and `await tc.run()`.
+  - Inspect `TestCaseResult.results`, `duration_ms`, and convenience booleans.
+
+### Tooling and conventions
+
+- Python >= 3.11 (enforced in `pyproject.toml`).
+- Linting: Ruff (`E`, `W`, `I`; line length E501 ignored).
+- Type checking: Pyright, `recommended` mode.
+- Testing: pytest with `asyncio_mode = auto`.
+- Commands (via `uv`):
+  - `uv run pytest -q`
+  - `uv run basedpyright`
+
+### Environment knobs
+
+- `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` (default truthy):
+  - Enforces uniqueness of `Check.KIND` across registered classes; otherwise duplicates warn and last writer wins.
+
+### Dependencies
+
+- Runtime:
+  - `pydantic~=2.11`
+  - `counterpoint>=0.1.2` (VCS source pinned to `tag = v0.1.2`)
+- Dev:
+  - `pytest`, `pytest-asyncio`
+
+### Testing overview
+
+- Integration tests under `tests/integration` cover:
+  - End-to-end chat serialization (`ChatInteraction`, `StringMatchingCheck`).
+  - Structured moderation example using `StructuredInteraction`.
+  - TestCase serialization/deserialization round-trips including lazy import behavior.
+
+### Public API surface
+
+Import namespaces re-exported by `giskard_checks.__init__`:
+
+```python
+from giskard_checks import core, interactions, testing, checks
+```
+
+- `core` → `Check`, `CheckResult`, `CheckSeverity`, `Interaction`
+- `interactions` → `StructuredInteraction`, `ChatInteraction`
+- `testing` → `TestCase`, `runner` (via module import)
+- `checks` → `from_fn`, `FnCheck`, and `StringMatchingCheck` (via submodule)
+
+### Contributing notes
+
+- Keep `README.md` examples in sync with APIs (especially async patterns and `uv` commands).
+- Prefer absolute imports within the `giskard_checks` package.
+- Ensure all public functions/classes have type hints and concise docstrings.
+- Avoid adding new runtime dependencies unless necessary; prefer small, composable APIs.
