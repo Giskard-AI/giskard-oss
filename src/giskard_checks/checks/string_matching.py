@@ -4,49 +4,44 @@ from typing import Any, ClassVar, TypeVar
 
 from pydantic import Field
 
-from giskard_checks.core.check import Check, CheckResult
-from giskard_checks.core.extraction import Extractor, JsonPathExtractor
+from giskard_checks.checks.value_based import ExtractionCheck
+from giskard_checks.core.check import CheckResult
 from giskard_checks.core.interactions import Interaction
 
 InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
 
 
-class StringMatchingCheck(Check[InteractionT]):
+class StringMatchingCheck(ExtractionCheck[InteractionT]):
     KIND: ClassVar[str | None] = "string_matching"
 
     content: str = Field(..., description="The string to match in the output")
-
-    # Optional new extractor strategy (preferred)
-    extractor: Extractor | None = Field(
-        default=None, description="Optional extractor for selecting values"
-    )
-    # Backcompat convenience to select values via JSONPath when no extractor is provided
-    key: str | None = Field(default=None, description="JSON path to the key to check")
+    # Backward compatibility - maps to evaluation_mode
     match_all: bool = Field(
-        default=False, description="Whether all strings should match"
+        default=False,
+        description="Whether all strings should match (maps to evaluation_mode='all')",
     )
 
-    async def run(self, interaction: InteractionT) -> CheckResult:
-        # Extract values using configured extractor or fall back to JSONPath/raw output
-        if self.extractor is not None:
-            values = self.extractor.extract(interaction)
-        elif self.key:
-            values = JsonPathExtractor(key=self.key).extract(interaction)
-        else:
-            # Default to selecting the output field via JSONPath
-            values = JsonPathExtractor(key="output").extract(interaction)
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
+        # Map match_all to evaluation_mode for backward compatibility
+        if "match_all" in data:
+            self.evaluation_mode = "all" if data["match_all"] else "any"
 
+    # pyright: ignore-next-line[reportIncompatibleMethodOverride]
+    def _evaluate_values(self, values: list[Any]) -> bool:
+        """Check if the content string is contained in any of the values."""
+        # Convert values to strings for comparison
         texts: list[str] = []
         for item in values:
             value = getattr(item, "value", item)
             texts.append(value if isinstance(value, str) else str(value))
 
-        if self.match_all:
-            matched = all(self.content in text for text in texts)
-        else:
-            matched = any(self.content in text for text in texts)
+        return any(self.content in text for text in texts)
 
-        if matched:
-            return CheckResult.success(message=f"String matching succeeded", details={})
-        else:
-            return CheckResult.failure(message=f"String matching failed", details={})
+    def _create_success_result(self, values: list[Any]) -> CheckResult:
+        """Create a success result for string matching check."""
+        return CheckResult.success(message=f"String matching succeeded", details={})
+
+    def _create_failure_result(self, values: list[Any]) -> CheckResult:
+        """Create a failure result for string matching check."""
+        return CheckResult.failure(message=f"String matching failed", details={})
