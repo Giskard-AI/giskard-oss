@@ -63,20 +63,22 @@ class TestRunner:
                 res = await chk.run(tc.interaction)
             except Exception as e:
                 res = CheckResult.error(
-                    kind=chk.kind,
-                    name=chk.name,
-                    description=chk.description,
                     message=str(e),
-                    traceback=traceback.format_exc(),
+                    details={"traceback": traceback.format_exc()},
                 )
 
-            # Update the result with the duration, kind, name, and description
+            # Update the result with the duration in details for observability
             res = res.model_copy(
                 update={
-                    "duration_ms": int((time.perf_counter() - check_start_time) * 1000),
-                    "kind": chk.kind,
-                    "name": chk.name,
-                    "description": chk.description,
+                    "details": {
+                        **(res.details or {}),
+                        "duration_ms": int(
+                            (time.perf_counter() - check_start_time) * 1000
+                        ),
+                        "check_kind": chk.kind,
+                        "check_name": chk.name,
+                        "check_description": chk.description,
+                    }
                 }
             )
 

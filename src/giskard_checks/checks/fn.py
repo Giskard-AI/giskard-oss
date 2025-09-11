@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Awaitable, Callable, ClassVar, TypeVar
+from collections.abc import Awaitable, Iterable
+from typing import Any, Callable, ClassVar, TypeVar
 
+from jsonpath_ng import parse
 from pydantic import Field
 
 from giskard_checks.core.check import Check, CheckResult, CheckSeverity
@@ -20,6 +22,88 @@ The callable can be synchronous or asynchronous and must return either:
 """
 
 InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
+
+
+class EqualityCheck(Check[InteractionT]):
+    KIND = "equality"
+
+    expected: Any
+    # TODO: move to base check
+    key: str | None = Field(default=None, description="JSON path to the key to check")
+    severity: CheckSeverity = CheckSeverity.ERROR
+
+    async def run(self, interaction: InteractionT) -> CheckResult:
+        result = None
+
+        if self.key:
+            jsonpath_expr = parse(self.key)
+            result = jsonpath_expr.find(interaction.model_dump())
+        else:
+            result = interaction.output
+
+        if result:
+            return CheckResult.success(
+                message=f"Input is equal to {self.expected}", details={}
+            )
+
+        return CheckResult.failure(
+            message=f"Input is not equal to {self.expected}, got {result}",
+            details={
+                "actual": result,
+                "expected": self.expected,
+                "key": self.key,
+            },
+        )
+
+
+# TODO: check DataInContext return type from jsonpath_expr.find
+class StringMatchingCheck(Check[InteractionT]):
+    KIND: ClassVar[str | None] = "string_matching"
+
+    content: str = Field(..., description="The string to match in the output")
+
+    # TODO: case_sensitive: bool = Field(default=True, description="Whether the string matching should be case sensitive")
+
+    # TODO: extract key and match_all to base check (rename match_all to something generic)
+    key: str | None = Field(default=None, description="JSON path to the key to check")
+    match_all: bool = Field(
+        default=False, description="Whether all strings should match"
+    )
+
+    async def run(self, interaction: InteractionT) -> CheckResult:
+        result = None
+
+        # TODO: Extract this and remove DataInContext wrapper
+        if self.key:
+            jsonpath_expr = parse(self.key)
+            result = jsonpath_expr.find(interaction.model_dump())
+        else:
+            result = interaction.output
+
+        if isinstance(result, str):
+            items: list[Any] = [result]
+        elif isinstance(result, Iterable):
+            items = list(result)
+        else:
+            return CheckResult.failure(
+                message=f"Result is not a string or list, got {type(result)}",
+                details={},
+            )
+
+        texts: list[str] = []
+        for item in items:
+            value = getattr(item, "value", item)
+            texts.append(value if isinstance(value, str) else str(value))
+
+        if self.match_all:
+            matched = all(self.content in text for text in texts)
+        else:
+            matched = any(self.content in text for text in texts)
+
+        if matched:
+            return CheckResult.success(message=f"String matching succeeded", details={})
+        else:
+            return CheckResult.failure(message=f"String matching failed", details={})
 
 
 class FnCheck(Check[InteractionT]):
@@ -60,19 +144,11 @@ class FnCheck(Check[InteractionT]):
         if isinstance(result, bool):
             if result:
                 return CheckResult.success(
-                    kind=self.kind,
-                    name=self.name,
-                    description=self.description,
                     message=self.success_message,
-                    severity=self.severity,
                     details=self.details,
                 )
             return CheckResult.failure(
-                kind=self.kind,
-                name=self.name,
-                description=self.description,
                 message=self.failure_message,
-                severity=self.severity,
                 details=self.details,
             )
 

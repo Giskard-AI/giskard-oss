@@ -28,7 +28,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 │  ├─ checks/                  # Built-in checks and helpers
 │  │  ├─ __init__.py
 │  │  ├─ fn.py                 # from_fn and FnCheck
-│  │  └─ chat.py               # StringMatchingCheck for chat transcripts
+│  │  └─ chat.py               # Chat utilities (StringMatchingCheck lives in checks/fn.py)
 │  └─ testing/                 # TestCase, TestRunner, samples
 │     ├─ __init__.py
 │     ├─ testcase.py           # TestCase model + serialization helpers
@@ -53,7 +53,6 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - Immutable result model for a single check execution.
   - Convenience constructors: `success`, `failure`, `skip`, `error`.
   - Convenience booleans: `passed`, `failed`, `errored`, `skipped`.
-  - Severity enum: `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
 
 - TestCase and TestRunner (in `testing/`)
   - `TestCase` bundles an `Interaction` and a sequence of `Check`s and exposes `await run()`.
@@ -65,9 +64,9 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - Turn a callable into a `Check`. The callable may be sync/async and return `bool` or `CheckResult`.
   - `FnCheck` is not serializable (function excluded) and is intended for programmatic/test use.
 
-- StringMatchingCheck (in `checks/chat.py`)
+- StringMatchingCheck (in `checks/fn.py`)
   - KIND: `string_matching`.
-  - Validates that output messages by role contain a substring (supports case sensitivity toggling).
+  - Generic substring matcher with optional `key` (JSONPath) and `match_all`.
 
 ### Interaction specializations
 
@@ -142,7 +141,7 @@ from giskard_checks import core, interactions, testing, checks
 - `core` → `Check`, `CheckResult`, `CheckSeverity`, `Interaction`
 - `interactions` → `StructuredInteraction`, `ChatInteraction`
 - `testing` → `TestCase`, `runner` (via module import)
-- `checks` → `from_fn`, `FnCheck`, and `StringMatchingCheck` (via submodule)
+- `checks` → `from_fn`, `FnCheck`, and `StringMatchingCheck` (re-export from fn)
 
 ### Contributing notes
 

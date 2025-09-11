@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from giskard_checks.core import Check, CheckResult, CheckSeverity, CheckStatus
+from giskard_checks.core import Check, CheckResult, CheckStatus
 from giskard_checks.interactions import StructuredInteraction
 from giskard_checks.testing.testcase import TestCase
 
@@ -17,18 +17,10 @@ class ContainsCheck(Check[StructuredInteraction[str, str]]):
     async def run(self, interaction: StructuredInteraction[str, str]) -> CheckResult:
         if interaction.input is not None and self.needle in interaction.input:
             return CheckResult.success(
-                kind=self.kind,
-                name=self.name,
-                description=self.description,
                 message=f"input contains '{self.needle}'",
-                severity=CheckSeverity.INFO,
             )
         return CheckResult.failure(
-            kind=self.kind,
-            name=self.name,
-            description=self.description,
             message=f"input does not contain '{self.needle}'",
-            severity=CheckSeverity.ERROR,
         )
 
 
@@ -40,16 +32,10 @@ class OutputEqualsCheck(Check[StructuredInteraction[str, str]]):
     async def run(self, interaction: StructuredInteraction[str, str]) -> CheckResult:
         if interaction.output == self.expected:
             return CheckResult.success(
-                kind=self.kind,
-                name=self.name,
                 message="output matched",
-                severity=CheckSeverity.INFO,
             )
         return CheckResult.failure(
-            kind=self.kind,
-            name=self.name,
             message=f"expected '{self.expected}', got '{interaction.output}'",
-            severity=CheckSeverity.ERROR,
         )
 
 

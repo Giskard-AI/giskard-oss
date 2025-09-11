@@ -4,7 +4,7 @@ import json
 
 from counterpoint import Message
 
-from giskard_checks.checks.chat import StringMatchingCheck
+from giskard_checks.checks import StringMatchingCheck
 from giskard_checks.core import CheckStatus
 from giskard_checks.interactions import ChatInteraction
 from giskard_checks.testing.testcase import TestCase
@@ -21,14 +21,12 @@ async def test_chat_interaction_roundtrip_serialization_and_execution():
     chk_pass = StringMatchingCheck(
         name="contains_hello",
         content="Hello",
-        role="assistant",
-        case_sensitive=True,
+        key="output[*].content",
     )
     chk_fail = StringMatchingCheck(
         name="contains_bye",
         content="bye",
-        role="assistant",
-        case_sensitive=False,
+        key="output[*].content",
     )
 
     tc = TestCase(
@@ -59,11 +57,9 @@ async def test_chat_interaction_roundtrip_serialization_and_execution():
     assert isinstance(tc2.checks[0], StringMatchingCheck)
     assert isinstance(tc2.checks[1], StringMatchingCheck)
     assert getattr(tc2.checks[0], "content") == "Hello"
-    assert getattr(tc2.checks[0], "role") == "assistant"
-    assert getattr(tc2.checks[0], "case_sensitive") is True
+    assert getattr(tc2.checks[0], "key") == "output[*].content"
     assert getattr(tc2.checks[1], "content") == "bye"
-    assert getattr(tc2.checks[1], "role") == "assistant"
-    assert getattr(tc2.checks[1], "case_sensitive") is False
+    assert getattr(tc2.checks[1], "key") == "output[*].content"
 
     # Run after deserialization and compare outcomes
     after = await tc2.run()

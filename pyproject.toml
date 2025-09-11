@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "counterpoint>=0.1.2",
+    "jsonpath-ng>=1.7.0",
     "pydantic~=2.11.7",
 ]
 
