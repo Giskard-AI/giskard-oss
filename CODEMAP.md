@@ -28,7 +28,8 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 │  ├─ checks/                  # Built-in checks and helpers
 │  │  ├─ __init__.py
 │  │  ├─ fn.py                 # from_fn and FnCheck
-│  │  └─ chat.py               # Chat utilities (StringMatchingCheck lives in checks/fn.py)
+│  │  ├─ equality.py           # EqualityCheck
+│  │  └─ string_matching.py    # StringMatchingCheck
 │  └─ testing/                 # TestCase, TestRunner, samples
 │     ├─ __init__.py
 │     ├─ testcase.py           # TestCase model + serialization helpers
@@ -64,7 +65,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - Turn a callable into a `Check`. The callable may be sync/async and return `bool` or `CheckResult`.
   - `FnCheck` is not serializable (function excluded) and is intended for programmatic/test use.
 
-- StringMatchingCheck (in `checks/fn.py`)
+- StringMatchingCheck (in `checks/string_matching.py`)
   - KIND: `string_matching`.
   - Generic substring matcher with optional `key` (JSONPath) and `match_all`.
 
@@ -138,10 +139,10 @@ Import namespaces re-exported by `giskard_checks.__init__`:
 from giskard_checks import core, interactions, testing, checks
 ```
 
-- `core` → `Check`, `CheckResult`, `CheckSeverity`, `Interaction`
+- `core` → `Check`, `CheckResult`, `Interaction`
 - `interactions` → `StructuredInteraction`
 - `testing` → `TestCase`, `runner` (via module import)
-- `checks` → `from_fn`, `FnCheck`, and `StringMatchingCheck` (re-export from fn)
+- `checks` → `from_fn`, `FnCheck`, `StringMatchingCheck`, and `EqualityCheck`
 
 ### Contributing notes
 

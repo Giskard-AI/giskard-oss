@@ -16,7 +16,6 @@ This module defines the foundational types used by the library to represent
 checks, their execution results, and related enums. The key abstractions are:
 
 - `CheckStatus`: outcome categories for a single check execution
-- `CheckSeverity`: importance of a check when it fails
 - `CheckResult`: immutable record describing the outcome of a check
 - `Check`: generic base class to implement concrete checks
 
@@ -36,15 +35,6 @@ class CheckStatus(str, Enum):
     FAIL = "fail"
     ERROR = "error"
     SKIP = "skip"
-
-
-class CheckSeverity(str, Enum):
-    """Represents how important a check is when it fails."""
-
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
 
 
 class Metric(BaseModel):
@@ -85,9 +75,8 @@ class CheckResult(BaseModel):
     ) -> "CheckResult":
         """Construct a successful result.
 
-        Parameters mirror the fields on the model. `severity` defaults to
-        `INFO` for a success, and `details` is normalized to an empty map if
-        not provided.
+        Parameters mirror the fields on the model. `details` is normalized to
+        an empty map if not provided.
         """
         return cls(
             status=CheckStatus.PASS,

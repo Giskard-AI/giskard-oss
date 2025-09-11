@@ -1,8 +1,7 @@
 from counterpoint import Message
 from pydantic import BaseModel
 
-from giskard_checks.checks import StringMatchingCheck
-from giskard_checks.checks.fn import EqualityCheck, FnCheck
+from giskard_checks.checks import EqualityCheck, StringMatchingCheck
 from giskard_checks.interactions import StructuredInteraction
 from giskard_checks.testing import TestCase
 
