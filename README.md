@@ -89,7 +89,7 @@ Interactions
 
 - `giskard_checks.interactions.StructuredInteraction[In, Out]`: specialization
   of `Interaction` for structured inputs/outputs.
- - `giskard_checks.interactions.ChatInteraction`: specialization for chat-style
+ - `giskard_checks.interactions.StructuredInteraction`: specialization for typed inputs/outputs (use for chat transcripts as well)
   interactions using `counterpoint.Message` as items.
 
 Testing
@@ -111,16 +111,16 @@ Usage Notes
 Chat quickstart
 ---------------
 
-Evaluate chat transcripts using `ChatInteraction` and the built-in
+Evaluate chat transcripts using `StructuredInteraction` and the built-in
 `StringMatchingCheck`:
 
 ```python
 from counterpoint import Message
-from giskard_checks.interactions import ChatInteraction
+from giskard_checks.interactions import StructuredInteraction
 from giskard_checks.checks import StringMatchingCheck
 from giskard_checks.testing import TestCase
 
-interaction = ChatInteraction(
+interaction = StructuredInteraction(
     input=[Message(role="user", content="Say hello")],
     output=[Message(role="assistant", content="Hello world!")],
 )
@@ -141,7 +141,7 @@ assert result.passed
 
 Notes:
 
-- `ChatInteraction` uses `counterpoint.Message` for messages; the `counterpoint`
+- Chat interactions use `counterpoint.Message` for messages; the `counterpoint`
   package is declared as a dependency.
 - `StringMatchingCheck` searches strings selected by `key` (JSONPath). When the
   key resolves to a list, set `match_all=True` to require all items contain the

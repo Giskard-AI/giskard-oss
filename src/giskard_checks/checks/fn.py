@@ -4,10 +4,10 @@ import inspect
 from collections.abc import Awaitable, Iterable
 from typing import Any, Callable, ClassVar, TypeVar
 
-from jsonpath_ng import parse
 from pydantic import Field
 
 from giskard_checks.core.check import Check, CheckResult, CheckSeverity
+from giskard_checks.core.extraction import Extractor, JsonPathExtractor
 from giskard_checks.core.interactions import Interaction
 
 """Function-backed check implementation.
@@ -28,28 +28,34 @@ class EqualityCheck(Check[InteractionT]):
     KIND = "equality"
 
     expected: Any
-    # TODO: move to base check
+    # Optional new extractor strategy (preferred)
+    extractor: Extractor | None = Field(
+        default=None, description="Optional extractor for selecting values"
+    )
+    # Backcompat convenience to select values via JSONPath when no extractor is provided
     key: str | None = Field(default=None, description="JSON path to the key to check")
     severity: CheckSeverity = CheckSeverity.ERROR
 
     async def run(self, interaction: InteractionT) -> CheckResult:
-        result = None
-
-        if self.key:
-            jsonpath_expr = parse(self.key)
-            result = jsonpath_expr.find(interaction.model_dump())
+        # Determine values to compare
+        if self.extractor is not None:
+            values = self.extractor.extract(interaction)
+        elif self.key:
+            values = JsonPathExtractor(key=self.key).extract(interaction)
         else:
-            result = interaction.output
+            # Default to selecting the output field via JSONPath
+            values = JsonPathExtractor(key="output").extract(interaction)
 
-        if result:
+        matched = any(value == self.expected for value in values)
+        if matched:
             return CheckResult.success(
                 message=f"Input is equal to {self.expected}", details={}
             )
 
         return CheckResult.failure(
-            message=f"Input is not equal to {self.expected}, got {result}",
+            message=f"Input is not equal to {self.expected}",
             details={
-                "actual": result,
+                "actual": values,
                 "expected": self.expected,
                 "key": self.key,
             },
@@ -64,34 +70,28 @@ class StringMatchingCheck(Check[InteractionT]):
 
     # TODO: case_sensitive: bool = Field(default=True, description="Whether the string matching should be case sensitive")
 
-    # TODO: extract key and match_all to base check (rename match_all to something generic)
+    # Optional new extractor strategy (preferred)
+    extractor: Extractor | None = Field(
+        default=None, description="Optional extractor for selecting values"
+    )
+    # Backcompat convenience to select values via JSONPath when no extractor is provided
     key: str | None = Field(default=None, description="JSON path to the key to check")
     match_all: bool = Field(
         default=False, description="Whether all strings should match"
     )
 
     async def run(self, interaction: InteractionT) -> CheckResult:
-        result = None
-
-        # TODO: Extract this and remove DataInContext wrapper
-        if self.key:
-            jsonpath_expr = parse(self.key)
-            result = jsonpath_expr.find(interaction.model_dump())
+        # Extract values using configured extractor or fall back to JSONPath/raw output
+        if self.extractor is not None:
+            values = self.extractor.extract(interaction)
+        elif self.key:
+            values = JsonPathExtractor(key=self.key).extract(interaction)
         else:
-            result = interaction.output
-
-        if isinstance(result, str):
-            items: list[Any] = [result]
-        elif isinstance(result, Iterable):
-            items = list(result)
-        else:
-            return CheckResult.failure(
-                message=f"Result is not a string or list, got {type(result)}",
-                details={},
-            )
+            # Default to selecting the output field via JSONPath
+            values = JsonPathExtractor(key="output").extract(interaction)
 
         texts: list[str] = []
-        for item in items:
+        for item in values:
             value = getattr(item, "value", item)
             texts.append(value if isinstance(value, str) else str(value))
 

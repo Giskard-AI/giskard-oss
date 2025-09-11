@@ -24,7 +24,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 │  ├─ interactions/            # Interaction specializations
 │  │  ├─ __init__.py
 │  │  ├─ structured.py         # StructuredInteraction[In, Out]
-│  │  └─ chat.py               # ChatInteraction using counterpoint.Message
+│  │  └─ structured.py         # StructuredInteraction
 │  ├─ checks/                  # Built-in checks and helpers
 │  │  ├─ __init__.py
 │  │  ├─ fn.py                 # from_fn and FnCheck
@@ -42,7 +42,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 
 - Interaction[InputT, OutputT] (in `core/interactions.py`)
   - Container for an input, optional output, and optional metadata.
-  - Specialized as `StructuredInteraction[In, Out]` and `ChatInteraction`.
+  - Specialized as `StructuredInteraction[In, Out]`.
 
 - Check[InteractionT] (in `core/check.py`)
   - Base class to implement concrete checks. Subclasses must define a class-level `KIND: str`.
@@ -73,7 +73,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 - StructuredInteraction[In, Out] (in `interactions/structured.py`)
   - Typed interaction for structured payloads.
 
-- ChatInteraction (in `interactions/chat.py`)
+- ChatInteraction (removed)
   - Specialization of `StructuredInteraction[list[Message], list[Message]]` using `counterpoint.Message`.
 
 ### Serialization model
@@ -90,7 +90,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 ### Typical workflows
 
 - Define an interaction
-  - Use `StructuredInteraction` for typed input/output models (Pydantic `BaseModel` recommended) or `ChatInteraction` for chat transcripts.
+  - Use `StructuredInteraction` for typed input/output models (Pydantic `BaseModel` recommended) including chat transcripts.
 
 - Author checks
   - Implement a concrete `Check` subclass with a unique `KIND`, or use `from_fn` for quick function-based checks.
@@ -139,7 +139,7 @@ from giskard_checks import core, interactions, testing, checks
 ```
 
 - `core` → `Check`, `CheckResult`, `CheckSeverity`, `Interaction`
-- `interactions` → `StructuredInteraction`, `ChatInteraction`
+- `interactions` → `StructuredInteraction`
 - `testing` → `TestCase`, `runner` (via module import)
 - `checks` → `from_fn`, `FnCheck`, and `StringMatchingCheck` (re-export from fn)
 

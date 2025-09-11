@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from giskard_checks.checks import StringMatchingCheck
 from giskard_checks.checks.fn import EqualityCheck, FnCheck
-from giskard_checks.interactions import ChatInteraction, StructuredInteraction
+from giskard_checks.interactions import StructuredInteraction
 from giskard_checks.testing import TestCase
 
 
@@ -75,7 +75,7 @@ async def test_chat_bot_context_relevance():
             content="Paris is the capital of France and has a population of 2.1 million.",
         ),
     ]
-    chat_interaction = ChatInteraction(
+    chat_interaction = StructuredInteraction(
         input=conversation,
         output=answer,
         metadata={
