@@ -27,7 +27,6 @@ class StringMatchingCheck(ExtractionCheck[InteractionT]):
         if "match_all" in data:
             self.evaluation_mode = "all" if data["match_all"] else "any"
 
-    # pyright: ignore-next-line[reportIncompatibleMethodOverride]
     def _evaluate_values(self, values: list[Any]) -> bool:
         """Check if the content string is contained in any of the values."""
         # Convert values to strings for comparison
