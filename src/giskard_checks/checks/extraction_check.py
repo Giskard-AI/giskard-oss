@@ -49,7 +49,7 @@ class ExtractionCheck(Check[InteractionT], ABC):
             return JsonPathExtractor(key="output").extract(interaction)
 
     @abstractmethod
-    def _evaluate_values(self, value: Any) -> bool:
+    def _evaluate_value(self, value: Any) -> bool:
         """Evaluate a single value according to the check's specific logic.
 
         Subclasses must implement this method to define their evaluation criteria.
@@ -99,13 +99,13 @@ class ExtractionCheck(Check[InteractionT], ABC):
         # Evaluate values based on evaluation mode
         if self.evaluation_mode == "all":
             # For "all" mode, we need all values to pass the evaluation
-            passed = all(self._evaluate_values(value) for value in values)
+            passed = all(self._evaluate_value(value) for value in values)
         elif self.evaluation_mode == "none":
             # For "none" mode, we need no values to pass the evaluation
-            passed = not any(self._evaluate_values(value) for value in values)
+            passed = not any(self._evaluate_value(value) for value in values)
         else:  # evaluation_mode == "any"
             # For "any" mode, we need at least one value to pass
-            passed = any(self._evaluate_values(value) for value in values)
+            passed = any(self._evaluate_value(value) for value in values)
 
         if passed:
             return self._create_success_result(values)

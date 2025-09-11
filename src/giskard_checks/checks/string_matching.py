@@ -4,7 +4,7 @@ from typing import Any, ClassVar, TypeVar
 
 from pydantic import Field
 
-from giskard_checks.checks.value_based import ExtractionCheck
+from giskard_checks.checks.extraction_check import ExtractionCheck
 from giskard_checks.core.check import CheckResult
 from giskard_checks.core.interactions import Interaction
 
@@ -28,7 +28,7 @@ class StringMatchingCheck(ExtractionCheck[InteractionT]):
 
     content: str = Field(..., description="The string to match in the output")
 
-    def _evaluate_values(self, value: Any) -> bool:
+    def _evaluate_value(self, value: Any) -> bool:
         """Check if the content string is contained in the value."""
         # Convert value to string for comparison
         item_value = getattr(value, "value", value)

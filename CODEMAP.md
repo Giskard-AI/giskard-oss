@@ -20,16 +20,17 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 │  ├─ core/                    # Core abstractions: Check, CheckResult, enums
 │  │  ├─ __init__.py
 │  │  ├─ check.py
+│  │  ├─ extraction.py         # Extractor, JsonPathExtractor
 │  │  └─ interactions.py
 │  ├─ interactions/            # Interaction specializations
 │  │  ├─ __init__.py
-│  │  ├─ structured.py         # StructuredInteraction[In, Out]
-│  │  └─ structured.py         # StructuredInteraction
+│  │  └─ structured.py         # StructuredInteraction[In, Out]
 │  ├─ checks/                  # Built-in checks and helpers
 │  │  ├─ __init__.py
 │  │  ├─ fn.py                 # from_fn and FnCheck
 │  │  ├─ equality.py           # EqualityCheck
-│  │  └─ string_matching.py    # StringMatchingCheck
+│  │  ├─ string_matching.py    # StringMatchingCheck
+│  │  └─ extraction_check.py   # ExtractionCheck
 │  └─ testing/                 # TestCase, TestRunner, samples
 │     ├─ __init__.py
 │     ├─ testcase.py           # TestCase model + serialization helpers
@@ -55,6 +56,10 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - Convenience constructors: `success`, `failure`, `skip`, `error`.
   - Convenience booleans: `passed`, `failed`, `errored`, `skipped`.
 
+- Extractor and JsonPathExtractor (in `core/extraction.py`)
+  - Base classes for extracting values from interactions.
+  - `JsonPathExtractor` uses JSONPath expressions to extract specific fields from interaction data.
+
 - TestCase and TestRunner (in `testing/`)
   - `TestCase` bundles an `Interaction` and a sequence of `Check`s and exposes `await run()`.
   - `TestRunner` executes checks sequentially, measures per-check/total durations, and returns a `TestCaseResult` aggregate (immutable, with .passed/.failed/.errored/.skipped).
@@ -68,6 +73,10 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 - StringMatchingCheck (in `checks/string_matching.py`)
   - KIND: `string_matching`.
   - Generic substring matcher with optional `key` (JSONPath) and `evaluation_mode`.
+
+- ExtractionCheck (in `checks/extraction_check.py`)
+  - Abstract base class for checks that extract values from interactions and evaluate them.
+  - Provides common functionality for value extraction and evaluation patterns.
 
 ### Interaction specializations
 
@@ -142,7 +151,7 @@ from giskard_checks import core, interactions, testing, checks
 - `core` → `Check`, `CheckResult`, `Interaction`
 - `interactions` → `StructuredInteraction`
 - `testing` → `TestCase`, `runner` (via module import)
-- `checks` → `from_fn`, `FnCheck`, `StringMatchingCheck`, `EqualityCheck`, and `ExtractionCheck`
+- `checks` → `from_fn`, `FnCheck`, `StringMatchingCheck`, `EqualityCheck`, `ExtractionCheck`
 
 ### Contributing notes
 
