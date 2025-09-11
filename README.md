@@ -83,13 +83,14 @@ Checks
   turns a callable into a check. The callable can return a `bool` or a
   `CheckResult` and may be async.
  - `giskard_checks.checks.StringMatchingCheck`: generic content matcher with optional
-   JSONPath `key` selection and optional `match_all`.
+   JSONPath `key` selection and `evaluation_mode` parameter.
+ - `giskard_checks.checks.EqualityCheck`: value equality checker with optional
+   JSONPath `key` selection.
 
 Interactions
 
 - `giskard_checks.interactions.StructuredInteraction[In, Out]`: specialization
-  of `Interaction` for structured inputs/outputs.
- - `giskard_checks.interactions.StructuredInteraction`: specialization for typed inputs/outputs (use for chat transcripts as well)
+  of `Interaction` for structured inputs/outputs (use for chat transcripts as well)
   interactions using `counterpoint.Message` as items.
 
 Testing
@@ -144,7 +145,7 @@ Notes:
 - Chat interactions use `counterpoint.Message` for messages; the `counterpoint`
   package is declared as a dependency.
 - `StringMatchingCheck` searches strings selected by `key` (JSONPath). When the
-  key resolves to a list, set `match_all=True` to require all items contain the
+  key resolves to a list, set `evaluation_mode="all"` to require all items contain the
   substring; otherwise any match passes.
 
 Development

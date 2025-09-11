@@ -38,6 +38,20 @@ class CheckStatus(str, Enum):
 
 
 class Metric(BaseModel):
+    """A named metric value captured during check execution.
+
+    Metrics provide a way to attach quantitative measurements to check results,
+    such as performance timings, confidence scores, or other numerical values
+    that provide additional context about the check execution.
+
+    Attributes
+    ----------
+    name : str
+        The name/identifier of the metric
+    value : float
+        The numerical value of the metric
+    """
+
     name: str
     value: float
 

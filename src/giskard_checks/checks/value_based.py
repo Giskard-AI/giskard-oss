@@ -27,9 +27,9 @@ class ExtractionCheck(Check[InteractionT], ABC):
     # Backcompat convenience to select values via JSONPath when no extractor is provided
     key: str | None = Field(default=None, description="JSON path to the key to check")
     # Evaluation mode - determines how multiple values are evaluated
-    evaluation_mode: Literal["any", "all"] = Field(
+    evaluation_mode: Literal["any", "all", "none"] = Field(
         default="any",
-        description="How to evaluate multiple values: 'any' (at least one must pass) or 'all' (all must pass)",
+        description="How to evaluate multiple values: 'any' (at least one must pass), 'all' (all must pass), or 'none' (none must pass)",
     )
 
     def _extract_values(self, interaction: InteractionT) -> list[Any]:
@@ -100,6 +100,9 @@ class ExtractionCheck(Check[InteractionT], ABC):
         if self.evaluation_mode == "all":
             # For "all" mode, we need all values to pass the evaluation
             passed = all(self._evaluate_values([value]) for value in values)
+        elif self.evaluation_mode == "none":
+            # For "none" mode, we need no values to pass the evaluation
+            passed = not any(self._evaluate_values([value]) for value in values)
         else:  # evaluation_mode == "any"
             # For "any" mode, we need at least one value to pass
             passed = any(self._evaluate_values([value]) for value in values)

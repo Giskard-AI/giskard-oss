@@ -50,7 +50,17 @@ class TestCaseResult(BaseModel):
 
 
 class TestRunner:
-    """Execute checks for a `TestCase` and produce a `TestCaseResult`."""
+    """Execute checks for a `TestCase` and produce a `TestCaseResult`.
+
+    The TestRunner is responsible for:
+    - Executing checks sequentially against a test case's interaction
+    - Capturing exceptions and converting them to error results
+    - Measuring execution durations for both individual checks and the total test case
+    - Aggregating all results into an immutable TestCaseResult
+
+    The runner automatically adds timing and metadata to each check result's details,
+    including the check's kind, name, and description for observability.
+    """
 
     async def run(self, tc: "TestCase[Any]") -> TestCaseResult:
         results: list[CheckResult] = []

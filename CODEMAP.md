@@ -67,15 +67,15 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 
 - StringMatchingCheck (in `checks/string_matching.py`)
   - KIND: `string_matching`.
-  - Generic substring matcher with optional `key` (JSONPath) and `match_all`.
+  - Generic substring matcher with optional `key` (JSONPath) and `evaluation_mode`.
 
 ### Interaction specializations
 
 - StructuredInteraction[In, Out] (in `interactions/structured.py`)
   - Typed interaction for structured payloads.
 
-- ChatInteraction (removed)
-  - Specialization of `StructuredInteraction[list[Message], list[Message]]` using `counterpoint.Message`.
+- Chat interactions
+  - Use `StructuredInteraction[list[Message], list[Message]]` with `counterpoint.Message` for chat transcripts.
 
 ### Serialization model
 
@@ -127,7 +127,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 ### Testing overview
 
 - Integration tests under `tests/integration` cover:
-  - End-to-end chat serialization (`ChatInteraction`, `StringMatchingCheck`).
+  - End-to-end chat serialization using `StructuredInteraction` with `StringMatchingCheck`.
   - Structured moderation example using `StructuredInteraction`.
   - TestCase serialization/deserialization round-trips including lazy import behavior.
 
@@ -142,7 +142,7 @@ from giskard_checks import core, interactions, testing, checks
 - `core` → `Check`, `CheckResult`, `Interaction`
 - `interactions` → `StructuredInteraction`
 - `testing` → `TestCase`, `runner` (via module import)
-- `checks` → `from_fn`, `FnCheck`, `StringMatchingCheck`, and `EqualityCheck`
+- `checks` → `from_fn`, `FnCheck`, `StringMatchingCheck`, `EqualityCheck`, and `ExtractionCheck`
 
 ### Contributing notes
 

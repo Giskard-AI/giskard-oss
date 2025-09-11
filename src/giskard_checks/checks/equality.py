@@ -12,6 +12,18 @@ InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
 
 
 class EqualityCheck(ExtractionCheck[InteractionT]):
+    """Check that validates if extracted values equal an expected value.
+
+    This check extracts values from an interaction and compares them against a
+    specified expected value. It supports both 'any' and 'all' evaluation modes
+    for handling multiple extracted values.
+
+    Attributes
+    ----------
+    expected : Any
+        The expected value to compare against the extracted values
+    """
+
     KIND: ClassVar[str | None] = "equality"
 
     expected: Any = Field(..., description="The expected value to compare against")
