@@ -49,22 +49,22 @@ class ExtractionCheck(Check[InteractionT], ABC):
             return JsonPathExtractor(key="output").extract(interaction)
 
     @abstractmethod
-    def _evaluate_values(self, values: list[Any]) -> bool:
-        """Evaluate the extracted values according to the check's specific logic.
+    def _evaluate_values(self, value: Any) -> bool:
+        """Evaluate a single value according to the check's specific logic.
 
         Subclasses must implement this method to define their evaluation criteria.
-        The method receives a list of extracted values and should return True if
-        the check passes, False otherwise.
+        The method receives a single extracted value and should return True if
+        the check passes for that value, False otherwise.
 
         Parameters
         ----------
-        values : list[Any]
-            The extracted values to evaluate
+        value : Any
+            The extracted value to evaluate
 
         Returns
         -------
         bool
-            True if the check passes, False otherwise
+            True if the check passes for this value, False otherwise
         """
         pass
 
@@ -99,13 +99,13 @@ class ExtractionCheck(Check[InteractionT], ABC):
         # Evaluate values based on evaluation mode
         if self.evaluation_mode == "all":
             # For "all" mode, we need all values to pass the evaluation
-            passed = all(self._evaluate_values([value]) for value in values)
+            passed = all(self._evaluate_values(value) for value in values)
         elif self.evaluation_mode == "none":
             # For "none" mode, we need no values to pass the evaluation
-            passed = not any(self._evaluate_values([value]) for value in values)
+            passed = not any(self._evaluate_values(value) for value in values)
         else:  # evaluation_mode == "any"
             # For "any" mode, we need at least one value to pass
-            passed = any(self._evaluate_values([value]) for value in values)
+            passed = any(self._evaluate_values(value) for value in values)
 
         if passed:
             return self._create_success_result(values)

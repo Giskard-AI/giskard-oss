@@ -28,9 +28,9 @@ class EqualityCheck(ExtractionCheck[InteractionT]):
 
     expected: Any = Field(..., description="The expected value to compare against")
 
-    def _evaluate_values(self, values: list[Any]) -> bool:
-        """Check if any of the values equals the expected value."""
-        return any(value == self.expected for value in values)
+    def _evaluate_values(self, value: Any) -> bool:
+        """Check if the value equals the expected value."""
+        return value == self.expected
 
     def _create_success_result(self, values: list[Any]) -> CheckResult:
         """Create a success result for equality check."""

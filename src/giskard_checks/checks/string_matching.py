@@ -28,15 +28,13 @@ class StringMatchingCheck(ExtractionCheck[InteractionT]):
 
     content: str = Field(..., description="The string to match in the output")
 
-    def _evaluate_values(self, values: list[Any]) -> bool:
-        """Check if the content string is contained in any of the values."""
-        # Convert values to strings for comparison
-        texts: list[str] = []
-        for item in values:
-            value = getattr(item, "value", item)
-            texts.append(value if isinstance(value, str) else str(value))
+    def _evaluate_values(self, value: Any) -> bool:
+        """Check if the content string is contained in the value."""
+        # Convert value to string for comparison
+        item_value = getattr(value, "value", value)
+        text = item_value if isinstance(item_value, str) else str(item_value)
 
-        return any(self.content in text for text in texts)
+        return self.content in text
 
     def _create_success_result(self, values: list[Any]) -> CheckResult:
         """Create a success result for string matching check."""
