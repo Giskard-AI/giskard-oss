@@ -69,7 +69,7 @@ class FnCheck(Check[InteractionT]):
             )
 
         raise TypeError(
-            "from_fn callable must return bool or CheckResult (or awaitable thereof)"
+            f"from_fn callable must return bool or CheckResult (or awaitable thereof), but got {type(result).__name__}: {result}"
         )
 
 

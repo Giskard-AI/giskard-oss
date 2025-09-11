@@ -73,8 +73,14 @@ class TestRunner:
                 res = await chk.run(tc.interaction)
             except Exception as e:
                 res = CheckResult.error(
-                    message=str(e),
-                    details={"traceback": traceback.format_exc()},
+                    message=f"Check '{chk.name or chk.kind}' failed with error: {str(e)}",
+                    details={
+                        "traceback": traceback.format_exc(),
+                        "check_name": chk.name,
+                        "check_kind": chk.kind,
+                        "check_description": chk.description,
+                        "exception_type": type(e).__name__,
+                    },
                 )
 
             # Update the result with the duration in details for observability

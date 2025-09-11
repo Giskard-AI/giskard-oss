@@ -93,7 +93,7 @@ async def test_single_error_fncheck():
     assert len(result.results) == 1
     r = result.results[0]
     assert r.status == CheckStatus.ERROR
-    assert r.message == "boom"
+    assert r.message == "Check 'boom' failed with error: boom"
     assert (
         isinstance(r.details.get("traceback"), str)
         and "RuntimeError" in r.details["traceback"]

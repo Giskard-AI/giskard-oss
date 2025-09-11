@@ -35,16 +35,23 @@ class EqualityCheck(ExtractionCheck[InteractionT]):
     def _create_success_result(self, values: list[Any]) -> CheckResult:
         """Create a success result for equality check."""
         return CheckResult.success(
-            message=f"Input is equal to {self.expected}", details={}
+            message=f"Extracted values match expected value: {self.expected}",
+            details={
+                "matched_values": values,
+                "expected": self.expected,
+                "key": self.key,
+                "evaluation_mode": self.evaluation_mode,
+            },
         )
 
     def _create_failure_result(self, values: list[Any]) -> CheckResult:
         """Create a failure result for equality check."""
         return CheckResult.failure(
-            message=f"Input is not equal to {self.expected}",
+            message=f"Extracted values do not match expected value: {self.expected}",
             details={
-                "actual": values,
+                "actual_values": values,
                 "expected": self.expected,
                 "key": self.key,
+                "evaluation_mode": self.evaluation_mode,
             },
         )

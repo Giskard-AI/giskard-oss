@@ -38,8 +38,24 @@ class StringMatchingCheck(ExtractionCheck[InteractionT]):
 
     def _create_success_result(self, values: list[Any]) -> CheckResult:
         """Create a success result for string matching check."""
-        return CheckResult.success(message=f"String matching succeeded", details={})
+        return CheckResult.success(
+            message=f"String '{self.content}' found in extracted values",
+            details={
+                "matched_values": values,
+                "content": self.content,
+                "key": self.key,
+                "evaluation_mode": self.evaluation_mode,
+            },
+        )
 
     def _create_failure_result(self, values: list[Any]) -> CheckResult:
         """Create a failure result for string matching check."""
-        return CheckResult.failure(message=f"String matching failed", details={})
+        return CheckResult.failure(
+            message=f"String '{self.content}' not found in extracted values",
+            details={
+                "searched_values": values,
+                "content": self.content,
+                "key": self.key,
+                "evaluation_mode": self.evaluation_mode,
+            },
+        )
