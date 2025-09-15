@@ -114,9 +114,14 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 - Linting: Ruff (`E`, `W`, `I`; line length E501 ignored).
 - Type checking: Pyright, `recommended` mode.
 - Testing: pytest with `asyncio_mode = auto`.
-- Commands (via `uv`):
-  - `uv run pytest -q`
-  - `uv run basedpyright`
+- Development workflow: Makefile with common commands (see `make help` for full list):
+  - `make setup` - Complete development setup (install deps + tools)
+  - `make all` - Format, check, and test
+  - `make test` - Run all tests
+  - `make lint` - Run linting checks
+  - `make format` - Format code with ruff
+  - `make check` - Run all checks (lint, format, compatibility)
+  - `make ci` - Run the same checks as CI
 
 ### Environment knobs
 

@@ -17,9 +17,14 @@ alwaysApply: false
 - Type checking: Pyright with `typeCheckingMode = "recommended"`.
 - Testing: pytest with `asyncio_mode = "auto"` and `pythonpath = ["src"]`.
 - Async tests: include `pytest-asyncio` where needed.
-- Prefer `uv` to run commands, e.g.:
-  - `uv run pytest -q`
-  - `uv run basedpyright`
+- **Use Makefile commands for all development tasks** (see `make help` for full list):
+  - `make setup` - Complete development setup (install deps + tools)
+  - `make test` - Run all tests
+  - `make lint` - Run linting checks
+  - `make format` - Format code with ruff
+  - `make check` - Run all checks (lint, format, compatibility)
+  - `make all` - Format, check, and test
+  - `make ci` - Run the same checks as CI
 
 ## Imports and Naming
 - Prefer absolute imports within the `giskard_checks` package.
@@ -57,8 +62,9 @@ alwaysApply: false
 
 ## Documentation
 - Document all public APIs with concise docstrings (purpose, parameters, returns, errors).
-- Keep `README.md` examples accurate (async patterns, `uv` commands, imports).
+- Keep `README.md` examples accurate (async patterns, Makefile commands, imports).
 - Use comments to explain why non-obvious choices are made.
+- Reference Makefile commands in documentation instead of direct tool invocations.
 
 ## Dependencies
 - Declare runtime dependencies and Python version in `pyproject.toml`.

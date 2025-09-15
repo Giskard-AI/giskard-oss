@@ -148,14 +148,23 @@ Notes:
 Development
 -----------
 
-Run the test suite:
+This project uses a Makefile for common development tasks. Run `make help` to see all available commands.
+
+Quick start:
 
 ```bash
-uv run pytest -q
+make setup    # Complete development setup (install deps + tools)
+make all      # Format, check, and test
 ```
 
-Type checking:
+Common commands:
 
 ```bash
-uv run basedpyright
+make test     # Run all tests
+make lint     # Run linting checks
+make format   # Format code with ruff
+make check    # Run all checks (lint, format, compatibility)
+make ci       # Run the same checks as CI
 ```
+
+For more details, see the [Makefile](Makefile) or run `make help`.
