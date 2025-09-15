@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import json
 
-from counterpoint import Message
-
 from giskard_checks.checks import StringMatchingCheck
 from giskard_checks.core import CheckStatus
 from giskard_checks.interactions import StructuredInteraction
+from giskard_checks.testing._samples.message import Message
 from giskard_checks.testing.testcase import TestCase
 
 

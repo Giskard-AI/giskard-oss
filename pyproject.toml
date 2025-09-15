@@ -29,7 +29,6 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "counterpoint>=0.1.2",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
 ]
@@ -43,6 +42,3 @@ include = [
   "README.md",
   "pyproject.toml",
 ]
-
-[tool.uv.sources]
-counterpoint = { git = "ssh://git@github.com/Giskard-AI/counterpoint.git", tag="v0.1.2" }
