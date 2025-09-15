@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import ClassVar, Generic, TypeVar
 
 from giskard_checks.core import Interaction
 
@@ -40,3 +40,5 @@ class StructuredInteraction(Interaction[In, Out], Generic[In, Out]):
     ...     output=Output(sentiment="positive", score=0.8)
     ... )
     """
+
+    KIND: ClassVar[str | None] = "structured"

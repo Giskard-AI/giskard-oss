@@ -12,6 +12,7 @@ install: ## Install project dependencies
 install-tools: ## Install development tools
 	uv tool install ruff
 	uv tool install vermin
+	uv tool install basedpyright
 	uv tool install pre-commit --with pre-commit-uv
 
 sync: install ## Alias for install
@@ -37,6 +38,9 @@ check-format: ## Check if code is formatted correctly
 check-compat: ## Check Python 3.11 compatibility
 	uv tool run vermin --target=3.11- --no-tips --violations .
 
+typecheck: ## Run type checking with basedpyright
+	uv tool run basedpyright --level error .
+
 # Pre-commit targets
 pre-commit-install: ## Install pre-commit hooks
 	pre-commit install
@@ -45,7 +49,7 @@ pre-commit-run: ## Run pre-commit on all files
 	pre-commit run --all-files
 
 # Combined targets
-check: lint check-format check-compat ## Run all checks (lint, format, compatibility)
+check: lint check-format check-compat typecheck ## Run all checks (lint, format, compatibility, typecheck)
 
 all: format check test ## Format, check, and test
 

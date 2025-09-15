@@ -77,6 +77,14 @@ Core
 - `giskard_checks.core.CheckResult`: immutable result of a check execution with
   convenience boolean properties (`passed`, `failed`, `errored`, `skipped`).
 
+Registry and Serialization
+
+- `giskard_checks.core.Registry[T]`: generic registry for managing kinds and their associated classes.
+- `giskard_checks.core.UnknownKindError`: exception raised when attempting to deserialize an unregistered kind.
+- `giskard_checks.core.DuplicateKindError`: exception raised when attempting to register a kind that already exists.
+- `giskard_checks.core.list_registered_check_kinds()`: list all registered check kinds.
+- `giskard_checks.core.list_registered_interaction_kinds()`: list all registered interaction kinds.
+
 Checks
 
 - `giskard_checks.checks.from_fn(fn, ...)` → `Check`: convenience factory that
@@ -103,10 +111,197 @@ Usage Notes
 -----------
 
 - Define your own `Check` subclasses with a unique class-level `KIND` string.
+- All custom checks and interactions are automatically registered when their classes are imported.
+- Use `serialize()` and `deserialize()` methods for reliable serialization (replaces `to_dict`/`from_dict`).
 - You can customize result messages and attach additional context in `details`
   via `CheckResult` or by returning `bool` from `from_fn`.
 - Environment variable `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` controls
   whether duplicate `KIND`s raise (default: enabled).
+
+Registry and Serialization
+--------------------------
+
+The library uses an explicit registry system for serialization. Classes with a `KIND` attribute are automatically registered when imported:
+
+```python
+from giskard_checks.core import Check, Interaction
+from giskard_checks.testing import TestCase
+
+# Custom check with automatic registration
+class MyCustomCheck(Check[Interaction[str, str]]):
+    KIND = "my_custom_check"
+
+    async def run(self, interaction):
+        return self.success("Check passed")
+
+# Custom interaction with automatic registration
+class MyCustomInteraction(Interaction[str, str]):
+    KIND = "my_custom_interaction"
+
+# Serialize and deserialize test cases
+interaction = MyCustomInteraction(input="test", output="result")
+check = MyCustomCheck(name="test")
+testcase = TestCase(interaction=interaction, checks=[check], name="example")
+
+# Serialize to dict
+serialized = testcase.serialize()
+
+# Deserialize back (requires classes to be imported)
+restored = TestCase.deserialize(serialized)
+```
+
+**Important**: For deserialization to work, all custom classes must be imported before calling `deserialize()`. The registry only knows about classes that have been loaded into memory.
+
+Creating Custom Checks and Interactions
+----------------------------------------
+
+### Step 1: Define a Custom Check
+
+Create a new check by subclassing `Check` and defining a unique `KIND`:
+
+```python
+from giskard_checks.core import Check, CheckResult, Interaction
+
+class AdvancedSecurityCheck(Check[Interaction[str, str]]):
+    KIND = "advanced_security"  # Must be unique across all checks
+
+    threshold: float = 0.8  # Custom fields using Pydantic
+
+    async def run(self, interaction: Interaction[str, str]) -> CheckResult:
+        # Your check logic here
+        score = await some_security_analysis(interaction.output)
+
+        if score >= self.threshold:
+            return self.success(f"Security score {score:.2f} meets threshold")
+        else:
+            return self.failure(f"Security score {score:.2f} below threshold {self.threshold}")
+```
+
+### Step 2: Define a Custom Interaction
+
+Create a new interaction type for specialized data:
+
+```python
+from giskard_checks.core import Interaction
+from pydantic import BaseModel
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+    timestamp: float
+
+class ChatInteraction(Interaction[list[ChatMessage], str]):
+    KIND = "chat_conversation"  # Must be unique across all interactions
+
+    session_id: str
+    model_name: str
+
+# Usage
+messages = [
+    ChatMessage(role="user", content="Hello", timestamp=1234567890),
+    ChatMessage(role="assistant", content="Hi there!", timestamp=1234567891)
+]
+interaction = ChatInteraction(
+    input=messages,
+    output="Conversation summary",
+    session_id="session_123",
+    model_name="gpt-4"
+)
+```
+
+### Step 3: Verify Registration
+
+Check that your custom types are properly registered:
+
+```python
+from giskard_checks.core import list_registered_check_kinds, list_registered_interaction_kinds
+
+# Import your custom classes first
+from my_module import AdvancedSecurityCheck, ChatInteraction
+
+# Verify registration
+print("Registered check kinds:", list_registered_check_kinds())
+print("Registered interaction kinds:", list_registered_interaction_kinds())
+
+# Should include 'advanced_security' and 'chat_conversation'
+```
+
+### Step 4: Test Serialization
+
+Verify that serialization and deserialization work correctly:
+
+```python
+from giskard_checks.testing import TestCase
+
+# Create test case with custom types
+check = AdvancedSecurityCheck(name="security_test", threshold=0.7)
+testcase = TestCase(
+    interaction=interaction,
+    checks=[check],
+    name="custom_test"
+)
+
+# Test serialization round-trip
+serialized = testcase.serialize()
+restored = TestCase.deserialize(serialized)
+
+# Verify types are preserved
+assert isinstance(restored.interaction, ChatInteraction)
+assert isinstance(restored.checks[0], AdvancedSecurityCheck)
+assert restored.checks[0].threshold == 0.7
+```
+
+Troubleshooting Registry Issues
+-------------------------------
+
+### Common Errors and Solutions
+
+**UnknownKindError**: "Unknown check kind 'my_custom_check'"
+- **Cause**: Custom class not imported before deserialization
+- **Solution**: Import all custom classes before calling `deserialize()`
+```python
+# Import before deserializing
+from my_module import MyCustomCheck
+restored = TestCase.deserialize(data)
+```
+
+**DuplicateKindError**: "Duplicate kind 'my_check' detected"
+- **Cause**: Multiple classes define the same `KIND` value
+- **Solution**: Ensure each `KIND` is unique across your codebase
+```python
+# Bad - duplicate KIND
+class CheckA(Check): KIND = "my_check"
+class CheckB(Check): KIND = "my_check"  # Error!
+
+# Good - unique KINDs
+class CheckA(Check): KIND = "check_a"
+class CheckB(Check): KIND = "check_b"
+```
+
+**Missing KIND attribute**
+- **Cause**: Subclass doesn't define a `KIND` attribute
+- **Solution**: Add a unique `KIND` to your class
+```python
+class MyCheck(Check):
+    KIND = "my_unique_check"  # Required for registration
+```
+
+**Import order issues in tests**
+- **Cause**: Tests deserialize before importing custom classes
+- **Solution**: Import custom modules in test setup
+```python
+import pytest
+from my_module import MyCustomCheck, MyCustomInteraction  # Import first
+
+def test_custom_serialization():
+    # Now deserialization will work
+    restored = TestCase.deserialize(serialized_data)
+```
+
+### Environment Variables
+
+- `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS=1` (default): Raises `DuplicateKindError` on conflicts
+- `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS=0`: Warns and allows last-defined class to win
 
 Structured data quickstart
 ---------------------------
@@ -163,7 +358,8 @@ Common commands:
 make test     # Run all tests
 make lint     # Run linting checks
 make format   # Format code with ruff
-make check    # Run all checks (lint, format, compatibility)
+make typecheck # Run type checking with basedpyright
+make check    # Run all checks (lint, format, compatibility, typecheck)
 make ci       # Run the same checks as CI
 ```
 

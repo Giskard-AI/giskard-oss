@@ -74,24 +74,11 @@ class TestCase(BaseModel, Generic[InteractionT]):
     def serialize(self) -> dict[str, Any]:
         """Serialize the TestCase into a JSON-friendly dict.
 
-        The interaction is annotated with its fully-qualified class path to
-        allow generic deserialization. Checks include their computed `kind` so
-        they can be reconstructed via the global registry.
+        Uses the new registry-based serialization for both interactions and checks.
+        The `kind` field in each object enables registry-based deserialization.
         """
-        interaction_obj = self.interaction
-        interaction_cls = interaction_obj.__class__
-        interaction_payload = {
-            "__type__": f"{interaction_cls.__module__}.{interaction_cls.__name__}",
-            "data": interaction_obj.model_dump(),
-        }
-
-        checks_payload = [chk.model_dump() for chk in self.checks]
-
-        # Include class paths for checks to enable lazy import during deserialization
-        for i, chk in enumerate(self.checks):
-            checks_payload[i]["__type__"] = (
-                f"{chk.__class__.__module__}.{chk.__class__.__name__}"
-            )
+        interaction_payload = self.interaction.serialize()
+        checks_payload = [chk.serialize() for chk in self.checks]
 
         return {
             "name": self.name,
@@ -103,33 +90,22 @@ class TestCase(BaseModel, Generic[InteractionT]):
     def deserialize(cls, payload: dict[str, Any]) -> "TestCase[Any]":
         """Reconstruct a TestCase from a dict produced by `serialize()`.
 
-        Check classes can be lazily imported if the serialized payload contains
-        a `__type__` field for each check with the fully-qualified class path.
+        Uses the new registry-based deserialization for both interactions and checks.
         """
-        from importlib import import_module
-
         from giskard_checks.core.check import Check
 
         name = payload.get("name")
 
+        # Deserialize interaction using registry
         inter_info = payload.get("interaction")
-        if not isinstance(inter_info, dict) or "__type__" not in inter_info:
+        if not isinstance(inter_info, dict):
             raise ValueError("Invalid interaction serialization format")
-        type_path: str = inter_info["__type__"]
-        if "." not in type_path:
-            raise ValueError("Invalid interaction type path")
-        module_name, class_name = type_path.rsplit(".", 1)
-        mod = import_module(module_name)
-        inter_cls = getattr(mod, class_name)
+        interaction = Interaction.deserialize(inter_info)
 
-        if not issubclass(inter_cls, Interaction):
-            raise ValueError("Invalid interaction type")
-
-        interaction = inter_cls.model_validate(inter_info.get("data", {}))
-
+        # Deserialize checks using registry
         checks_data = payload.get("checks")
         if not isinstance(checks_data, list):
             raise ValueError("Invalid checks serialization format")
-        checks = [Check.from_dict(cd) for cd in checks_data]
+        checks = [Check.deserialize(cd) for cd in checks_data]
 
         return cls(name=name, interaction=interaction, checks=checks)  # pyright: ignore

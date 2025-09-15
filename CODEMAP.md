@@ -21,7 +21,8 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 │  │  ├─ __init__.py
 │  │  ├─ check.py
 │  │  ├─ extraction.py         # Extractor, JsonPathExtractor
-│  │  └─ interactions.py
+│  │  ├─ interactions.py
+│  │  └─ registry.py           # Registry infrastructure and exceptions
 │  ├─ interactions/            # Interaction specializations
 │  │  ├─ __init__.py
 │  │  └─ structured.py         # StructuredInteraction[In, Out]
@@ -50,6 +51,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - Base class to implement concrete checks. Subclasses must define a class-level `KIND: str`.
   - Key fields: `name`, `description`. `kind` is a computed field derived from `KIND`.
   - Global registry keyed by `KIND` to support deserialization and uniqueness validation.
+  - Automatic registration via `__init_subclass__` when classes are imported.
 
 - CheckResult (in `core/check.py`)
   - Immutable result model for a single check execution.
@@ -59,6 +61,12 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 - Extractor and JsonPathExtractor (in `core/extraction.py`)
   - Base classes for extracting values from interactions.
   - `JsonPathExtractor` uses JSONPath expressions to extract specific fields from interaction data.
+
+- Registry infrastructure (in `core/registry.py`)
+  - `Registry[T]`: Generic registry for managing kinds and their associated classes.
+  - `UnknownKindError`: Raised when attempting to deserialize an unregistered kind.
+  - `DuplicateKindError`: Raised when attempting to register a kind that already exists.
+  - Provides registration, retrieval, and listing utilities with clear error messages.
 
 - TestCase and TestRunner (in `testing/`)
   - `TestCase` bundles an `Interaction` and a sequence of `Check`s and exposes `await run()`.
@@ -86,14 +94,24 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 
 ### Serialization model
 
+The library uses an explicit registry-based serialization system that replaces dynamic imports with explicit registration patterns.
+
+- Registry-based approach
+  - All `Check` and `Interaction` subclasses with a `KIND` attribute are automatically registered via `__init_subclass__`.
+  - `serialize()` includes the computed `kind` field for registry-based deserialization.
+  - `deserialize()` uses the global registries to instantiate the correct classes.
+
 - Checks
   - Each `Check` exposes a computed `kind` used during serialization.
-  - Deserialization uses the global `KIND` registry and may lazily import classes when `__type__` is provided.
+  - Deserialization uses `Check.deserialize()` with registry lookup based on the `kind` field.
+
+- Interactions
+  - Each `Interaction` exposes a computed `kind` used during serialization.
+  - Deserialization uses `Interaction.deserialize()` with registry lookup based on the `kind` field.
 
 - TestCase
-  - `serialize()` embeds the fully-qualified class path of the `Interaction` in `interaction.__type__` and its data in `interaction.data`.
-  - Each check payload includes `__type__` for lazy import during deserialization.
-  - `deserialize()` reconstructs `Interaction` and checks using the above information.
+  - `serialize()` embeds the interaction and checks using their respective `serialize()` methods.
+  - `deserialize()` reconstructs `Interaction` and checks using their respective `deserialize()` methods.
 
 ### Typical workflows
 
@@ -112,7 +130,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 
 - Python >= 3.11 (enforced in `pyproject.toml`).
 - Linting: Ruff (`E`, `W`, `I`; line length E501 ignored).
-- Type checking: Pyright, `recommended` mode.
+- Type checking: basedpyright (Pyright), `recommended` mode.
 - Testing: pytest with `asyncio_mode = auto`.
 - Development workflow: Makefile with common commands (see `make help` for full list):
   - `make setup` - Complete development setup (install deps + tools)
@@ -120,7 +138,8 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - `make test` - Run all tests
   - `make lint` - Run linting checks
   - `make format` - Format code with ruff
-  - `make check` - Run all checks (lint, format, compatibility)
+  - `make typecheck` - Run type checking with basedpyright
+  - `make check` - Run all checks (lint, format, compatibility, typecheck)
   - `make ci` - Run the same checks as CI
 
 ### Environment knobs
@@ -150,7 +169,7 @@ Import namespaces re-exported by `giskard_checks.__init__`:
 from giskard_checks import core, interactions, testing, checks
 ```
 
-- `core` → `Check`, `CheckResult`, `Interaction`
+- `core` → `Check`, `CheckResult`, `Interaction`, `Registry`, `UnknownKindError`, `DuplicateKindError`
 - `interactions` → `StructuredInteraction`
 - `testing` → `TestCase`, `runner` (via module import)
 - `checks` → `from_fn`, `FnCheck`, `StringMatchingCheck`, `EqualityCheck`, `ExtractionCheck`
