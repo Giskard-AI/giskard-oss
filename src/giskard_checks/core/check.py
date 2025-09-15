@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import os
-import warnings
 from enum import Enum
-from importlib import import_module
 from typing import Any, ClassVar, Generic, TypeVar
 
-from pydantic import BaseModel, Field, computed_field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
 from .interactions import Interaction
+from .registry import Registry
 
 """Core checking primitives.
 
@@ -72,7 +71,7 @@ class CheckResult(BaseModel):
         timings, and any metadata the check wishes to include).
     """
 
-    model_config = {"frozen": True}
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     status: CheckStatus = Field(..., description="Check status")
     message: str | None = Field(default=None, description="Check message")
@@ -198,9 +197,18 @@ class Check(BaseModel, Generic[InteractionT]):
         if cls is Check or getattr(cls, "__abstractmethods__", None):
             return
 
+        # Skip generic instantiations (like Check[SomeInteraction])
+        # Only register the actual class definitions
+        if (
+            hasattr(cls, "__origin__")
+            or getattr(cls, "__args__", None)
+            or "[" in cls.__name__
+        ):
+            return
+
         class_kind = getattr(cls, "KIND", None)
         if isinstance(class_kind, str) and class_kind:
-            _register_check_kind(class_kind, cls)
+            _CHECK_REGISTRY.register(class_kind, cls)
 
     @computed_field(return_type=str)
     @property
@@ -216,67 +224,56 @@ class Check(BaseModel, Generic[InteractionT]):
         return class_kind
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Check[Any]":
+    def deserialize(cls, data: dict[str, Any]) -> "Check[Any]":
         """Instantiate a concrete `Check` from serialized data.
 
-        Expects a `kind` field to resolve the target subclass using the global
-        registry. Extra fields not defined on the subclass are ignored by default.
+        Uses registry-based format with `kind` field for deserialization.
         """
         kind = data.get("kind")
         if not isinstance(kind, str) or not kind:
-            raise ValueError("Serialized check must include non-empty 'kind'")
-        target_cls = _CHECK_KIND_REGISTRY.get(kind)
-        if target_cls is None:
-            # Try lazy import when a fully-qualified class path is provided
-            type_path = data.get("__type__")
-            if isinstance(type_path, str) and "." in type_path:
-                module_name, class_name = type_path.rsplit(".", 1)
-                try:
-                    mod = import_module(module_name)
-                    # Access the class to ensure module side-effects (registry) occur
-                    getattr(mod, class_name)
-                except Exception:
-                    # Fall through to unknown kind error below
-                    pass
-                else:
-                    target_cls = _CHECK_KIND_REGISTRY.get(kind)
-        if target_cls is None:
-            raise ValueError(f"Unknown check kind '{kind}'; is the class imported?")
+            raise ValueError("Serialized check must include a non-empty 'kind' field")
+
+        target_cls = _CHECK_REGISTRY.get_or_raise(kind)
         return target_cls.model_validate(data)
+
+    def serialize(self) -> dict[str, Any]:
+        """Serialize the check into a JSON-friendly dict.
+
+        The output includes the computed `kind` field to enable registry-based
+        deserialization.
+        """
+        return self.model_dump()
 
     async def run(self, interaction: InteractionT) -> CheckResult:
         """Execute the check against the provided interaction.
 
         Subclasses must override this method and return a `CheckResult`. The
         implementation may be async.
+
+        Parameters
+        ----------
+        interaction : InteractionT
+            The interaction to check against
         """
         raise NotImplementedError
 
 
-# Optional global registry for Check kinds
-_CHECK_KIND_REGISTRY: dict[str, type["Check[Any]"]] = {}
+# Global registry for Check kinds
 _ENFORCE_KIND_UNIQUENESS: bool = os.getenv(
     "GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS", "1"
 ).lower() in {"1", "true", "yes", "on"}
 
+_CHECK_REGISTRY = Registry[Check[Any]](
+    name="check", enforce_uniqueness=_ENFORCE_KIND_UNIQUENESS
+)
 
-def _register_check_kind(kind: str, cls: type["Check[Any]"]) -> None:
-    """Register a check class for a given kind.
 
-    If `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` is truthy (default), a duplicate
-    registration with a different class raises a `ValueError`. Otherwise a
-    warning is emitted and the new class overwrites the previous one.
+def list_registered_check_kinds() -> list[str]:
+    """List all registered check kinds in alphabetical order.
+
+    Returns
+    -------
+    list[str]
+        Sorted list of all registered check kind identifiers
     """
-    existing = _CHECK_KIND_REGISTRY.get(kind)
-    if existing is not None and existing is not cls:
-        if _ENFORCE_KIND_UNIQUENESS:
-            raise ValueError(
-                f"Duplicate check KIND '{kind}' for classes {existing.__name__} and {cls.__name__}"
-            )
-        warnings.warn(
-            f"Duplicate check KIND '{kind}' detected for {existing.__name__} and {cls.__name__}; "
-            "latest class will overwrite the registry entry.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-    _CHECK_KIND_REGISTRY[kind] = cls
+    return _CHECK_REGISTRY.list_kinds()

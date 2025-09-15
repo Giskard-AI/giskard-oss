@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import time
 import traceback
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from giskard_checks.core.check import CheckResult
 
@@ -24,7 +24,7 @@ an immutable `TestCaseResult` with convenience properties.
 class TestCaseResult(BaseModel):
     """Immutable summary of a test case execution."""
 
-    model_config = {"frozen": True}
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
     results: list[CheckResult]
     duration_ms: int
 

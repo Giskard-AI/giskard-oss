@@ -86,20 +86,18 @@ async def test_testcase_roundtrip_serialization_custom_checks():
     assert after_statuses == before_statuses
 
 
-def _minimal_interaction_payload() -> dict[str, Any]:
-    return {
-        "__type__": "giskard_checks.interactions.structured.StructuredInteraction",
-        "data": {"input": "hello", "output": None, "metadata": None},
-    }
-
-
-def test_deserialize_rejects_check_without_kind_and_no_type():
+def test_deserialize_rejects_check_without_kind():
     payload: dict[str, Any] = {
         "name": "tc-bad-missing-kind",
-        "interaction": _minimal_interaction_payload(),
+        "interaction": {
+            "kind": "structured",
+            "input": "hello",
+            "output": None,
+            "metadata": None,
+        },
         "checks": [
             {
-                # no 'kind' and no '__type__'
+                # no 'kind' field
             }
         ],
     }
@@ -107,17 +105,21 @@ def test_deserialize_rejects_check_without_kind_and_no_type():
     with pytest.raises(ValueError) as err:
         TestCase.deserialize(payload)
 
-    assert "Serialized check must include non-empty 'kind'" in str(err.value)
+    assert "Serialized check must include a non-empty 'kind' field" in str(err.value)
 
 
-def test_deserialize_rejects_check_with_empty_kind_and_no_type():
+def test_deserialize_rejects_check_with_empty_kind():
     payload: dict[str, Any] = {
         "name": "tc-bad-empty-kind",
-        "interaction": _minimal_interaction_payload(),
+        "interaction": {
+            "kind": "structured",
+            "input": "hello",
+            "output": None,
+            "metadata": None,
+        },
         "checks": [
             {
                 "kind": "",
-                # explicitly no '__type__'
             }
         ],
     }
@@ -125,4 +127,4 @@ def test_deserialize_rejects_check_with_empty_kind_and_no_type():
     with pytest.raises(ValueError) as err:
         TestCase.deserialize(payload)
 
-    assert "Serialized check must include non-empty 'kind'" in str(err.value)
+    assert "Serialized check must include a non-empty 'kind' field" in str(err.value)

@@ -7,6 +7,8 @@ from giskard_checks.core.interactions import Interaction
 class CustomInteraction(Interaction[str, str]):
     """Simple custom interaction to test import-based deserialization."""
 
+    KIND = "custom_unloaded"
+
 
 class StartsWithCheck(Check[CustomInteraction]):
     KIND = "starts_with"

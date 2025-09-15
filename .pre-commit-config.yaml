@@ -27,7 +27,7 @@ repos:
     hooks:
      - id: basedpyright
        name: basedpyright
-       entry: bash -c 'uv run basedpyright .'
+       entry: bash -c 'uv run basedpyright --level error .'
        language: system
 
   # Python compatibility checking

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from jsonpath_ng import parse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from giskard_checks.core.interactions import Interaction
 
@@ -14,7 +14,7 @@ class Extractor(BaseModel):
     Implementations return a list of extracted items from an `Interaction`.
     """
 
-    model_config = {"frozen": True}
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     def extract(self, interaction: Interaction[Any, Any]) -> list[Any]:
         raise NotImplementedError
