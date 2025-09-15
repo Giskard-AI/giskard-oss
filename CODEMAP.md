@@ -20,15 +20,17 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 │  ├─ core/                    # Core abstractions: Check, CheckResult, enums
 │  │  ├─ __init__.py
 │  │  ├─ check.py
+│  │  ├─ extraction.py         # Extractor, JsonPathExtractor
 │  │  └─ interactions.py
 │  ├─ interactions/            # Interaction specializations
 │  │  ├─ __init__.py
-│  │  ├─ structured.py         # StructuredInteraction[In, Out]
-│  │  └─ chat.py               # ChatInteraction using counterpoint.Message
+│  │  └─ structured.py         # StructuredInteraction[In, Out]
 │  ├─ checks/                  # Built-in checks and helpers
 │  │  ├─ __init__.py
 │  │  ├─ fn.py                 # from_fn and FnCheck
-│  │  └─ chat.py               # StringMatchingCheck for chat transcripts
+│  │  ├─ equality.py           # EqualityCheck
+│  │  ├─ string_matching.py    # StringMatchingCheck
+│  │  └─ extraction_check.py   # ExtractionCheck
 │  └─ testing/                 # TestCase, TestRunner, samples
 │     ├─ __init__.py
 │     ├─ testcase.py           # TestCase model + serialization helpers
@@ -42,7 +44,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 
 - Interaction[InputT, OutputT] (in `core/interactions.py`)
   - Container for an input, optional output, and optional metadata.
-  - Specialized as `StructuredInteraction[In, Out]` and `ChatInteraction`.
+  - Specialized as `StructuredInteraction[In, Out]`.
 
 - Check[InteractionT] (in `core/check.py`)
   - Base class to implement concrete checks. Subclasses must define a class-level `KIND: str`.
@@ -53,7 +55,10 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - Immutable result model for a single check execution.
   - Convenience constructors: `success`, `failure`, `skip`, `error`.
   - Convenience booleans: `passed`, `failed`, `errored`, `skipped`.
-  - Severity enum: `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
+
+- Extractor and JsonPathExtractor (in `core/extraction.py`)
+  - Base classes for extracting values from interactions.
+  - `JsonPathExtractor` uses JSONPath expressions to extract specific fields from interaction data.
 
 - TestCase and TestRunner (in `testing/`)
   - `TestCase` bundles an `Interaction` and a sequence of `Check`s and exposes `await run()`.
@@ -65,17 +70,21 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - Turn a callable into a `Check`. The callable may be sync/async and return `bool` or `CheckResult`.
   - `FnCheck` is not serializable (function excluded) and is intended for programmatic/test use.
 
-- StringMatchingCheck (in `checks/chat.py`)
+- StringMatchingCheck (in `checks/string_matching.py`)
   - KIND: `string_matching`.
-  - Validates that output messages by role contain a substring (supports case sensitivity toggling).
+  - Generic substring matcher with optional `key` (JSONPath) and `evaluation_mode`.
+
+- ExtractionCheck (in `checks/extraction_check.py`)
+  - Abstract base class for checks that extract values from interactions and evaluate them.
+  - Provides common functionality for value extraction and evaluation patterns.
 
 ### Interaction specializations
 
 - StructuredInteraction[In, Out] (in `interactions/structured.py`)
   - Typed interaction for structured payloads.
 
-- ChatInteraction (in `interactions/chat.py`)
-  - Specialization of `StructuredInteraction[list[Message], list[Message]]` using `counterpoint.Message`.
+- Chat interactions
+  - Use `StructuredInteraction[list[Message], list[Message]]` with `counterpoint.Message` for chat transcripts.
 
 ### Serialization model
 
@@ -91,7 +100,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 ### Typical workflows
 
 - Define an interaction
-  - Use `StructuredInteraction` for typed input/output models (Pydantic `BaseModel` recommended) or `ChatInteraction` for chat transcripts.
+  - Use `StructuredInteraction` for typed input/output models (Pydantic `BaseModel` recommended) including chat transcripts.
 
 - Author checks
   - Implement a concrete `Check` subclass with a unique `KIND`, or use `from_fn` for quick function-based checks.
@@ -127,7 +136,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 ### Testing overview
 
 - Integration tests under `tests/integration` cover:
-  - End-to-end chat serialization (`ChatInteraction`, `StringMatchingCheck`).
+  - End-to-end chat serialization using `StructuredInteraction` with `StringMatchingCheck`.
   - Structured moderation example using `StructuredInteraction`.
   - TestCase serialization/deserialization round-trips including lazy import behavior.
 
@@ -139,10 +148,10 @@ Import namespaces re-exported by `giskard_checks.__init__`:
 from giskard_checks import core, interactions, testing, checks
 ```
 
-- `core` → `Check`, `CheckResult`, `CheckSeverity`, `Interaction`
-- `interactions` → `StructuredInteraction`, `ChatInteraction`
+- `core` → `Check`, `CheckResult`, `Interaction`
+- `interactions` → `StructuredInteraction`
 - `testing` → `TestCase`, `runner` (via module import)
-- `checks` → `from_fn`, `FnCheck`, and `StringMatchingCheck` (via submodule)
+- `checks` → `from_fn`, `FnCheck`, `StringMatchingCheck`, `EqualityCheck`, `ExtractionCheck`
 
 ### Contributing notes
 

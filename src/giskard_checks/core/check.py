@@ -16,7 +16,6 @@ This module defines the foundational types used by the library to represent
 checks, their execution results, and related enums. The key abstractions are:
 
 - `CheckStatus`: outcome categories for a single check execution
-- `CheckSeverity`: importance of a check when it fails
 - `CheckResult`: immutable record describing the outcome of a check
 - `Check`: generic base class to implement concrete checks
 
@@ -38,13 +37,23 @@ class CheckStatus(str, Enum):
     SKIP = "skip"
 
 
-class CheckSeverity(str, Enum):
-    """Represents how important a check is when it fails."""
+class Metric(BaseModel):
+    """A named metric value captured during check execution.
 
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
+    Metrics provide a way to attach quantitative measurements to check results,
+    such as performance timings, confidence scores, or other numerical values
+    that provide additional context about the check execution.
+
+    Attributes
+    ----------
+    name : str
+        The name/identifier of the metric
+    value : float
+        The numerical value of the metric
+    """
+
+    name: str
+    value: float
 
 
 class CheckResult(BaseModel):
@@ -52,35 +61,22 @@ class CheckResult(BaseModel):
 
     Attributes
     ----------
-    kind:
-        Check type identifier (usually provided by the `Check` subclass `KIND`).
-    name:
-        Human-friendly name of the check.
-    description:
-        Optional description of what the check validates.
     status:
         Outcome status of the check.
     message:
         Optional short message to surface to users (e.g., success/failure reason).
-    traceback:
-        Captured traceback if the check raised an unhandled exception.
-    duration_ms:
-        Execution time in milliseconds.
-    severity:
-        Importance of the check when it fails.
+    metrics:
+        List of auxiliary metrics captured by the check.
     details:
-        Arbitrary structured payload with additional context.
+        Arbitrary structured payload with additional context (e.g., failure reasons,
+        timings, and any metadata the check wishes to include).
     """
 
     model_config = {"frozen": True}
-    kind: str = Field(..., description="Check type identifier")
-    name: str | None = Field(None, description="Check name")
-    description: str | None = Field(None, description="Check description")
+
     status: CheckStatus = Field(..., description="Check status")
-    message: str | None = Field(None, description="Check message")
-    traceback: str | None = Field(None, description="Check traceback")
-    duration_ms: int | None = Field(None, description="Check duration in milliseconds")
-    severity: CheckSeverity = Field(..., description="Check severity")
+    message: str | None = Field(default=None, description="Check message")
+    metrics: list[Metric] = Field(default_factory=list, description="Check metric")
     details: dict[str, Any] = Field(default_factory=dict, description="Check details")
 
     # Convenience constructors
@@ -88,28 +84,17 @@ class CheckResult(BaseModel):
     def success(
         cls,
         *,
-        kind: str,
-        name: str | None = None,
-        description: str | None = None,
         message: str | None = None,
-        severity: CheckSeverity = CheckSeverity.INFO,
         details: dict[str, Any] | None = None,
     ) -> "CheckResult":
         """Construct a successful result.
 
-        Parameters mirror the fields on the model. `severity` defaults to
-        `INFO` for a success, and `details` is normalized to an empty map if
-        not provided.
+        Parameters mirror the fields on the model. `details` is normalized to
+        an empty map if not provided.
         """
         return cls(
-            kind=kind,
-            name=name,
-            description=description,
             status=CheckStatus.PASS,
             message=message,
-            traceback=None,
-            duration_ms=None,
-            severity=severity,
             details={} if details is None else details,
         )
 
@@ -117,23 +102,13 @@ class CheckResult(BaseModel):
     def failure(
         cls,
         *,
-        kind: str,
-        name: str | None = None,
-        description: str | None = None,
         message: str | None = None,
-        severity: CheckSeverity = CheckSeverity.ERROR,
         details: dict[str, Any] | None = None,
     ) -> "CheckResult":
         """Construct a failure result."""
         return cls(
-            kind=kind,
-            name=name,
-            description=description,
             status=CheckStatus.FAIL,
             message=message,
-            traceback=None,
-            duration_ms=None,
-            severity=severity,
             details={} if details is None else details,
         )
 
@@ -141,23 +116,13 @@ class CheckResult(BaseModel):
     def skip(
         cls,
         *,
-        kind: str,
-        name: str | None = None,
-        description: str | None = None,
         message: str | None = None,
-        severity: CheckSeverity = CheckSeverity.INFO,
         details: dict[str, Any] | None = None,
     ) -> "CheckResult":
         """Construct a skipped result (e.g., precondition not met)."""
         return cls(
-            kind=kind,
-            name=name,
-            description=description,
             status=CheckStatus.SKIP,
             message=message,
-            traceback=None,
-            duration_ms=None,
-            severity=severity,
             details={} if details is None else details,
         )
 
@@ -165,24 +130,13 @@ class CheckResult(BaseModel):
     def error(
         cls,
         *,
-        kind: str,
-        name: str | None = None,
-        description: str | None = None,
         message: str | None = None,
-        traceback: str | None = None,
-        severity: CheckSeverity = CheckSeverity.ERROR,
         details: dict[str, Any] | None = None,
     ) -> "CheckResult":
         """Construct an error result from an exception or unexpected condition."""
         return cls(
-            kind=kind,
-            name=name,
-            description=description,
             status=CheckStatus.ERROR,
             message=message,
-            traceback=traceback,
-            duration_ms=None,
-            severity=severity,
             details={} if details is None else details,
         )
 

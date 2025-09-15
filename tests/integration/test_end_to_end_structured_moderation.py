@@ -41,9 +41,11 @@ async def test_single_pass_boolean_fncheck():
     r = result.results[0]
     assert r.status == CheckStatus.PASS
     assert r.message == "content is not moderated"
-    assert r.kind == "fn"
-    assert r.name == "not_moderated"
-    assert r.duration_ms is not None and r.duration_ms >= 0
+    assert r.details.get("check_kind") == "fn"
+    assert r.details.get("check_name") == "not_moderated"
+    assert (
+        isinstance(r.details.get("duration_ms"), int) and r.details["duration_ms"] >= 0
+    )
 
     assert result.passed is True
     assert result.failed is False
@@ -66,9 +68,11 @@ async def test_single_fail_boolean_fncheck():
     r = result.results[0]
     assert r.status == CheckStatus.FAIL
     assert r.message == "expected moderated but was not"
-    assert r.kind == "fn"
-    assert r.name == "is_moderated"
-    assert r.duration_ms is not None and r.duration_ms >= 0
+    assert r.details.get("check_kind") == "fn"
+    assert r.details.get("check_name") == "is_moderated"
+    assert (
+        isinstance(r.details.get("duration_ms"), int) and r.details["duration_ms"] >= 0
+    )
 
     assert result.passed is False
     assert result.failed is True
@@ -89,11 +93,16 @@ async def test_single_error_fncheck():
     assert len(result.results) == 1
     r = result.results[0]
     assert r.status == CheckStatus.ERROR
-    assert r.message == "boom"
-    assert r.traceback is not None and "RuntimeError" in r.traceback
-    assert r.kind == "fn"
-    assert r.name == "boom"
-    assert r.duration_ms is not None and r.duration_ms >= 0
+    assert r.message == "Check 'boom' failed with error: boom"
+    assert (
+        isinstance(r.details.get("traceback"), str)
+        and "RuntimeError" in r.details["traceback"]
+    )
+    assert r.details.get("check_kind") == "fn"
+    assert r.details.get("check_name") == "boom"
+    assert (
+        isinstance(r.details.get("duration_ms"), int) and r.details["duration_ms"] >= 0
+    )
 
     assert result.passed is False
     assert result.failed is False

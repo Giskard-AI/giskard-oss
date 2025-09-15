@@ -82,15 +82,16 @@ Checks
 - `giskard_checks.checks.from_fn(fn, ...)` → `Check`: convenience factory that
   turns a callable into a check. The callable can return a `bool` or a
   `CheckResult` and may be async.
- - `giskard_checks.checks.chat.StringMatchingCheck`: content matcher for chat
-   transcripts; verifies a message by role contains a substring.
+ - `giskard_checks.checks.StringMatchingCheck`: generic content matcher with optional
+   JSONPath `key` selection and `evaluation_mode` parameter.
+ - `giskard_checks.checks.EqualityCheck`: value equality checker with optional
+   JSONPath `key` selection.
 
 Interactions
 
 - `giskard_checks.interactions.StructuredInteraction[In, Out]`: specialization
-  of `Interaction` for structured inputs/outputs.
- - `giskard_checks.interactions.ChatInteraction`: specialization for chat-style
-   interactions using `counterpoint.Message` as items.
+  of `Interaction` for structured inputs/outputs (use for chat transcripts as well)
+  interactions using `counterpoint.Message` as items.
 
 Testing
 
@@ -103,23 +104,24 @@ Usage Notes
 -----------
 
 - Define your own `Check` subclasses with a unique class-level `KIND` string.
-- You can customize severity and messages with `CheckResult` or via `from_fn`.
+- You can customize result messages and attach additional context in `details`
+  via `CheckResult` or by returning `bool` from `from_fn`.
 - Environment variable `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` controls
   whether duplicate `KIND`s raise (default: enabled).
 
 Chat quickstart
 ---------------
 
-Evaluate chat transcripts using `ChatInteraction` and the built-in
+Evaluate chat transcripts using `StructuredInteraction` and the built-in
 `StringMatchingCheck`:
 
 ```python
 from counterpoint import Message
-from giskard_checks.interactions import ChatInteraction
-from giskard_checks.checks.chat import StringMatchingCheck
+from giskard_checks.interactions import StructuredInteraction
+from giskard_checks.checks import StringMatchingCheck
 from giskard_checks.testing import TestCase
 
-interaction = ChatInteraction(
+interaction = StructuredInteraction(
     input=[Message(role="user", content="Say hello")],
     output=[Message(role="assistant", content="Hello world!")],
 )
@@ -128,8 +130,7 @@ checks = [
     StringMatchingCheck(
         name="contains_hello",
         content="Hello",
-        role="assistant",
-        case_sensitive=True,
+        key="output[*].content",
     ),
 ]
 
@@ -141,10 +142,11 @@ assert result.passed
 
 Notes:
 
-- `ChatInteraction` uses `counterpoint.Message` for messages; the `counterpoint`
+- Chat interactions use `counterpoint.Message` for messages; the `counterpoint`
   package is declared as a dependency.
-- `StringMatchingCheck` inspects messages by `role` and supports
-  case-insensitive matching via `case_sensitive=False`.
+- `StringMatchingCheck` searches strings selected by `key` (JSONPath). When the
+  key resolves to a list, set `evaluation_mode="all"` to require all items contain the
+  substring; otherwise any match passes.
 
 Development
 -----------

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Awaitable, Callable, ClassVar, TypeVar
+from collections.abc import Awaitable
+from typing import Any, Callable, ClassVar, TypeVar
 
 from pydantic import Field
 
-from giskard_checks.core.check import Check, CheckResult, CheckSeverity
+from giskard_checks.core.check import Check, CheckResult
 from giskard_checks.core.interactions import Interaction
 
 """Function-backed check implementation.
@@ -45,7 +46,6 @@ class FnCheck(Check[InteractionT]):
     )
     success_message: str | None = None
     failure_message: str | None = None
-    severity: CheckSeverity = CheckSeverity.ERROR
     details: dict[str, Any] = Field(default_factory=dict)
 
     async def run(self, interaction: InteractionT) -> CheckResult:
@@ -60,24 +60,16 @@ class FnCheck(Check[InteractionT]):
         if isinstance(result, bool):
             if result:
                 return CheckResult.success(
-                    kind=self.kind,
-                    name=self.name,
-                    description=self.description,
                     message=self.success_message,
-                    severity=self.severity,
                     details=self.details,
                 )
             return CheckResult.failure(
-                kind=self.kind,
-                name=self.name,
-                description=self.description,
                 message=self.failure_message,
-                severity=self.severity,
                 details=self.details,
             )
 
         raise TypeError(
-            "from_fn callable must return bool or CheckResult (or awaitable thereof)"
+            f"from_fn callable must return bool or CheckResult (or awaitable thereof), but got {type(result).__name__}: {result}"
         )
 
 
@@ -86,7 +78,6 @@ def from_fn(
     *,
     name: str | None = None,
     description: str | None = None,
-    severity: CheckSeverity = CheckSeverity.ERROR,
     success_message: str | None = None,
     failure_message: str | None = None,
     details: dict[str, Any] | None = None,
@@ -105,7 +96,6 @@ def from_fn(
         name=name,
         description=description,
         fn=fn,
-        severity=severity,
         success_message=success_message,
         failure_message=failure_message,
         details={} if details is None else details,
