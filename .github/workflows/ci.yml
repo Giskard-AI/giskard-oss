@@ -22,23 +22,11 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v6
 
-      - name: Install deps & build base images
-        run: uv sync
+      - name: Setup development environment
+        run: make setup
 
-      - name: Check linting
-        run: uv run ruff check .
-
-      - name: Check type hints
-        run: uv run basedpyright .
-
-      - name: Check Python compatibility
-        run: uv run vermin --target=3.11- --no-tips --violations .
-
-      - name: Check security
-        run: uv run pip-audit .
-
-      - name: Final pre-commit enforcement
-        run: uv run pre-commit run --all-files
+      - name: Run all checks
+        run: make check
 
   test:
     runs-on: ubuntu-latest
@@ -57,7 +45,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install deps & build base images
-        run: uv sync
+        run: make setup
 
       - name: Run the tests
-        run: uv run pytest
+        run: make test
