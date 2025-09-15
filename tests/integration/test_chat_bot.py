@@ -1,11 +1,11 @@
 """Integration tests for chat bot scenarios using the giskard_checks testing framework."""
 
-from counterpoint import Message
 from pydantic import BaseModel
 
 from giskard_checks.checks import StringMatchingCheck
 from giskard_checks.interactions import StructuredInteraction
 from giskard_checks.testing import TestCase
+from giskard_checks.testing._samples.message import Message
 
 
 class ChatResponse(BaseModel):

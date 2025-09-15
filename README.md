@@ -89,9 +89,8 @@ Checks
 
 Interactions
 
-- `giskard_checks.interactions.StructuredInteraction[In, Out]`: specialization
-  of `Interaction` for structured inputs/outputs (use for chat transcripts as well)
-  interactions using `counterpoint.Message` as items.
+- `giskard_checks.interactions.StructuredInteraction[In, Out]`: base interaction
+  for structured inputs/outputs with full type safety and serialization support.
 
 Testing
 
@@ -109,32 +108,31 @@ Usage Notes
 - Environment variable `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` controls
   whether duplicate `KIND`s raise (default: enabled).
 
-Chat quickstart
----------------
+Structured data quickstart
+---------------------------
 
-Evaluate chat transcripts using `StructuredInteraction` and the built-in
+Evaluate structured data using `StructuredInteraction` and the built-in
 `StringMatchingCheck`:
 
 ```python
-from counterpoint import Message
 from giskard_checks.interactions import StructuredInteraction
 from giskard_checks.checks import StringMatchingCheck
 from giskard_checks.testing import TestCase
 
 interaction = StructuredInteraction(
-    input=[Message(role="user", content="Say hello")],
-    output=[Message(role="assistant", content="Hello world!")],
+    input={"question": "What is the capital of France?"},
+    output={"answer": "Paris is the capital of France."},
 )
 
 checks = [
     StringMatchingCheck(
-        name="contains_hello",
-        content="Hello",
-        key="output[*].content",
+        name="contains_paris",
+        content="Paris",
+        key="output.answer",
     ),
 ]
 
-tc = TestCase(interaction=interaction, checks=checks, name="chat-example")
+tc = TestCase(interaction=interaction, checks=checks, name="structured-example")
 result = await tc.run()  # in async context
 
 assert result.passed
@@ -142,8 +140,7 @@ assert result.passed
 
 Notes:
 
-- Chat interactions use `counterpoint.Message` for messages; the `counterpoint`
-  package is declared as a dependency.
+- `StructuredInteraction` is the base interaction type for all structured data with full type safety.
 - `StringMatchingCheck` searches strings selected by `key` (JSONPath). When the
   key resolves to a list, set `evaluation_mode="all"` to require all items contain the
   substring; otherwise any match passes.

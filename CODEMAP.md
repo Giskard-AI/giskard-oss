@@ -83,8 +83,6 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 - StructuredInteraction[In, Out] (in `interactions/structured.py`)
   - Typed interaction for structured payloads.
 
-- Chat interactions
-  - Use `StructuredInteraction[list[Message], list[Message]]` with `counterpoint.Message` for chat transcripts.
 
 ### Serialization model
 
@@ -129,7 +127,6 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 
 - Runtime:
   - `pydantic~=2.11`
-  - `counterpoint>=0.1.2` (VCS source pinned to `tag = v0.1.2`)
 - Dev:
   - `pytest`, `pytest-asyncio`
 
