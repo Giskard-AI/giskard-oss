@@ -1,0 +1,63 @@
+name: Full CI
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre_checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v6
+
+      - name: Install deps & build base images
+        run: uv sync
+
+      - name: Check linting
+        run: uv run ruff check .
+
+      - name: Check type hints
+        run: uv run basedpyright .
+
+      - name: Check Python compatibility
+        run: uv run vermin --target=3.11- --no-tips --violations .
+
+      - name: Check security
+        run: uv run pip-audit .
+
+      - name: Final pre-commit enforcement
+        run: uv run pre-commit run --all-files
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: Install uv and set the python version
+        uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install deps & build base images
+        run: uv sync
+
+      - name: Run the tests
+        run: uv run pytest
