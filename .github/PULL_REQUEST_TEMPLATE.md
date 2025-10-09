@@ -1,29 +1,63 @@
-## Description
+# Pull Request Template for Giskard
 
-<!-- Add a more detailed description of the changes if needed. -->
+Thank you for contributing! Please fill out this template to help us review your changes efficiently.  
 
-## Related Issue
+---
 
-<!-- If your PR refers to a related issue, link it here. -->
+## 🚀 Description
 
-## Type of Change
+<!-- Provide a clear and concise description of what this PR does. -->
 
-<!-- Mark with an `x` all the checkboxes that apply (like `[x]`) -->
+Examples:
+- Fix a bug in drift detection
+- Improve documentation for ML tests
+- Add a new feature in scan module
+- Refactor code for better maintainability
 
-- [ ] 📚 Examples / docs / tutorials / dependencies update
-- [ ] 🔧 Bug fix (non-breaking change which fixes an issue)
-- [ ] 🥂 Improvement (non-breaking change which improves an existing feature)
-- [ ] 🚀 New feature (non-breaking change which adds functionality)
-- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to change)
+---
+
+## 🔗 Related Issue
+
+<!-- Link to the issue this PR addresses (e.g., #2200) -->
+
+---
+
+## 📝 Type of Change
+
+<!-- Mark all that apply with [x] -->
+
+- [ ] 📚 Documentation / examples / tutorials / dependencies update
+- [ ] 🔧 Bug fix (non-breaking change)
+- [ ] 🥂 Improvement (enhancement of existing functionality)
+- [ ] 🚀 New feature (non-breaking)
+- [ ] 💥 Breaking change (changes existing functionality)
 - [ ] 🔐 Security fix
 
-## Checklist
+---
 
-<!-- Mark with an `x` all the checkboxes that apply (like `[x]`) -->
+## ✅ Checklist
 
-- [ ] I've read the [`CODE_OF_CONDUCT.md`](https://github.com/Giskard-AI/ai-inspector/blob/master/CODE_OF_CONDUCT.md) document.
-- [ ] I've read the [`CONTRIBUTING.md`](https://github.com/Giskard-AI/ai-inspector/blob/master/CONTRIBUTING.md) guide.
-- [ ] I've written tests for all new methods and classes that I created.
-- [ ] I've written the docstring in Google format for all the methods and classes that I used.
-- [ ] I've updated the `pdm.lock` running `pdm update-lock` (only applicable when `pyproject.toml` has been
-  modified)
+<!-- Mark all that apply with [x] -->
+
+- [ ] I have read the [`CODE_OF_CONDUCT.md`](https://github.com/Giskard-AI/ai-inspector/blob/master/CODE_OF_CONDUCT.md)
+- [ ] I have read the [`CONTRIBUTING.md`](https://github.com/Giskard-AI/ai-inspector/blob/master/CONTRIBUTING.md) guide
+- [ ] My code follows the style guide (black, isort, pre-commit hooks)
+- [ ] I have added or updated relevant docstrings (Google / NumPy style)
+- [ ] I have updated documentation/examples if needed
+- [ ] I have added or updated tests for my changes
+- [ ] I have verified my code works with supported Python versions
+- [ ] I have self-reviewed my code
+- [ ] I have checked that this PR is not duplicating an existing issue/PR
+
+---
+
+## 🧪 How to Test / Reproduce
+
+<!-- Explain how reviewers can verify your changes. Skip if the PR is documentation-only. -->
+
+Example:
+```python
+# Steps to test
+from giskard import scan
+result = scan.run(my_model, my_dataset)
+print(result)
