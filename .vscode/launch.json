@@ -9,7 +9,19 @@
             "type": "python",
             "request": "attach",
             "connect": {
-                "host": "localhost",
+   {
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Run File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}             "host": "localhost",
                 "port": 5678
             },
             "pathMappings": [
