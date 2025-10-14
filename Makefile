@@ -31,6 +31,7 @@ lint: ## Run linting checks
 
 format: ## Format code with ruff
 	uv tool run ruff format .
+	uv tool run ruff check --fix .
 
 check-format: ## Check if code is formatted correctly
 	uv tool run ruff format --check .
