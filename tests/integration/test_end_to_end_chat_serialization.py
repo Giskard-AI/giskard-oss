@@ -4,14 +4,14 @@ import json
 
 from giskard_checks.checks import StringMatchingCheck
 from giskard_checks.core import CheckStatus
-from giskard_checks.interactions import StructuredInteraction
+from giskard_checks.core.interactions import Interaction
 from giskard_checks.testing._samples.message import Message
 from giskard_checks.testing.testcase import TestCase
 
 
 async def test_chat_interaction_roundtrip_serialization_and_execution():
     # Prepare a simple chat interaction with one user input and one assistant output
-    interaction = StructuredInteraction(
+    interaction = Interaction(
         input=[Message(role="user", content="Say hello")],
         output=[Message(role="assistant", content="Hello world!")],
     )

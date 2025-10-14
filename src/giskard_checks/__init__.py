@@ -8,7 +8,6 @@ exposed as modules. Import specific names from their respective subpackages.
 # Re-export subpackages as modules for convenient access, without star imports
 from . import checks as checks
 from . import core as core
-from . import interactions as interactions
 from . import testing as testing
 
-__all__ = ["core", "interactions", "testing", "checks"]
+__all__ = ["core", "testing", "checks"]

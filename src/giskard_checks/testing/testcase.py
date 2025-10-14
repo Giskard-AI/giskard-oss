@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, Field, SkipValidation, field_validator
+from pydantic import BaseModel, Field, SkipValidation, field_serializer, field_validator
 
 from giskard_checks.core.check import Check
 from giskard_checks.core.interactions import Interaction
@@ -19,10 +19,8 @@ and delegates execution to a `TestRunner`. It offers a single `run()` method
 that returns a `TestCaseResult` summarizing the outcomes.
 """
 
-InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
 
-
-class TestCase(BaseModel, Generic[InteractionT]):
+class TestCase(BaseModel):
     """Bundle a single interaction with a set of checks to execute.
 
     Attributes
@@ -40,8 +38,8 @@ class TestCase(BaseModel, Generic[InteractionT]):
 
     name: str | None = Field(None, description="Test case name")
     # Validation is skipped for the interaction field to allow for generic deserialization
-    interaction: InteractionT = Field(..., description="Test case interaction")
-    checks: Sequence[Check[InteractionT]] = Field(..., description="Test case checks")
+    interaction: Interaction[Any, Any] = Field(..., description="Test case interaction")
+    checks: Sequence[Check] = Field(..., description="Test case checks")
 
     async def run(self) -> TestCaseResult:
         """Execute the test case using the configured `TestRunner`."""

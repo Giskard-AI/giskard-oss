@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from giskard_checks.checks.fn import from_fn
 from giskard_checks.core.check import CheckStatus
-from giskard_checks.interactions import StructuredInteraction
+from giskard_checks.core.interactions import Interaction
 from giskard_checks.testing.testcase import TestCase
 
 
@@ -17,8 +17,8 @@ class ModerationResult(BaseModel):
 
 def make_interaction(
     moderated: bool, reason: Optional[str] = None
-) -> StructuredInteraction[str, ModerationResult]:
-    return StructuredInteraction[str, ModerationResult](
+) -> Interaction[str, ModerationResult]:
+    return Interaction[str, ModerationResult](
         input="some user text",
         output=ModerationResult(moderated=moderated, reason=reason),
     )

@@ -1,21 +1,17 @@
 from __future__ import annotations
 
+from typing import Any
+
 from giskard_checks.core import Check, CheckResult
 from giskard_checks.core.interactions import Interaction
 
 
-class CustomInteraction(Interaction[str, str]):
-    """Simple custom interaction to test import-based deserialization."""
-
-    KIND = "custom_unloaded"
-
-
-class StartsWithCheck(Check[CustomInteraction]):
+class StartsWithCheck(Check):
     KIND = "starts_with"
 
     prefix: str
 
-    async def run(self, interaction: CustomInteraction) -> CheckResult:  # type: ignore[override]
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:  # type: ignore[override]
         ok = interaction.input is not None and str(interaction.input).startswith(
             self.prefix
         )
@@ -28,12 +24,12 @@ class StartsWithCheck(Check[CustomInteraction]):
         )
 
 
-class EqualsOutputCheck(Check[CustomInteraction]):
+class EqualsOutputCheck(Check):
     KIND = "equals_out"
 
     expected: str
 
-    async def run(self, interaction: CustomInteraction) -> CheckResult:  # type: ignore[override]
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:  # type: ignore[override]
         if interaction.output == self.expected:
             return CheckResult.success(
                 message="output matched",

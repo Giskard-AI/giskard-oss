@@ -47,7 +47,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - Container for an input, optional output, and optional metadata.
   - Specialized as `StructuredInteraction[In, Out]`.
 
-- Check[InteractionT] (in `core/check.py`)
+- Check (in `core/check.py`)
   - Base class to implement concrete checks. Subclasses use `@Check.register("kind")` decorator.
   - Key fields: `name`, `description`. `kind` is a computed field from registration.
   - Discriminated union support for polymorphic serialization and deserialization.
@@ -87,8 +87,8 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 
 ### Interaction specializations
 
-- StructuredInteraction[In, Out] (in `interactions/structured.py`)
-  - Typed interaction for structured payloads.
+- Interaction[In, Out] (in `core/interactions.py`)
+  - Base interaction class for all data types with full type safety.
 
 
 ### Serialization
@@ -102,7 +102,7 @@ The library uses standard Pydantic serialization with discriminated unions for p
 ### Typical workflows
 
 - Define an interaction
-  - Use `StructuredInteraction` for typed input/output models (Pydantic `BaseModel` recommended) including chat transcripts.
+  - Use `Interaction[In, Out]` for typed input/output models (Pydantic `BaseModel` recommended) including chat transcripts.
 
 - Author checks
   - Implement a concrete `Check` subclass with a unique `KIND`, or use `from_fn` for quick function-based checks.

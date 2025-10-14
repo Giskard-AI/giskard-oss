@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from typing import Any
+
 from giskard_checks.core import Check, CheckResult
-from giskard_checks.testing._samples.custom_interaction import CustomInteraction
+from giskard_checks.core.interactions import Interaction
 
 
 @Check.register("starts_with")
-class StartsWithCheck(Check[CustomInteraction]):
+class StartsWithCheck(Check):
     """Check that validates if the input starts with a specified prefix.
 
     This is a sample custom check implementation that demonstrates how to create
@@ -19,7 +21,7 @@ class StartsWithCheck(Check[CustomInteraction]):
 
     prefix: str
 
-    async def run(self, interaction: CustomInteraction) -> CheckResult:  # type: ignore[override]
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:  # type: ignore[override]
         ok = interaction.input is not None and str(interaction.input).startswith(
             self.prefix
         )
@@ -33,7 +35,7 @@ class StartsWithCheck(Check[CustomInteraction]):
 
 
 @Check.register("equals_out")
-class EqualsOutputCheck(Check[CustomInteraction]):
+class EqualsOutputCheck(Check):
     """Check that validates if the output equals an expected value.
 
     This is a sample custom check implementation that demonstrates how to create
@@ -47,7 +49,7 @@ class EqualsOutputCheck(Check[CustomInteraction]):
 
     expected: str
 
-    async def run(self, interaction: CustomInteraction) -> CheckResult:  # type: ignore[override]
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:  # type: ignore[override]
         if interaction.output == self.expected:
             return CheckResult.success(
                 message="output matched",

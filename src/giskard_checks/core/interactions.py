@@ -17,7 +17,6 @@ InputT = TypeVar("InputT")
 OutputT = TypeVar("OutputT")
 
 
-@discriminated_base
 class Interaction(Discriminated, Generic[InputT, OutputT]):
     """Container for a single interaction under test.
 

@@ -5,15 +5,15 @@ from typing import Any
 import pytest
 
 from giskard_checks.core import Check, CheckResult, CheckStatus
-from giskard_checks.interactions import StructuredInteraction
+from giskard_checks.core.interactions import Interaction
 from giskard_checks.testing.testcase import TestCase
 
 
 @Check.register("contains")
-class ContainsCheck(Check[StructuredInteraction[str, str]]):
+class ContainsCheck(Check):
     needle: str
 
-    async def run(self, interaction: StructuredInteraction[str, str]) -> CheckResult:
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         if interaction.input is not None and self.needle in interaction.input:
             return CheckResult.success(
                 message=f"input contains '{self.needle}'",
@@ -24,10 +24,10 @@ class ContainsCheck(Check[StructuredInteraction[str, str]]):
 
 
 @Check.register("equals")
-class OutputEqualsCheck(Check[StructuredInteraction[str, str]]):
+class OutputEqualsCheck(Check):
     expected: str
 
-    async def run(self, interaction: StructuredInteraction[str, str]) -> CheckResult:
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         if interaction.output == self.expected:
             return CheckResult.success(
                 message="output matched",
@@ -38,13 +38,13 @@ class OutputEqualsCheck(Check[StructuredInteraction[str, str]]):
 
 
 @Check.register("explode")
-class ExplodeCheck(Check[StructuredInteraction[str, str]]):
-    async def run(self, interaction: StructuredInteraction[str, str]) -> CheckResult:  # type: ignore[override]
+class ExplodeCheck(Check):
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:  # type: ignore[override]
         raise RuntimeError("kaboom")
 
 
 async def test_testcase_roundtrip_serialization_custom_checks():
-    interaction = StructuredInteraction[str, str](input="hello world", output="hello")
+    interaction = Interaction[str, str](input="hello world", output="hello")
 
     chk1 = ContainsCheck(name="has_hello", needle="hello")
     chk2 = OutputEqualsCheck(name="out_is_hello", expected="hello")
@@ -87,7 +87,6 @@ def test_deserialize_rejects_check_without_kind():
     payload: dict[str, Any] = {
         "name": "tc-bad-missing-kind",
         "interaction": {
-            "kind": "structured",
             "input": "hello",
             "output": None,
             "metadata": None,
@@ -109,7 +108,6 @@ def test_deserialize_rejects_check_with_empty_kind():
     payload: dict[str, Any] = {
         "name": "tc-bad-empty-kind",
         "interaction": {
-            "kind": "structured",
             "input": "hello",
             "output": None,
             "metadata": None,

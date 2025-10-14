@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, ClassVar, Generic, TypeVar
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,15 +15,13 @@ checks, their execution results, and related enums. The key abstractions are:
 
 - `CheckStatus`: outcome categories for a single check execution
 - `CheckResult`: immutable record describing the outcome of a check
-- `Check`: generic base class to implement concrete checks
+- `Check`: base class to implement concrete checks
 
 It also provides a small global registry keyed by `Check.KIND` to help detect
 duplicate kinds during development. Set the environment variable
 `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` to control enforcement (enabled by
 default).
 """
-
-InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
 
 
 class CheckStatus(str, Enum):
@@ -160,7 +158,7 @@ class CheckResult(BaseModel):
 
 
 @discriminated_base
-class Check(Discriminated, Generic[InteractionT]):
+class Check(Discriminated):
     """Base class for checks.
 
     Subclasses should be registered using the @Check.register("kind") decorator
@@ -170,7 +168,7 @@ class Check(Discriminated, Generic[InteractionT]):
     name: str | None = Field(default=None, description="Check name")
     description: str | None = Field(default=None, description="Check description")
 
-    async def run(self, interaction: InteractionT) -> CheckResult:
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         """Execute the check against the provided interaction.
 
         Subclasses must override this method and return a `CheckResult`. The
@@ -178,7 +176,7 @@ class Check(Discriminated, Generic[InteractionT]):
 
         Parameters
         ----------
-        interaction : InteractionT
+        interaction : Interaction[Any, Any]
             The interaction to check against
         """
         raise NotImplementedError

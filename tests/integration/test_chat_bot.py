@@ -3,7 +3,7 @@
 from pydantic import BaseModel
 
 from giskard_checks.checks import StringMatchingCheck
-from giskard_checks.interactions import StructuredInteraction
+from giskard_checks.core.interactions import Interaction
 from giskard_checks.testing import TestCase
 from giskard_checks.testing._samples.message import Message
 
@@ -78,7 +78,7 @@ async def test_chat_bot_basic_conversation():
 
     testcase = TestCase(
         name="test_chat_bot_basic_conversation",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=conversation,
             output=answer,
         ),
@@ -113,7 +113,7 @@ async def test_chat_bot_context_relevance():
         ),
     ]
 
-    chat_interaction = StructuredInteraction(
+    chat_interaction = Interaction(
         input=conversation,
         output=answer,
         metadata={
@@ -182,7 +182,7 @@ async def test_chat_bot_conversation_history():
 
     testcase = TestCase(
         name="test_chat_bot_conversation_history",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=conversation,
             output=answer,
         ),
@@ -231,7 +231,7 @@ async def test_chat_bot_multiple_turns():
 
     testcase = TestCase(
         name="test_chat_bot_multiple_turns",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=conversation,
             output=answer,
         ),
@@ -293,7 +293,7 @@ async def test_chat_bot_edge_cases():
 
         testcase = TestCase(
             name=f"test_chat_bot_edge_cases_{test_name}",
-            interaction=StructuredInteraction(
+            interaction=Interaction(
                 input=conversation,
                 output=answer,
             ),
@@ -330,7 +330,7 @@ async def test_chat_bot_none_evaluation_mode():
 
     testcase = TestCase(
         name="test_chat_bot_none_evaluation_mode",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=conversation,
             output=answer,
         ),
@@ -374,7 +374,7 @@ async def test_chat_bot_none_evaluation_mode_failure():
 
     testcase = TestCase(
         name="test_chat_bot_none_evaluation_mode_failure",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=conversation,
             output=answer,
         ),

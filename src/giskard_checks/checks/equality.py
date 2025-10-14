@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, TypeVar
+from typing import Any, ClassVar
 
 from pydantic import Field
 
@@ -8,11 +8,9 @@ from giskard_checks.checks.extraction_check import ExtractionCheck
 from giskard_checks.core.check import Check, CheckResult
 from giskard_checks.core.interactions import Interaction
 
-InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
-
 
 @Check.register("equality")
-class EqualityCheck(ExtractionCheck[InteractionT]):
+class EqualityCheck(ExtractionCheck):
     """Check that validates if extracted values equal an expected value.
 
     This check extracts values from an interaction and compares them against a

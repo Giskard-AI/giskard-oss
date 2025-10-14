@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Awaitable
-from typing import Any, Callable, ClassVar, TypeVar
+from typing import Any, Callable, ClassVar
 
 from pydantic import Field
 
@@ -20,11 +20,9 @@ The callable can be synchronous or asynchronous and must return either:
 - a `CheckResult`: used as-is
 """
 
-InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
-
 
 @Check.register("fn")
-class FnCheck(Check[InteractionT]):
+class FnCheck(Check):
     """A `Check` whose logic is a Python callable.
 
     Parameters are modeled as pydantic fields. At runtime, the `run` method will
@@ -36,18 +34,18 @@ class FnCheck(Check[InteractionT]):
     serialized/deserialized. This is intended for programmatic/test use only.
     """
 
-    fn: Callable[[InteractionT], Awaitable[bool | CheckResult] | bool | CheckResult] = (
-        Field(
-            exclude=True,
-            repr=False,
-            description="Function to execute for the check. Not serializable.",
-        )
+    fn: Callable[
+        [Interaction[Any, Any]], Awaitable[bool | CheckResult] | bool | CheckResult
+    ] = Field(
+        exclude=True,
+        repr=False,
+        description="Function to execute for the check. Not serializable.",
     )
     success_message: str | None = None
     failure_message: str | None = None
     details: dict[str, Any] = Field(default_factory=dict)
 
-    async def run(self, interaction: InteractionT) -> CheckResult:
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         """Execute the function and normalize its result to a `CheckResult`."""
         result = self.fn(interaction)
         if inspect.isawaitable(result):
@@ -73,14 +71,16 @@ class FnCheck(Check[InteractionT]):
 
 
 def from_fn(
-    fn: Callable[[InteractionT], Awaitable[bool | CheckResult] | bool | CheckResult],
+    fn: Callable[
+        [Interaction[Any, Any]], Awaitable[bool | CheckResult] | bool | CheckResult
+    ],
     *,
     name: str | None = None,
     description: str | None = None,
     success_message: str | None = None,
     failure_message: str | None = None,
     details: dict[str, Any] | None = None,
-) -> Check[InteractionT]:
+) -> Check:
     """Create an `FnCheck` from a callable.
 
     Example

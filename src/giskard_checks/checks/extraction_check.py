@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -9,10 +9,8 @@ from giskard_checks.core.check import Check, CheckResult
 from giskard_checks.core.extraction import Extractor, JsonPathExtractor
 from giskard_checks.core.interactions import Interaction
 
-InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
 
-
-class ExtractionCheck(Check[InteractionT], ABC):
+class ExtractionCheck(Check, ABC):
     """Abstract base class for checks that extract values from interactions and evaluate them.
 
     This class provides common functionality for value extraction and evaluation patterns
@@ -32,7 +30,7 @@ class ExtractionCheck(Check[InteractionT], ABC):
         description="How to evaluate multiple values: 'any' (at least one must pass), 'all' (all must pass), or 'none' (none must pass)",
     )
 
-    def _extract_values(self, interaction: InteractionT) -> list[Any]:
+    def _extract_values(self, interaction: Interaction[Any, Any]) -> list[Any]:
         """Extract values using configured extractor or fall back to JSONPath.
 
         This method handles the common pattern of:
@@ -86,7 +84,7 @@ class ExtractionCheck(Check[InteractionT], ABC):
         """
         pass
 
-    async def run(self, interaction: InteractionT) -> CheckResult:
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         """Execute the check by extracting values and evaluating them.
 
         This method implements the common pattern:

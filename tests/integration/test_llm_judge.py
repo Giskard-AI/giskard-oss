@@ -3,7 +3,7 @@
 from pydantic import BaseModel
 
 from giskard_checks.checks import EqualityCheck, StringMatchingCheck
-from giskard_checks.interactions import StructuredInteraction
+from giskard_checks.core.interactions import Interaction
 from giskard_checks.testing import TestCase
 
 
@@ -57,7 +57,7 @@ async def test_llm_judge_basic_success():
 
     testcase = TestCase(
         name="test_llm_judge_basic_success",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=input_data,
             output=result,
         ),
@@ -92,7 +92,7 @@ async def test_llm_judge_basic_failure():
 
     testcase = TestCase(
         name="test_llm_judge_basic_failure",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=input_data,
             output=result,
         ),
@@ -127,7 +127,7 @@ async def test_llm_judge_partial_match():
 
     testcase = TestCase(
         name="test_llm_judge_partial_match",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=input_data,
             output=result,
         ),
@@ -162,7 +162,7 @@ async def test_llm_judge_multiple_checks_mixed_results():
 
     testcase = TestCase(
         name="test_llm_judge_multiple_checks_mixed_results",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=input_data,
             output=result,
         ),
@@ -202,7 +202,7 @@ async def test_llm_judge_with_metadata():
 
     testcase = TestCase(
         name="test_llm_judge_with_metadata",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=input_data,
             output=result,
             metadata={
@@ -247,7 +247,7 @@ async def test_llm_judge_error_handling():
 
     testcase = TestCase(
         name="test_llm_judge_error_handling",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=input_data,
             output=result,
         ),
@@ -305,7 +305,7 @@ async def test_llm_judge_complex_evaluation():
 
         testcase = TestCase(
             name=f"test_llm_judge_complex_evaluation_{i}",
-            interaction=StructuredInteraction(
+            interaction=Interaction(
                 input=input_data,
                 output=result,
             ),
@@ -336,7 +336,7 @@ async def test_llm_judge_none_evaluation_mode():
 
     testcase = TestCase(
         name="test_llm_judge_none_evaluation_mode",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=input_data,
             output=result,
         ),
@@ -380,7 +380,7 @@ async def test_llm_judge_none_evaluation_mode_failure():
 
     testcase = TestCase(
         name="test_llm_judge_none_evaluation_mode_failure",
-        interaction=StructuredInteraction(
+        interaction=Interaction(
             input=input_data,
             output=result,
         ),

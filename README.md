@@ -25,7 +25,7 @@ Define an interaction and a simple check that validates it:
 
 ```python
 from pydantic import BaseModel
-from giskard_checks.interactions import StructuredInteraction
+from giskard_checks.core.interactions import Interaction
 from giskard_checks.checks import from_fn
 from giskard_checks.testing import TestCase
 
@@ -34,7 +34,7 @@ class Output(BaseModel):
     moderated: bool
 
 
-interaction = StructuredInteraction[str, Output](
+interaction = Interaction[str, Output](
     input="some text",
     output=Output(moderated=False),
 )
@@ -73,7 +73,7 @@ API Overview
 Core
 
 - `giskard_checks.core.Interaction[InputT, OutputT]`: generic interaction model.
-- `giskard_checks.core.Check[InteractionT]`: base class for checks.
+- `giskard_checks.core.Check`: base class for checks.
 - `giskard_checks.core.CheckResult`: immutable result of a check execution with
   convenience boolean properties (`passed`, `failed`, `errored`, `skipped`).
 
@@ -96,7 +96,7 @@ Checks
 
 Interactions
 
-- `giskard_checks.interactions.StructuredInteraction[In, Out]`: base interaction
+- `giskard_checks.core.interactions.Interaction[In, Out]`: base interaction
   for structured inputs/outputs with full type safety and serialization support.
 
 Testing
@@ -132,13 +132,8 @@ class MyCustomCheck(Check[Interaction[str, str]]):
     async def run(self, interaction):
         return CheckResult.success("Check passed")
 
-# Custom interaction with automatic registration
-@Interaction.register("my_custom_interaction")
-class MyCustomInteraction(Interaction[str, str]):
-    pass
-
 # Serialize and deserialize test cases
-interaction = MyCustomInteraction(input="test", output="result")
+interaction = Interaction(input="test", output="result")
 check = MyCustomCheck(name="test")
 testcase = TestCase(interaction=interaction, checks=[check], name="example")
 
@@ -161,12 +156,12 @@ Create a new check by subclassing `Check` and defining a unique `KIND`:
 ```python
 from giskard_checks.core import Check, CheckResult, Interaction
 
-class AdvancedSecurityCheck(Check[Interaction[str, str]]):
+class AdvancedSecurityCheck(Check):
     KIND = "advanced_security"  # Must be unique across all checks
 
     threshold: float = 0.8  # Custom fields using Pydantic
 
-    async def run(self, interaction: Interaction[str, str]) -> CheckResult:
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         # Your check logic here
         score = await some_security_analysis(interaction.output)
 
@@ -306,15 +301,15 @@ def test_custom_serialization():
 Structured data quickstart
 ---------------------------
 
-Evaluate structured data using `StructuredInteraction` and the built-in
+Evaluate structured data using `Interaction` and the built-in
 `StringMatchingCheck`:
 
 ```python
-from giskard_checks.interactions import StructuredInteraction
+from giskard_checks.core.interactions import Interaction
 from giskard_checks.checks import StringMatchingCheck
 from giskard_checks.testing import TestCase
 
-interaction = StructuredInteraction(
+interaction = Interaction(
     input={"question": "What is the capital of France?"},
     output={"answer": "Paris is the capital of France."},
 )
@@ -335,7 +330,7 @@ assert result.passed
 
 Notes:
 
-- `StructuredInteraction` is the base interaction type for all structured data with full type safety.
+- `Interaction` is the base interaction type for all data with full type safety.
 - `StringMatchingCheck` searches strings selected by `key` (JSONPath). When the
   key resolves to a list, set `evaluation_mode="all"` to require all items contain the
   substring; otherwise any match passes.
