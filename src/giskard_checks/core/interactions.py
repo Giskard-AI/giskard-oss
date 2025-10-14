@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel
-
-from ..utils.discriminated import Discriminated, discriminated_base
+from ..utils.discriminated import Discriminated
 
 """Generic interaction model.
 

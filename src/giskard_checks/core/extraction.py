@@ -37,3 +37,17 @@ class JsonPathExtractor(Extractor):
             value = getattr(item, "value", item)
             results.append(value)
         return results
+
+
+def resolve(
+    interaction: Interaction[Any, Any], key: str, multiple: bool = False
+) -> list[Any] | Any | None:
+    expr = parse(key)
+    matches = expr.find(interaction.model_dump())
+
+    if not matches:
+        return [] if multiple else None
+
+    values = [m.value for m in matches]
+
+    return values if multiple else values[0]
