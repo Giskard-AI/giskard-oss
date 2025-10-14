@@ -40,12 +40,12 @@ async def test_chat_interaction_roundtrip_serialization_and_execution():
     assert before_statuses == [CheckStatus.PASS, CheckStatus.FAIL]
 
     # Serialize and JSON roundtrip to ensure JSON compatibility
-    payload = tc.serialize()
+    payload = tc.model_dump()
     payload_json = json.dumps(payload)
     payload_roundtrip = json.loads(payload_json)
 
     # Reconstruct
-    tc2 = TestCase.deserialize(payload_roundtrip)
+    tc2 = TestCase.model_validate(payload_roundtrip)
 
     # Structural equivalence
     assert tc2.name == tc.name

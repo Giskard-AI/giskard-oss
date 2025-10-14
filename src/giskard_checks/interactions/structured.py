@@ -13,6 +13,7 @@ In = TypeVar("In")
 Out = TypeVar("Out")
 
 
+@Interaction.register("structured")
 class StructuredInteraction(Interaction[In, Out], Generic[In, Out]):
     """Typed interaction carrying structured input and output payloads.
 
@@ -40,5 +41,3 @@ class StructuredInteraction(Interaction[In, Out], Generic[In, Out]):
     ...     output=Output(sentiment="positive", score=0.8)
     ... )
     """
-
-    KIND: ClassVar[str | None] = "structured"

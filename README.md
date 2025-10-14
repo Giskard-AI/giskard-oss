@@ -77,13 +77,12 @@ Core
 - `giskard_checks.core.CheckResult`: immutable result of a check execution with
   convenience boolean properties (`passed`, `failed`, `errored`, `skipped`).
 
-Registry and Serialization
+Core Types
 
-- `giskard_checks.core.Registry[T]`: generic registry for managing kinds and their associated classes.
-- `giskard_checks.core.UnknownKindError`: exception raised when attempting to deserialize an unregistered kind.
-- `giskard_checks.core.DuplicateKindError`: exception raised when attempting to register a kind that already exists.
-- `giskard_checks.core.list_registered_check_kinds()`: list all registered check kinds.
-- `giskard_checks.core.list_registered_interaction_kinds()`: list all registered interaction kinds.
+- `giskard_checks.core.Check`: base class for all checks with discriminated union support
+- `giskard_checks.core.CheckResult`: immutable result from check execution
+- `giskard_checks.core.CheckStatus`: enum for check outcomes (PASS, FAIL, ERROR, SKIP)
+- `giskard_checks.core.Interaction`: base class for all interactions with discriminated union support
 
 Checks
 
@@ -112,31 +111,31 @@ Usage Notes
 
 - Define your own `Check` subclasses with a unique class-level `KIND` string.
 - All custom checks and interactions are automatically registered when their classes are imported.
-- Use `serialize()` and `deserialize()` methods for reliable serialization (replaces `to_dict`/`from_dict`).
+- Use `model_dump()` and `model_validate()` methods for reliable serialization (replaces `to_dict`/`from_dict`).
 - You can customize result messages and attach additional context in `details`
   via `CheckResult` or by returning `bool` from `from_fn`.
 - Environment variable `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` controls
   whether duplicate `KIND`s raise (default: enabled).
 
-Registry and Serialization
---------------------------
+Serialization
+-------------
 
-The library uses an explicit registry system for serialization. Classes with a `KIND` attribute are automatically registered when imported:
+The library uses Pydantic's discriminated unions for polymorphic serialization. Classes are automatically registered when imported:
 
 ```python
 from giskard_checks.core import Check, Interaction
 from giskard_checks.testing import TestCase
 
 # Custom check with automatic registration
+@Check.register("my_custom_check")
 class MyCustomCheck(Check[Interaction[str, str]]):
-    KIND = "my_custom_check"
-
     async def run(self, interaction):
-        return self.success("Check passed")
+        return CheckResult.success("Check passed")
 
 # Custom interaction with automatic registration
+@Interaction.register("my_custom_interaction")
 class MyCustomInteraction(Interaction[str, str]):
-    KIND = "my_custom_interaction"
+    pass
 
 # Serialize and deserialize test cases
 interaction = MyCustomInteraction(input="test", output="result")
@@ -144,13 +143,13 @@ check = MyCustomCheck(name="test")
 testcase = TestCase(interaction=interaction, checks=[check], name="example")
 
 # Serialize to dict
-serialized = testcase.serialize()
+serialized = testcase.model_dump()
 
 # Deserialize back (requires classes to be imported)
-restored = TestCase.deserialize(serialized)
+restored = TestCase.model_validate(serialized)
 ```
 
-**Important**: For deserialization to work, all custom classes must be imported before calling `deserialize()`. The registry only knows about classes that have been loaded into memory.
+**Important**: For deserialization to work, all custom classes must be imported before calling `model_validate()`. The registry only knows about classes that have been loaded into memory.
 
 Creating Custom Checks and Interactions
 ----------------------------------------
@@ -242,8 +241,8 @@ testcase = TestCase(
 )
 
 # Test serialization round-trip
-serialized = testcase.serialize()
-restored = TestCase.deserialize(serialized)
+serialized = testcase.model_dump()
+restored = TestCase.model_validate(serialized)
 
 # Verify types are preserved
 assert isinstance(restored.interaction, ChatInteraction)
@@ -251,18 +250,18 @@ assert isinstance(restored.checks[0], AdvancedSecurityCheck)
 assert restored.checks[0].threshold == 0.7
 ```
 
-Troubleshooting Registry Issues
--------------------------------
+Troubleshooting Serialization Issues
+------------------------------------
 
 ### Common Errors and Solutions
 
-**UnknownKindError**: "Unknown check kind 'my_custom_check'"
+**ValidationError**: "Kind is not provided for Check"
 - **Cause**: Custom class not imported before deserialization
-- **Solution**: Import all custom classes before calling `deserialize()`
+- **Solution**: Import all custom classes before calling `model_validate()`
 ```python
 # Import before deserializing
 from my_module import MyCustomCheck
-restored = TestCase.deserialize(data)
+restored = TestCase.model_validate(data)
 ```
 
 **DuplicateKindError**: "Duplicate kind 'my_check' detected"
@@ -278,16 +277,17 @@ class CheckA(Check): KIND = "check_a"
 class CheckB(Check): KIND = "check_b"
 ```
 
-**Missing KIND attribute**
-- **Cause**: Subclass doesn't define a `KIND` attribute
-- **Solution**: Add a unique `KIND` to your class
+**Missing registration**
+- **Cause**: Subclass not registered with a decorator
+- **Solution**: Use the `@Check.register()` decorator
 ```python
+@Check.register("my_check")
 class MyCheck(Check):
-    KIND = "my_unique_check"  # Required for registration
+    pass
 ```
 
 **Import order issues in tests**
-- **Cause**: Tests deserialize before importing custom classes
+- **Cause**: Tests call `model_validate()` before importing custom classes
 - **Solution**: Import custom modules in test setup
 ```python
 import pytest
@@ -295,7 +295,7 @@ from my_module import MyCustomCheck, MyCustomInteraction  # Import first
 
 def test_custom_serialization():
     # Now deserialization will work
-    restored = TestCase.deserialize(serialized_data)
+    restored = TestCase.model_validate(serialized_data)
 ```
 
 ### Environment Variables

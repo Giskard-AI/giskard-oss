@@ -23,6 +23,7 @@ The callable can be synchronous or asynchronous and must return either:
 InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
 
 
+@Check.register("fn")
 class FnCheck(Check[InteractionT]):
     """A `Check` whose logic is a Python callable.
 
@@ -34,8 +35,6 @@ class FnCheck(Check[InteractionT]):
     serialization. As a result, `FnCheck` instances cannot be reliably
     serialized/deserialized. This is intended for programmatic/test use only.
     """
-
-    KIND: ClassVar[str | None] = "fn"
 
     fn: Callable[[InteractionT], Awaitable[bool | CheckResult] | bool | CheckResult] = (
         Field(

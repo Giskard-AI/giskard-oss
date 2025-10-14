@@ -9,9 +9,8 @@ from giskard_checks.interactions import StructuredInteraction
 from giskard_checks.testing.testcase import TestCase
 
 
+@Check.register("contains")
 class ContainsCheck(Check[StructuredInteraction[str, str]]):
-    KIND = "contains"
-
     needle: str
 
     async def run(self, interaction: StructuredInteraction[str, str]) -> CheckResult:
@@ -24,9 +23,8 @@ class ContainsCheck(Check[StructuredInteraction[str, str]]):
         )
 
 
+@Check.register("equals")
 class OutputEqualsCheck(Check[StructuredInteraction[str, str]]):
-    KIND = "equals"
-
     expected: str
 
     async def run(self, interaction: StructuredInteraction[str, str]) -> CheckResult:
@@ -39,9 +37,8 @@ class OutputEqualsCheck(Check[StructuredInteraction[str, str]]):
         )
 
 
+@Check.register("explode")
 class ExplodeCheck(Check[StructuredInteraction[str, str]]):
-    KIND = "explode"
-
     async def run(self, interaction: StructuredInteraction[str, str]) -> CheckResult:  # type: ignore[override]
         raise RuntimeError("kaboom")
 
@@ -65,8 +62,8 @@ async def test_testcase_roundtrip_serialization_custom_checks():
     assert before_statuses == [CheckStatus.PASS, CheckStatus.PASS, CheckStatus.ERROR]
 
     # Serialize and reconstruct
-    payload = tc.serialize()
-    tc2 = TestCase.deserialize(payload)
+    payload = tc.model_dump()
+    tc2 = TestCase.model_validate(payload)
 
     # Structural equivalence
     assert tc2.name == tc.name
@@ -103,9 +100,9 @@ def test_deserialize_rejects_check_without_kind():
     }
 
     with pytest.raises(ValueError) as err:
-        TestCase.deserialize(payload)
+        TestCase.model_validate(payload)
 
-    assert "Serialized check must include a non-empty 'kind' field" in str(err.value)
+    assert "Kind is not provided for" in str(err.value)
 
 
 def test_deserialize_rejects_check_with_empty_kind():
@@ -125,6 +122,6 @@ def test_deserialize_rejects_check_with_empty_kind():
     }
 
     with pytest.raises(ValueError) as err:
-        TestCase.deserialize(payload)
+        TestCase.model_validate(payload)
 
-    assert "Serialized check must include a non-empty 'kind' field" in str(err.value)
+    assert "Kind" in str(err.value) and "not registered" in str(err.value)

@@ -48,10 +48,10 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - Specialized as `StructuredInteraction[In, Out]`.
 
 - Check[InteractionT] (in `core/check.py`)
-  - Base class to implement concrete checks. Subclasses must define a class-level `KIND: str`.
-  - Key fields: `name`, `description`. `kind` is a computed field derived from `KIND`.
-  - Global registry keyed by `KIND` to support deserialization and uniqueness validation.
-  - Automatic registration via `__init_subclass__` when classes are imported.
+  - Base class to implement concrete checks. Subclasses use `@Check.register("kind")` decorator.
+  - Key fields: `name`, `description`. `kind` is a computed field from registration.
+  - Discriminated union support for polymorphic serialization and deserialization.
+  - Automatic registration when classes are imported.
 
 - CheckResult (in `core/check.py`)
   - Immutable result model for a single check execution.
@@ -62,11 +62,10 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - Base classes for extracting values from interactions.
   - `JsonPathExtractor` uses JSONPath expressions to extract specific fields from interaction data.
 
-- Registry infrastructure (in `core/registry.py`)
-  - `Registry[T]`: Generic registry for managing kinds and their associated classes.
-  - `UnknownKindError`: Raised when attempting to deserialize an unregistered kind.
-  - `DuplicateKindError`: Raised when attempting to register a kind that already exists.
-  - Provides registration, retrieval, and listing utilities with clear error messages.
+- Discriminated union infrastructure (in `utils/discriminated.py`)
+  - `Discriminated`: Base class for polymorphic types with automatic `kind` field
+  - `discriminated_base`: Decorator to mark base classes for discriminated unions
+  - Automatic registration and deserialization using Pydantic's discriminated unions
 
 - TestCase and TestRunner (in `testing/`)
   - `TestCase` bundles an `Interaction` and a sequence of `Check`s and exposes `await run()`.
@@ -92,26 +91,13 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - Typed interaction for structured payloads.
 
 
-### Serialization model
+### Serialization
 
-The library uses an explicit registry-based serialization system that replaces dynamic imports with explicit registration patterns.
+The library uses standard Pydantic serialization with discriminated unions for polymorphic types.
 
-- Registry-based approach
-  - All `Check` and `Interaction` subclasses with a `KIND` attribute are automatically registered via `__init_subclass__`.
-  - `serialize()` includes the computed `kind` field for registry-based deserialization.
-  - `deserialize()` uses the global registries to instantiate the correct classes.
-
-- Checks
-  - Each `Check` exposes a computed `kind` used during serialization.
-  - Deserialization uses `Check.deserialize()` with registry lookup based on the `kind` field.
-
-- Interactions
-  - Each `Interaction` exposes a computed `kind` used during serialization.
-  - Deserialization uses `Interaction.deserialize()` with registry lookup based on the `kind` field.
-
-- TestCase
-  - `serialize()` embeds the interaction and checks using their respective `serialize()` methods.
-  - `deserialize()` reconstructs `Interaction` and checks using their respective `deserialize()` methods.
+- All models use standard Pydantic `model_dump()` and `model_validate()` methods
+- Discriminated unions automatically handle polymorphic serialization using the `kind` field
+- No custom serialization logic is needed
 
 ### Typical workflows
 
@@ -169,7 +155,7 @@ Import namespaces re-exported by `giskard_checks.__init__`:
 from giskard_checks import core, interactions, testing, checks
 ```
 
-- `core` → `Check`, `CheckResult`, `Interaction`, `Registry`, `UnknownKindError`, `DuplicateKindError`
+- `core` → `Check`, `CheckResult`, `CheckStatus`, `Interaction`
 - `interactions` → `StructuredInteraction`
 - `testing` → `TestCase`, `runner` (via module import)
 - `checks` → `from_fn`, `FnCheck`, `StringMatchingCheck`, `EqualityCheck`, `ExtractionCheck`

@@ -5,12 +5,13 @@ from typing import Any, ClassVar, TypeVar
 from pydantic import Field
 
 from giskard_checks.checks.extraction_check import ExtractionCheck
-from giskard_checks.core.check import CheckResult
+from giskard_checks.core.check import Check, CheckResult
 from giskard_checks.core.interactions import Interaction
 
 InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
 
 
+@Check.register("equality")
 class EqualityCheck(ExtractionCheck[InteractionT]):
     """Check that validates if extracted values equal an expected value.
 
@@ -23,8 +24,6 @@ class EqualityCheck(ExtractionCheck[InteractionT]):
     expected : Any
         The expected value to compare against the extracted values
     """
-
-    KIND: ClassVar[str | None] = "equality"
 
     expected: Any = Field(..., description="The expected value to compare against")
 

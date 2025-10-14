@@ -40,27 +40,8 @@ class TestCase(BaseModel, Generic[InteractionT]):
 
     name: str | None = Field(None, description="Test case name")
     # Validation is skipped for the interaction field to allow for generic deserialization
-    interaction: SkipValidation[InteractionT] = Field(
-        ..., description="Test case interaction"
-    )
-    checks: Sequence[SkipValidation[Check[InteractionT]]] = Field(
-        ..., description="Test case checks"
-    )
-
-    @field_validator("interaction")
-    def validate_interaction(cls, val):
-        if not isinstance(val, Interaction):
-            raise TypeError(
-                "Wrong type for 'interaction', must be subclass of Interaction"
-            )
-        return val
-
-    @field_validator("checks")
-    def validate_checks(cls, val):
-        for chk in val:
-            if not isinstance(chk, Check):
-                raise TypeError("Wrong type for 'checks', must be subclass of Check")
-        return val
+    interaction: InteractionT = Field(..., description="Test case interaction")
+    checks: Sequence[Check[InteractionT]] = Field(..., description="Test case checks")
 
     async def run(self) -> TestCaseResult:
         """Execute the test case using the configured `TestRunner`."""
@@ -69,43 +50,3 @@ class TestCase(BaseModel, Generic[InteractionT]):
 
         runner = get_runner()
         return await runner.run(self)
-
-    # --- Serialization helpers -------------------------------------------------
-    def serialize(self) -> dict[str, Any]:
-        """Serialize the TestCase into a JSON-friendly dict.
-
-        Uses the new registry-based serialization for both interactions and checks.
-        The `kind` field in each object enables registry-based deserialization.
-        """
-        interaction_payload = self.interaction.serialize()
-        checks_payload = [chk.serialize() for chk in self.checks]
-
-        return {
-            "name": self.name,
-            "interaction": interaction_payload,
-            "checks": checks_payload,
-        }
-
-    @classmethod
-    def deserialize(cls, payload: dict[str, Any]) -> "TestCase[Any]":
-        """Reconstruct a TestCase from a dict produced by `serialize()`.
-
-        Uses the new registry-based deserialization for both interactions and checks.
-        """
-        from giskard_checks.core.check import Check
-
-        name = payload.get("name")
-
-        # Deserialize interaction using registry
-        inter_info = payload.get("interaction")
-        if not isinstance(inter_info, dict):
-            raise ValueError("Invalid interaction serialization format")
-        interaction = Interaction.deserialize(inter_info)
-
-        # Deserialize checks using registry
-        checks_data = payload.get("checks")
-        if not isinstance(checks_data, list):
-            raise ValueError("Invalid checks serialization format")
-        checks = [Check.deserialize(cd) for cd in checks_data]
-
-        return cls(name=name, interaction=interaction, checks=checks)  # pyright: ignore

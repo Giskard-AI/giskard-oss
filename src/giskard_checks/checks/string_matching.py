@@ -5,12 +5,13 @@ from typing import Any, ClassVar, TypeVar
 from pydantic import Field
 
 from giskard_checks.checks.extraction_check import ExtractionCheck
-from giskard_checks.core.check import CheckResult
+from giskard_checks.core.check import Check, CheckResult
 from giskard_checks.core.interactions import Interaction
 
 InteractionT = TypeVar("InteractionT", bound=Interaction[Any, Any])
 
 
+@Check.register("string_matching")
 class StringMatchingCheck(ExtractionCheck[InteractionT]):
     """Check that validates if a specific string content is present in interaction outputs.
 
@@ -23,8 +24,6 @@ class StringMatchingCheck(ExtractionCheck[InteractionT]):
     content : str
         The string content to search for in the extracted values
     """
-
-    KIND: ClassVar[str | None] = "string_matching"
 
     content: str = Field(..., description="The string to match in the output")
 

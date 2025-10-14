@@ -4,6 +4,7 @@ from giskard_checks.core import Check, CheckResult
 from giskard_checks.testing._samples.custom_interaction import CustomInteraction
 
 
+@Check.register("starts_with")
 class StartsWithCheck(Check[CustomInteraction]):
     """Check that validates if the input starts with a specified prefix.
 
@@ -15,8 +16,6 @@ class StartsWithCheck(Check[CustomInteraction]):
     prefix : str
         The prefix string that the input should start with
     """
-
-    KIND = "starts_with"
 
     prefix: str
 
@@ -33,6 +32,7 @@ class StartsWithCheck(Check[CustomInteraction]):
         )
 
 
+@Check.register("equals_out")
 class EqualsOutputCheck(Check[CustomInteraction]):
     """Check that validates if the output equals an expected value.
 
@@ -44,8 +44,6 @@ class EqualsOutputCheck(Check[CustomInteraction]):
     expected : str
         The expected output value to compare against
     """
-
-    KIND = "equals_out"
 
     expected: str
 
