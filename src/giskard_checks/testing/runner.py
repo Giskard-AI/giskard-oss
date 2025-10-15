@@ -48,6 +48,48 @@ class TestCaseResult(BaseModel):
         """True when all checks were skipped."""
         return all(result.skipped for result in self.results) and len(self.results) > 0
 
+    def format_failures(self) -> list[str]:
+        """Format failed check results into a list of readable error messages.
+
+        Returns
+        -------
+        list[str]
+            List of formatted error messages for failed checks. Each message includes
+            the check name/kind and the failure reason.
+        """
+        failure_messages: list[str] = []
+        for result in self.results:
+            if result.failed or result.errored:
+                check_name: str = result.details.get(
+                    "check_name"
+                ) or result.details.get("check_kind", "Unknown check")
+                status = "ERRORED" if result.errored else "FAILED"
+                message = result.message or "No specific error message provided"
+                failure_messages.append(f"{check_name} {status}: {message}")
+        return failure_messages
+
+    def assert_passed(self) -> None:
+        """Assert that the test case passed, raising an AssertionError with formatted failure messages if not.
+
+        This is a convenience method for test code that combines the assertion check
+        with formatted error reporting. It's equivalent to:
+
+        ```python
+        assert result.passed, result.format_failures()
+        ```
+
+        Raises
+        ------
+        AssertionError
+            If the test case did not pass, with formatted failure messages as the error message.
+        """
+        if not self.passed:
+            failure_messages = self.format_failures()
+            error_msg = "Test case failed with the following errors:\n" + "\n".join(
+                failure_messages
+            )
+            raise AssertionError(error_msg)
+
 
 class TestRunner:
     """Execute checks for a `TestCase` and produce a `TestCaseResult`.
