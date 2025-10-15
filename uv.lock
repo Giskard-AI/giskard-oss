@@ -434,6 +434,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "counterpoint" },
+    { name = "jinja2" },
     { name = "jsonpath-ng" },
     { name = "pydantic" },
 ]
@@ -447,8 +448,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "counterpoint", git = "https://github.com/Giskard-AI/counterpoint.git?tag=v0.2.3" },
-    { name = "jsonpath-ng", specifier = ">=1.7.0" },
-    { name = "pydantic", specifier = "~=2.11.7" },
+    { name = "jinja2", specifier = ">=3.1.6,<4" },
+    { name = "jsonpath-ng", specifier = ">=1.7.0,<2" },
+    { name = "pydantic", specifier = "~=2.11.7,<3" },
 ]
 
 [package.metadata.requires-dev]

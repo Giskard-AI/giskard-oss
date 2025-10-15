@@ -39,7 +39,7 @@ class OutputEqualsCheck(Check):
 
 @Check.register("explode")
 class ExplodeCheck(Check):
-    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:  # type: ignore[override]
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         raise RuntimeError("kaboom")
 
 

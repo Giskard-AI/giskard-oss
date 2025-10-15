@@ -11,7 +11,7 @@ class StartsWithCheck(Check):
 
     prefix: str
 
-    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:  # type: ignore[override]
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         ok = interaction.inputs is not None and str(interaction.inputs).startswith(
             self.prefix
         )
@@ -29,7 +29,7 @@ class EqualsOutputCheck(Check):
 
     expected: str
 
-    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:  # type: ignore[override]
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         if interaction.outputs == self.expected:
             return CheckResult.success(
                 message="output matched",

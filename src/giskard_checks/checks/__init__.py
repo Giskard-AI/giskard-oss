@@ -1,5 +1,6 @@
 """Built-in check implementations and helpers."""
 
+from .conformity import Conformity
 from .equality import EqualityCheck
 from .extraction_check import ExtractionCheck
 from .fn import FnCheck, from_fn
@@ -13,4 +14,5 @@ __all__ = [
     "EqualityCheck",
     "ExtractionCheck",
     "Groundedness",
+    "Conformity",
 ]
