@@ -48,3 +48,22 @@ class TestCase(BaseModel):
 
         runner = get_runner()
         return await runner.run(self)
+
+    async def assert_passed(self) -> None:
+        """Run the test case and assert that it passed.
+
+        This is a convenience method that combines running the test case with
+        asserting that it passed. It's equivalent to:
+
+        ```python
+        result = await test_case.run()
+        result.assert_passed()
+        ```
+
+        Raises
+        ------
+        AssertionError
+            If the test case did not pass, with formatted failure messages as the error message.
+        """
+        result = await self.run()
+        result.assert_passed()

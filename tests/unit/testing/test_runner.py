@@ -1,9 +1,13 @@
 """Tests for the test runner and result formatting utilities."""
 
+from typing import Any
+
 import pytest
 
-from giskard_checks.core.check import CheckResult, CheckStatus
+from giskard_checks.core.check import Check, CheckResult, CheckStatus
+from giskard_checks.core.interactions import Interaction
 from giskard_checks.testing.runner import TestCaseResult
+from giskard_checks.testing.testcase import TestCase
 
 
 class TestTestCaseResult:
@@ -156,3 +160,102 @@ class TestTestCaseResult:
         assert (
             "Unknown check FAILED: No specific error message provided" in error_message
         )
+
+
+class TestTestCase:
+    """Test the TestCase class and its utility methods."""
+
+    @pytest.mark.asyncio
+    async def test_assert_passed_with_success(self):
+        """Test assert_passed does not raise when all checks pass."""
+        # Create a simple interaction and check that will pass
+        interaction = Interaction(
+            inputs={"input": "test"},
+            outputs={"output": "test"},
+        )
+
+        # Create a mock check that always passes
+        @Check.register("mock_passing")
+        class MockPassingCheck(Check):
+            async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
+                _ = interaction  # Mark as used to avoid linting warning
+                return CheckResult(
+                    status=CheckStatus.PASS,
+                    message="Check passed",
+                    details={"check_name": "mock_check", "check_kind": "mock_passing"},
+                )
+
+        test_case = TestCase(
+            name="test_assert_passed_success",
+            interaction=interaction,
+            checks=[MockPassingCheck()],
+        )
+
+        # Should not raise an exception
+        await test_case.assert_passed()
+
+    @pytest.mark.asyncio
+    async def test_assert_passed_with_failures(self):
+        """Test assert_passed raises AssertionError with formatted messages when checks fail."""
+        # Create a simple interaction
+        interaction = Interaction(
+            inputs={"input": "test"},
+            outputs={"output": "test"},
+        )
+
+        # Create a mock check that always fails
+        @Check.register("mock_failing")
+        class MockFailingCheck(Check):
+            async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
+                _ = interaction  # Mark as used to avoid linting warning
+                return CheckResult(
+                    status=CheckStatus.FAIL,
+                    message="This check failed",
+                    details={"check_name": "mock_check", "check_kind": "mock_failing"},
+                )
+
+        test_case = TestCase(
+            name="test_assert_passed_failure",
+            interaction=interaction,
+            checks=[MockFailingCheck()],
+        )
+
+        with pytest.raises(AssertionError) as exc_info:
+            await test_case.assert_passed()
+
+        error_message = str(exc_info.value)
+        assert "Test case failed with the following errors:" in error_message
+        assert "mock_failing FAILED: This check failed" in error_message
+
+    @pytest.mark.asyncio
+    async def test_assert_passed_with_errors(self):
+        """Test assert_passed raises AssertionError when checks error."""
+        # Create a simple interaction
+        interaction = Interaction(
+            inputs={"input": "test"},
+            outputs={"output": "test"},
+        )
+
+        # Create a mock check that always errors
+        @Check.register("mock_erroring")
+        class MockErroringCheck(Check):
+            async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
+                _ = interaction  # Mark as used to avoid linting warning
+                return CheckResult(
+                    status=CheckStatus.ERROR,
+                    message="This check errored",
+                    details={"check_name": "mock_check", "check_kind": "mock_erroring"},
+                )
+
+        test_case = TestCase(
+            name="test_assert_passed_error",
+            interaction=interaction,
+            checks=[MockErroringCheck()],
+        )
+
+        with pytest.raises(AssertionError) as exc_info:
+            await test_case.assert_passed()
+
+        error_message = str(exc_info.value)
+        assert "Test case failed with the following errors:" in error_message
+        assert "mock_erroring ERRORED: This check errored" in error_message
