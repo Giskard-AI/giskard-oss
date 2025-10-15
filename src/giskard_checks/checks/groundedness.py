@@ -2,14 +2,14 @@ from typing import Any
 
 from pydantic import Field
 
-from giskard_checks.checks.llm_check import LLMCheck
+from giskard_checks.checks.llm_check import TemplateLLMCheck
 from giskard_checks.core.check import Check
 from giskard_checks.core.extraction import resolve
 from giskard_checks.core.interactions import Interaction
 
 
 @Check.register("groundedness")
-class Groundedness(LLMCheck):
+class Groundedness(TemplateLLMCheck):
     """LLM-based check that validates answers are grounded in context.
 
     Uses an LLM to determine if an answer is properly supported by
