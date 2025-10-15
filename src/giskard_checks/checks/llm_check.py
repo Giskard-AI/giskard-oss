@@ -254,7 +254,7 @@ class InlinePromptCheck(LLMCheck):
     >>> # With dynamic inputs from interaction
     >>> check = InlinePromptCheck(
     ...     template_content="Check if {{ text }} is positive",
-    ...     template_input_keys={"text": "$.output"},
+    ...     template_input_keys={"text": "$.outputs"},
     ...     name="dynamic_check"
     ... )
     >>>
@@ -262,7 +262,7 @@ class InlinePromptCheck(LLMCheck):
     >>> check = InlinePromptCheck(
     ...     template_content="Analyze {{ text }} with context {{ context }}",
     ...     template_input={"context": "sentiment analysis"},
-    ...     template_input_keys={"text": "$.output"},
+    ...     template_input_keys={"text": "$.outputs"},
     ...     name="mixed_check"
     ... )
     """

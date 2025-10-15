@@ -44,7 +44,7 @@ class ExtractionCheck(Check, ABC):
             return JsonPathExtractor(key=self.key).extract(interaction)
         else:
             # Default to selecting the output field via JSONPath
-            return JsonPathExtractor(key="output").extract(interaction)
+            return JsonPathExtractor(key="outputs").extract(interaction)
 
     @abstractmethod
     def _evaluate_value(self, value: Any) -> bool:

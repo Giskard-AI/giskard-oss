@@ -12,20 +12,20 @@ from giskard_checks.testing.testcase import TestCase
 async def test_chat_interaction_roundtrip_serialization_and_execution():
     # Prepare a simple chat interaction with one user input and one assistant output
     interaction = Interaction(
-        input=[Message(role="user", content="Say hello")],
-        output=[Message(role="assistant", content="Hello world!")],
+        inputs=[Message(role="user", content="Say hello")],
+        outputs=[Message(role="assistant", content="Hello world!")],
     )
 
     # One check that should pass, one that should fail
     chk_pass = StringMatchingCheck(
         name="contains_hello",
         content="Hello",
-        key="output[*].content",
+        key="outputs[*].content",
     )
     chk_fail = StringMatchingCheck(
         name="contains_bye",
         content="bye",
-        key="output[*].content",
+        key="outputs[*].content",
     )
 
     tc = TestCase(
@@ -56,9 +56,9 @@ async def test_chat_interaction_roundtrip_serialization_and_execution():
     assert isinstance(tc2.checks[0], StringMatchingCheck)
     assert isinstance(tc2.checks[1], StringMatchingCheck)
     assert getattr(tc2.checks[0], "content") == "Hello"
-    assert getattr(tc2.checks[0], "key") == "output[*].content"
+    assert getattr(tc2.checks[0], "key") == "outputs[*].content"
     assert getattr(tc2.checks[1], "content") == "bye"
-    assert getattr(tc2.checks[1], "key") == "output[*].content"
+    assert getattr(tc2.checks[1], "key") == "outputs[*].content"
 
     # Run after deserialization and compare outcomes
     after = await tc2.run()

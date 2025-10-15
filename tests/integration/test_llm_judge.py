@@ -58,17 +58,17 @@ async def test_llm_judge_basic_success():
     testcase = TestCase(
         name="test_llm_judge_basic_success",
         interaction=Interaction(
-            input=input_data,
-            output=result,
+            inputs=input_data,
+            outputs=result,
         ),
         checks=[
             EqualityCheck(
                 expected=True,
-                key="output.passed",
+                key="outputs.passed",
             ),
             EqualityCheck(
                 expected=1.0,
-                key="output.score",
+                key="outputs.score",
             ),
         ],
     )
@@ -93,17 +93,17 @@ async def test_llm_judge_basic_failure():
     testcase = TestCase(
         name="test_llm_judge_basic_failure",
         interaction=Interaction(
-            input=input_data,
-            output=result,
+            inputs=input_data,
+            outputs=result,
         ),
         checks=[
             EqualityCheck(
                 expected=False,
-                key="output.passed",
+                key="outputs.passed",
             ),
             EqualityCheck(
                 expected=0.0,
-                key="output.score",
+                key="outputs.score",
             ),
         ],
     )
@@ -128,17 +128,17 @@ async def test_llm_judge_partial_match():
     testcase = TestCase(
         name="test_llm_judge_partial_match",
         interaction=Interaction(
-            input=input_data,
-            output=result,
+            inputs=input_data,
+            outputs=result,
         ),
         checks=[
             EqualityCheck(
                 expected=True,
-                key="output.passed",
+                key="outputs.passed",
             ),
             StringMatchingCheck(
                 content="Answer is in the reference answer",
-                key="output.reason",
+                key="outputs.reason",
             ),
         ],
     )
@@ -163,22 +163,22 @@ async def test_llm_judge_multiple_checks_mixed_results():
     testcase = TestCase(
         name="test_llm_judge_multiple_checks_mixed_results",
         interaction=Interaction(
-            input=input_data,
-            output=result,
+            inputs=input_data,
+            outputs=result,
         ),
         checks=[
             EqualityCheck(
                 expected=True,
-                key="output.passed",
+                key="outputs.passed",
             ),
             EqualityCheck(
                 expected=1.0,
-                key="output.score",
+                key="outputs.score",
             ),
             # This check will fail, making the overall test fail
             EqualityCheck(
                 expected=False,
-                key="output.passed",
+                key="outputs.passed",
             ),
         ],
     )
@@ -203,8 +203,8 @@ async def test_llm_judge_with_metadata():
     testcase = TestCase(
         name="test_llm_judge_with_metadata",
         interaction=Interaction(
-            input=input_data,
-            output=result,
+            inputs=input_data,
+            outputs=result,
             metadata={
                 "model": "gpt-4",
                 "temperature": 0.1,
@@ -214,7 +214,7 @@ async def test_llm_judge_with_metadata():
         checks=[
             EqualityCheck(
                 expected=True,
-                key="output.passed",
+                key="outputs.passed",
             ),
             StringMatchingCheck(
                 content="gpt-4",
@@ -248,17 +248,17 @@ async def test_llm_judge_error_handling():
     testcase = TestCase(
         name="test_llm_judge_error_handling",
         interaction=Interaction(
-            input=input_data,
-            output=result,
+            inputs=input_data,
+            outputs=result,
         ),
         checks=[
             EqualityCheck(
                 expected=False,
-                key="output.passed",
+                key="outputs.passed",
             ),
             StringMatchingCheck(
                 content="Answer is not in the reference answer",
-                key="output.reason",
+                key="outputs.reason",
             ),
         ],
     )
@@ -306,13 +306,13 @@ async def test_llm_judge_complex_evaluation():
         testcase = TestCase(
             name=f"test_llm_judge_complex_evaluation_{i}",
             interaction=Interaction(
-                input=input_data,
-                output=result,
+                inputs=input_data,
+                outputs=result,
             ),
             checks=[
                 EqualityCheck(
                     expected=test_case["expected_passed"],
-                    key="output.passed",
+                    key="outputs.passed",
                 ),
             ],
         )
@@ -337,26 +337,26 @@ async def test_llm_judge_none_evaluation_mode():
     testcase = TestCase(
         name="test_llm_judge_none_evaluation_mode",
         interaction=Interaction(
-            input=input_data,
-            output=result,
+            inputs=input_data,
+            outputs=result,
         ),
         checks=[
             # Test that "error" is NOT present in the reason
             StringMatchingCheck(
                 content="error",
-                key="output.reason",
+                key="outputs.reason",
                 evaluation_mode="none",
             ),
             # Test that "failed" is NOT present in the reason
             StringMatchingCheck(
                 content="failed",
-                key="output.reason",
+                key="outputs.reason",
                 evaluation_mode="none",
             ),
             # Test that "Answer is in the reference answer" IS present
             StringMatchingCheck(
                 content="Answer is in the reference answer",
-                key="output.reason",
+                key="outputs.reason",
             ),
         ],
     )
@@ -381,14 +381,14 @@ async def test_llm_judge_none_evaluation_mode_failure():
     testcase = TestCase(
         name="test_llm_judge_none_evaluation_mode_failure",
         interaction=Interaction(
-            input=input_data,
-            output=result,
+            inputs=input_data,
+            outputs=result,
         ),
         checks=[
             # This should fail because "Answer" IS present in the reason
             StringMatchingCheck(
                 content="Answer",
-                key="output.reason",
+                key="outputs.reason",
                 evaluation_mode="none",
             ),
         ],

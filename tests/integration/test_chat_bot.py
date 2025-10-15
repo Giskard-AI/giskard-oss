@@ -79,17 +79,17 @@ async def test_chat_bot_basic_conversation():
     testcase = TestCase(
         name="test_chat_bot_basic_conversation",
         interaction=Interaction(
-            input=conversation,
-            output=answer,
+            inputs=conversation,
+            outputs=answer,
         ),
         checks=[
             StringMatchingCheck(
                 content="Paris",
-                key="output[*].content",
+                key="outputs[*].content",
             ),
             StringMatchingCheck(
                 content="2.1 million",
-                key="output[*].content",
+                key="outputs[*].content",
             ),
         ],
     )
@@ -114,8 +114,8 @@ async def test_chat_bot_context_relevance():
     ]
 
     chat_interaction = Interaction(
-        input=conversation,
-        output=answer,
+        inputs=conversation,
+        outputs=answer,
         metadata={
             "context": {
                 "documents": [
@@ -183,27 +183,27 @@ async def test_chat_bot_conversation_history():
     testcase = TestCase(
         name="test_chat_bot_conversation_history",
         interaction=Interaction(
-            input=conversation,
-            output=answer,
+            inputs=conversation,
+            outputs=answer,
         ),
         checks=[
             # Check that the conversation contains the expected flow
             StringMatchingCheck(
                 content="capital of France",
-                key="input[*].content",
+                key="inputs[*].content",
             ),
             StringMatchingCheck(
                 content="population of Paris",
-                key="input[*].content",
+                key="inputs[*].content",
             ),
             # Check that the response is relevant to the last question
             StringMatchingCheck(
                 content="population",
-                key="output[*].content",
+                key="outputs[*].content",
             ),
             StringMatchingCheck(
                 content="2.1 million",
-                key="output[*].content",
+                key="outputs[*].content",
             ),
         ],
     )
@@ -232,23 +232,23 @@ async def test_chat_bot_multiple_turns():
     testcase = TestCase(
         name="test_chat_bot_multiple_turns",
         interaction=Interaction(
-            input=conversation,
-            output=answer,
+            inputs=conversation,
+            outputs=answer,
         ),
         checks=[
             # Verify all messages have roles
             StringMatchingCheck(
                 content="user",
-                key="input[*].role",
+                key="inputs[*].role",
             ),
             StringMatchingCheck(
                 content="assistant",
-                key="input[*].role",
+                key="inputs[*].role",
             ),
             # Verify response quality
             StringMatchingCheck(
                 content="population",
-                key="output[*].content",
+                key="outputs[*].content",
             ),
         ],
     )
@@ -294,19 +294,19 @@ async def test_chat_bot_edge_cases():
         testcase = TestCase(
             name=f"test_chat_bot_edge_cases_{test_name}",
             interaction=Interaction(
-                input=conversation,
-                output=answer,
+                inputs=conversation,
+                outputs=answer,
             ),
             checks=[
                 # Basic check that we get a response
                 StringMatchingCheck(
                     content="assistant",
-                    key="output[*].role",
+                    key="outputs[*].role",
                 ),
                 # Check that response contains expected content
                 StringMatchingCheck(
                     content="understand",
-                    key="output[*].content",
+                    key="outputs[*].content",
                 ),
             ],
         )
@@ -331,26 +331,26 @@ async def test_chat_bot_none_evaluation_mode():
     testcase = TestCase(
         name="test_chat_bot_none_evaluation_mode",
         interaction=Interaction(
-            input=conversation,
-            output=answer,
+            inputs=conversation,
+            outputs=answer,
         ),
         checks=[
             # Test that "London" is NOT present in the response
             StringMatchingCheck(
                 content="London",
-                key="output[*].content",
+                key="outputs[*].content",
                 evaluation_mode="none",
             ),
             # Test that "Berlin" is NOT present in the response
             StringMatchingCheck(
                 content="Berlin",
-                key="output[*].content",
+                key="outputs[*].content",
                 evaluation_mode="none",
             ),
             # Test that "Paris" IS present (using default "any" mode)
             StringMatchingCheck(
                 content="Paris",
-                key="output[*].content",
+                key="outputs[*].content",
             ),
         ],
     )
@@ -375,14 +375,14 @@ async def test_chat_bot_none_evaluation_mode_failure():
     testcase = TestCase(
         name="test_chat_bot_none_evaluation_mode_failure",
         interaction=Interaction(
-            input=conversation,
-            output=answer,
+            inputs=conversation,
+            outputs=answer,
         ),
         checks=[
             # This should fail because "Paris" IS present in the response
             StringMatchingCheck(
                 content="Paris",
-                key="output[*].content",
+                key="outputs[*].content",
                 evaluation_mode="none",
             ),
         ],

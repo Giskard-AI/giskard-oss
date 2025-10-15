@@ -17,14 +17,14 @@ from tests.test_utils.mock_generator import MockGenerator
 async def test_inline_prompt_check_direct_instantiation(passed: bool, reason: str):
     """Test direct instantiation of InlinePromptCheck."""
     interaction = Interaction(
-        input="This is a test question.", output="This is a test response."
+        inputs="This is a test question.", outputs="This is a test response."
     )
 
     check = InlinePromptCheck(
         template_content="Analyze this text: {{ text }}. Is it in French",
         template_input={"text": "This is a test question."},
         generator=MockGenerator(
-            output=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
+            outputs=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
         ),
     )
 
@@ -41,7 +41,7 @@ async def test_inline_prompt_check_direct_instantiation(passed: bool, reason: st
 
     # Set the same generator for the deserialized check
     deserialized.generator = MockGenerator(
-        output=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
+        outputs=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
     )
 
     res2 = await deserialized.run(interaction)
@@ -61,14 +61,14 @@ async def test_inline_prompt_check_direct_instantiation(passed: bool, reason: st
 async def test_inline_prompt_check_keys_instantiation(passed: bool, reason: str):
     """Test direct instantiation of InlinePromptCheck."""
     interaction = Interaction(
-        input="This is a test question.", output="This is a test response."
+        inputs="This is a test question.", outputs="This is a test response."
     )
 
     check = InlinePromptCheck(
         template_content="Analyze this text: {{ text }}. Is it in French",
-        template_input_keys={"text": "$.output"},
+        template_input_keys={"text": "$.outputs"},
         generator=MockGenerator(
-            output=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
+            outputs=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
         ),
     )
 
@@ -85,7 +85,7 @@ async def test_inline_prompt_check_keys_instantiation(passed: bool, reason: str)
 
     # Set the same generator for the deserialized check
     deserialized.generator = MockGenerator(
-        output=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
+        outputs=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
     )
 
     res2 = await deserialized.run(interaction)
@@ -105,15 +105,15 @@ async def test_inline_prompt_check_keys_instantiation(passed: bool, reason: str)
 async def test_inline_prompt_check_mixed_instantiation(passed: bool, reason: str):
     """Test direct instantiation of InlinePromptCheck."""
     interaction = Interaction(
-        input="This is a test question.", output="This is a test response."
+        inputs="This is a test question.", outputs="This is a test response."
     )
 
     check = InlinePromptCheck(
         template_content="Analyze this text: {{ text }}. Is it in French",
         template_input={"text": "This is a test question."},
-        template_input_keys={"text": "$.output"},
+        template_input_keys={"text": "$.outputs"},
         generator=MockGenerator(
-            output=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
+            outputs=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
         ),
     )
 
@@ -130,7 +130,7 @@ async def test_inline_prompt_check_mixed_instantiation(passed: bool, reason: str
 
     # Set the same generator for the deserialized check
     deserialized.generator = MockGenerator(
-        output=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
+        outputs=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
     )
 
     res2 = await deserialized.run(interaction)

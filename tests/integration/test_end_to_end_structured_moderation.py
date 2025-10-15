@@ -19,8 +19,8 @@ def make_interaction(
     moderated: bool, reason: Optional[str] = None
 ) -> Interaction[str, ModerationResult]:
     return Interaction[str, ModerationResult](
-        input="some user text",
-        output=ModerationResult(moderated=moderated, reason=reason),
+        inputs="some user text",
+        outputs=ModerationResult(moderated=moderated, reason=reason),
     )
 
 
@@ -28,7 +28,9 @@ async def test_single_pass_boolean_fncheck():
     interaction = make_interaction(moderated=False)
 
     chk = from_fn(
-        lambda inter: not inter.output.moderated if inter.output is not None else False,
+        lambda inter: not inter.outputs.moderated
+        if inter.outputs is not None
+        else False,
         name="not_moderated",
         success_message="content is not moderated",
         failure_message="content was moderated",
@@ -56,7 +58,7 @@ async def test_single_fail_boolean_fncheck():
     interaction = make_interaction(moderated=False)
 
     chk = from_fn(
-        lambda inter: inter.output.moderated if inter.output is not None else False,
+        lambda inter: inter.outputs.moderated if inter.outputs is not None else False,
         name="is_moderated",
         failure_message="expected moderated but was not",
     )

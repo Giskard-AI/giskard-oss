@@ -4,13 +4,13 @@ from pydantic import Field
 
 
 class MockGenerator(BaseGenerator):
-    output: str | None
+    outputs: str | None
     calls: list[tuple[list[Message], GenerationParams | None]] = Field(
         default_factory=list
     )
 
     def with_output(self, output: str | None) -> "MockGenerator":
-        self.output = output
+        self.outputs = output
         return self
 
     def clear_calls(self) -> None:
@@ -21,5 +21,6 @@ class MockGenerator(BaseGenerator):
     ) -> Response:
         self.calls.append((messages, params))
         return Response(
-            message=Message(role="assistant", content=self.output), finish_reason="stop"
+            message=Message(role="assistant", content=self.outputs),
+            finish_reason="stop",
         )

@@ -35,12 +35,12 @@ class Output(BaseModel):
 
 
 interaction = Interaction[str, Output](
-    input="some text",
-    output=Output(moderated=False),
+    inputs="some text",
+    outputs=Output(moderated=False),
 )
 
 check = from_fn(
-    lambda inter: not inter.output.moderated if inter.output else False,
+    lambda inter: not inter.outputs.moderated if inter.output else False,
     name="not_moderated",
     success_message="content is not moderated",
     failure_message="content was moderated",
@@ -133,7 +133,7 @@ class MyCustomCheck(Check[Interaction[str, str]]):
         return CheckResult.success("Check passed")
 
 # Serialize and deserialize test cases
-interaction = Interaction(input="test", output="result")
+interaction = Interaction(inputs="test", outputs="result")
 check = MyCustomCheck(name="test")
 testcase = TestCase(interaction=interaction, checks=[check], name="example")
 
@@ -196,8 +196,8 @@ messages = [
     ChatMessage(role="assistant", content="Hi there!", timestamp=1234567891)
 ]
 interaction = ChatInteraction(
-    input=messages,
-    output="Conversation summary",
+    inputs=messages,
+    outputs="Conversation summary",
     session_id="session_123",
     model_name="gpt-4"
 )
@@ -310,15 +310,15 @@ from giskard_checks.checks import StringMatchingCheck
 from giskard_checks.testing import TestCase
 
 interaction = Interaction(
-    input={"question": "What is the capital of France?"},
-    output={"answer": "Paris is the capital of France."},
+    inputs={"question": "What is the capital of France?"},
+    outputs={"answer": "Paris is the capital of France."},
 )
 
 checks = [
     StringMatchingCheck(
         name="contains_paris",
         content="Paris",
-        key="output.answer",
+        key="outputs.answer",
     ),
 ]
 

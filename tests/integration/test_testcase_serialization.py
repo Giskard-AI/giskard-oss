@@ -14,7 +14,7 @@ class ContainsCheck(Check):
     needle: str
 
     async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
-        if interaction.input is not None and self.needle in interaction.input:
+        if interaction.inputs is not None and self.needle in interaction.inputs:
             return CheckResult.success(
                 message=f"input contains '{self.needle}'",
             )
@@ -28,12 +28,12 @@ class OutputEqualsCheck(Check):
     expected: str
 
     async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
-        if interaction.output == self.expected:
+        if interaction.outputs == self.expected:
             return CheckResult.success(
                 message="output matched",
             )
         return CheckResult.failure(
-            message=f"expected '{self.expected}', got '{interaction.output}'",
+            message=f"expected '{self.expected}', got '{interaction.outputs}'",
         )
 
 
@@ -44,7 +44,7 @@ class ExplodeCheck(Check):
 
 
 async def test_testcase_roundtrip_serialization_custom_checks():
-    interaction = Interaction[str, str](input="hello world", output="hello")
+    interaction = Interaction[str, str](inputs="hello world", outputs="hello")
 
     chk1 = ContainsCheck(name="has_hello", needle="hello")
     chk2 = OutputEqualsCheck(name="out_is_hello", expected="hello")
@@ -87,8 +87,8 @@ def test_deserialize_rejects_check_without_kind():
     payload: dict[str, Any] = {
         "name": "tc-bad-missing-kind",
         "interaction": {
-            "input": "hello",
-            "output": None,
+            "inputs": "hello",
+            "outputs": None,
             "metadata": None,
         },
         "checks": [

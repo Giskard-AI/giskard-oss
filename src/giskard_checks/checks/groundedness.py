@@ -20,7 +20,7 @@ class Groundedness(TemplateLLMCheck):
     answer : str | None
         The answer text to evaluate for groundedness.
     answer_key : str
-        Key to extract the answer from the interaction (default: "$.output").
+        Key to extract the answer from the interaction (default: "$.outputs").
     context : list[str] | None
         List of context documents that should support the answer.
     context_key : str
@@ -42,7 +42,8 @@ class Groundedness(TemplateLLMCheck):
         default=None, description="Input source for the answer to evaluate"
     )
     answer_key: str = Field(
-        default="$.output", description="Key to extract the answer from the interaction"
+        default="$.outputs",
+        description="Key to extract the answer from the interaction",
     )
     context: list[str] | None = Field(
         default=None, description="Input source for the reference context"

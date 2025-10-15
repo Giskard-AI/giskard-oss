@@ -14,7 +14,7 @@ from tests.test_utils.mock_generator import MockGenerator
 )
 async def test_groundedness_pass_fail_roundtrip(passed: bool, reason: str):
     interaction = Interaction(
-        input="This is a test question.", output="This is a test response."
+        inputs="This is a test question.", outputs="This is a test response."
     )
 
     answer_value = "The Eiffel Tower is in Paris."
@@ -24,7 +24,7 @@ async def test_groundedness_pass_fail_roundtrip(passed: bool, reason: str):
         answer=answer_value,
         context=context_list,
         generator=MockGenerator(
-            output=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
+            outputs=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
         ),
     )
 
@@ -42,7 +42,7 @@ async def test_groundedness_pass_fail_roundtrip(passed: bool, reason: str):
 
     # Set the same generator for the deserialized check
     deserialized.generator = MockGenerator(
-        output=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
+        outputs=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
     )
 
     res2 = await deserialized.run(interaction)
@@ -64,18 +64,18 @@ async def test_groundedness_pass_fail_roundtrip_default_keys(passed: bool, reaso
     answer_value = "The Eiffel Tower is in Paris."
     context_list = ["The Eiffel Tower is located in Paris, France."]
     interaction = Interaction(
-        input="This is a test question.",
-        output={"answer": answer_value},
+        inputs="This is a test question.",
+        outputs={"answer": answer_value},
         metadata={
             "context": [{"name": "context", "value": ctx} for ctx in context_list]
         },
     )
 
     check = Groundedness(
-        answer_key="$.output.answer",
+        answer_key="$.outputs.answer",
         context_key="$.metadata.context[*].value",
         generator=MockGenerator(
-            output=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
+            outputs=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
         ),
     )
 
@@ -93,7 +93,7 @@ async def test_groundedness_pass_fail_roundtrip_default_keys(passed: bool, reaso
 
     # Set the same generator for the deserialized check
     deserialized.generator = MockGenerator(
-        output=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
+        outputs=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
     )
 
     res2 = await deserialized.run(interaction)
@@ -115,14 +115,14 @@ async def test_groundedness_pass_fail_roundtrip_custom_keys(passed: bool, reason
     answer_value = "The Eiffel Tower is in Paris."
     context_list = ["The Eiffel Tower is located in Paris, France."]
     interaction = Interaction(
-        input="This is a test question.",
-        output=answer_value,
+        inputs="This is a test question.",
+        outputs=answer_value,
         metadata={"context": context_list},
     )
 
     check = Groundedness(
         generator=MockGenerator(
-            output=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
+            outputs=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
         ),
     )
 
@@ -140,7 +140,7 @@ async def test_groundedness_pass_fail_roundtrip_custom_keys(passed: bool, reason
 
     # Set the same generator for the deserialized check
     deserialized.generator = MockGenerator(
-        output=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
+        outputs=f'{{"passed": {str(passed).lower()}, "reason": "{reason}"}}'
     )
 
     res2 = await deserialized.run(interaction)

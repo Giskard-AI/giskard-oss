@@ -31,6 +31,6 @@ class Interaction(Discriminated, Generic[InputT, OutputT]):
         Optional free-form metadata associated with the interaction.
     """
 
-    input: InputT
-    output: OutputT | None = None
+    inputs: InputT
+    outputs: OutputT | None = None
     metadata: dict[str, Any] | None = None
