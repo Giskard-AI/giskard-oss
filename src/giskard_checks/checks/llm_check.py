@@ -242,73 +242,58 @@ class InlinePromptCheck(LLMCheck):
     This class can be instantiated directly with a template string,
     enabling rapid prototyping without subclassing.
 
+    The template can access the entire `Interaction` object using Jinja2 templating,
+    allowing dynamic access to inputs, outputs, and metadata fields.
+
     Examples
     --------
-    >>> # Direct instantiation with static inputs
+    >>> # Direct instantiation with interaction data access
     >>> check = InlinePromptCheck(
-    ...     template_content="Analyze sentiment: {{ text }}",
-    ...     template_input={"text": "This is great!"},
+    ...     template_content="Analyze sentiment of: {{ inputs.text }}",
     ...     name="sentiment_check"
     ... )
     >>>
-    >>> # With dynamic inputs from interaction
+    >>> # Access output data
     >>> check = InlinePromptCheck(
-    ...     template_content="Check if {{ text }} is positive",
-    ...     template_input_keys={"text": "$.outputs"},
-    ...     name="dynamic_check"
+    ...     template_content="Check if {{ outputs.text_value }} is positive",
+    ...     name="output_check"
     ... )
     >>>
-    >>> # Mix of static and dynamic inputs (static overrides dynamic on conflicts)
+    >>> # Access metadata
     >>> check = InlinePromptCheck(
-    ...     template_content="Analyze {{ text }} with context {{ context }}",
-    ...     template_input={"context": "sentiment analysis"},
-    ...     template_input_keys={"text": "$.outputs"},
-    ...     name="mixed_check"
+    ...     template_content="Analyze {{ inputs.text }} with context {{ metadata.category }}",
+    ...     name="contextual_check"
     ... )
     """
 
-    template_content: str = Field(..., description="Inline Jinja2 template content")
-
-    template_input: dict[str, str] = Field(
-        default_factory=dict, description="Static template inputs (key-value pairs)"
-    )
-
-    template_input_keys: dict[str, str] = Field(
-        default_factory=dict,
-        description="Dynamic template inputs (key-JSONPath pairs to extract from interaction)",
+    template_content: str = Field(
+        ...,
+        description="Inline Jinja2 template content with access to interaction data",
     )
 
     async def _build_chat_workflow(
         self, interaction: Interaction[Any, Any]
     ) -> ChatWorkflow[Any]:
         """Build ChatWorkflow using inline template content."""
+        # Render the template with interaction data
         template_inputs = await self._build_template_inputs(interaction)
+        rendered_template = template_inputs["template"]
 
-        return (
-            self._generator.chat(self.template_content)
-            .with_inputs(**template_inputs)
-            .with_output(self.output_type)
-        )
+        return self._generator.chat(rendered_template).with_output(self.output_type)
 
     async def _build_template_inputs(
         self, interaction: Interaction[Any, Any]
     ) -> dict[str, str]:
-        """Build template inputs from static values and dynamic extraction.
+        """Render the template content with interaction data.
 
-        Combines static template_input with dynamic template_input_keys.
-        Static inputs override dynamic inputs on key conflicts.
+        The template can access the entire interaction object using Jinja2 templating.
+        Returns a dict with the rendered template for compatibility with base class.
         """
-        from giskard_checks.core.extraction import resolve
+        from jinja2 import Template
 
-        # Start with dynamic inputs from interaction
-        dynamic_inputs = {}
-        for key, jsonpath in self.template_input_keys.items():
-            try:
-                value = resolve(interaction, jsonpath)
-                dynamic_inputs[key] = str(value)
-            except Exception:
-                # If extraction fails, skip this key
-                continue
+        # Render the template with the full interaction data
+        rendered_template = Template(self.template_content).render(
+            **interaction.model_dump()
+        )
 
-        # Merge with static inputs (static overrides dynamic)
-        return {**dynamic_inputs, **self.template_input}
+        return {"template": rendered_template}
