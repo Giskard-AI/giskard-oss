@@ -1,0 +1,174 @@
+from abc import ABC, abstractmethod
+from typing import Any
+
+from counterpoint.chat import Message
+from counterpoint.generators.base import BaseGenerator
+from counterpoint.templates import MessageTemplate
+from counterpoint.workflow import ChatWorkflow, TemplateReference
+from pydantic import BaseModel, Field
+
+from giskard_checks.core.check import Check, CheckResult
+from giskard_checks.core.interaction_result import InteractionResult
+from giskard_checks.settings import get_default_generator
+
+
+class LLMCheckResult(BaseModel):
+    """Default result model for LLM-based checks."""
+
+    reason: str | None = Field(
+        default=None, description="Optional explanation for the result"
+    )
+    passed: bool = Field(..., description="Whether the check passed or failed")
+
+
+class BaseLLMCheck(Check, ABC):
+    """Abstract base class for LLM-based checks.
+
+    Provides a framework for creating checks that use Large Language Models
+    to evaluate interactions. Subclasses must implement the `get_prompt` method
+    to define how the LLM should be prompted.
+
+    Attributes
+    ----------
+    generator : BaseGenerator
+        Counterpoint generator for LLM evaluation. Defaults to the global
+        default generator if not specified.
+    """
+
+    generator: BaseGenerator = Field(
+        default_factory=get_default_generator,
+        exclude=True,  # Not serializable
+        description="Counterpoint generator for LLM evaluation",
+    )
+
+    @property
+    def output_type(self) -> type[BaseModel] | None:
+        return LLMCheckResult
+
+    @abstractmethod
+    def get_prompt(self) -> str | Message | MessageTemplate | TemplateReference:
+        """Get the prompt for the LLM evaluation.
+
+        Returns
+        -------
+        str | Message | MessageTemplate | TemplateReference
+            The prompt to send to the LLM. Can be:
+            - A string (converted to MessageTemplate)
+            - A Message object
+            - A MessageTemplate object
+            - A TemplateReference for file-based templates
+        """
+
+    async def _build_workflow(
+        self, interaction: InteractionResult[Any, Any]
+    ) -> ChatWorkflow[Any]:
+        """Build the Counterpoint workflow for LLM evaluation.
+
+        Parameters
+        ----------
+        interaction : InteractionResult[Any, Any]
+            The interaction to evaluate.
+
+        Returns
+        -------
+        ChatWorkflow[Any]
+            Configured workflow ready for execution.
+        """
+        _ = interaction  # Not used in base implementation
+        prompt = self.get_prompt()
+
+        if isinstance(prompt, str):
+            prompt = MessageTemplate(role="user", content_template=prompt)
+
+        return ChatWorkflow(generator=self.generator, messages=[prompt])
+
+    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:  # noqa: D102
+        """Execute the LLM-based check.
+
+        Parameters
+        ----------
+        interaction : InteractionResult[Any, Any]
+            The interaction to evaluate.
+
+        Returns
+        -------
+        CheckResult
+            The result of the check evaluation.
+        """
+        workflow = await self._build_workflow(interaction)
+
+        inputs = await self.get_inputs(interaction)
+        workflow = workflow.with_inputs(**inputs)
+
+        if self.output_type is not None:
+            workflow = workflow.with_output(self.output_type)
+
+        chat = await workflow.run()
+
+        return await self._handle_output(chat.output, inputs, interaction)
+
+    async def get_inputs(
+        self, interaction: InteractionResult[Any, Any]
+    ) -> dict[str, Any]:
+        """Get template inputs for the LLM prompt.
+
+        Parameters
+        ----------
+        interaction : InteractionResult[Any, Any]
+            The interaction to evaluate.
+
+        Returns
+        -------
+        dict[str, Any]
+            Template variables available in the prompt. Default implementation
+            provides the interaction object.
+        """
+        return {"interaction": interaction}
+
+    async def _handle_output(
+        self,
+        output_value: BaseModel,
+        template_inputs: dict[str, Any],
+        interaction: InteractionResult[Any, Any],
+    ) -> CheckResult:
+        """Convert LLM output to CheckResult.
+
+        Default implementation handles LLMCheckResult. Override for
+        custom output types.
+
+        Parameters
+        ----------
+        output_value : BaseModel
+            The structured output from the LLM.
+        template_inputs : dict[str, str]
+            The template inputs used for the evaluation.
+        interaction : InteractionResult[Any, Any]
+            The original interaction.
+
+        Returns
+        -------
+        CheckResult
+            Success or failure based on LLM output.
+        """
+        _ = interaction  # Not used in base implementation
+        if isinstance(output_value, LLMCheckResult):
+            if output_value.passed:
+                return CheckResult.success(
+                    message=output_value.reason or "Check passed",
+                    details={
+                        "reason": output_value.reason,
+                        "inputs": template_inputs,
+                    },
+                )
+            else:
+                return CheckResult.failure(
+                    message=output_value.reason or "Check failed",
+                    details={
+                        "reason": output_value.reason,
+                        "inputs": template_inputs,
+                    },
+                )
+
+        raise NotImplementedError(
+            f"Custom output type {type(output_value)} requires overriding _handle_output"
+        )

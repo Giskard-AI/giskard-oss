@@ -5,6 +5,7 @@ from .equality import EqualityCheck
 from .extraction_check import ExtractionCheck
 from .fn import FnCheck, from_fn
 from .groundedness import Groundedness
+from .judge import LLMJudge
 from .string_matching import StringMatchingCheck
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "ExtractionCheck",
     "Groundedness",
     "Conformity",
+    "LLMJudge",
 ]

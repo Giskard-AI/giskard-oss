@@ -1,15 +1,16 @@
 from typing import Any
 
+from counterpoint.workflow import TemplateReference
 from jinja2 import Template
 from pydantic import BaseModel, Field
 
-from giskard_checks.checks.llm_check import TemplateLLMCheck
+from giskard_checks.checks.base import BaseLLMCheck
 from giskard_checks.core.check import Check
 from giskard_checks.core.interaction_result import InteractionResult
 
 
 @Check.register("conformity")
-class Conformity(TemplateLLMCheck):
+class Conformity(BaseLLMCheck):
     """LLM-based check that validates interactions conform to a given rule.
 
     This check supports **dynamic rules** by using Jinja2 templating on the `rule`
@@ -25,7 +26,7 @@ class Conformity(TemplateLLMCheck):
         The rule statement to evaluate against the interaction.
         This string can contain Jinja2 placeholders (e.g., `{{ outputs.text_value }}`).
     generator : BaseGenerator | None
-        Counterpoint generator for LLM evaluation (inherited from LLMCheck).
+        Counterpoint generator for LLM evaluation (inherited from BaseLLMCheck).
 
     Examples
     --------
@@ -52,10 +53,9 @@ class Conformity(TemplateLLMCheck):
         ..., description="The rule statement to evaluate against the interaction"
     )
 
-    @property
-    def template_name(self) -> str:
+    def get_prompt(self) -> TemplateReference:
         """Return the Jinja2 template name for conformity evaluation."""
-        return "giskard_checks::checks/conformity.j2"
+        return TemplateReference(template_name="giskard_checks::checks/conformity.j2")
 
     def _format_data(self, data: Any) -> str:
         """Formats data for the LLM prompt template."""
@@ -65,7 +65,7 @@ class Conformity(TemplateLLMCheck):
         # Use repr() as a fallback for non-Pydantic types
         return repr(data)
 
-    async def _build_template_inputs(
+    async def get_inputs(
         self, interaction: InteractionResult[Any, Any]
     ) -> dict[str, str]:
         """Build template variables from the interaction."""

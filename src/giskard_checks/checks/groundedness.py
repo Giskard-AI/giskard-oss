@@ -1,15 +1,16 @@
 from typing import Any
 
+from counterpoint.workflow import TemplateReference
 from pydantic import Field
 
-from giskard_checks.checks.llm_check import TemplateLLMCheck
+from giskard_checks.checks.base import BaseLLMCheck
 from giskard_checks.core.check import Check
 from giskard_checks.core.extraction import resolve
 from giskard_checks.core.interaction_result import InteractionResult
 
 
 @Check.register("groundedness")
-class Groundedness(TemplateLLMCheck):
+class Groundedness(BaseLLMCheck):
     """LLM-based check that validates answers are grounded in context.
 
     Uses an LLM to determine if an answer is properly supported by
@@ -26,7 +27,7 @@ class Groundedness(TemplateLLMCheck):
     context_key : str
         Key to extract the context from the interaction (default: "$.metadata.context").
     generator : BaseGenerator | None
-        Counterpoint generator for LLM evaluation (inherited from LLMCheck).
+        Counterpoint generator for LLM evaluation (inherited from BaseLLMCheck).
 
     Examples
     --------
@@ -53,12 +54,10 @@ class Groundedness(TemplateLLMCheck):
         description="Key to extract the context from the interaction",
     )
 
-    @property
-    def template_name(self) -> str:
-        """Return the Jinja2 template name for groundedness evaluation."""
-        return "giskard_checks::checks/groundedness.j2"
+    def get_prompt(self) -> TemplateReference:
+        return TemplateReference(template_name="giskard_checks::checks/groundedness.j2")
 
-    async def _build_template_inputs(
+    async def get_inputs(
         self, interaction: InteractionResult[Any, Any]
     ) -> dict[str, str]:
         """Build template variables from resolved inputs.
