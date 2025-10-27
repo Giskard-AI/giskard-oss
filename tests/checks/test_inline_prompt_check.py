@@ -3,7 +3,7 @@
 import pytest
 
 from giskard_checks.checks.llm_check import Check, InlinePromptCheck
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.core.interaction_result import InteractionResult
 from tests.test_utils.mock_generator import MockGenerator
 
 
@@ -16,7 +16,7 @@ from tests.test_utils.mock_generator import MockGenerator
 )
 async def test_inline_prompt_check_direct_instantiation(passed: bool, reason: str):
     """Test direct instantiation of InlinePromptCheck."""
-    interaction = Interaction(
+    interaction = InteractionResult(
         inputs="This is a test question.", outputs="This is a test response."
     )
 
@@ -65,7 +65,7 @@ async def test_inline_prompt_check_direct_instantiation(passed: bool, reason: st
 )
 async def test_inline_prompt_check_outputs_instantiation(passed: bool, reason: str):
     """Test direct instantiation of InlinePromptCheck accessing outputs."""
-    interaction = Interaction(
+    interaction = InteractionResult(
         inputs="This is a test question.", outputs="This is a test response."
     )
 
@@ -114,7 +114,7 @@ async def test_inline_prompt_check_outputs_instantiation(passed: bool, reason: s
 )
 async def test_inline_prompt_check_metadata_instantiation(passed: bool, reason: str):
     """Test direct instantiation of InlinePromptCheck accessing metadata."""
-    interaction = Interaction(
+    interaction = InteractionResult(
         inputs="This is a test question.",
         outputs="This is a test response.",
         metadata={"category": "test", "language": "en"},

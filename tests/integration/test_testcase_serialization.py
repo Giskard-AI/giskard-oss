@@ -4,8 +4,9 @@ from typing import Any
 
 import pytest
 
-from giskard_checks.core import Check, CheckResult, CheckStatus
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.core import Check, CheckResult, CheckStatus, InteractionResult
+from giskard_checks.core.interaction_result import InteractionResult
+from giskard_checks.generators import Interaction
 from giskard_checks.testing.testcase import TestCase
 
 
@@ -13,7 +14,7 @@ from giskard_checks.testing.testcase import TestCase
 class ContainsCheck(Check):
     needle: str
 
-    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
+    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
         if interaction.inputs is not None and self.needle in interaction.inputs:
             return CheckResult.success(
                 message=f"input contains '{self.needle}'",
@@ -27,7 +28,7 @@ class ContainsCheck(Check):
 class OutputEqualsCheck(Check):
     expected: str
 
-    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
+    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
         if interaction.outputs == self.expected:
             return CheckResult.success(
                 message="output matched",
@@ -39,12 +40,12 @@ class OutputEqualsCheck(Check):
 
 @Check.register("explode")
 class ExplodeCheck(Check):
-    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
+    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
         raise RuntimeError("kaboom")
 
 
 async def test_testcase_roundtrip_serialization_custom_checks():
-    interaction = Interaction[str, str](inputs="hello world", outputs="hello")
+    interaction = Interaction(inputs="hello world", outputs="hello")
 
     chk1 = ContainsCheck(name="has_hello", needle="hello")
     chk2 = OutputEqualsCheck(name="out_is_hello", expected="hello")

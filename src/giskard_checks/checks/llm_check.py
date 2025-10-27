@@ -8,7 +8,7 @@ from counterpoint.workflow import ChatWorkflow
 from pydantic import BaseModel, Field
 
 from giskard_checks.core.check import Check, CheckResult
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.core.interaction_result import InteractionResult
 
 
 class LLMCheckResult(BaseModel):
@@ -24,7 +24,7 @@ class LLMCheck(Check, ABC):
     """Abstract base class for LLM-powered validation checks.
 
     Provides infrastructure for checks that use LLMs to evaluate
-    interactions. Subclasses must implement _build_chat_workflow and
+    interaction results. Subclasses must implement _build_chat_workflow and
     _build_template_inputs to define check-specific behavior.
 
     Attributes
@@ -43,7 +43,7 @@ class LLMCheck(Check, ABC):
     ...     def template_name(self) -> str:
     ...         return "checks/sentiment.j2"
     ...
-    ...     async def _build_template_inputs(self, interaction: Interaction) -> dict[str, str]:
+    ...     async def _build_template_inputs(self, interaction: InteractionResult) -> dict[str, str]:
     ...         return {"text": resolve(self.text, interaction)}
     ...
     >>> # Use with specific generator
@@ -79,7 +79,7 @@ class LLMCheck(Check, ABC):
 
     @abstractmethod
     async def _build_chat_workflow(
-        self, interaction: Interaction[Any, Any]
+        self, interaction: InteractionResult[Any, Any]
     ) -> ChatWorkflow[Any]:
         """Build the ChatWorkflow for this check.
 
@@ -88,8 +88,8 @@ class LLMCheck(Check, ABC):
 
         Parameters
         ----------
-        interaction : Interaction
-            The interaction to validate.
+        interaction : InteractionResult
+            The interaction result to validate.
 
         Returns
         -------
@@ -100,14 +100,14 @@ class LLMCheck(Check, ABC):
 
     async def run(
         self,
-        interaction: Interaction[Any, Any],
+        interaction: InteractionResult[Any, Any],
     ) -> CheckResult:
         """Execute LLM-based validation using the configured ChatWorkflow.
 
         Parameters
         ----------
-        interaction : Interaction
-            The interaction to validate.
+        interaction : InteractionResult
+            The interaction result to validate.
 
         Returns
         -------
@@ -122,17 +122,17 @@ class LLMCheck(Check, ABC):
 
     @abstractmethod
     async def _build_template_inputs(
-        self, interaction: Interaction[Any, Any]
+        self, interaction: InteractionResult[Any, Any]
     ) -> dict[str, str]:
-        """Build template variables from the interaction.
+        """Build template variables from the interaction result.
 
         Subclasses must implement this to extract values for their
         specific template.
 
         Parameters
         ----------
-        interaction : Interaction
-            Context for resolving inputs.
+        interaction : InteractionResult
+            The interaction result containing inputs, outputs, and metadata.
 
         Returns
         -------
@@ -147,7 +147,7 @@ class LLMCheck(Check, ABC):
         self,
         output_value: BaseModel,
         template_inputs: dict[str, str],
-        interaction: Interaction[Any, Any],
+        interaction: InteractionResult[Any, Any],
     ) -> CheckResult:
         """Convert LLM output to CheckResult.
 
@@ -160,8 +160,8 @@ class LLMCheck(Check, ABC):
             The structured output from the LLM.
         template_inputs : dict[str, str]
             The template inputs used for the evaluation.
-        interaction : Interaction
-            The original interaction.
+        interaction : InteractionResult
+            The original interaction result.
 
         Returns
         -------
@@ -223,7 +223,7 @@ class TemplateLLMCheck(LLMCheck, ABC):
         raise NotImplementedError
 
     async def _build_chat_workflow(
-        self, interaction: Interaction[Any, Any]
+        self, interaction: InteractionResult[Any, Any]
     ) -> ChatWorkflow[Any]:
         """Build ChatWorkflow using file-based template."""
         template_inputs = await self._build_template_inputs(interaction)
@@ -237,10 +237,30 @@ class TemplateLLMCheck(LLMCheck, ABC):
 
 @Check.register("inline_prompt")
 class InlinePromptCheck(LLMCheck):
-    """Concrete LLM check using inline template strings.
+    """Concrete LLM check using inline Jinja2 template strings.
 
-    This class can be instantiated directly with a template string,
-    enabling rapid prototyping without subclassing.
+    This class can be instantiated directly with a Jinja2 template string,
+    enabling rapid prototyping without subclassing. The template has direct
+    access to the interaction's inputs, outputs, and metadata.
+
+    Template Variables
+    ------------------
+    inputs : Any
+        The input payload for the system under test.
+    outputs : Any | None
+        The output produced by the system (may be None).
+    metadata : dict[str, Any] | None
+        Optional free-form metadata associated with the interaction.
+
+    Parameters
+    ----------
+    template_content : str
+        Jinja2 template string that will be rendered with interaction data.
+        The template is rendered before being sent to the LLM for evaluation.
+    name : str
+        Name identifier for this check instance.
+    generator : BaseGenerator | None, optional
+        Counterpoint generator for LLM evaluation. If None, uses global default.
 
     The template can access the entire `Interaction` object using Jinja2 templating,
     allowing dynamic access to inputs, outputs, and metadata fields.
@@ -264,6 +284,33 @@ class InlinePromptCheck(LLMCheck):
     ...     template_content="Analyze {{ inputs.text }} with context {{ metadata.category }}",
     ...     name="contextual_check"
     ... )
+    >>>
+    >>> # Access metadata for context
+    >>> check = InlinePromptCheck(
+    ...     template_content="Analyze '{{ inputs }}' for category: {{ metadata.category }}",
+    ...     name="contextual_check"
+    ... )
+    >>>
+    >>> # Use Jinja2 filters and control structures
+    >>> check = InlinePromptCheck(
+    ...     template_content='''
+    ...     {% if metadata.language == "fr" %}
+    ...     Vérifier si "{{ outputs }}" est poli.
+    ...     {% else %}
+    ...     Check if "{{ outputs }}" is polite.
+    ...     {% endif %}
+    ...     ''',
+    ...     name="politeness_check"
+    ... )
+
+    Notes
+    -----
+    - The template is rendered using Jinja2's Template.render() with the full
+      interaction data (inputs, outputs, metadata).
+    - If a variable is not present in the interaction, Jinja2 will render it as
+      an empty string by default (undefined variables don't raise errors).
+    - All standard Jinja2 features are supported: filters, tests, control
+      structures (if/for), whitespace control, etc.
     """
 
     template_content: str = Field(
@@ -272,7 +319,7 @@ class InlinePromptCheck(LLMCheck):
     )
 
     async def _build_chat_workflow(
-        self, interaction: Interaction[Any, Any]
+        self, interaction: InteractionResult[Any, Any]
     ) -> ChatWorkflow[Any]:
         """Build ChatWorkflow using inline template content."""
         # Render the template with interaction data
@@ -282,7 +329,7 @@ class InlinePromptCheck(LLMCheck):
         return self._generator.chat(rendered_template).with_output(self.output_type)
 
     async def _build_template_inputs(
-        self, interaction: Interaction[Any, Any]
+        self, interaction: InteractionResult[Any, Any]
     ) -> dict[str, str]:
         """Render the template content with interaction data.
 

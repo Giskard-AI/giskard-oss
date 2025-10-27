@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from giskard_checks.core import Check, CheckResult
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.core import Check, CheckResult, InteractionResult
 
 
 class StartsWithCheck(Check):
@@ -11,7 +10,7 @@ class StartsWithCheck(Check):
 
     prefix: str
 
-    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
+    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
         ok = interaction.inputs is not None and str(interaction.inputs).startswith(
             self.prefix
         )
@@ -29,7 +28,7 @@ class EqualsOutputCheck(Check):
 
     expected: str
 
-    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
+    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
         if interaction.outputs == self.expected:
             return CheckResult.success(
                 message="output matched",

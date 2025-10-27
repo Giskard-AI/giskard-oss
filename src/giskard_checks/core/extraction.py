@@ -5,18 +5,18 @@ from typing import Any, ClassVar
 from jsonpath_ng import parse
 from pydantic import BaseModel, ConfigDict, Field
 
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.core.interaction_result import InteractionResult
 
 
 class Extractor(BaseModel):
     """Base extractor strategy.
 
-    Implementations return a list of extracted items from an `Interaction`.
+    Implementations return a list of extracted items from an `InteractionResult`.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    def extract(self, interaction: Interaction[Any, Any]) -> list[Any]:
+    def extract(self, interaction: InteractionResult[Any, Any]) -> list[Any]:
         raise NotImplementedError
 
 
@@ -29,7 +29,7 @@ class JsonPathExtractor(Extractor):
 
     key: str = Field(..., description="JSONPath selecting values to extract")
 
-    def extract(self, interaction: Interaction[Any, Any]) -> list[Any]:
+    def extract(self, interaction: InteractionResult[Any, Any]) -> list[Any]:
         expr = parse(self.key)
         matches = expr.find(interaction.model_dump())
         results: list[Any] = []
@@ -40,7 +40,7 @@ class JsonPathExtractor(Extractor):
 
 
 def resolve(
-    interaction: Interaction[Any, Any], key: str, multiple: bool = False
+    interaction: InteractionResult[Any, Any], key: str, multiple: bool = False
 ) -> list[Any] | Any | None:
     expr = parse(key)
     matches = expr.find(interaction.model_dump())

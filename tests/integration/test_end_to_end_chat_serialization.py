@@ -4,7 +4,7 @@ import json
 
 from giskard_checks.checks import StringMatchingCheck
 from giskard_checks.core import CheckStatus
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.generators import Interaction
 from giskard_checks.testing._samples.message import Message
 from giskard_checks.testing.testcase import TestCase
 

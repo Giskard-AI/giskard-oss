@@ -25,7 +25,7 @@ Define an interaction and a simple check that validates it:
 
 ```python
 from pydantic import BaseModel
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.generators import Interaction
 from giskard_checks.checks import from_fn
 from giskard_checks.testing import TestCase
 
@@ -34,13 +34,13 @@ class Output(BaseModel):
     moderated: bool
 
 
-interaction = Interaction[str, Output](
+interaction = Interaction(
     inputs="some text",
     outputs=Output(moderated=False),
 )
 
 check = from_fn(
-    lambda inter: not inter.outputs.moderated if inter.output else False,
+    lambda inter: not inter.outputs.moderated if inter.outputs else False,
     name="not_moderated",
     success_message="content is not moderated",
     failure_message="content was moderated",
@@ -62,49 +62,45 @@ Why this library?
 Concepts
 --------
 
-- Interaction: container for the input, optional output, and metadata.
-- Check: unit that inspects an interaction and returns a `CheckResult`.
-- TestCase: pairs an interaction with a set of checks and executes them.
-- TestRunner: executes checks, records durations, and aggregates results.
+- InteractionGenerator: produces InteractionResult instances containing inputs, outputs, and metadata
+- InteractionResult: internal data structure used by checks containing inputs, outputs, and metadata
+- Check: unit that inspects an interaction result and returns a `CheckResult`
+- TestCase: pairs an interaction generator with a set of checks and executes them
+- TestRunner: executes checks, records durations, and aggregates results
 
 API Overview
 ------------
 
-Core
-
-- `giskard_checks.core.Interaction[InputT, OutputT]`: generic interaction model.
-- `giskard_checks.core.Check`: base class for checks.
-- `giskard_checks.core.CheckResult`: immutable result of a check execution with
-  convenience boolean properties (`passed`, `failed`, `errored`, `skipped`).
-
 Core Types
 
 - `giskard_checks.core.Check`: base class for all checks with discriminated union support
-- `giskard_checks.core.CheckResult`: immutable result from check execution
+- `giskard_checks.core.CheckResult`: immutable result from check execution with
+  convenience boolean properties (`passed`, `failed`, `errored`, `skipped`)
 - `giskard_checks.core.CheckStatus`: enum for check outcomes (PASS, FAIL, ERROR, SKIP)
-- `giskard_checks.core.Interaction`: base class for all interactions with discriminated union support
+- `giskard_checks.core.InteractionResult`: internal data structure containing inputs, outputs, and metadata
+
+Generators
+
+- `giskard_checks.generators.InteractionGenerator`: base class for interaction generators with discriminated union support
+- `giskard_checks.generators.Interaction`: static interaction generator for pre-defined inputs/outputs
 
 Checks
 
 - `giskard_checks.checks.from_fn(fn, ...)` → `Check`: convenience factory that
   turns a callable into a check. The callable can return a `bool` or a
   `CheckResult` and may be async.
- - `giskard_checks.checks.StringMatchingCheck`: generic content matcher with optional
-   JSONPath `key` selection and `evaluation_mode` parameter.
- - `giskard_checks.checks.EqualityCheck`: value equality checker with optional
-   JSONPath `key` selection.
-
-Interactions
-
-- `giskard_checks.core.interactions.Interaction[In, Out]`: base interaction
-  for structured inputs/outputs with full type safety and serialization support.
+- `giskard_checks.checks.StringMatchingCheck`: generic content matcher with optional
+  JSONPath `key` selection and `evaluation_mode` parameter.
+- `giskard_checks.checks.EqualityCheck`: value equality checker with optional
+  JSONPath `key` selection.
+- `giskard_checks.checks.InlinePromptCheck`: LLM-based check using inline Jinja2 templates
 
 Testing
 
-- `giskard_checks.testing.TestCase`: bundle an interaction with checks.
-- `giskard_checks.testing.runner.TestRunner`: default runner used by `TestCase`.
+- `giskard_checks.testing.TestCase`: bundle an interaction generator with checks
+- `giskard_checks.testing.runner.TestRunner`: default runner used by `TestCase`
 - `giskard_checks.testing.runner.TestCaseResult`: immutable aggregate with
-  durations and convenience properties.
+  durations and convenience properties
 
 Usage Notes
 -----------
@@ -123,12 +119,13 @@ Serialization
 The library uses Pydantic's discriminated unions for polymorphic serialization. Classes are automatically registered when imported:
 
 ```python
-from giskard_checks.core import Check, Interaction
+from giskard_checks.core import Check, CheckResult
+from giskard_checks.generators import Interaction
 from giskard_checks.testing import TestCase
 
 # Custom check with automatic registration
 @Check.register("my_custom_check")
-class MyCustomCheck(Check[Interaction[str, str]]):
+class MyCustomCheck(Check):
     async def run(self, interaction):
         return CheckResult.success("Check passed")
 
@@ -146,37 +143,39 @@ restored = TestCase.model_validate(serialized)
 
 **Important**: For deserialization to work, all custom classes must be imported before calling `model_validate()`. The registry only knows about classes that have been loaded into memory.
 
-Creating Custom Checks and Interactions
-----------------------------------------
+Creating Custom Checks and Generators
+--------------------------------------
 
 ### Step 1: Define a Custom Check
 
-Create a new check by subclassing `Check` and defining a unique `KIND`:
+Create a new check by subclassing `Check` and registering it with a unique kind:
 
 ```python
-from giskard_checks.core import Check, CheckResult, Interaction
+from typing import Any
+from giskard_checks.core import Check, CheckResult, InteractionResult
 
+@Check.register("advanced_security")
 class AdvancedSecurityCheck(Check):
-    KIND = "advanced_security"  # Must be unique across all checks
-
     threshold: float = 0.8  # Custom fields using Pydantic
 
-    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
+    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
         # Your check logic here
-        score = await some_security_analysis(interaction.output)
+        score = await some_security_analysis(interaction.outputs)
 
         if score >= self.threshold:
-            return self.success(f"Security score {score:.2f} meets threshold")
+            return CheckResult.success(f"Security score {score:.2f} meets threshold")
         else:
-            return self.failure(f"Security score {score:.2f} below threshold {self.threshold}")
+            return CheckResult.failure(f"Security score {score:.2f} below threshold {self.threshold}")
 ```
 
-### Step 2: Define a Custom Interaction
+### Step 2: Define a Custom Interaction Generator
 
-Create a new interaction type for specialized data:
+Create a new generator type for dynamic interaction creation:
 
 ```python
-from giskard_checks.core import Interaction
+from typing import Any
+from giskard_checks.generators import InteractionGenerator
+from giskard_checks.core import InteractionResult, Context
 from pydantic import BaseModel
 
 class ChatMessage(BaseModel):
@@ -184,20 +183,28 @@ class ChatMessage(BaseModel):
     content: str
     timestamp: float
 
-class ChatInteraction(Interaction[list[ChatMessage], str]):
-    KIND = "chat_conversation"  # Must be unique across all interactions
-
+@InteractionGenerator.register("chat_conversation")
+class ChatInteractionGenerator(InteractionGenerator):
     session_id: str
     model_name: str
+    messages: list[ChatMessage]
+
+    async def generate(self, context: Context) -> InteractionResult[Any, Any]:
+        # Generate dynamic outputs based on messages
+        summary = f"Conversation with {len(self.messages)} messages"
+        return InteractionResult(
+            inputs=self.messages,
+            outputs=summary,
+            metadata={"session_id": self.session_id, "model": self.model_name}
+        )
 
 # Usage
 messages = [
     ChatMessage(role="user", content="Hello", timestamp=1234567890),
     ChatMessage(role="assistant", content="Hi there!", timestamp=1234567891)
 ]
-interaction = ChatInteraction(
-    inputs=messages,
-    outputs="Conversation summary",
+generator = ChatInteractionGenerator(
+    messages=messages,
     session_id="session_123",
     model_name="gpt-4"
 )
@@ -208,42 +215,22 @@ interaction = ChatInteraction(
 Check that your custom types are properly registered:
 
 ```python
-from giskard_checks.core import list_registered_check_kinds, list_registered_interaction_kinds
-
 # Import your custom classes first
-from my_module import AdvancedSecurityCheck, ChatInteraction
+from my_module import AdvancedSecurityCheck, ChatInteractionGenerator
 
-# Verify registration
-print("Registered check kinds:", list_registered_check_kinds())
-print("Registered interaction kinds:", list_registered_interaction_kinds())
-
-# Should include 'advanced_security' and 'chat_conversation'
-```
-
-### Step 4: Test Serialization
-
-Verify that serialization and deserialization work correctly:
-
-```python
+# Custom classes are automatically registered upon import
+# Verify they work with serialization
 from giskard_checks.testing import TestCase
 
-# Create test case with custom types
+generator = ChatInteractionGenerator(messages=[], session_id="test", model_name="gpt-4")
 check = AdvancedSecurityCheck(name="security_test", threshold=0.7)
-testcase = TestCase(
-    interaction=interaction,
-    checks=[check],
-    name="custom_test"
-)
+testcase = TestCase(interaction=generator, checks=[check], name="custom_test")
 
 # Test serialization round-trip
 serialized = testcase.model_dump()
 restored = TestCase.model_validate(serialized)
-
-# Verify types are preserved
-assert isinstance(restored.interaction, ChatInteraction)
-assert isinstance(restored.checks[0], AdvancedSecurityCheck)
-assert restored.checks[0].threshold == 0.7
 ```
+
 
 Troubleshooting Serialization Issues
 ------------------------------------
@@ -301,11 +288,11 @@ def test_custom_serialization():
 Structured data quickstart
 ---------------------------
 
-Evaluate structured data using `Interaction` and the built-in
+Evaluate structured data using `Interaction` (static generator) and the built-in
 `StringMatchingCheck`:
 
 ```python
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.generators import Interaction
 from giskard_checks.checks import StringMatchingCheck
 from giskard_checks.testing import TestCase
 
@@ -330,7 +317,7 @@ assert result.passed
 
 Notes:
 
-- `Interaction` is the base interaction type for all data with full type safety.
+- `Interaction` is a static generator that wraps pre-defined inputs and outputs
 - `StringMatchingCheck` searches strings selected by `key` (JSONPath). When the
   key resolves to a list, set `evaluation_mode="all"` to require all items contain the
   substring; otherwise any match passes.

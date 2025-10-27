@@ -13,6 +13,7 @@ from counterpoint import add_prompts_path
 
 from . import checks as checks
 from . import core as core
+from . import generators as generators
 from . import testing as testing
 
 if TYPE_CHECKING:
@@ -49,6 +50,7 @@ add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard_checks")
 
 __all__ = [
     "core",
+    "generators",
     "testing",
     "checks",
     "set_default_generator",

@@ -7,7 +7,7 @@ from typing import Any, Callable, ClassVar
 from pydantic import Field
 
 from giskard_checks.core.check import Check, CheckResult
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.core.interaction_result import InteractionResult
 
 """Function-backed check implementation.
 
@@ -35,7 +35,8 @@ class FnCheck(Check):
     """
 
     fn: Callable[
-        [Interaction[Any, Any]], Awaitable[bool | CheckResult] | bool | CheckResult
+        [InteractionResult[Any, Any]],
+        Awaitable[bool | CheckResult] | bool | CheckResult,
     ] = Field(
         exclude=True,
         repr=False,
@@ -45,7 +46,7 @@ class FnCheck(Check):
     failure_message: str | None = None
     details: dict[str, Any] = Field(default_factory=dict)
 
-    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
+    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
         """Execute the function and normalize its result to a `CheckResult`."""
         result = self.fn(interaction)
         if inspect.isawaitable(result):
@@ -72,7 +73,8 @@ class FnCheck(Check):
 
 def from_fn(
     fn: Callable[
-        [Interaction[Any, Any]], Awaitable[bool | CheckResult] | bool | CheckResult
+        [InteractionResult[Any, Any]],
+        Awaitable[bool | CheckResult] | bool | CheckResult,
     ],
     *,
     name: str | None = None,

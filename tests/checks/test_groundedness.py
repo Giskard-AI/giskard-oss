@@ -1,7 +1,7 @@
 import pytest
 
 from giskard_checks.checks import Groundedness
-from giskard_checks.core import Check, Interaction
+from giskard_checks.core import Check, InteractionResult
 from tests.test_utils.mock_generator import MockGenerator
 
 
@@ -13,7 +13,7 @@ from tests.test_utils.mock_generator import MockGenerator
     ],
 )
 async def test_groundedness_pass_fail_roundtrip(passed: bool, reason: str):
-    interaction = Interaction(
+    interaction = InteractionResult(
         inputs="This is a test question.", outputs="This is a test response."
     )
 
@@ -63,7 +63,7 @@ async def test_groundedness_pass_fail_roundtrip(passed: bool, reason: str):
 async def test_groundedness_pass_fail_roundtrip_default_keys(passed: bool, reason: str):
     answer_value = "The Eiffel Tower is in Paris."
     context_list = ["The Eiffel Tower is located in Paris, France."]
-    interaction = Interaction(
+    interaction = InteractionResult(
         inputs="This is a test question.",
         outputs={"answer": answer_value},
         metadata={
@@ -114,7 +114,7 @@ async def test_groundedness_pass_fail_roundtrip_default_keys(passed: bool, reaso
 async def test_groundedness_pass_fail_roundtrip_custom_keys(passed: bool, reason: str):
     answer_value = "The Eiffel Tower is in Paris."
     context_list = ["The Eiffel Tower is located in Paris, France."]
-    interaction = Interaction(
+    interaction = InteractionResult(
         inputs="This is a test question.",
         outputs=answer_value,
         metadata={"context": context_list},

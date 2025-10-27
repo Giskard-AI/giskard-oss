@@ -6,7 +6,7 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.discriminated import Discriminated, discriminated_base
-from .interactions import Interaction
+from .interaction_result import InteractionResult
 
 """Core checking primitives.
 
@@ -168,15 +168,15 @@ class Check(Discriminated):
     name: str | None = Field(default=None, description="Check name")
     description: str | None = Field(default=None, description="Check description")
 
-    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
-        """Execute the check against the provided interaction.
+    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
+        """Execute the check against the provided interaction result.
 
         Subclasses must override this method and return a `CheckResult`. The
         implementation may be async.
 
         Parameters
         ----------
-        interaction : Interaction[Any, Any]
-            The interaction to check against
+        interaction : InteractionResult[Any, Any]
+            The interaction result to check against
         """
         raise NotImplementedError

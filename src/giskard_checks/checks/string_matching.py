@@ -6,7 +6,6 @@ from pydantic import Field
 
 from giskard_checks.checks.extraction_check import ExtractionCheck
 from giskard_checks.core.check import Check, CheckResult
-from giskard_checks.core.interactions import Interaction
 
 
 @Check.register("string_matching")

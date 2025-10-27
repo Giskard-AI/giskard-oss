@@ -3,7 +3,7 @@
 from pydantic import BaseModel
 
 from giskard_checks.checks import EqualityCheck, StringMatchingCheck
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.generators import Interaction
 from giskard_checks.testing import TestCase
 
 

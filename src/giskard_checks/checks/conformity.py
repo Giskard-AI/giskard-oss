@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from giskard_checks.checks.llm_check import TemplateLLMCheck
 from giskard_checks.core.check import Check
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.core.interaction_result import InteractionResult
 
 
 @Check.register("conformity")
@@ -30,7 +30,7 @@ class Conformity(TemplateLLMCheck):
     Examples
     --------
     >>> import counterpoint as cp
-    >>> from giskard_checks.core.interactions import Interaction
+    >>> from giskard_checks.core.interaction_result import InteractionResult
     >>> # Example of a dynamic rule accessing a field in the output object
     >>> check = Conformity(
     ...     rule="The response should contain the keywords '{{ inputs.keywords }}' and be polite.",
@@ -66,7 +66,7 @@ class Conformity(TemplateLLMCheck):
         return repr(data)
 
     async def _build_template_inputs(
-        self, interaction: Interaction[Any, Any]
+        self, interaction: InteractionResult[Any, Any]
     ) -> dict[str, str]:
         """Build template variables from the interaction."""
 

@@ -5,7 +5,7 @@ from pydantic import Field
 from giskard_checks.checks.llm_check import TemplateLLMCheck
 from giskard_checks.core.check import Check
 from giskard_checks.core.extraction import resolve
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.core.interaction_result import InteractionResult
 
 
 @Check.register("groundedness")
@@ -59,7 +59,7 @@ class Groundedness(TemplateLLMCheck):
         return "giskard_checks::checks/groundedness.j2"
 
     async def _build_template_inputs(
-        self, interaction: Interaction[Any, Any]
+        self, interaction: InteractionResult[Any, Any]
     ) -> dict[str, str]:
         """Build template variables from resolved inputs.
 

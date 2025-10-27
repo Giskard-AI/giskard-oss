@@ -3,7 +3,7 @@
 from pydantic import BaseModel
 
 from giskard_checks.checks import StringMatchingCheck
-from giskard_checks.core.interactions import Interaction
+from giskard_checks.generators import DynamicInteraction, Interaction
 from giskard_checks.testing import TestCase
 from giskard_checks.testing._samples.message import Message
 
@@ -74,14 +74,9 @@ async def test_chat_bot_basic_conversation():
         Message(role="user", content="What is the population of Paris?"),
     ]
 
-    answer = chat_bot.respond(conversation)
-
     testcase = TestCase(
         name="test_chat_bot_basic_conversation",
-        interaction=Interaction(
-            inputs=conversation,
-            outputs=answer,
-        ),
+        interaction=DynamicInteraction.from_callable(chat_bot.respond, conversation),
         checks=[
             StringMatchingCheck(
                 content="Paris",

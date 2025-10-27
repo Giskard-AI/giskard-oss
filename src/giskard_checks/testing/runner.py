@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import time
 import traceback
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
-from giskard_checks.core.check import CheckResult
+from giskard_checks.core.check import Check, CheckResult
+from giskard_checks.core.context import Context
+from giskard_checks.core.interaction_result import InteractionResult
 
 if TYPE_CHECKING:
     # Imported only for type checking to avoid runtime import cycle
@@ -22,11 +25,17 @@ an immutable `TestCaseResult` with convenience properties.
 
 
 class TestCaseResult(BaseModel):
-    """Immutable summary of a test case execution."""
+    """Immutable summary of a test case execution with full run history."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-    results: list[CheckResult]
+    all_runs: list[list[CheckResult]]  # Primary data: all runs
     duration_ms: int
+    total_runs: int = 1
+
+    @property
+    def results(self) -> list[CheckResult]:
+        """Final run results."""
+        return self.all_runs[-1] if self.all_runs else []
 
     @property
     def passed(self) -> bool:
@@ -104,15 +113,17 @@ class TestRunner:
     including the check's kind, name, and description for observability.
     """
 
-    async def run(self, tc: "TestCase[Any]") -> TestCaseResult:
+    async def _run(
+        self, interaction_result: InteractionResult[Any, Any], checks: Sequence[Check]
+    ) -> list[CheckResult]:
         results: list[CheckResult] = []
 
-        start_time = time.perf_counter()
-        for chk in tc.checks:
+        for chk in checks:
             check_start_time = time.perf_counter()
             res: CheckResult | None = None
+
             try:
-                res = await chk.run(tc.interaction)
+                res = await chk.run(interaction_result)
             except Exception as e:
                 res = CheckResult.error(
                     message=f"Check '{chk.name or chk.kind}' failed with error: {str(e)}",
@@ -142,10 +153,32 @@ class TestRunner:
 
             results.append(res)
 
+        return results
+
+    async def run(self, tc: "TestCase[Any]", max_runs: int = 1) -> TestCaseResult:
+        start_time = time.perf_counter()
+
+        all_runs: list[list[CheckResult]] = []
+
+        for _ in range(max_runs):
+            interaction_result = await tc.interaction.generate(Context())
+            results = await self._run(interaction_result, tc.checks)
+            all_runs.append(results)
+
+            # Check if this run failed - if so, we can stop early
+            run_passed = all(result.passed for result in results)
+            if not run_passed:
+                break
+
         end_time = time.perf_counter()
         total_duration_ms = int((end_time - start_time) * 1000)
 
-        return TestCaseResult(results=results, duration_ms=total_duration_ms)
+        if not all_runs:
+            raise ValueError("max_runs should be greater than 0")
+
+        return TestCaseResult(
+            all_runs=all_runs, duration_ms=total_duration_ms, total_runs=len(all_runs)
+        )
 
 
 _default_runner = TestRunner()

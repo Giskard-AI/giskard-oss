@@ -1,7 +1,7 @@
 import pytest
 
 from giskard_checks.checks import Conformity
-from giskard_checks.core import Check, Interaction
+from giskard_checks.core import Check, InteractionResult
 from tests.test_utils.mock_generator import MockGenerator
 
 
@@ -14,7 +14,7 @@ from tests.test_utils.mock_generator import MockGenerator
 )
 async def test_conformity_pass_fail_roundtrip(passed: bool, reason: str):
     """Test basic conformity check with direct rule string."""
-    interaction = Interaction(
+    interaction = InteractionResult(
         inputs="This is a test question.", outputs="This is a test response."
     )
 
@@ -65,7 +65,7 @@ async def test_conformity_pass_fail_roundtrip(passed: bool, reason: str):
 )
 async def test_conformity_with_rule_templating(passed: bool, reason: str):
     """Test conformity with Jinja2 rule templating."""
-    interaction = Interaction(
+    interaction = InteractionResult(
         inputs="What is the capital of France?",
         outputs="The capital of France is Paris.",
         metadata={"category": "geography", "difficulty": "easy"},
@@ -121,7 +121,7 @@ async def test_conformity_with_rule_templating(passed: bool, reason: str):
 )
 async def test_conformity_with_complex_data(passed: bool, reason: str):
     """Test conformity with complex data structures and templating."""
-    interaction = Interaction(
+    interaction = InteractionResult(
         inputs={"question": "What is the capital of France?", "context": "geography"},
         outputs={"answer": "Paris", "confidence": 0.95, "source": "wikipedia"},
         metadata={"model": "gpt-4", "timestamp": "2024-01-01", "category": "geography"},
@@ -170,7 +170,7 @@ async def test_conformity_with_complex_data(passed: bool, reason: str):
 
 async def test_conformity_without_metadata():
     """Test conformity without metadata."""
-    interaction = Interaction(inputs="Simple question", outputs="Simple answer")
+    interaction = InteractionResult(inputs="Simple question", outputs="Simple answer")
 
     rule = "The response should be concise."
 
