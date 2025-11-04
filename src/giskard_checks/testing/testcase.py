@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, Field, SkipValidation, field_serializer, field_validator
+from pydantic import BaseModel, Field
 
 from giskard_checks.core.check import Check
 from giskard_checks.generators import InteractionGenerator

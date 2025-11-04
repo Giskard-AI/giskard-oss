@@ -17,7 +17,7 @@ asyncio_mode = "auto"
 pythonpath = ["src"]
 
 [tool.ruff.lint]
-select = ["E", "W", "I"]
+select = ["E", "W", "I", "F401"]
 ignore = ["E501"]
 
 [tool.pyright]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Awaitable
-from typing import Any, Callable, ClassVar
+from typing import Any, Callable
 
 from pydantic import Field
 
