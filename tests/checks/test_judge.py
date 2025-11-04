@@ -1,9 +1,9 @@
 """Tests for InlinePromptCheck."""
 
 import pytest
-
 from giskard.checks.checks.judge import LLMJudge
 from giskard.checks.core.interaction_result import InteractionResult
+
 from tests.test_utils.mock_generator import MockGenerator
 
 

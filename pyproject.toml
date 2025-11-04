@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "jsonpath-ng>=1.7.0,<2",
     "pydantic>=2.11.7,<3",
-    "counterpoint>=0.2.3,<1",
+    "giskard-agents>=0.3,<1",
     "jinja2>=3.1.6,<4",
 ]
 
@@ -19,6 +19,9 @@ pythonpath = ["src"]
 [tool.ruff.lint]
 select = ["E", "W", "I", "F401"]
 ignore = ["E501"]
+
+[tool.ruff.lint.isort.sections]
+"my_packages" = ["giskard"]
 
 [tool.pyright]
 failOnWarnings = false
@@ -44,6 +47,3 @@ include = [
   "README.md",
   "pyproject.toml",
 ]
-
-[tool.uv.sources]
-counterpoint = { git = "https://github.com/Giskard-AI/counterpoint.git", tag = "v0.2.3" }

@@ -1,5 +1,5 @@
-from counterpoint.chat import Message
-from counterpoint.generators.base import BaseGenerator, GenerationParams, Response
+from giskard.agents.chat import Message
+from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
 from pydantic import Field
 
 

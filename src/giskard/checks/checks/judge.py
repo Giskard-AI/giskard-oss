@@ -1,6 +1,6 @@
-from counterpoint.chat import Message
-from counterpoint.templates import MessageTemplate
-from counterpoint.workflow import TemplateReference
+from giskard.agents.chat import Message
+from giskard.agents.templates import MessageTemplate
+from giskard.agents.workflow import TemplateReference
 from pydantic import Field, model_validator
 
 from ..checks.base import BaseLLMCheck

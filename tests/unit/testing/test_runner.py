@@ -3,7 +3,6 @@
 from typing import Any
 
 import pytest
-
 from giskard.checks.core.check import Check, CheckResult, CheckStatus
 from giskard.checks.core.context import Context
 from giskard.checks.core.interaction_result import InteractionResult

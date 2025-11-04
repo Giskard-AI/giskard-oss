@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
-
 from giskard.checks.checks.fn import from_fn
 from giskard.checks.core.check import CheckStatus
 from giskard.checks.generators import Interaction
 from giskard.checks.testing.testcase import TestCase
+from pydantic import BaseModel
 
 
 class ModerationResult(BaseModel):

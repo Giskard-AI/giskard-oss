@@ -1,6 +1,6 @@
 from typing import Any
 
-from counterpoint.workflow import TemplateReference
+from giskard.agents.workflow import TemplateReference
 from jinja2 import Template
 from pydantic import BaseModel, Field
 
@@ -26,16 +26,16 @@ class Conformity(BaseLLMCheck):
         The rule statement to evaluate against the interaction.
         This string can contain Jinja2 placeholders (e.g., `{{ outputs.text_value }}`).
     generator : BaseGenerator | None
-        Counterpoint generator for LLM evaluation (inherited from BaseLLMCheck).
+        Generator for LLM evaluation (inherited from BaseLLMCheck).
 
     Examples
     --------
-    >>> import counterpoint as cp
+    >>> from giskard.agents.generators import Generator
     >>> from giskard.checks.core.interaction_result import InteractionResult
     >>> # Example of a dynamic rule accessing a field in the output object
     >>> check = Conformity(
     ...     rule="The response should contain the keywords '{{ inputs.keywords }}' and be polite.",
-    ...     generator=cp.Generator(model="openai/gpt-4o")
+    ...     generator=Generator(model="openai/gpt-4o")
     ... )
     >>>
     >>> # The 'rule' string is rendered using all fields of the Interaction model.

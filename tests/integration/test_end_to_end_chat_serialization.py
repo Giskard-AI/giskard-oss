@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import json
 
-from pydantic import BaseModel
-
 from giskard.checks.checks import StringMatchingCheck
 from giskard.checks.core import CheckStatus
 from giskard.checks.generators import Interaction
 from giskard.checks.testing.testcase import TestCase
+from pydantic import BaseModel
 
 
 class Message(BaseModel):

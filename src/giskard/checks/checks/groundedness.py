@@ -1,6 +1,6 @@
 from typing import Any
 
-from counterpoint.workflow import TemplateReference
+from giskard.agents.workflow import TemplateReference
 from pydantic import Field
 
 from ..checks.base import BaseLLMCheck
@@ -27,15 +27,15 @@ class Groundedness(BaseLLMCheck):
     context_key : str
         Key to extract the context from the interaction (default: "$.metadata.context").
     generator : BaseGenerator | None
-        Counterpoint generator for LLM evaluation (inherited from BaseLLMCheck).
+        Generator for LLM evaluation (inherited from BaseLLMCheck).
 
     Examples
     --------
-    >>> import counterpoint as cp
+    >>> from giskard.agents.generators import Generator
     >>> check = Groundedness(
     ...     answer="The Eiffel Tower is in Paris.",
     ...     context=["Paris is the capital of France.", "It's located in Europe."],
-    ...     generator=cp.Generator(model="openai/gpt-4o")
+    ...     generator=Generator(model="openai/gpt-4o")
     ... )
     """
 

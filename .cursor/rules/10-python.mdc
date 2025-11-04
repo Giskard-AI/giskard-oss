@@ -69,4 +69,4 @@ alwaysApply: false
 ## Dependencies
 - Declare runtime dependencies and Python version in `pyproject.toml`.
 - Keep dev-only tools (pytest, pytest-asyncio) in the `dev` dependency group.
-- Use tagged VCS dependencies (e.g., `counterpoint`) via `tool.uv.sources` as configured.
+- Use tagged VCS dependencies (e.g., `giskard-agents`) via `tool.uv.sources` as configured.

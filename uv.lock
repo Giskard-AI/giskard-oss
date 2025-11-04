@@ -242,20 +242,6 @@ wheels = [
 ]
 
 [[package]]
-name = "counterpoint"
-version = "0.2.3"
-source = { git = "https://github.com/Giskard-AI/counterpoint.git?tag=v0.2.3#3a0c813266b1b8f2f77180cdf381ec2c31e210df" }
-dependencies = [
-    { name = "griffe" },
-    { name = "jinja2" },
-    { name = "litellm" },
-    { name = "logfire-api" },
-    { name = "pydantic" },
-    { name = "tenacity" },
-    { name = "typing-extensions" },
-]
-
-[[package]]
 name = "distro"
 version = "1.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -429,11 +415,29 @@ wheels = [
 ]
 
 [[package]]
+name = "giskard-agents"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "griffe" },
+    { name = "jinja2" },
+    { name = "litellm" },
+    { name = "logfire-api" },
+    { name = "pydantic" },
+    { name = "tenacity" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/aa/b8/a2237cc9eb5a7324ff385229b41091921048d5a3132e047ec4f8ea334f1d/giskard_agents-0.3.0.tar.gz", hash = "sha256:c9e821b513c6f2e902e41c496d14c6141783293c51202858c9d1f9ad4b0a6573", size = 136157 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b0/06/5749ca2d50378a6e131b7e72b4c7f1e22a886a72441c67316988537c046c/giskard_agents-0.3.0-py3-none-any.whl", hash = "sha256:e4f05d538108156e86143317e051471a908091e5f7f0f1b32749a5fea61694b9", size = 28574 },
+]
+
+[[package]]
 name = "giskard-checks"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "counterpoint" },
+    { name = "giskard-agents" },
     { name = "jinja2" },
     { name = "jsonpath-ng" },
     { name = "pydantic" },
@@ -447,7 +451,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "counterpoint", git = "https://github.com/Giskard-AI/counterpoint.git?tag=v0.2.3" },
+    { name = "giskard-agents", specifier = ">=0.3,<1" },
     { name = "jinja2", specifier = ">=3.1.6,<4" },
     { name = "jsonpath-ng", specifier = ">=1.7.0,<2" },
     { name = "pydantic", specifier = ">=2.11.7,<3" },

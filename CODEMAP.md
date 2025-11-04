@@ -114,16 +114,16 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
   - Provides common functionality for value extraction and evaluation patterns.
 
 - BaseLLMCheck (in `checks/base.py`)
-  - Abstract base class for LLM-based checks using Counterpoint.
+  - Abstract base class for LLM-based checks.
   - Provides framework for creating checks that use Large Language Models to evaluate interactions.
   - Includes `LLMCheckResult` model for structured LLM outputs.
 
 - Groundedness (in `checks/groundedness.py`)
-  - LLM-based check for evaluating response groundedness using Counterpoint.
+  - LLM-based check for evaluating response groundedness.
   - Uses Jinja2 templates for prompt generation.
 
 - Conformity (in `checks/conformity.py`)
-  - LLM-based check for evaluating response conformity using Counterpoint.
+  - LLM-based check for evaluating response conformity.
   - Uses Jinja2 templates for prompt generation.
 
 - LLMJudge (in `checks/judge.py`)
@@ -199,7 +199,7 @@ The library uses standard Pydantic serialization with discriminated unions for p
 
 - Runtime:
   - `pydantic>=2.11.7,<3` - Core data validation and serialization
-  - `counterpoint>=0.2.3,<1` - LLM integration and workflow management
+  - `giskard-agents>=0.3,<1` - LLM integration and workflow management
   - `jsonpath-ng>=1.7.0,<2` - JSONPath expressions for data extraction
   - `jinja2>=3.1.6,<4` - Template engine for LLM prompts
 - Dev:
@@ -212,7 +212,7 @@ The library uses standard Pydantic serialization with discriminated unions for p
   - End-to-end chat serialization using `Interaction` with `StringMatchingCheck`.
   - Structured moderation example using `Interaction`.
   - TestCase serialization/deserialization round-trips including lazy import behavior.
-  - LLM-based checks using Counterpoint integration.
+  - LLM-based checks using giskard-agents integration.
 - Unit tests under `tests/unit` cover individual components and modules.
 - Test utilities in `tests/test_utils` provide mocks and helpers for testing.
 

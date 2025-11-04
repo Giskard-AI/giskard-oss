@@ -1,5 +1,5 @@
-from counterpoint.generators import Generator
-from counterpoint.generators.base import BaseGenerator
+from giskard.agents.generators import Generator
+from giskard.agents.generators.base import BaseGenerator
 
 # Global default generator
 _default_generator: BaseGenerator | None = None
@@ -11,7 +11,7 @@ def set_default_generator(generator: "BaseGenerator") -> None:
     Parameters
     ----------
     generator : BaseGenerator
-        The counterpoint generator to use as default for all LLM checks.
+        The generator to use as default for all LLM checks.
     """
     global _default_generator
     _default_generator = generator

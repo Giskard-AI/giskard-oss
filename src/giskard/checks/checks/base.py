@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from counterpoint.chat import Message
-from counterpoint.generators.base import BaseGenerator
-from counterpoint.templates import MessageTemplate
-from counterpoint.workflow import ChatWorkflow, TemplateReference
+from giskard.agents.chat import Message
+from giskard.agents.generators.base import BaseGenerator
+from giskard.agents.templates import MessageTemplate
+from giskard.agents.workflow import ChatWorkflow, TemplateReference
 from pydantic import BaseModel, Field
 
 from ..core.check import Check, CheckResult
@@ -31,14 +31,14 @@ class BaseLLMCheck(Check, ABC):
     Attributes
     ----------
     generator : BaseGenerator
-        Counterpoint generator for LLM evaluation. Defaults to the global
+        Generator for LLM evaluation. Defaults to the global
         default generator if not specified.
     """
 
     generator: BaseGenerator = Field(
         default_factory=get_default_generator,
         exclude=True,  # Not serializable
-        description="Counterpoint generator for LLM evaluation",
+        description="Generator for LLM evaluation",
     )
 
     @property
@@ -62,7 +62,7 @@ class BaseLLMCheck(Check, ABC):
     async def _build_workflow(
         self, interaction: InteractionResult[Any, Any]
     ) -> ChatWorkflow[Any]:
-        """Build the Counterpoint workflow for LLM evaluation.
+        """Build the workflow for LLM evaluation.
 
         Parameters
         ----------

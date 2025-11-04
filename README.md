@@ -7,7 +7,7 @@ This library provides:
 
 - Core types to represent interaction generators and checks
 - A simple test runner with timing and error capture
-- Built-in checks including LLM-based evaluation using Counterpoint
+- Built-in checks including LLM-based evaluation using giskard-agents
 - Convenient helpers like `from_fn` for writing custom checks as functions
 - Support for both static and dynamic interaction generation
 
@@ -22,7 +22,7 @@ Requires Python >= 3.11.
 
 **Dependencies:**
 - `pydantic>=2.11.7` - Core data validation and serialization
-- `counterpoint>=0.2.3` - LLM integration and workflow management
+- `giskard-agents>=0.3` - LLM integration and workflow management
 - `jsonpath-ng>=1.7.0` - JSONPath expressions for data extraction
 - `jinja2>=3.1.6` - Template engine for LLM prompts
 
@@ -108,7 +108,7 @@ Checks
 - `giskard.checks.checks.EqualityCheck`: value equality checker with optional
   JSONPath `key` selection.
 - `giskard.checks.checks.ExtractionCheck`: abstract base class for checks that extract values from interactions
-- `giskard.checks.checks.BaseLLMCheck`: abstract base class for LLM-based checks using Counterpoint
+- `giskard.checks.checks.BaseLLMCheck`: abstract base class for LLM-based checks
 - `giskard.checks.checks.Groundedness`: LLM-based check for evaluating response groundedness
 - `giskard.checks.checks.Conformity`: LLM-based check for evaluating response conformity
 - `giskard.checks.checks.LLMJudge`: flexible LLM-based check that supports both
@@ -382,7 +382,7 @@ Use AI models to evaluate interactions with built-in LLM checks:
 from giskard.checks.generators import Interaction
 from giskard.checks.checks import Groundedness, Conformity, LLMJudge
 from giskard.checks import set_default_generator
-from counterpoint.generators import Generator
+from giskard.agents.generators import Generator
 
 # Configure the default LLM generator
 set_default_generator(Generator(model="openai/gpt-4o-mini"))

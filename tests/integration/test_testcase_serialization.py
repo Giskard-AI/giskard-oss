@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from giskard.checks.core import Check, CheckResult, CheckStatus, InteractionResult
 from giskard.checks.core.interaction_result import InteractionResult
 from giskard.checks.generators import Interaction

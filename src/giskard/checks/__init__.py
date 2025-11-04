@@ -8,7 +8,7 @@ exposed as modules. Import specific names from their respective subpackages.
 # Re-export subpackages as modules for convenient access, without star imports
 from pathlib import Path
 
-from counterpoint import add_prompts_path
+from giskard.agents import add_prompts_path
 
 from . import checks as checks
 from . import core as core

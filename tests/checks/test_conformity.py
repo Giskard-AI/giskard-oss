@@ -1,7 +1,7 @@
 import pytest
-
 from giskard.checks.checks import Conformity
 from giskard.checks.core import Check, InteractionResult
+
 from tests.test_utils.mock_generator import MockGenerator
 
 
