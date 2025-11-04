@@ -6,10 +6,10 @@ alwaysApply: false
 # Python Best Practices
 
 ## Project Structure
-- Use src-layout with `src/giskard_checks/` as the package root.
+- Use src-layout with `src/giskard/checks/` as the package root.
 - Place tests in `tests/` parallel to `src/`; follow similar module structure.
 - Store configuration in `pyproject.toml` and use environment variables for runtime knobs.
-- Build with Hatch; distribute `src/giskard_checks`, `README.md`, and `pyproject.toml`.
+- Build with Hatch; distribute `src/giskard/checks`, `README.md`, and `pyproject.toml`.
 
 ## Tooling and Commands
 - Python version: >= 3.11 (enforced via `pyproject.toml`).
@@ -27,7 +27,7 @@ alwaysApply: false
   - `make ci` - Run the same checks as CI
 
 ## Imports and Naming
-- Prefer absolute imports within the `giskard_checks` package.
+- Prefer absolute imports within the `giskard.checks` package.
 - Follow PEP 8 naming conventions:
   - snake_case for functions and variables
   - PascalCase for classes

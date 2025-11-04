@@ -4,10 +4,10 @@ from typing import Any
 
 import pytest
 
-from giskard_checks.core import Check, CheckResult, CheckStatus, InteractionResult
-from giskard_checks.core.interaction_result import InteractionResult
-from giskard_checks.generators import Interaction
-from giskard_checks.testing.testcase import TestCase
+from giskard.checks.core import Check, CheckResult, CheckStatus, InteractionResult
+from giskard.checks.core.interaction_result import InteractionResult
+from giskard.checks.generators import Interaction
+from giskard.checks.testing.testcase import TestCase
 
 
 @Check.register("contains")

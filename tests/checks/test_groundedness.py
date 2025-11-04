@@ -1,7 +1,7 @@
 import pytest
 
-from giskard_checks.checks import Groundedness
-from giskard_checks.core import Check, InteractionResult
+from giskard.checks.checks import Groundedness
+from giskard.checks.core import Check, InteractionResult
 from tests.test_utils.mock_generator import MockGenerator
 
 

@@ -2,7 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from giskard_checks.core.interaction_result import InteractionResult
+from ..core.interaction_result import InteractionResult
 
 
 class Context(BaseModel):

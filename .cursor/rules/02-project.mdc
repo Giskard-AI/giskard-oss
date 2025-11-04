@@ -25,7 +25,7 @@ Always use Makefile commands for development tasks. See [02-development.mdc](02-
 - Use Pydantic v2 models for type safety
 - Async-friendly: checks can be sync or async
 - Follow the existing patterns in the codebase
-- Use absolute imports within the `giskard_checks` package
+- Use absolute imports within the `giskard.checks` package
 
 ## Testing
 
@@ -35,10 +35,10 @@ Always use Makefile commands for development tasks. See [02-development.mdc](02-
 
 ## Architecture
 
-- Core abstractions in `src/giskard_checks/core/`
-- Built-in checks in `src/giskard_checks/checks/`
-- Interaction types in `src/giskard_checks/interactions/`
-- Testing utilities in `src/giskard_checks/testing/`
+- Core abstractions in `src/giskard/checks/core/`
+- Built-in checks in `src/giskard/checks/checks/`
+- Interaction types in `src/giskard/checks/interactions/`
+- Testing utilities in `src/giskard/checks/testing/`
 
 See [CODEMAP.md](../CODEMAP.md) for detailed architecture documentation.
 # Project Rules and Conventions
@@ -64,7 +64,7 @@ Always use Makefile commands for development tasks. See [development.md](develop
 - Use Pydantic v2 models for type safety
 - Async-friendly: checks can be sync or async
 - Follow the existing patterns in the codebase
-- Use absolute imports within the `giskard_checks` package
+- Use absolute imports within the `giskard.checks` package
 
 ## Testing
 
@@ -74,9 +74,9 @@ Always use Makefile commands for development tasks. See [development.md](develop
 
 ## Architecture
 
-- Core abstractions in `src/giskard_checks/core/`
-- Built-in checks in `src/giskard_checks/checks/`
-- Interaction types in `src/giskard_checks/interactions/`
-- Testing utilities in `src/giskard_checks/testing/`
+- Core abstractions in `src/giskard/checks/core/`
+- Built-in checks in `src/giskard/checks/checks/`
+- Interaction types in `src/giskard/checks/interactions/`
+- Testing utilities in `src/giskard/checks/testing/`
 
 See [CODEMAP.md](../CODEMAP.md) for detailed architecture documentation.

@@ -4,9 +4,9 @@ from counterpoint.workflow import TemplateReference
 from jinja2 import Template
 from pydantic import BaseModel, Field
 
-from giskard_checks.checks.base import BaseLLMCheck
-from giskard_checks.core.check import Check
-from giskard_checks.core.interaction_result import InteractionResult
+from ..checks.base import BaseLLMCheck
+from ..core.check import Check
+from ..core.interaction_result import InteractionResult
 
 
 @Check.register("conformity")
@@ -31,7 +31,7 @@ class Conformity(BaseLLMCheck):
     Examples
     --------
     >>> import counterpoint as cp
-    >>> from giskard_checks.core.interaction_result import InteractionResult
+    >>> from giskard.checks.core.interaction_result import InteractionResult
     >>> # Example of a dynamic rule accessing a field in the output object
     >>> check = Conformity(
     ...     rule="The response should contain the keywords '{{ inputs.keywords }}' and be polite.",
@@ -55,7 +55,7 @@ class Conformity(BaseLLMCheck):
 
     def get_prompt(self) -> TemplateReference:
         """Return the Jinja2 template name for conformity evaluation."""
-        return TemplateReference(template_name="giskard_checks::checks/conformity.j2")
+        return TemplateReference(template_name="giskard.checks::checks/conformity.j2")
 
     def _format_data(self, data: Any) -> str:
         """Formats data for the LLM prompt template."""

@@ -3,10 +3,10 @@ from typing import Any
 from counterpoint.workflow import TemplateReference
 from pydantic import Field
 
-from giskard_checks.checks.base import BaseLLMCheck
-from giskard_checks.core.check import Check
-from giskard_checks.core.extraction import resolve
-from giskard_checks.core.interaction_result import InteractionResult
+from ..checks.base import BaseLLMCheck
+from ..core.check import Check
+from ..core.extraction import resolve
+from ..core.interaction_result import InteractionResult
 
 
 @Check.register("groundedness")
@@ -55,7 +55,7 @@ class Groundedness(BaseLLMCheck):
     )
 
     def get_prompt(self) -> TemplateReference:
-        return TemplateReference(template_name="giskard_checks::checks/groundedness.j2")
+        return TemplateReference(template_name="giskard.checks::checks/groundedness.j2")
 
     async def get_inputs(
         self, interaction: InteractionResult[Any, Any]

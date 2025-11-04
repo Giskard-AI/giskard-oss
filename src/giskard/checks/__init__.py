@@ -1,4 +1,4 @@
-"""Public package exports for giskard_checks.
+"""Public package exports for giskard.checks.
 
 This package provides primitives to model interactions, implement checks, and
 run them via a lightweight test runner. The most commonly used subpackages are
@@ -16,7 +16,7 @@ from . import generators as generators
 from . import testing as testing
 from .settings import get_default_generator, set_default_generator
 
-add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard_checks")
+add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.checks")
 
 __all__ = [
     "core",

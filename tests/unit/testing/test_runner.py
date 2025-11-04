@@ -4,13 +4,13 @@ from typing import Any
 
 import pytest
 
-from giskard_checks.core.check import Check, CheckResult, CheckStatus
-from giskard_checks.core.context import Context
-from giskard_checks.core.interaction_result import InteractionResult
-from giskard_checks.generators import Interaction
-from giskard_checks.generators.base import InteractionGenerator
-from giskard_checks.testing.runner import TestCaseResult, TestRunner
-from giskard_checks.testing.testcase import TestCase
+from giskard.checks.core.check import Check, CheckResult, CheckStatus
+from giskard.checks.core.context import Context
+from giskard.checks.core.interaction_result import InteractionResult
+from giskard.checks.generators import Interaction
+from giskard.checks.generators.base import InteractionGenerator
+from giskard.checks.testing.runner import TestCaseResult, TestRunner
+from giskard.checks.testing.testcase import TestCase
 
 
 class TestTestCaseResult:

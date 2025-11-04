@@ -4,8 +4,8 @@ from typing import Any
 
 from pydantic import Field
 
-from giskard_checks.checks.extraction_check import ExtractionCheck
-from giskard_checks.core.check import Check, CheckResult
+from ..checks.extraction_check import ExtractionCheck
+from ..core.check import Check, CheckResult
 
 
 @Check.register("equality")

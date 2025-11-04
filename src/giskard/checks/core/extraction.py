@@ -5,7 +5,7 @@ from typing import Any, ClassVar
 from jsonpath_ng import parse
 from pydantic import BaseModel, ConfigDict, Field
 
-from giskard_checks.core.interaction_result import InteractionResult
+from ..core.interaction_result import InteractionResult
 
 
 class Extractor(BaseModel):

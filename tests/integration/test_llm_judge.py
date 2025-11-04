@@ -1,10 +1,10 @@
-"""Integration tests for LLM-as-a-judge scenarios using the giskard_checks testing framework."""
+"""Integration tests for LLM-as-a-judge scenarios using the giskard.checks testing framework."""
 
 from pydantic import BaseModel
 
-from giskard_checks.checks import EqualityCheck, StringMatchingCheck
-from giskard_checks.generators import Interaction
-from giskard_checks.testing import TestCase
+from giskard.checks.checks import EqualityCheck, StringMatchingCheck
+from giskard.checks.generators import Interaction
+from giskard.checks.testing import TestCase
 
 
 class CheckResult(BaseModel):

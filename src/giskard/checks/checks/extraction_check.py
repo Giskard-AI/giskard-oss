@@ -5,9 +5,9 @@ from typing import Any, Literal
 
 from pydantic import Field
 
-from giskard_checks.core.check import Check, CheckResult
-from giskard_checks.core.extraction import Extractor, JsonPathExtractor
-from giskard_checks.core.interaction_result import InteractionResult
+from ..core.check import Check, CheckResult
+from ..core.extraction import Extractor, JsonPathExtractor
+from ..core.interaction_result import InteractionResult
 
 
 class ExtractionCheck(Check, ABC):

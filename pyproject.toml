@@ -36,11 +36,11 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/giskard_checks"]
+packages = ["src/giskard"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-  "src/giskard_checks",
+  "src/giskard/checks",
   "README.md",
   "pyproject.toml",
 ]

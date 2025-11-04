@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from giskard_checks.core.check import Check
-from giskard_checks.generators import InteractionGenerator
+from ..core.check import Check
+from ..generators import InteractionGenerator
 
 if TYPE_CHECKING:
-    from giskard_checks.testing.runner import TestCaseResult
+    from ..testing.runner import TestCaseResult
 
 
 """Test case model and runner integration.
@@ -59,7 +59,7 @@ class TestCase(BaseModel):
             if stopped early due to failure).
         """
         # Lazy import to avoid circular dependency with runner importing TestCase
-        from giskard_checks.testing.runner import get_runner
+        from ..testing.runner import get_runner
 
         runner = get_runner()
         return await runner.run(self, max_runs)

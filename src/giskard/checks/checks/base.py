@@ -7,9 +7,9 @@ from counterpoint.templates import MessageTemplate
 from counterpoint.workflow import ChatWorkflow, TemplateReference
 from pydantic import BaseModel, Field
 
-from giskard_checks.core.check import Check, CheckResult
-from giskard_checks.core.interaction_result import InteractionResult
-from giskard_checks.settings import get_default_generator
+from ..core.check import Check, CheckResult
+from ..core.interaction_result import InteractionResult
+from ..settings import get_default_generator
 
 
 class LLMCheckResult(BaseModel):

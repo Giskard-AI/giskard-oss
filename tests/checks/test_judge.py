@@ -2,8 +2,8 @@
 
 import pytest
 
-from giskard_checks.checks.judge import LLMJudge
-from giskard_checks.core.interaction_result import InteractionResult
+from giskard.checks.checks.judge import LLMJudge
+from giskard.checks.core.interaction_result import InteractionResult
 from tests.test_utils.mock_generator import MockGenerator
 
 

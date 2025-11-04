@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import json
 
-from giskard_checks.checks import StringMatchingCheck
-from giskard_checks.core import CheckStatus
-from giskard_checks.generators import Interaction
-from giskard_checks.testing._samples.message import Message
-from giskard_checks.testing.testcase import TestCase
+from pydantic import BaseModel
+
+from giskard.checks.checks import StringMatchingCheck
+from giskard.checks.core import CheckStatus
+from giskard.checks.generators import Interaction
+from giskard.checks.testing.testcase import TestCase
+
+
+class Message(BaseModel):
+    role: str
+    content: str
 
 
 async def test_chat_interaction_roundtrip_serialization_and_execution():

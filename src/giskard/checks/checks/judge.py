@@ -3,8 +3,8 @@ from counterpoint.templates import MessageTemplate
 from counterpoint.workflow import TemplateReference
 from pydantic import Field, model_validator
 
-from giskard_checks.checks.base import BaseLLMCheck
-from giskard_checks.core.check import Check
+from ..checks.base import BaseLLMCheck
+from ..core.check import Check
 
 
 @Check.register("llm_judge")

@@ -1,8 +1,8 @@
 """Tests for DynamicInteraction generator."""
 
-from giskard_checks.core.context import Context
-from giskard_checks.core.interaction_result import InteractionResult
-from giskard_checks.generators import DynamicInteraction
+from giskard.checks.core.context import Context
+from giskard.checks.core.interaction_result import InteractionResult
+from giskard.checks.generators import DynamicInteraction
 
 
 class TestDynamicInteraction:

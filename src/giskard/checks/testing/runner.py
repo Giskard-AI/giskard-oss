@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
-from giskard_checks.core.check import Check, CheckResult
-from giskard_checks.core.context import Context
-from giskard_checks.core.interaction_result import InteractionResult
+from ..core.check import Check, CheckResult
+from ..core.context import Context
+from ..core.interaction_result import InteractionResult
 
 if TYPE_CHECKING:
     # Imported only for type checking to avoid runtime import cycle
-    from giskard_checks.testing.testcase import TestCase
+    from ..testing.testcase import TestCase
 
 
 """Test runner and results aggregation.

@@ -6,8 +6,8 @@ from typing import Any, Callable
 
 from pydantic import Field
 
-from giskard_checks.core.check import Check, CheckResult
-from giskard_checks.core.interaction_result import InteractionResult
+from ..core.check import Check, CheckResult
+from ..core.interaction_result import InteractionResult
 
 """Function-backed check implementation.
 
@@ -88,7 +88,7 @@ def from_fn(
     Example
     -------
     ```python
-    from giskard_checks.checks import from_fn
+    from giskard.checks.checks import from_fn
 
     chk = from_fn(lambda inter: inter.output is not None, name="has_output")
     ```
