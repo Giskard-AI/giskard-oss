@@ -7,7 +7,7 @@ from typing import Any, Callable
 from pydantic import Field
 
 from ..core.check import Check, CheckResult
-from ..core.interaction_result import InteractionResult
+from ..core.interaction import Interaction
 
 """Function-backed check implementation.
 
@@ -35,7 +35,7 @@ class FnCheck(Check):
     """
 
     fn: Callable[
-        [InteractionResult[Any, Any]],
+        [Interaction[Any, Any]],
         Awaitable[bool | CheckResult] | bool | CheckResult,
     ] = Field(
         exclude=True,
@@ -46,7 +46,7 @@ class FnCheck(Check):
     failure_message: str | None = None
     details: dict[str, Any] = Field(default_factory=dict)
 
-    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         """Execute the function and normalize its result to a `CheckResult`."""
         result = self.fn(interaction)
         if inspect.isawaitable(result):
@@ -73,7 +73,7 @@ class FnCheck(Check):
 
 def from_fn(
     fn: Callable[
-        [InteractionResult[Any, Any]],
+        [Interaction[Any, Any]],
         Awaitable[bool | CheckResult] | bool | CheckResult,
     ],
     *,

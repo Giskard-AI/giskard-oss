@@ -3,8 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from giskard.checks.core import Check, CheckResult, CheckStatus, InteractionResult
-from giskard.checks.generators import Interaction
+from giskard.checks.core import Check, CheckResult, CheckStatus, Interaction
 from giskard.checks.testing.testcase import TestCase
 
 
@@ -12,7 +11,7 @@ from giskard.checks.testing.testcase import TestCase
 class ContainsCheck(Check):
     needle: str
 
-    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         if interaction.inputs is not None and self.needle in interaction.inputs:
             return CheckResult.success(
                 message=f"input contains '{self.needle}'",
@@ -26,7 +25,7 @@ class ContainsCheck(Check):
 class OutputEqualsCheck(Check):
     expected: str
 
-    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         if interaction.outputs == self.expected:
             return CheckResult.success(
                 message="output matched",
@@ -38,7 +37,7 @@ class OutputEqualsCheck(Check):
 
 @Check.register("explode")
 class ExplodeCheck(Check):
-    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         raise RuntimeError("kaboom")
 
 

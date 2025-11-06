@@ -42,7 +42,7 @@ class Output(BaseModel):
     moderated: bool
 
 
-# Create a static interaction generator
+# Create an interaction
 interaction = Interaction(
     inputs="some text",
     outputs=Output(moderated=False),
@@ -74,8 +74,8 @@ Why this library?
 Concepts
 --------
 
-- **InteractionGenerator**: base class for generating interactions, produces `InteractionResult` instances
-- **InteractionResult**: internal data structure used by checks containing inputs, outputs, and metadata
+- **InteractionGenerator**: base class for generating interactions, produces `Interaction` instances
+- **Interaction**: internal data structure used by checks containing inputs, outputs, and metadata
 - **Check**: unit that inspects an interaction result and returns a `CheckResult`
 - **TestCase**: pairs an interaction generator with a set of checks and executes them
 - **TestRunner**: executes checks, records durations, and aggregates results
@@ -90,12 +90,11 @@ Core Types
 - `giskard.checks.core.CheckResult`: immutable result from check execution with
   convenience boolean properties (`passed`, `failed`, `errored`, `skipped`)
 - `giskard.checks.core.CheckStatus`: enum for check outcomes (PASS, FAIL, ERROR, SKIP)
-- `giskard.checks.core.InteractionResult`: internal data structure containing inputs, outputs, and metadata
+- `giskard.checks.core.Interaction`: internal data structure containing inputs, outputs, and metadata
 
 Generators
 
 - `giskard.checks.generators.InteractionGenerator`: base class for interaction generators with discriminated union support
-- `giskard.checks.generators.Interaction`: static interaction generator for pre-defined inputs/outputs
 - `giskard.checks.generators.DynamicInteraction`: dynamic interaction generator using callable functions
 
 Checks
@@ -172,13 +171,13 @@ Create a new check by subclassing `Check` and registering it with a unique kind:
 
 ```python
 from typing import Any
-from giskard.checks.core import Check, CheckResult, InteractionResult
+from giskard.checks.core import Check, CheckResult, Interaction
 
 @Check.register("advanced_security")
 class AdvancedSecurityCheck(Check):
     threshold: float = 0.8  # Custom fields using Pydantic
 
-    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         # Your check logic here
         score = await some_security_analysis(interaction.outputs)
 
@@ -195,7 +194,7 @@ Create a new generator type for dynamic interaction creation:
 ```python
 from typing import Any
 from giskard.checks.generators import InteractionGenerator
-from giskard.checks.core import InteractionResult, Context
+from giskard.checks.core import Interaction, Context
 from pydantic import BaseModel
 
 class ChatMessage(BaseModel):
@@ -209,10 +208,10 @@ class ChatInteractionGenerator(InteractionGenerator):
     model_name: str
     messages: list[ChatMessage]
 
-    async def generate(self, context: Context) -> InteractionResult[Any, Any]:
+    async def generate(self, context: Context) -> Interaction[Any, Any]:
         # Generate dynamic outputs based on messages
         summary = f"Conversation with {len(self.messages)} messages"
-        return InteractionResult(
+        return Interaction(
             inputs=self.messages,
             outputs=summary,
             metadata={"session_id": self.session_id, "model": self.model_name}
@@ -308,10 +307,10 @@ def test_custom_serialization():
 Structured data quickstart
 ---------------------------
 
-Evaluate structured data using `Interaction` (static generator) and built-in checks:
+Evaluate structured data using `Interaction` and built-in checks:
 
 ```python
-from giskard.checks.generators import Interaction
+from giskard.checks.core import Interaction
 from giskard.checks.checks import StringMatchingCheck, EqualityCheck
 from giskard.checks.testing import TestCase
 
@@ -350,14 +349,14 @@ Use `DynamicInteraction` for callable-based interaction generation:
 
 ```python
 from giskard.checks.generators import DynamicInteraction
-from giskard.checks.core import InteractionResult, Context
+from giskard.checks.core import Interaction, Context
 
 # Define a dynamic interaction generator
-async def generate_chat_interaction(context: Context) -> InteractionResult:
+async def generate_chat_interaction(context: Context) -> Interaction:
     # Access previous interactions for context
     previous_count = len(context.previous_interactions)
 
-    return InteractionResult(
+    return Interaction(
         inputs={"message": f"Hello! This is message #{previous_count + 1}"},
         outputs={"response": f"Hi there! I've seen {previous_count} previous messages."},
         metadata={"generation_time": "2024-01-01T12:00:00Z"}
@@ -460,7 +459,7 @@ class CustomLLMCheck(BaseLLMCheck):
 
 Notes:
 
-- `Interaction` is a static generator that wraps pre-defined inputs and outputs
+- `Interaction` is the core data structure containing inputs, outputs, and metadata
 - `DynamicInteraction` can be used for callable-based interaction generation
 - `StringMatchingCheck` searches strings selected by `key` (JSONPath). When the
   key resolves to a list, set `evaluation_mode="all"` to require all items contain the

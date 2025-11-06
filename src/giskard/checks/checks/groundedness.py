@@ -6,7 +6,7 @@ from pydantic import Field
 from ..checks.base import BaseLLMCheck
 from ..core.check import Check
 from ..core.extraction import resolve
-from ..core.interaction_result import InteractionResult
+from ..core.interaction import Interaction
 
 
 @Check.register("groundedness")
@@ -57,9 +57,7 @@ class Groundedness(BaseLLMCheck):
     def get_prompt(self) -> TemplateReference:
         return TemplateReference(template_name="giskard.checks::checks/groundedness.j2")
 
-    async def get_inputs(
-        self, interaction: InteractionResult[Any, Any]
-    ) -> dict[str, str]:
+    async def get_inputs(self, interaction: Interaction[Any, Any]) -> dict[str, str]:
         """Build template variables from resolved inputs.
 
         Parameters

@@ -2,7 +2,7 @@
 
 import pytest
 from giskard.checks.checks.judge import LLMJudge
-from giskard.checks.core.interaction_result import InteractionResult
+from giskard.checks.core.interaction import Interaction
 
 from tests.test_utils.mock_generator import MockGenerator
 
@@ -16,7 +16,7 @@ from tests.test_utils.mock_generator import MockGenerator
 )
 async def test_judge_check_direct_instantiation(passed: bool, reason: str):
     """Test direct instantiation of InlinePromptCheck."""
-    interaction = InteractionResult(
+    interaction = Interaction(
         inputs="This is a test question.", outputs="This is a test response."
     )
 
@@ -57,7 +57,7 @@ async def test_judge_check_direct_instantiation(passed: bool, reason: str):
 )
 async def test_judge_check_outputs_instantiation(passed: bool, reason: str):
     """Test direct instantiation of InlinePromptCheck accessing outputs."""
-    interaction = InteractionResult(
+    interaction = Interaction(
         inputs="This is a test question.", outputs="This is a test response."
     )
 
@@ -98,7 +98,7 @@ async def test_judge_check_outputs_instantiation(passed: bool, reason: str):
 )
 async def test_inline_prompt_check_metadata_instantiation(passed: bool, reason: str):
     """Test direct instantiation of InlinePromptCheck accessing metadata."""
-    interaction = InteractionResult(
+    interaction = Interaction(
         inputs="This is a test question.",
         outputs="This is a test response.",
         metadata={"category": "test", "language": "en"},

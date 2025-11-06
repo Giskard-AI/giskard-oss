@@ -7,7 +7,7 @@ from pydantic import Field
 
 from ..core.check import Check, CheckResult
 from ..core.extraction import Extractor, JsonPathExtractor
-from ..core.interaction_result import InteractionResult
+from ..core.interaction import Interaction
 
 
 class ExtractionCheck(Check, ABC):
@@ -30,7 +30,7 @@ class ExtractionCheck(Check, ABC):
         description="How to evaluate multiple values: 'any' (at least one must pass), 'all' (all must pass), or 'none' (none must pass)",
     )
 
-    def _extract_values(self, interaction: InteractionResult[Any, Any]) -> list[Any]:
+    def _extract_values(self, interaction: Interaction[Any, Any]) -> list[Any]:
         """Extract values using configured extractor or fall back to JSONPath.
 
         This method handles the common pattern of:
@@ -84,7 +84,7 @@ class ExtractionCheck(Check, ABC):
         """
         pass
 
-    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
         """Execute the check by extracting values and evaluating them.
 
         This method implements the common pattern:

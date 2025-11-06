@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
 from ..core.check import Check
+from ..core.interaction import Interaction
 from ..generators import InteractionGenerator
 
 if TYPE_CHECKING:
@@ -14,21 +15,23 @@ if TYPE_CHECKING:
 
 """Test case model and runner integration.
 
-`TestCase` binds a specific interaction generator with a sequence of `Check`s
+`TestCase` binds a specific interaction or interaction generator with a sequence of `Check`s
 and delegates execution to a `TestRunner`. It offers a single `run()` method
 that returns a `TestCaseResult` summarizing the outcomes.
 """
 
 
 class TestCase(BaseModel):
-    """Bundle an interaction generator with a set of checks to execute.
+    """Bundle an interaction or interaction generator with a set of checks to execute.
 
     Attributes
     ----------
     name:
         Optional label for the test case.
     interaction:
-        The interaction generator that produces interactions for testing.
+        The interaction or interaction generator that produces interactions for testing.
+        If an `Interaction` is provided, it will be used directly. If an `InteractionGenerator`
+        is provided, it will be called to generate the interaction.
     checks:
         Sequence of checks to run against the generated interaction.
     """
@@ -37,7 +40,9 @@ class TestCase(BaseModel):
     __test__ = False
 
     name: str | None = Field(None, description="Test case name")
-    interaction: InteractionGenerator = Field(..., description="Interaction generator")
+    interaction: Interaction[Any, Any] | InteractionGenerator = Field(
+        ..., description="Interaction or interaction generator"
+    )
     checks: Sequence[Check] = Field(..., description="Test case checks")
 
     async def run(self, max_runs: int = 1) -> TestCaseResult:

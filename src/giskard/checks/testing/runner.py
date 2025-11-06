@@ -9,7 +9,8 @@ from pydantic import BaseModel, ConfigDict
 
 from ..core.check import Check, CheckResult
 from ..core.context import Context
-from ..core.interaction_result import InteractionResult
+from ..core.interaction import Interaction
+from ..generators import InteractionGenerator
 
 if TYPE_CHECKING:
     # Imported only for type checking to avoid runtime import cycle
@@ -114,7 +115,7 @@ class TestRunner:
     """
 
     async def _run(
-        self, interaction_result: InteractionResult[Any, Any], checks: Sequence[Check]
+        self, interaction_result: Interaction[Any, Any], checks: Sequence[Check]
     ) -> list[CheckResult]:
         results: list[CheckResult] = []
 
@@ -161,7 +162,13 @@ class TestRunner:
         all_runs: list[list[CheckResult]] = []
 
         for _ in range(max_runs):
-            interaction_result = await tc.interaction.generate(Context())
+            # Handle both Interaction and InteractionGenerator
+            if isinstance(tc.interaction, InteractionGenerator):
+                interaction_result = await tc.interaction.generate(Context())
+            else:
+                # Already an Interaction, use directly
+                interaction_result = tc.interaction
+
             results = await self._run(interaction_result, tc.checks)
             all_runs.append(results)
 

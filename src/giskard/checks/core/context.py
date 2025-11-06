@@ -2,7 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..core.interaction_result import InteractionResult
+from ..core.interaction import Interaction
 
 
 class Context(BaseModel):
@@ -14,9 +14,7 @@ class Context(BaseModel):
     Attributes
     ----------
     previous_interactions:
-        List of previous interaction results in this test scenario.
+        List of previous interactions in this test scenario.
     """
 
-    previous_interactions: list[InteractionResult[Any, Any]] = Field(
-        default_factory=list
-    )
+    previous_interactions: list[Interaction[Any, Any]] = Field(default_factory=list)

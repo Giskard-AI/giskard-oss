@@ -1,7 +1,7 @@
 """Tests for DynamicInteraction generator."""
 
 from giskard.checks.core.context import Context
-from giskard.checks.core.interaction_result import InteractionResult
+from giskard.checks.core.interaction import Interaction
 from giskard.checks.generators import DynamicInteraction
 
 
@@ -12,7 +12,7 @@ class TestDynamicInteraction:
         """Test sync callable that doesn't take context parameter."""
 
         def simple_generator():
-            return InteractionResult(inputs="hello", outputs="world")
+            return Interaction(inputs="hello", outputs="world")
 
         interaction = DynamicInteraction(fn=simple_generator)
         result = await interaction.generate(Context())
@@ -25,7 +25,7 @@ class TestDynamicInteraction:
         """Test sync callable that takes context parameter."""
 
         def context_generator(context: Context):
-            return InteractionResult(
+            return Interaction(
                 inputs=len(context.previous_interactions),
                 outputs="processed",
                 metadata={"context_length": len(context.previous_interactions)},
@@ -33,8 +33,8 @@ class TestDynamicInteraction:
 
         context = Context(
             previous_interactions=[
-                InteractionResult(inputs="test1", outputs="result1"),
-                InteractionResult(inputs="test2", outputs="result2"),
+                Interaction(inputs="test1", outputs="result1"),
+                Interaction(inputs="test2", outputs="result2"),
             ]
         )
 
@@ -49,7 +49,7 @@ class TestDynamicInteraction:
         """Test async callable that doesn't take context parameter."""
 
         async def async_generator():
-            return InteractionResult(inputs="async_hello", outputs="async_world")
+            return Interaction(inputs="async_hello", outputs="async_world")
 
         interaction = DynamicInteraction(fn=async_generator)
         result = await interaction.generate(Context())
@@ -61,15 +61,15 @@ class TestDynamicInteraction:
         """Test async callable that takes context parameter."""
 
         async def async_context_generator(context: Context):
-            return InteractionResult(
+            return Interaction(
                 inputs=[i.inputs for i in context.previous_interactions],
                 outputs="async_processed",
             )
 
         context = Context(
             previous_interactions=[
-                InteractionResult(inputs="msg1", outputs="resp1"),
-                InteractionResult(inputs="msg2", outputs="resp2"),
+                Interaction(inputs="msg1", outputs="resp1"),
+                Interaction(inputs="msg2", outputs="resp2"),
             ]
         )
 
@@ -83,7 +83,7 @@ class TestDynamicInteraction:
         """Test that metadata is properly passed through."""
 
         def metadata_generator():
-            return InteractionResult(
+            return Interaction(
                 inputs="test",
                 outputs="result",
                 metadata={"custom": "data", "number": 42},
@@ -98,7 +98,7 @@ class TestDynamicInteraction:
         """Test with empty context."""
 
         def empty_context_generator(context: Context):
-            return InteractionResult(
+            return Interaction(
                 inputs=len(context.previous_interactions),
                 outputs="empty"
                 if len(context.previous_interactions) == 0
@@ -116,10 +116,10 @@ class TestDynamicInteraction:
 
         def history_generator(context: Context):
             if not context.previous_interactions:
-                return InteractionResult(inputs="first", outputs="initial")
+                return Interaction(inputs="first", outputs="initial")
 
             last_interaction = context.previous_interactions[-1]
-            return InteractionResult(
+            return Interaction(
                 inputs=f"follow_up_to_{last_interaction.inputs}", outputs="response"
             )
 
@@ -131,9 +131,7 @@ class TestDynamicInteraction:
 
         # Second call with previous interaction
         context_with_history = Context(
-            previous_interactions=[
-                InteractionResult(inputs="previous", outputs="result")
-            ]
+            previous_interactions=[Interaction(inputs="previous", outputs="result")]
         )
         result2 = await interaction.generate(context_with_history)
         assert result2.inputs == "follow_up_to_previous"

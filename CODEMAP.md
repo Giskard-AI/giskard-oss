@@ -17,16 +17,15 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 ├─ CODEMAP.md                  # This file
 ├─ src/giskard/checks/         # Package source (src-layout)
 │  ├─ __init__.py              # Public re-exports: core, generators, testing, checks
-│  ├─ core/                    # Core abstractions: Check, CheckResult, InteractionResult
+│  ├─ core/                    # Core abstractions: Check, CheckResult, Interaction
 │  │  ├─ __init__.py
 │  │  ├─ check.py              # Check, CheckResult, CheckStatus, Metric
 │  │  ├─ context.py            # Context for interaction generation
 │  │  ├─ extraction.py         # Extractor, JsonPathExtractor
-│  │  └─ interaction_result.py # InteractionResult[In, Out]
+│  │  └─ interaction.py # Interaction[In, Out]
 │  ├─ generators/              # Interaction generation system
 │  │  ├─ __init__.py
 │  │  ├─ base.py               # InteractionGenerator base class
-│  │  ├─ static.py             # Interaction (static interactions)
 │  │  └─ dynamic.py            # DynamicInteraction (callable-based)
 │  ├─ checks/                  # Built-in checks and helpers
 │  │  ├─ __init__.py
@@ -58,21 +57,21 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 
 ### Core concepts and types
 
-- InteractionResult[InputT, OutputT] (in `core/interaction_result.py`)
+- Interaction[InputT, OutputT] (in `core/interaction.py`)
   - Container for interaction data used internally by checks.
   - Contains inputs, outputs, and optional metadata from interaction generation.
   - This is the result of calling `InteractionGenerator.generate()`.
 
 - InteractionGenerator (in `generators/base.py`)
   - Base class for generating interactions. Subclasses use `@InteractionGenerator.register("kind")` decorator.
-  - Key method: `async generate(context: Context) -> InteractionResult[Any, Any]`.
+  - Key method: `async generate(context: Context) -> Interaction[Any, Any]`.
   - Discriminated union support for polymorphic serialization and deserialization.
   - Automatic registration when classes are imported.
 
 - Check (in `core/check.py`)
   - Base class to implement concrete checks. Subclasses use `@Check.register("kind")` decorator.
   - Key fields: `name`, `description`. `kind` is a computed field from registration.
-  - Key method: `async run(interaction: InteractionResult[Any, Any]) -> CheckResult`.
+  - Key method: `async run(interaction: Interaction[Any, Any]) -> CheckResult`.
   - Discriminated union support for polymorphic serialization and deserialization.
   - Automatic registration when classes are imported.
 
@@ -134,7 +133,7 @@ This codemap provides a high-level overview of the `giskard-checks` repository: 
 
 - InteractionGenerator (in `generators/base.py`)
   - Base class for all interaction generators with discriminated union support.
-  - Key method: `async generate(context: Context) -> InteractionResult[Any, Any]`.
+  - Key method: `async generate(context: Context) -> Interaction[Any, Any]`.
   - Subclasses use `@InteractionGenerator.register("kind")` decorator.
 
 - Interaction (in `generators/static.py`)
@@ -224,8 +223,8 @@ Import namespaces re-exported by `giskard.checks.__init__`:
 from giskard.checks import core, generators, testing, checks
 ```
 
-- `core` → `Check`, `CheckResult`, `CheckStatus`, `InteractionResult`
-- `generators` → `InteractionGenerator`, `Interaction`, `DynamicInteraction`
+- `core` → `Check`, `CheckResult`, `CheckStatus`, `Interaction`
+- `generators` → `InteractionGenerator`, `DynamicInteraction`
 - `testing` → `TestCase`, `get_runner` (via module import)
 - `checks` → `from_fn`, `FnCheck`, `StringMatchingCheck`, `EqualityCheck`, `ExtractionCheck`, `Groundedness`, `Conformity`, `LLMJudge`, `BaseLLMCheck`
 - `settings` → `set_default_generator`, `get_default_generator` (imported directly)

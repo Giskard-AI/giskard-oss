@@ -1,7 +1,8 @@
 """Integration tests for chat bot scenarios using the giskard.checks testing framework."""
 
 from giskard.checks.checks import StringMatchingCheck
-from giskard.checks.generators import DynamicInteraction, Interaction
+from giskard.checks.core import Interaction
+from giskard.checks.generators import DynamicInteraction
 from giskard.checks.testing import TestCase
 from pydantic import BaseModel
 

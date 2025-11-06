@@ -5,8 +5,7 @@ from typing import Any
 import pytest
 from giskard.checks.core.check import Check, CheckResult, CheckStatus
 from giskard.checks.core.context import Context
-from giskard.checks.core.interaction_result import InteractionResult
-from giskard.checks.generators import Interaction
+from giskard.checks.core.interaction import Interaction
 from giskard.checks.generators.base import InteractionGenerator
 from giskard.checks.testing.runner import TestCaseResult, TestRunner
 from giskard.checks.testing.testcase import TestCase
@@ -181,7 +180,7 @@ class TestTestCase:
         class MockPassingCheck(Check):
             async def run(
                 self,
-                interaction: InteractionResult[Any, Any],
+                interaction: Interaction[Any, Any],
             ) -> CheckResult:
                 _ = interaction  # Mark as used to avoid linting warning
                 return CheckResult(
@@ -213,7 +212,7 @@ class TestTestCase:
         class MockFailingCheck(Check):
             async def run(
                 self,
-                interaction: InteractionResult[Any, Any],
+                interaction: Interaction[Any, Any],
             ) -> CheckResult:
                 _ = interaction  # Mark as used to avoid linting warning
                 return CheckResult(
@@ -249,7 +248,7 @@ class TestTestCase:
         class MockErroringCheck(Check):
             async def run(
                 self,
-                interaction: InteractionResult[Any, Any],
+                interaction: Interaction[Any, Any],
             ) -> CheckResult:
                 _ = interaction  # Mark as used to avoid linting warning
                 return CheckResult(
@@ -279,10 +278,10 @@ class CountingInteractionGenerator(InteractionGenerator):
     inputs: str = "test_input"
     outputs: str = "test_output"
 
-    async def generate(self, context: Context) -> InteractionResult[str, str]:
+    async def generate(self, context: Context) -> Interaction[str, str]:
         """Generate an interaction and track the call count."""
         self.call_count += 1
-        return InteractionResult(
+        return Interaction(
             inputs=self.inputs,
             outputs=self.outputs,
             metadata={"call_count": self.call_count},
@@ -303,7 +302,7 @@ class TestTestRunnerMaxRuns:
         class MockFailingCheck(Check):
             async def run(
                 self,
-                interaction: InteractionResult[Any, Any],
+                interaction: Interaction[Any, Any],
             ) -> CheckResult:
                 _ = interaction  # Mark as used to avoid linting warning
                 return CheckResult(
@@ -342,9 +341,7 @@ class TestTestRunnerMaxRuns:
         # Create a check that always passes
         @Check.register("mock_passing_max_runs")
         class MockPassingCheck(Check):
-            async def run(
-                self, interaction: InteractionResult[Any, Any]
-            ) -> CheckResult:
+            async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
                 _ = interaction  # Mark as used to avoid linting warning
                 return CheckResult(
                     status=CheckStatus.PASS,
@@ -382,7 +379,7 @@ class TestTestRunnerMaxRuns:
         class MockErroringCheck(Check):
             async def run(
                 self,
-                interaction: InteractionResult[Any, Any],
+                interaction: Interaction[Any, Any],
             ) -> CheckResult:
                 _ = interaction  # Mark as used to avoid linting warning
                 return CheckResult(
@@ -421,9 +418,7 @@ class TestTestRunnerMaxRuns:
         # Create multiple checks: pass, fail, pass
         @Check.register("mock_passing_mixed")
         class MockPassingCheck(Check):
-            async def run(
-                self, interaction: InteractionResult[Any, Any]
-            ) -> CheckResult:
+            async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
                 _ = interaction  # Mark as used to avoid linting warning
                 return CheckResult(
                     status=CheckStatus.PASS,
@@ -438,7 +433,7 @@ class TestTestRunnerMaxRuns:
         class MockFailingCheck(Check):
             async def run(
                 self,
-                interaction: InteractionResult[Any, Any],
+                interaction: Interaction[Any, Any],
             ) -> CheckResult:
                 _ = interaction  # Mark as used to avoid linting warning
                 return CheckResult(
@@ -452,9 +447,7 @@ class TestTestRunnerMaxRuns:
 
         @Check.register("mock_passing_mixed_2")
         class MockPassingCheck2(Check):
-            async def run(
-                self, interaction: InteractionResult[Any, Any]
-            ) -> CheckResult:
+            async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
                 _ = interaction  # Mark as used to avoid linting warning
                 return CheckResult(
                     status=CheckStatus.PASS,
@@ -498,9 +491,7 @@ class TestTestRunnerMaxRuns:
         # Create a check that always passes
         @Check.register("mock_passing_direct")
         class MockPassingCheck(Check):
-            async def run(
-                self, interaction: InteractionResult[Any, Any]
-            ) -> CheckResult:
+            async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
                 _ = interaction  # Mark as used to avoid linting warning
                 return CheckResult(
                     status=CheckStatus.PASS,

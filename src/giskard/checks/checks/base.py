@@ -8,7 +8,7 @@ from giskard.agents.workflow import ChatWorkflow, TemplateReference
 from pydantic import BaseModel, Field
 
 from ..core.check import Check, CheckResult
-from ..core.interaction_result import InteractionResult
+from ..core.interaction import Interaction
 from ..settings import get_default_generator
 
 
@@ -60,13 +60,13 @@ class BaseLLMCheck(Check, ABC):
         """
 
     async def _build_workflow(
-        self, interaction: InteractionResult[Any, Any]
+        self, interaction: Interaction[Any, Any]
     ) -> ChatWorkflow[Any]:
         """Build the workflow for LLM evaluation.
 
         Parameters
         ----------
-        interaction : InteractionResult[Any, Any]
+        interaction : Interaction[Any, Any]
             The interaction to evaluate.
 
         Returns
@@ -82,12 +82,12 @@ class BaseLLMCheck(Check, ABC):
 
         return ChatWorkflow(generator=self.generator, messages=[prompt])
 
-    async def run(self, interaction: InteractionResult[Any, Any]) -> CheckResult:  # noqa: D102
+    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:  # noqa: D102
         """Execute the LLM-based check.
 
         Parameters
         ----------
-        interaction : InteractionResult[Any, Any]
+        interaction : Interaction[Any, Any]
             The interaction to evaluate.
 
         Returns
@@ -107,14 +107,12 @@ class BaseLLMCheck(Check, ABC):
 
         return await self._handle_output(chat.output, inputs, interaction)
 
-    async def get_inputs(
-        self, interaction: InteractionResult[Any, Any]
-    ) -> dict[str, Any]:
+    async def get_inputs(self, interaction: Interaction[Any, Any]) -> dict[str, Any]:
         """Get template inputs for the LLM prompt.
 
         Parameters
         ----------
-        interaction : InteractionResult[Any, Any]
+        interaction : Interaction[Any, Any]
             The interaction to evaluate.
 
         Returns
@@ -129,7 +127,7 @@ class BaseLLMCheck(Check, ABC):
         self,
         output_value: BaseModel,
         template_inputs: dict[str, Any],
-        interaction: InteractionResult[Any, Any],
+        interaction: Interaction[Any, Any],
     ) -> CheckResult:
         """Convert LLM output to CheckResult.
 
@@ -142,7 +140,7 @@ class BaseLLMCheck(Check, ABC):
             The structured output from the LLM.
         template_inputs : dict[str, str]
             The template inputs used for the evaluation.
-        interaction : InteractionResult[Any, Any]
+        interaction : Interaction[Any, Any]
             The original interaction.
 
         Returns

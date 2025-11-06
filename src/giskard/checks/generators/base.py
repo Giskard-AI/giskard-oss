@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from ..core.context import Context
-from ..core.interaction_result import InteractionResult
+from ..core.interaction import Interaction
 from ..utils.discriminated import Discriminated, discriminated_base
 
 
@@ -10,7 +10,7 @@ from ..utils.discriminated import Discriminated, discriminated_base
 class InteractionGenerator(Discriminated, ABC):
     """Base class for interaction generators.
 
-    Interaction generators produce InteractionResult instances that are used
+    Interaction generators produce Interaction instances that are used
     by checks. Subclasses should be registered using the
     @InteractionGenerator.register("kind") decorator to enable polymorphic
     serialization and deserialization.
@@ -19,13 +19,13 @@ class InteractionGenerator(Discriminated, ABC):
     --------
     >>> @InteractionGenerator.register("custom")
     ... class CustomGenerator(InteractionGenerator):
-    ...     async def generate(self, context: Context) -> InteractionResult:
+    ...     async def generate(self, context: Context) -> Interaction:
     ...         # Custom generation logic here
-    ...         return InteractionResult(inputs=..., outputs=...)
+    ...         return Interaction(inputs=..., outputs=...)
     """
 
     @abstractmethod
-    async def generate(self, context: Context) -> InteractionResult[Any, Any]:
+    async def generate(self, context: Context) -> Interaction[Any, Any]:
         """Generate an interaction based on the provided context.
 
         Parameters
@@ -35,7 +35,7 @@ class InteractionGenerator(Discriminated, ABC):
 
         Returns
         -------
-        InteractionResult[Any, Any]
-            The generated interaction result containing inputs and outputs.
+        Interaction[Any, Any]
+            The generated interaction containing inputs and outputs.
         """
         ...

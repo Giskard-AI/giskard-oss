@@ -1,11 +1,11 @@
-"""Core exports: base check and interaction result types."""
+"""Core exports: base check and interaction types."""
 
 from .check import Check, CheckResult, CheckStatus
 from .context import Context
-from .interaction_result import InteractionResult
+from .interaction import Interaction
 
 __all__ = [
-    "InteractionResult",
+    "Interaction",
     "Check",
     "CheckResult",
     "CheckStatus",

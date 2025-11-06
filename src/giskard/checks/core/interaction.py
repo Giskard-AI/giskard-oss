@@ -4,9 +4,9 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 
-"""Generic interaction result model.
+"""Generic interaction model.
 
-An `InteractionResult` represents the result of generating an interaction,
+An `Interaction` represents the result of generating an interaction,
 containing inputs, outputs, and optional metadata. This is an internal data
 structure used by checks to access interaction data.
 """
@@ -15,7 +15,7 @@ InputT = TypeVar("InputT")
 OutputT = TypeVar("OutputT")
 
 
-class InteractionResult(BaseModel, Generic[InputT, OutputT]):
+class Interaction(BaseModel, Generic[InputT, OutputT]):
     """Container for interaction data used internally by checks.
 
     This is the result of calling `InteractionGenerator.generate()`. It contains
