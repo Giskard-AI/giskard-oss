@@ -17,7 +17,7 @@ asyncio_mode = "auto"
 pythonpath = ["src"]
 
 [tool.ruff.lint]
-select = ["E", "W", "I", "F401"]
+select = ["E", "W", "I", "F"]
 ignore = ["E501"]
 
 [tool.ruff.lint.isort.sections]

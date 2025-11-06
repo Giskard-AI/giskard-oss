@@ -27,17 +27,17 @@ class LLMAsAJudge:
         # Handle empty answers as failures
         if not answer.strip():
             return CheckResult(
-                passed=False, reason=f"Answer is not in the reference answer", score=0.0
+                passed=False, reason="Answer is not in the reference answer", score=0.0
             )
 
         # Check if answer is contained in reference answer or vice versa
         if answer in reference_answer or reference_answer in answer:
             return CheckResult(
-                passed=True, reason=f"Answer is in the reference answer", score=1.0
+                passed=True, reason="Answer is in the reference answer", score=1.0
             )
         else:
             return CheckResult(
-                passed=False, reason=f"Answer is not in the reference answer", score=0.0
+                passed=False, reason="Answer is not in the reference answer", score=0.0
             )
 
 

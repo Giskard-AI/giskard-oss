@@ -4,7 +4,6 @@ from typing import Any
 
 import pytest
 from giskard.checks.core import Check, CheckResult, CheckStatus, InteractionResult
-from giskard.checks.core.interaction_result import InteractionResult
 from giskard.checks.generators import Interaction
 from giskard.checks.testing.testcase import TestCase
 
