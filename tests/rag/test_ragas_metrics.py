@@ -1,11 +1,10 @@
 import logging
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, patch , AsyncMock
 
 import pydantic
 import pytest
 
 from giskard.rag.base import AgentAnswer
-from unittest.mock import MagicMock, Mock, patch, AsyncMock
 
 logger = logging.getLogger(__name__)
 
