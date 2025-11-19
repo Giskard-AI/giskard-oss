@@ -10,7 +10,7 @@ from ..base import AgentAnswer
 from .base import Metric
 from ragas.dataset_schema import SingleTurnSample
 from langchain_core.outputs import ChatGeneration
-
+import asyncio
 logger = logging.getLogger(__name__)
 
 try:
@@ -146,7 +146,7 @@ class RagasMetric(Metric):
             return {self.name: 0}
 
         ragas_sample = self.prepare_ragas_sample(question_sample, answer)
-
+                
         #return {self.name: self.metric.score(ragas_sample)}
         
         sample = SingleTurnSample(
@@ -156,13 +156,21 @@ class RagasMetric(Metric):
             reference=ragas_sample.get("reference") or ragas_sample.get("ground_truth"),
         )
 
-        if hasattr(self.metric, "single_turn_score"):
-            val = self.metric.single_turn_score(sample)
-        else:
-            val = self.metric.score(ragas_sample)
-
+        async def _compute_score():
+            if hasattr(self.metric, "single_turn_ascore"):
+                return await self.metric.single_turn_ascore(sample)
+            elif hasattr(self.metric, "multi_turn_ascore"):
+                return await self.metric.multi_turn_ascore(sample)
+            else:
+                raise AttributeError(
+                    f"{self.metric} has neither single_turn_ascore nor multi_turn_ascore "
+                    "— check ragas version or metric type."
+                )
+                
+        loop = asyncio.get_event_loop()
+        val = loop.run_until_complete(_compute_score())
         return {self.name: val}
-
+    
     @staticmethod
     def prepare_ragas_sample(question_sample: dict, answer: AgentAnswer) -> dict:
         if ragas.__version__.startswith("0.1"):
