@@ -1,13 +1,18 @@
-"""Core exports: base check and interaction types."""
-
-from .check import Check, CheckResult, CheckStatus
-from .context import Context
-from .interaction import Interaction
+from .check import Check
+from .result import CheckResult, CheckStatus, Metric, ScenarioResult, TestCaseResult
+from .scenario import Scenario
+from .testcase import TestCase
+from .trace import Interaction, Trace
 
 __all__ = [
+    "Scenario",
+    "Trace",
     "Interaction",
     "Check",
     "CheckResult",
     "CheckStatus",
-    "Context",
+    "Metric",
+    "ScenarioResult",
+    "TestCaseResult",
+    "TestCase",
 ]

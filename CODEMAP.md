@@ -1,237 +1,157 @@
 # CODEMAP
 
-This codemap provides a high-level overview of the `giskard-checks` repository: purpose, architecture, modules, key types, and typical workflows. It is intended for contributors and advanced users.
+This document is an orientation guide for contributors: repository layout, key
+modules, core abstractions, and expected workflows.
 
-### What is this library?
+## What is this library?
+
 - Lightweight primitives to define and run checks against model interactions.
-- Small, explicit, and type-safe with Pydantic v2 models.
-- Async-friendly: checks can be sync or async.
-- Results are immutable and easy to serialize.
+- Type-safe, async-friendly, and immutable by design via Pydantic v2.
+- Built-in extraction utilities and LLM-based checks powered by `giskard-agents`.
 
-### Repository layout
+## Repository layout
 
 ```
 / (repo root)
 ├─ pyproject.toml              # Build, tooling, dependencies
-├─ README.md                   # End-user quickstart and API overview
+├─ README.md                   # End-user quickstart & API overview
 ├─ CODEMAP.md                  # This file
-├─ src/giskard/checks/         # Package source (src-layout)
-│  ├─ __init__.py              # Public re-exports: core, generators, testing, checks
-│  ├─ core/                    # Core abstractions: Check, CheckResult, Interaction
-│  │  ├─ __init__.py
-│  │  ├─ check.py              # Check, CheckResult, CheckStatus, Metric
-│  │  ├─ context.py            # Context for interaction generation
-│  │  ├─ extraction.py         # Extractor, JsonPathExtractor
-│  │  └─ interaction.py # Interaction[In, Out]
-│  ├─ generators/              # Interaction generation system
-│  │  ├─ __init__.py
-│  │  ├─ base.py               # InteractionGenerator base class
-│  │  └─ dynamic.py            # DynamicInteraction (callable-based)
-│  ├─ checks/                  # Built-in checks and helpers
-│  │  ├─ __init__.py
-│  │  ├─ base.py               # BaseLLMCheck, LLMCheckResult
-│  │  ├─ fn.py                 # from_fn and FnCheck
-│  │  ├─ equality.py           # EqualityCheck
-│  │  ├─ string_matching.py    # StringMatchingCheck
-│  │  ├─ extraction_check.py   # ExtractionCheck
-│  │  ├─ groundedness.py       # Groundedness check
-│  │  ├─ conformity.py         # Conformity check
-│  │  └─ judge.py              # LLMJudge check
-│  ├─ testing/                 # TestCase, TestRunner, samples
-│  │  ├─ __init__.py
-│  │  ├─ testcase.py           # TestCase model + serialization helpers
-│  │  └─ runner.py             # TestRunner + TestCaseResult
-│  ├─ prompts/                 # Jinja2 templates for LLM checks
-│  │  └─ checks/
-│  │     ├─ groundedness.j2
-│  │     └─ conformity.j2
-│  ├─ settings.py              # Global generator settings
-│  └─ utils/                   # Utility functions
-│     ├─ __init__.py
-│     └─ discriminated.py      # Discriminated union infrastructure
+├─ Makefile                    # Canonical dev workflow (lint, typecheck, tests)
+├─ src/giskard/checks/
+│  ├─ __init__.py              # Public re-exports: builtin checks + settings helpers
+│  ├─ builtin/                 # Built-in Check implementations (fn, equality, LLM, etc.)
+│  ├─ core/                    # Core abstractions: Check, Scenario, Trace, results, extraction
+│  ├─ interaction/             # `InteractionSpec` implementation
+│  ├─ scenarios/               # Runner, TestCase model, and helper utilities
+│  ├─ settings.py              # Global generator configuration for LLM checks
+│  └─ trace/                   # Reserved for future trace utilities (currently empty)
 └─ tests/
-   ├─ integration/             # Serialization and E2E tests
-   ├─ unit/                    # Unit tests
-   └─ test_utils/              # Test utilities and mocks
+   ├─ core/                    # Unit tests for Check/Scenario primitives
+   ├─ scenarios/               # TestCase + runner scenarios
+   └─ trace/                   # Trace/interaction behavior
 ```
 
-### Core concepts and types
+## Core concepts & files
 
-- Interaction[InputT, OutputT] (in `core/interaction.py`)
-  - Container for interaction data used internally by checks.
-  - Contains inputs, outputs, and optional metadata from interaction generation.
-  - This is the result of calling `InteractionGenerator.generate()`.
+### Trace & Interactions (`core/trace.py`)
+- `Interaction`: immutable payload with `inputs`, `outputs`, `metadata`.
+- `Trace`: ordered list of interactions; passed to every `Check`.
 
-- InteractionGenerator (in `generators/base.py`)
-  - Base class for generating interactions. Subclasses use `@InteractionGenerator.register("kind")` decorator.
-  - Key method: `async generate(context: Context) -> Interaction[Any, Any]`.
-  - Discriminated union support for polymorphic serialization and deserialization.
-  - Automatic registration when classes are imported.
+### Scenario components (`core/scenario.py`, `core/interaction.py`, `core/check.py`)
+- `ScenarioComponent`: discriminated base for anything that can be executed in a scenario
+  (either an `InteractionSpec` or a `Check`).
+- `Scenario`: ordered sequence of components with a shared `Trace`. Components execute
+  sequentially, stopping at the first failing check. Supports custom trace types.
+- `BaseInteractionSpec`: base class for specs that emit `Interaction` objects via
+  the `generate()` async generator method. Each yielded interaction receives the updated
+  trace via `generator.asend()`.
+- `InteractionSpec` (`interaction/__init__.py`): default implementation accepting
+  static values, callables, or generators for both inputs and outputs. Supports
+  multi-turn interactions through generators.
+- `Check`: base class for executable validations; subclasses return `CheckResult`.
+- Registration via `@Check.register("kind")` and `@BaseInteractionSpec.register("kind")`
+  enables polymorphic serialization.
 
-- Check (in `core/check.py`)
-  - Base class to implement concrete checks. Subclasses use `@Check.register("kind")` decorator.
-  - Key fields: `name`, `description`. `kind` is a computed field from registration.
-  - Key method: `async run(interaction: Interaction[Any, Any]) -> CheckResult`.
-  - Discriminated union support for polymorphic serialization and deserialization.
-  - Automatic registration when classes are imported.
+### Results (`core/result.py`)
+- `CheckStatus`, `CheckResult`, `Metric`: immutable check outcomes with helpers.
+- `ScenarioResult`: aggregated results + final trace for a single scenario execution.
+- `TestCaseResult`: multi-run summary with helper predicates (`passed`, `failed`, etc.)
+  and `format_failures()` / `assert_passed()` helpers.
 
-- CheckResult (in `core/check.py`)
-  - Immutable result model for a single check execution.
-  - Convenience constructors: `success`, `failure`, `skip`, `error`.
-  - Convenience booleans: `passed`, `failed`, `errored`, `skipped`.
-  - Includes `Metric` support for quantitative measurements.
+### Extraction (`core/extraction.py`)
+- `Extractor` base class plus `JsonPathExtractor`.
+- `resolve()` helper to evaluate JSONPath expressions against a trace.
+- Used heavily by builtin checks via `ExtractionCheck`.
 
-- Context (in `core/context.py`)
-  - Context for generating interactions containing previous interaction history.
-  - Used by interaction generators to create context-aware test cases.
+### Scenario runner (`scenarios/runner.py`)
+- `ScenarioRunner`: orchestrates sequences of `ScenarioComponent`s using async
+  generators and shared traces. Processes components sequentially:
+  - `InteractionSpec` components: call `generate()` to yield interactions, send
+    updated trace back via `asend()`
+  - `Check` components: call `run()` to validate trace, stop on failure/error
+- Adds duration metrics, converts exceptions into `CheckResult.error`, and stops
+  on first failure.
+- `TraceBuilder`: helper class for incrementally building trace instances.
+- `_default_runner` singleton accessible via `get_runner()`.
 
-- Extractor and JsonPathExtractor (in `core/extraction.py`)
-  - Base classes for extracting values from interactions.
-  - `JsonPathExtractor` uses JSONPath expressions to extract specific fields from interaction data.
+### Test cases (`scenarios/testcase.py`)
+- `TestCase`: wraps a single interaction spec + a list of checks.
+- `run(max_runs=1)` delegates to the runner and returns `TestCaseResult`.
+- `assert_passed()` helper runs + asserts success.
 
-- Discriminated union infrastructure (in `utils/discriminated.py`)
-  - `Discriminated`: Base class for polymorphic types with automatic `kind` field
-  - `discriminated_base`: Decorator to mark base classes for discriminated unions
-  - Automatic registration and deserialization using Pydantic's discriminated unions
+### Utilities (`scenarios/utils.py`)
+- `with_params`, `execute_code`, `generate`: adapt sync/async callables or generators
+  into forms consumable by `InteractionSpec`.
+- Provide ergonomic wrappers when binding user callables into specs.
 
-- TestCase and TestRunner (in `testing/`)
-  - `TestCase` bundles an `InteractionGenerator` and a sequence of `Check`s and exposes `await run()`.
-  - `TestRunner` executes checks sequentially, measures per-check/total durations, and returns a `TestCaseResult` aggregate (immutable, with .passed/.failed/.errored/.skipped).
+### Built-in checks (`builtin/`)
+- `from_fn`, `FnCheck`: wrap arbitrary callables (sync/async) that receive a `Trace`.
+- Extraction-based checks: `StringMatchingCheck`, `EqualityCheck`, `ExtractionCheck`.
+- LLM checks: `BaseLLMCheck`, `LLMJudge`, `Groundedness`, `Conformity`.
+  These integrate with `giskard-agents` via `TemplateReference` and respect
+  global/default generators configured through `settings.py`.
 
-### Built-in checks and helpers
+### Settings (`settings.py`)
+- `set_default_generator` / `get_default_generator`: configure the generator used by
+  LLM checks when none is supplied explicitly.
 
-- FnCheck and from_fn (in `checks/fn.py`)
-  - Turn a callable into a `Check`. The callable may be sync/async and return `bool` or `CheckResult`.
-  - `FnCheck` is not serializable (function excluded) and is intended for programmatic/test use.
+### Tests (`tests/`)
+- `tests/core`: covers `Check`, `CheckResult`, extraction utilities, etc.
+- `tests/scenarios`: heavy coverage of `TestCase`, runner edges, scenario behavior,
+  and fixtures for async execution.
+- `tests/trace`: trace/interaction specification behavior and serialization tests.
 
-- StringMatchingCheck (in `checks/string_matching.py`)
-  - KIND: `string_matching`.
-  - Generic substring matcher with optional `key` (JSONPath) and `evaluation_mode`.
+## Typical workflows
 
-- ExtractionCheck (in `checks/extraction_check.py`)
-  - Abstract base class for checks that extract values from interactions and evaluate them.
-  - Provides common functionality for value extraction and evaluation patterns.
+1. **Describe interactions** using `InteractionSpec` (static payloads, callables, or
+   generators that can themselves depend on the current `Trace`).
+2. **Author checks** by subclassing `Check` or using `from_fn`. Access the
+   current output via `trace.interactions[-1]`.
+3. **Bundle scenarios/test cases**:
+   - `Scenario(sequence=[...])`: compose multiple interactions and checks in order
+   - `TestCase(interaction=spec, checks=[...])`: convenience wrapper for single interaction
+   - `await scenario.run()` or `await tc.run()` (optionally `max_runs > 1`).
+4. **Inspect results** via `ScenarioResult` or `TestCaseResult`:
+   - `result.passed`, `result.failed`, `result.errored` convenience booleans
+   - `result.check_results`: list of all check results
+   - `result.final_trace`: final trace state after execution
+   - `result.duration_ms`: execution time
+   - `result.assert_passed()`: raise AssertionError with formatted failures
 
-- BaseLLMCheck (in `checks/base.py`)
-  - Abstract base class for LLM-based checks.
-  - Provides framework for creating checks that use Large Language Models to evaluate interactions.
-  - Includes `LLMCheckResult` model for structured LLM outputs.
+## Tooling & conventions
 
-- Groundedness (in `checks/groundedness.py`)
-  - LLM-based check for evaluating response groundedness.
-  - Uses Jinja2 templates for prompt generation.
+- Python >= 3.12 (enforced in `pyproject.toml`).
+- Ruff for linting (`E`, `W`, `I`; `E501` ignored), basedpyright for typing, pytest-asyncio.
+- Use Makefile commands (`make test`, `make lint`, `make ci`, etc.) instead of
+  invoking tools directly.
+- Prefer absolute imports within `giskard.checks`.
+- Keep docstrings concise but informative; README and this CODEMAP must reflect API reality.
 
-- Conformity (in `checks/conformity.py`)
-  - LLM-based check for evaluating response conformity.
-  - Uses Jinja2 templates for prompt generation.
-
-- LLMJudge (in `checks/judge.py`)
-  - Generic LLM-based judge for custom evaluation criteria.
-  - Flexible check that can be configured with custom prompts.
-
-### Interaction generators
-
-- InteractionGenerator (in `generators/base.py`)
-  - Base class for all interaction generators with discriminated union support.
-  - Key method: `async generate(context: Context) -> Interaction[Any, Any]`.
-  - Subclasses use `@InteractionGenerator.register("kind")` decorator.
-
-- Interaction (in `generators/static.py`)
-  - KIND: `static`.
-  - Static interaction generator with pre-defined inputs and outputs.
-  - Most common type used for testing with fixed data.
-
-- DynamicInteraction (in `generators/dynamic.py`)
-  - KIND: `dynamic`.
-  - Dynamic interaction generator using callable functions.
-  - Supports both sync and async callables with optional Context parameter.
-  - Not serializable (function excluded) and intended for programmatic/test use.
-
-
-### Serialization
-
-The library uses standard Pydantic serialization with discriminated unions for polymorphic types.
-
-- All models use standard Pydantic `model_dump()` and `model_validate()` methods
-- Discriminated unions automatically handle polymorphic serialization using the `kind` field
-- No custom serialization logic is needed
-
-### Typical workflows
-
-- Define an interaction generator
-  - Use `Interaction` for static interactions with pre-defined inputs and outputs.
-  - Use `DynamicInteraction` for dynamic interactions generated by callable functions.
-  - Implement custom `InteractionGenerator` subclasses for complex generation logic.
-
-- Author checks
-  - Implement a concrete `Check` subclass with a unique `KIND`, or use `from_fn` for quick function-based checks.
-  - For LLM-based checks, extend `BaseLLMCheck` and implement `get_prompt()` method.
-  - Return `CheckResult` explicitly or a `bool` from `from_fn` callables.
-
-- Run tests
-  - Create a `TestCase(interaction=generator, checks=[...], name=...)` and `await tc.run()`.
-  - Inspect `TestCaseResult.results`, `duration_ms`, and convenience booleans.
-  - Use `await tc.assert_passed()` for assertion-based testing.
-
-### Tooling and conventions
-
-- Python >= 3.11 (enforced in `pyproject.toml`).
-- Linting: Ruff (`E`, `W`, `I`; line length E501 ignored).
-- Type checking: basedpyright (Pyright), `recommended` mode.
-- Testing: pytest with `asyncio_mode = auto`.
-- Development workflow: Makefile with common commands (see `make help` for full list):
-  - `make setup` - Complete development setup (install deps + tools)
-  - `make all` - Format, check, and test
-  - `make test` - Run all tests
-  - `make lint` - Run linting checks
-  - `make format` - Format code with ruff
-  - `make typecheck` - Run type checking with basedpyright
-  - `make check` - Run all checks (lint, format, compatibility, typecheck)
-  - `make ci` - Run the same checks as CI
-
-### Environment knobs
-
-- `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` (default truthy):
-  - Enforces uniqueness of `Check.KIND` across registered classes; otherwise duplicates warn and last writer wins.
-
-### Dependencies
-
-- Runtime:
-  - `pydantic>=2.11.7,<3` - Core data validation and serialization
-  - `giskard-agents>=0.3,<1` - LLM integration and workflow management
-  - `jsonpath-ng>=1.7.0,<2` - JSONPath expressions for data extraction
-  - `jinja2>=3.1.6,<4` - Template engine for LLM prompts
-- Dev:
-  - `pytest==8.4.2` - Testing framework
-  - `pytest-asyncio==1.2.0` - Async test support
-
-### Testing overview
-
-- Integration tests under `tests/integration` cover:
-  - End-to-end chat serialization using `Interaction` with `StringMatchingCheck`.
-  - Structured moderation example using `Interaction`.
-  - TestCase serialization/deserialization round-trips including lazy import behavior.
-  - LLM-based checks using giskard-agents integration.
-- Unit tests under `tests/unit` cover individual components and modules.
-- Test utilities in `tests/test_utils` provide mocks and helpers for testing.
-
-### Public API surface
-
-Import namespaces re-exported by `giskard.checks.__init__`:
+## Public API surface
 
 ```python
-from giskard.checks import core, generators, testing, checks
+from giskard.checks import builtin, set_default_generator, get_default_generator
+from giskard.checks.core import (
+    Check, CheckResult, CheckStatus,
+    Scenario, ScenarioResult,
+    Trace, Interaction,
+    TestCaseResult
+)
+from giskard.checks.interaction import InteractionSpec
+from giskard.checks.scenarios import TestCase, execute_code, generate, with_params
 ```
 
-- `core` → `Check`, `CheckResult`, `CheckStatus`, `Interaction`
-- `generators` → `InteractionGenerator`, `DynamicInteraction`
-- `testing` → `TestCase`, `get_runner` (via module import)
-- `checks` → `from_fn`, `FnCheck`, `StringMatchingCheck`, `EqualityCheck`, `ExtractionCheck`, `Groundedness`, `Conformity`, `LLMJudge`, `BaseLLMCheck`
-- `settings` → `set_default_generator`, `get_default_generator` (imported directly)
+- Built-in checks live under `giskard.checks.builtin`.
+- Import `Trace`, `InteractionSpec`, `Scenario`, etc. from their dedicated subpackages.
 
-### Contributing notes
+## Environment knobs
 
-- Keep `README.md` examples in sync with APIs (especially async patterns and `uv` commands).
-- Prefer absolute imports within the `giskard.checks` package.
-- Ensure all public functions/classes have type hints and concise docstrings.
-- Avoid adding new runtime dependencies unless necessary; prefer small, composable APIs.
+- `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` (default truthy):
+  raises when duplicate `KIND`s are registered; set to `0` to allow last-one-wins (with warning).
+
+## Contributing notes
+
+- Keep README/CODEMAP in sync with code changes—especially when reorganizing modules.
+- Any new `ScenarioComponent` must opt into discriminated registration via the decorator.
+- Favor immutable data structures (`frozen=True`) when extending Trace/Interaction models.
+- Avoid introducing new runtime dependencies unless necessary; prefer composable helpers.

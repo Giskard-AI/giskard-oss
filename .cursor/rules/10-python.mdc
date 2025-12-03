@@ -12,7 +12,7 @@ alwaysApply: false
 - Build with Hatch; distribute `src/giskard/checks`, `README.md`, and `pyproject.toml`.
 
 ## Tooling and Commands
-- Python version: >= 3.11 (enforced via `pyproject.toml`).
+- Python version: >= 3.12 (enforced via `pyproject.toml`).
 - Linting: Ruff with `select = ["E", "W", "I"]` and `ignore = ["E501"]`.
 - Type checking: Pyright with `typeCheckingMode = "recommended"`.
 - Testing: pytest with `asyncio_mode = "auto"` and `pythonpath = ["src"]`.

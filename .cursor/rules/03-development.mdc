@@ -23,7 +23,7 @@ make all      # Format, check, and test
 - `make lint` - Run linting checks
 - `make format` - Format code with ruff
 - `make check-format` - Check if code is formatted correctly
-- `make check-compat` - Check Python 3.11 compatibility
+- `make check-compat` - Check Python 3.12 compatibility
 - `make check` - Run all checks (lint, format, compatibility)
 - `make all` - Format, check, and test
 - `make ci` - Run the same checks as CI
@@ -68,7 +68,7 @@ make all      # Format, check, and test
 - `make lint` - Run linting checks
 - `make format` - Format code with ruff
 - `make check-format` - Check if code is formatted correctly
-- `make check-compat` - Check Python 3.11 compatibility
+- `make check-compat` - Check Python 3.12 compatibility
 - `make check` - Run all checks (lint, format, compatibility)
 - `make all` - Format, check, and test
 - `make ci` - Run the same checks as CI

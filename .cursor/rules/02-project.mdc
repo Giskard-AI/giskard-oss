@@ -21,7 +21,7 @@ Always use Makefile commands for development tasks. See [02-development.mdc](02-
 
 ## Code Quality
 
-- Python >= 3.11 required
+- Python >= 3.12 required
 - Use Pydantic v2 models for type safety
 - Async-friendly: checks can be sync or async
 - Follow the existing patterns in the codebase
@@ -60,7 +60,7 @@ Always use Makefile commands for development tasks. See [development.md](develop
 
 ## Code Quality
 
-- Python >= 3.11 required
+- Python >= 3.12 required
 - Use Pydantic v2 models for type safety
 - Async-friendly: checks can be sync or async
 - Follow the existing patterns in the codebase

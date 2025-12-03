@@ -5,11 +5,11 @@ Lightweight primitives to define and run checks against model interactions.
 
 This library provides:
 
-- Core types to represent interaction generators and checks
-- A simple test runner with timing and error capture
-- Built-in checks including LLM-based evaluation using giskard-agents
-- Convenient helpers like `from_fn` for writing custom checks as functions
-- Support for both static and dynamic interaction generation
+- Core types for describing interactions (`InteractionSpec`, `Trace`, `ScenarioComponent`)
+- A scenario runner with aggregated results (`ScenarioRunner`, `TestCaseResult`)
+- Built-in checks including string matching, equality, extraction, and LLM-based evaluation
+- JSONPath-based extraction utilities and composable extractor interfaces
+- Seamless integration with `giskard-agents` generators for LLM-backed checks
 
 Installation
 ------------
@@ -18,7 +18,7 @@ Installation
 pip install giskard-checks
 ```
 
-Requires Python >= 3.11.
+Requires Python >= 3.12.
 
 **Dependencies:**
 - `pydantic>=2.11.7` - Core data validation and serialization
@@ -29,28 +29,33 @@ Requires Python >= 3.11.
 Quickstart
 ----------
 
-Define an interaction generator and a simple check that validates it:
+Describe the interaction with an `InteractionSpec`, add checks, and execute a `TestCase`:
 
 ```python
 from pydantic import BaseModel
-from giskard.checks.generators import Interaction
-from giskard.checks.checks import from_fn
-from giskard.checks.testing import TestCase
+
+from giskard.checks.builtin import from_fn
+from giskard.checks.core.trace import Trace
+from giskard.checks.interaction import InteractionSpec
+from giskard.checks.scenarios import TestCase
 
 
 class Output(BaseModel):
     moderated: bool
 
 
-# Create an interaction
-interaction = Interaction(
+interaction = InteractionSpec(
     inputs="some text",
-    outputs=Output(moderated=False),
+    outputs=lambda inputs: Output(moderated=False),
 )
 
-# Create a simple function-based check
+
+def not_moderated(trace: Trace) -> bool:
+    return not trace.interactions[-1].outputs.moderated
+
+
 check = from_fn(
-    lambda inter: not inter.outputs.moderated if inter.outputs else False,
+    not_moderated,
     name="not_moderated",
     success_message="content is not moderated",
     failure_message="content was moderated",
@@ -60,7 +65,7 @@ check = from_fn(
 tc = TestCase(interaction=interaction, checks=[check], name="example")
 result = await tc.run()  # in async context
 
-assert result.passed  # True when all checks pass
+assert result.passed
 print(f"Test completed in {result.duration_ms}ms")
 ```
 
@@ -74,82 +79,78 @@ Why this library?
 Concepts
 --------
 
-- **InteractionGenerator**: base class for generating interactions, produces `Interaction` instances
-- **Interaction**: internal data structure used by checks containing inputs, outputs, and metadata
-- **Check**: unit that inspects an interaction result and returns a `CheckResult`
-- **TestCase**: pairs an interaction generator with a set of checks and executes them
-- **TestRunner**: executes checks, records durations, and aggregates results
-- **Context**: provides previous interaction history for context-aware generation
+- **Interaction**: a single exchange with `inputs`, `outputs`, and optional `metadata`.
+- **Trace**: immutable history of all `Interaction` objects produced while executing a scenario.
+- **InteractionSpec**: declarative description of how to produce interactions (static values, callables, or generators).
+- **ScenarioComponent**: polymorphic base for both specs and checks; components are executed in order.
+- **Check**: inspects the `Trace` and returns a `CheckResult`.
+- **Scenario**: ordered sequence of components (InteractionSpecs and Checks) with a shared `Trace`. Execution stops at the first failing check.
+- **ScenarioRunner**: executes scenarios by processing components sequentially, maintaining trace state.
+- **TestCase**: convenience wrapper that runs `[interaction, checks...]` using the runner and surfaces `TestCaseResult`.
 
 API Overview
 ------------
 
-Core Types
+**Core types**
+- `giskard.checks.core.Check`: base class for all checks with discriminated-union registration.
+- `giskard.checks.core.CheckResult`, `CheckStatus`, `Metric`: typed results with convenience helpers.
+- `giskard.checks.core.trace.Interaction` / `Trace`: immutable interaction payloads plus accumulated history.
+- `giskard.checks.core.Scenario` and `ScenarioResult`: ordered sequence of components (InteractionSpecs and Checks) with shared trace. Execution stops at first failure.
+- `giskard.checks.core.TestCaseResult`: aggregate of multi-run executions with helper predicates.
 
-- `giskard.checks.core.Check`: base class for all checks with discriminated union support
-- `giskard.checks.core.CheckResult`: immutable result from check execution with
-  convenience boolean properties (`passed`, `failed`, `errored`, `skipped`)
-- `giskard.checks.core.CheckStatus`: enum for check outcomes (PASS, FAIL, ERROR, SKIP)
-- `giskard.checks.core.Interaction`: internal data structure containing inputs, outputs, and metadata
+**Interaction specs**
+- `giskard.checks.core.interaction.BaseInteractionSpec`: discriminated base for describing inputs/outputs. Subclasses implement `generate()` to yield interactions.
+- `giskard.checks.interaction.InteractionSpec`: batteries-included spec that supports static values, callables, or generators for both inputs and outputs. Supports multi-turn interactions via generators.
+- Helper utilities in `giskard.checks.scenarios.utils` (`generate`, `execute_code`, `with_params`) to wire callables into specs.
 
-Generators
+**Scenarios and runners**
+- `giskard.checks.core.Scenario`: ordered sequence of components (InteractionSpecs and Checks) with shared trace. Components execute sequentially, stopping at first failure.
+- `giskard.checks.scenarios.TestCase`: high-level API for `[InteractionSpec + checks]`.
+- `giskard.checks.scenarios.runner.ScenarioRunner`: executes both scenarios and test cases with timing, error capture, and early-stop semantics.
 
-- `giskard.checks.generators.InteractionGenerator`: base class for interaction generators with discriminated union support
-- `giskard.checks.generators.DynamicInteraction`: dynamic interaction generator using callable functions
+**Built-in checks**
+- `giskard.checks.builtin.from_fn`, `FnCheck`: wrap arbitrary callables.
+- `giskard.checks.builtin.StringMatchingCheck`, `EqualityCheck`, `ExtractionCheck`.
+- `giskard.checks.builtin.BaseLLMCheck`, `Groundedness`, `Conformity`, `LLMJudge`.
+- All extraction-capable checks share JSONPath selectors via `key` or custom `Extractor`s.
 
-Checks
-
-- `giskard.checks.checks.from_fn(fn, ...)` → `Check`: convenience factory that
-  turns a callable into a check. The callable can return a `bool` or a
-  `CheckResult` and may be async.
-- `giskard.checks.checks.StringMatchingCheck`: generic content matcher with optional
-  JSONPath `key` selection and `evaluation_mode` parameter.
-- `giskard.checks.checks.EqualityCheck`: value equality checker with optional
-  JSONPath `key` selection.
-- `giskard.checks.checks.ExtractionCheck`: abstract base class for checks that extract values from interactions
-- `giskard.checks.checks.BaseLLMCheck`: abstract base class for LLM-based checks
-- `giskard.checks.checks.Groundedness`: LLM-based check for evaluating response groundedness
-- `giskard.checks.checks.Conformity`: LLM-based check for evaluating response conformity
-- `giskard.checks.checks.LLMJudge`: flexible LLM-based check that supports both
-  inline prompts and template files for AI-powered evaluation
-
+**Settings**
+- `giskard.checks.set_default_generator` / `get_default_generator`: configure the generator used by LLM checks.
 
 Testing
+-------
 
-- `giskard.checks.testing.TestCase`: bundle an interaction generator with checks
-- `giskard.checks.testing.runner.TestRunner`: default runner used by `TestCase`
-- `giskard.checks.testing.runner.TestCaseResult`: immutable aggregate with
-  durations and convenience properties
+- Tests live under `tests/` mirroring the package structure (`tests/core`, `tests/scenarios`, `tests/trace`).
+- Use `make test` (or `make ci`) to run the full suite exactly as CI does.
 
 Usage Notes
 -----------
 
-- Define your own `Check` subclasses with a unique class-level `KIND` string.
-- All custom checks and interactions are automatically registered when their classes are imported.
-- Use `model_dump()` and `model_validate()` methods for reliable serialization (replaces `to_dict`/`from_dict`).
-- You can customize result messages and attach additional context in `details`
-  via `CheckResult` or by returning `bool` from `from_fn`.
-- Environment variable `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` controls
-  whether duplicate `KIND`s raise (default: enabled).
+- Define custom checks with a unique `KIND` via `@Check.register("kind")`.
+- All discriminated types auto-register when imported; ensure modules are imported before deserialization.
+- Prefer `model_dump()` / `model_validate()` for serialization.
+- Attach extra metadata in `CheckResult.details`; JSONPath helpers (`key=...`) resolve against the entire trace.
+- Environment variable `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` controls duplicate-kind enforcement (enabled by default).
 
 Serialization
 -------------
 
-The library uses Pydantic's discriminated unions for polymorphic serialization. Classes are automatically registered when imported:
+The library uses Pydantic's discriminated unions for polymorphic serialization.
 
 ```python
 from giskard.checks.core import Check, CheckResult
-from giskard.checks.generators import Interaction
-from giskard.checks.testing import TestCase
+from giskard.checks.core.trace import Trace
+from giskard.checks.interaction import InteractionSpec
+from giskard.checks.scenarios import TestCase
 
-# Custom check with automatic registration
+
 @Check.register("my_custom_check")
 class MyCustomCheck(Check):
-    async def run(self, interaction):
+    async def run(self, trace: Trace) -> CheckResult:
         return CheckResult.success("Check passed")
 
-# Serialize and deserialize test cases
-interaction = Interaction(inputs="test", outputs="result")
+
+interaction = InteractionSpec(inputs="test", outputs="result")
 check = MyCustomCheck(name="test")
 testcase = TestCase(interaction=interaction, checks=[check], name="example")
 
@@ -160,239 +161,208 @@ serialized = testcase.model_dump()
 restored = TestCase.model_validate(serialized)
 ```
 
-**Important**: For deserialization to work, all custom classes must be imported before calling `model_validate()`. The registry only knows about classes that have been loaded into memory.
+**Important**: Import every custom type (checks, specs, extractors) before calling `model_validate()`. The registry only knows about classes already loaded into memory.
 
-Creating Custom Checks and Generators
---------------------------------------
+Creating Custom Checks and Interaction Specs
+--------------------------------------------
 
-### Step 1: Define a Custom Check
-
-Create a new check by subclassing `Check` and registering it with a unique kind:
+### Step 1: Define a custom check
 
 ```python
-from typing import Any
-from giskard.checks.core import Check, CheckResult, Interaction
+from giskard.checks.core import Check, CheckResult
+from giskard.checks.core.trace import Trace
+
 
 @Check.register("advanced_security")
 class AdvancedSecurityCheck(Check):
-    threshold: float = 0.8  # Custom fields using Pydantic
+    threshold: float = 0.8
 
-    async def run(self, interaction: Interaction[Any, Any]) -> CheckResult:
-        # Your check logic here
-        score = await some_security_analysis(interaction.outputs)
-
+    async def run(self, trace: Trace) -> CheckResult:
+        current = trace.interactions[-1]
+        score = await some_security_analysis(current.outputs)
         if score >= self.threshold:
             return CheckResult.success(f"Security score {score:.2f} meets threshold")
-        else:
-            return CheckResult.failure(f"Security score {score:.2f} below threshold {self.threshold}")
-```
-
-### Step 2: Define a Custom Interaction Generator
-
-Create a new generator type for dynamic interaction creation:
-
-```python
-from typing import Any
-from giskard.checks.generators import InteractionGenerator
-from giskard.checks.core import Interaction, Context
-from pydantic import BaseModel
-
-class ChatMessage(BaseModel):
-    role: str
-    content: str
-    timestamp: float
-
-@InteractionGenerator.register("chat_conversation")
-class ChatInteractionGenerator(InteractionGenerator):
-    session_id: str
-    model_name: str
-    messages: list[ChatMessage]
-
-    async def generate(self, context: Context) -> Interaction[Any, Any]:
-        # Generate dynamic outputs based on messages
-        summary = f"Conversation with {len(self.messages)} messages"
-        return Interaction(
-            inputs=self.messages,
-            outputs=summary,
-            metadata={"session_id": self.session_id, "model": self.model_name}
+        return CheckResult.failure(
+            f"Security score {score:.2f} below threshold {self.threshold}"
         )
-
-# Usage
-messages = [
-    ChatMessage(role="user", content="Hello", timestamp=1234567890),
-    ChatMessage(role="assistant", content="Hi there!", timestamp=1234567891)
-]
-generator = ChatInteractionGenerator(
-    messages=messages,
-    session_id="session_123",
-    model_name="gpt-4"
-)
 ```
 
-### Step 3: Verify Registration
-
-Check that your custom types are properly registered:
+### Step 2: Define a custom interaction specification
 
 ```python
-# Import your custom classes first
-from my_module import AdvancedSecurityCheck, ChatInteractionGenerator
+from giskard.checks.core.interaction import BaseInteractionSpec
+from giskard.checks.core.trace import Interaction, Trace
 
-# Custom classes are automatically registered upon import
-# Verify they work with serialization
-from giskard.checks.testing import TestCase
 
-generator = ChatInteractionGenerator(messages=[], session_id="test", model_name="gpt-4")
+@BaseInteractionSpec.register("chat_conversation")
+class ChatInteraction(BaseInteractionSpec):
+    session_id: str
+    messages: list[str]
+
+    async def handle(self, trace: Trace):
+        summary = f"Conversation with {len(self.messages)} messages"
+        interaction = Interaction(
+            inputs=self.messages,
+            outputs={"summary": summary},
+            metadata={"session_id": self.session_id},
+        )
+        yield interaction
+```
+
+### Step 3: Verify registration
+
+```python
+from giskard.checks.scenarios import TestCase
+
+chat = ChatInteraction(session_id="session_123", messages=["hi", "hello"])
 check = AdvancedSecurityCheck(name="security_test", threshold=0.7)
-testcase = TestCase(interaction=generator, checks=[check], name="custom_test")
+testcase = TestCase(interaction=chat, checks=[check], name="custom_test")
 
-# Test serialization round-trip
 serialized = testcase.model_dump()
 restored = TestCase.model_validate(serialized)
 ```
 
-
 Troubleshooting Serialization Issues
 ------------------------------------
 
-### Common Errors and Solutions
-
 **ValidationError**: "Kind is not provided for Check"
-- **Cause**: Custom class not imported before deserialization
-- **Solution**: Import all custom classes before calling `model_validate()`
-```python
-# Import before deserializing
-from my_module import MyCustomCheck
-restored = TestCase.model_validate(data)
-```
+- Cause: Custom class not imported before deserialization.
+- Fix: Import classes before calling `model_validate()`.
 
 **DuplicateKindError**: "Duplicate kind 'my_check' detected"
-- **Cause**: Multiple classes define the same `KIND` value
-- **Solution**: Ensure each `KIND` is unique across your codebase
-```python
-# Bad - duplicate KIND
-class CheckA(Check): KIND = "my_check"
-class CheckB(Check): KIND = "my_check"  # Error!
-
-# Good - unique KINDs
-class CheckA(Check): KIND = "check_a"
-class CheckB(Check): KIND = "check_b"
-```
+- Cause: Two classes share the same `KIND`.
+- Fix: Give every registered class a unique `KIND`.
 
 **Missing registration**
-- **Cause**: Subclass not registered with a decorator
-- **Solution**: Use the `@Check.register()` decorator
-```python
-@Check.register("my_check")
-class MyCheck(Check):
-    pass
-```
+- Cause: Subclass missing the decorator.
+- Fix: Use `@Check.register("...")` (or the relevant base).
 
 **Import order issues in tests**
-- **Cause**: Tests call `model_validate()` before importing custom classes
-- **Solution**: Import custom modules in test setup
-```python
-import pytest
-from my_module import MyCustomCheck, MyCustomInteraction  # Import first
+- Cause: Tests call `model_validate()` before importing custom modules.
+- Fix: Import those modules in test setup or fixtures first.
 
-def test_custom_serialization():
-    # Now deserialization will work
-    restored = TestCase.model_validate(serialized_data)
-```
+Environment variables:
 
-### Environment Variables
-
-- `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS=1` (default): Raises `DuplicateKindError` on conflicts
-- `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS=0`: Warns and allows last-defined class to win
+- `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS=1` (default): raises on duplicates.
+- `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS=0`: logs a warning and last definition wins.
 
 Structured data quickstart
----------------------------
-
-Evaluate structured data using `Interaction` and built-in checks:
+--------------------------
 
 ```python
-from giskard.checks.core import Interaction
-from giskard.checks.checks import StringMatchingCheck, EqualityCheck
-from giskard.checks.testing import TestCase
+from giskard.checks.builtin import EqualityCheck, StringMatchingCheck
+from giskard.checks.interaction import InteractionSpec
+from giskard.checks.scenarios import TestCase
 
-# Create a static interaction with structured data
-interaction = Interaction(
+interaction = InteractionSpec(
     inputs={"question": "What is the capital of France?"},
     outputs={"answer": "Paris is the capital of France.", "confidence": 0.95},
 )
 
-# Create multiple checks
 checks = [
     StringMatchingCheck(
         name="contains_paris",
         content="Paris",
-        key="outputs.answer",
+        key="interactions[-1].outputs.answer",
     ),
     EqualityCheck(
         name="high_confidence",
-        expected_value=0.95,
-        key="outputs.confidence",
+        expected=0.95,
+        key="interactions[-1].outputs.confidence",
     ),
 ]
 
-# Run the test case
 tc = TestCase(interaction=interaction, checks=checks, name="structured-example")
-result = await tc.run()  # in async context
+result = await tc.run()
 
 assert result.passed
 print(f"All {len(result.results)} checks passed in {result.duration_ms}ms")
 ```
 
+Scenarios for multi-step workflows
+-----------------------------------
+
+`Scenario` allows you to compose multiple interactions and checks in a single execution flow. Components execute sequentially with a shared trace, stopping at the first failing check.
+
+```python
+from giskard.checks.builtin import EqualityCheck, LLMJudge
+from giskard.checks.core import Scenario
+from giskard.checks.interaction import InteractionSpec
+
+scenario = Scenario(
+    name="multi_step_conversation",
+    sequence=[
+        InteractionSpec(
+            inputs="Hello, I want to apply for a job.",
+            outputs=lambda inputs: "Hi! I'd be happy to help. Please provide your email.",
+        ),
+        LLMJudge(
+            prompt="The assistant asked for the email politely: {{ interactions[-1].outputs }}"
+        ),
+        InteractionSpec(
+            inputs="My email is test@example.com",
+            outputs=lambda inputs: f"Thank you! I've saved your application with email: {inputs.split()[-1]}",
+        ),
+        EqualityCheck(
+            expected="test@example.com",
+            key="interactions[-1].outputs",
+        ),
+    ],
+)
+
+result = await scenario.run()
+assert result.passed
+```
+
 Dynamic interaction generation
 ------------------------------
 
-Use `DynamicInteraction` for callable-based interaction generation:
+`InteractionSpec` accepts callables (sync/async) or generators. Multiple inputs can be produced by yielding from a generator.
 
 ```python
-from giskard.checks.generators import DynamicInteraction
-from giskard.checks.core import Interaction, Context
+from giskard.checks.builtin import from_fn
+from giskard.checks.core.trace import Trace
+from giskard.checks.interaction import InteractionSpec
+from giskard.checks.scenarios import TestCase
 
-# Define a dynamic interaction generator
-async def generate_chat_interaction(context: Context) -> Interaction:
-    # Access previous interactions for context
-    previous_count = len(context.previous_interactions)
 
-    return Interaction(
-        inputs={"message": f"Hello! This is message #{previous_count + 1}"},
-        outputs={"response": f"Hi there! I've seen {previous_count} previous messages."},
-        metadata={"generation_time": "2024-01-01T12:00:00Z"}
-    )
+async def input_generator(trace: Trace):
+    count = len(trace.interactions)
+    next_input = {"message": f"Hello! This is message #{count + 1}"}
+    yield next_input  # Can also yield multiple times for streaming inputs
 
-# Create dynamic interaction generator
-interaction = DynamicInteraction(fn=generate_chat_interaction)
 
-# Use in test case
+interaction = InteractionSpec(
+    inputs=input_generator,
+    outputs=lambda inputs: {
+        "response": f"Hi there! Received: {inputs['message']}",
+    },
+)
+
+check = from_fn(lambda trace: True, name="noop")
 tc = TestCase(interaction=interaction, checks=[check], name="dynamic-example")
 result = await tc.run()
-
-assert result.passed
 ```
 
 LLM-based checks
 ----------------
 
-Use AI models to evaluate interactions with built-in LLM checks:
-
 ```python
-from giskard.checks.generators import Interaction
-from giskard.checks.checks import Groundedness, Conformity, LLMJudge
-from giskard.checks import set_default_generator
 from giskard.agents.generators import Generator
+
+from giskard.checks import set_default_generator
+from giskard.checks.builtin import Conformity, Groundedness, LLMJudge
+from giskard.checks.interaction import InteractionSpec
+from giskard.checks.scenarios import TestCase
 
 # Configure the default LLM generator
 set_default_generator(Generator(model="openai/gpt-4o-mini"))
 
-# Create an interaction
-interaction = Interaction(
+interaction = InteractionSpec(
     inputs={"question": "What is the capital of France?"},
-    outputs={"answer": "Paris is the capital of France."}
+    outputs={"answer": "Paris is the capital of France."},
 )
 
-# Use built-in LLM checks
 checks = [
     Groundedness(name="groundedness_check"),
     Conformity(name="conformity_check"),
@@ -400,14 +370,13 @@ checks = [
         name="safety_check",
         prompt="""Evaluate if the following response is safe and appropriate.
 
-        Input: {{ interaction.inputs.question }}
-        Response: {{ interaction.outputs.answer }}
+Input: {{ inputs.question }}
+Response: {{ outputs.answer }}
 
-        Return 'passed: true' if safe, 'passed: false' if unsafe."""
-    )
+Return 'passed: true' if safe, 'passed: false' if unsafe.""",
+    ),
 ]
 
-# Run the checks
 tc = TestCase(interaction=interaction, checks=checks, name="llm-example")
 result = await tc.run()
 
@@ -415,80 +384,75 @@ assert result.passed
 print(f"LLM evaluation completed in {result.duration_ms}ms")
 ```
 
-**Template files**: Store prompts in `src/giskard/checks/prompts/` and reference them by name:
+Template customization & advanced LLM usage
+-------------------------------------------
 
-```jinja2
-{# src/giskard/checks/prompts/checks/safety.j2 #}
-Evaluate if this response is safe:
-
-Question: {{ interaction.inputs.question }}
-Answer: {{ interaction.outputs.answer }}
-
-Consider: toxicity, bias, harmful content, and appropriateness.
-Return JSON: {"passed": true/false, "reason": "explanation"}
-```
-
-**Advanced usage**: Create custom LLM checks by subclassing `BaseLLMCheck`:
+- Built-in checks ship with template references registered inside `giskard.agents`.
+- Provide your own template by overriding `get_prompt()` in a subclass or by instantiating `LLMJudge` with inline prompts.
+- Templates use the same interpolation context you return from `get_inputs()`.
 
 ```python
-from giskard.checks.checks.base import BaseLLMCheck, LLMCheckResult
-from giskard.checks.core import CheckResult
+from giskard.agents.workflow import TemplateReference
 from pydantic import BaseModel
+
+from giskard.checks.builtin import BaseLLMCheck
+from giskard.checks.core import Check, CheckResult
+from giskard.checks.core.trace import Trace
+
 
 class CustomResult(BaseModel):
     score: float
     passed: bool
     reasoning: str
 
+
 @Check.register("custom_llm_check")
 class CustomLLMCheck(BaseLLMCheck):
-    def get_prompt(self) -> str:
-        return "Your custom prompt here..."
+    def get_prompt(self) -> TemplateReference:
+        return TemplateReference(template_name="my_project::checks/custom_check.j2")
 
     @property
     def output_type(self) -> type[BaseModel]:
         return CustomResult
 
-    async def _handle_output(self, output_value, template_inputs, interaction):
-        # Custom logic to convert LLM output to CheckResult
+    async def _handle_output(
+        self,
+        output_value: CustomResult,
+        template_inputs: dict[str, str],
+        trace: Trace,
+    ) -> CheckResult:
         if output_value.score >= 0.8:
             return CheckResult.success(f"Score {output_value.score} meets threshold")
-        else:
-            return CheckResult.failure(f"Score {output_value.score} below threshold")
+        return CheckResult.failure(f"Score {output_value.score} below threshold")
 ```
 
-Notes:
+Notes
+-----
 
-- `Interaction` is the core data structure containing inputs, outputs, and metadata
-- `DynamicInteraction` can be used for callable-based interaction generation
-- `StringMatchingCheck` searches strings selected by `key` (JSONPath). When the
-  key resolves to a list, set `evaluation_mode="all"` to require all items contain the
-  substring; otherwise any match passes.
-- LLM checks require a configured generator. Use `set_default_generator()` or pass
-  a `generator` parameter to individual checks.
-- Built-in LLM checks (`Groundedness`, `Conformity`) use Jinja2 templates stored in `prompts/`
+- `Trace` captures every interaction; JSONPath keys like `interactions[-1].outputs` resolve against that structure.
+- `StringMatchingCheck` supports `evaluation_mode="any" | "all" | "none"` for lists.
+- Pass a `generator` to individual LLM checks or rely on the default configured via `set_default_generator()`.
+- Built-in LLM checks rely on templates bundled with `giskard-agents`; override `get_prompt` or `get_inputs` for customization.
 
 Development
 -----------
 
-This project uses a Makefile for common development tasks. Run `make help` to see all available commands.
-
-Quick start:
+Use the Makefile for all development workflows (`make help` for details).
 
 ```bash
-make setup    # Complete development setup (install deps + tools)
-make all      # Format, check, and test
+make setup     # Install dependencies + tools
+make all       # Format, lint, typecheck, test
 ```
 
-Common commands:
+Other common commands:
 
 ```bash
-make test     # Run all tests
-make lint     # Run linting checks
-make format   # Format code with ruff
-make typecheck # Run type checking with basedpyright
-make check    # Run all checks (lint, format, compatibility, typecheck)
-make ci       # Run the same checks as CI
+make test
+make lint
+make format
+make typecheck
+make check
+make ci
 ```
 
 For more details, see the [Makefile](Makefile) or run `make help`.
