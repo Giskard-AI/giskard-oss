@@ -7,7 +7,7 @@ from giskard.checks.core.trace import Interaction, Trace
 
 
 @BaseInteractionSpec.register("with_spy")
-class WithSpy[InputType, OutputType, TraceType: Trace[object, object]](
+class WithSpy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     BaseInteractionSpec[InputType, OutputType, TraceType]
 ):
     interaction_generator: BaseInteractionSpec[InputType, OutputType, TraceType]

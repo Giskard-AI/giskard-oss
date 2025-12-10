@@ -1,9 +1,7 @@
 """Utilities for converting values and generators to async generators."""
 
-from collections.abc import AsyncGenerator, Awaitable, Generator
-from typing import Any, Callable
-
-from ..utils.callable import a_callable
+from collections.abc import AsyncGenerator, Generator
+from typing import Any
 
 
 async def _to_async_generator[YieldType, SendType](
@@ -42,35 +40,3 @@ def a_generator[YieldType, SendType](
         return _to_async_generator(value_or_generator)
 
     return _single_value_to_async_generator(value_or_generator)
-
-
-async def a_identity[T](
-    input: T,
-) -> T:
-    """Identity a value."""
-    return input
-
-
-async def map_a_generator[YieldType, SendType](
-    generator: AsyncGenerator[YieldType, SendType],
-    map_yield: Callable[[YieldType], Awaitable[YieldType]]
-    | Callable[[YieldType], YieldType]
-    | None = None,
-    map_send: Callable[[SendType], Awaitable[SendType]]
-    | Callable[[SendType], SendType]
-    | None = None,
-) -> AsyncGenerator[YieldType, SendType]:
-    """Map a generator to a new generator."""
-    map_yield = a_callable(map_yield or a_identity)
-    map_send = a_callable(map_send or a_identity)
-
-    try:
-        received = yield await map_yield(await anext(generator))
-        while True:
-            received = yield await map_yield(
-                await generator.asend(await map_send(received))
-            )
-    except StopAsyncIteration:
-        return
-    finally:
-        await generator.aclose()

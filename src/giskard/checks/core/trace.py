@@ -114,3 +114,5 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
         finally:
             if generator is not None:
                 await generator.aclose()
+
+    # TODO def steps() -> list[list[Interaction[InputType, OutputType]]]: # Index based

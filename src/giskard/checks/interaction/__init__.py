@@ -1,13 +1,26 @@
-from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
-from functools import partial
+from collections.abc import AsyncGenerator, Callable
 from typing import Any, cast, override
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr, model_validator
 
 from ..core.interaction import BaseInteractionSpec
 from ..core.trace import Interaction, Trace
-from ..scenarios import execute_code, make_generator
-from ..utils.callable import a_callable
+from ..core.types import SyncOrAsyncCallable, SyncOrAsyncGenerator
+from ..utils.parameter_injection import ParameterInjectionRequirement
+from ..utils.value_provider import (
+    ValueGeneratorProvider,
+    ValueProvider,
+)
+
+INJECTABLE_TRACE = ParameterInjectionRequirement(
+    class_info=Trace,
+    optional=True,
+)
+
+INJECTABLE_INPUT = ParameterInjectionRequirement(
+    class_info=Any,
+    optional=True,
+)
 
 
 @BaseInteractionSpec.register("interaction_spec")
@@ -95,62 +108,61 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
 
     inputs: (
         InputType
-        | Callable[
-            [],
-            InputType
-            | Awaitable[InputType]
-            | Generator[InputType, TraceType, None]
-            | AsyncGenerator[InputType, TraceType],
-        ]
-        | Callable[
-            [TraceType],
-            InputType
-            | Awaitable[InputType]
-            | Generator[InputType, TraceType, None]
-            | AsyncGenerator[InputType, TraceType],
-        ]
+        | Callable[[], SyncOrAsyncGenerator[InputType, None]]
+        | Callable[[TraceType], SyncOrAsyncGenerator[InputType, TraceType]]
+        | SyncOrAsyncCallable[[], InputType]
+        | SyncOrAsyncCallable[[TraceType], InputType]
     ) = Field(..., description="The inputs of the interaction.")
     outputs: (
         OutputType
-        | Callable[
-            [InputType],
-            OutputType
-            | Awaitable[
-                OutputType
-                | Interaction[InputType, OutputType]
-                | Awaitable[Interaction[InputType, OutputType]],
-            ],
-        ]
-        | Callable[
-            [InputType, Trace[InputType, OutputType]],
-            OutputType
-            | Awaitable[
-                OutputType
-                | Interaction[InputType, OutputType]
-                | Awaitable[Interaction[InputType, OutputType]],
-            ],
-        ]
+        | SyncOrAsyncCallable[[InputType], OutputType]
+        | SyncOrAsyncCallable[[InputType, TraceType], OutputType]
     ) = Field(..., description="The outputs of the interaction.")
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="The metadata of the interaction."
     )
 
+    _input_value_generator_provider: ValueGeneratorProvider[
+        [TraceType], InputType, TraceType
+    ] = PrivateAttr()
+    _output_value_provider: ValueProvider[[InputType, TraceType], OutputType] = (
+        PrivateAttr()
+    )
+
+    @model_validator(mode="after")
+    def _validate_injection_mappings(
+        self,
+    ) -> "InteractionSpec[InputType, OutputType, TraceType]":
+        try:
+            self._input_value_generator_provider = ValueGeneratorProvider.from_mapping(
+                self.inputs, INJECTABLE_TRACE
+            )
+        except ValueError as e:
+            raise ValueError(f"Error getting injection settings for inputs: {e}") from e
+
+        try:
+            self._output_value_provider = ValueProvider.from_mapping(
+                self.outputs, INJECTABLE_INPUT, INJECTABLE_TRACE
+            )
+        except ValueError as e:
+            raise ValueError(
+                f"Error getting injection settings for outputs: {e}"
+            ) from e
+
+        return self
+
     @override
     async def generate(
         self, trace: TraceType
     ) -> AsyncGenerator[Interaction[InputType, OutputType], TraceType]:
-        generator = cast(
-            AsyncGenerator[InputType, TraceType],
-            await make_generator(self.inputs, trace),
-        )
-        outputs_callable = a_callable(self.outputs)
+        generator = await self._input_value_generator_provider(trace)
 
         try:
             inputs = await anext(generator)
             while True:
                 # Execute user-provided logic to transform inputs into either raw outputs
                 # or a fully constructed Interaction instance.
-                outputs = await execute_code(partial(outputs_callable, inputs), trace)
+                outputs = await self._output_value_provider(inputs, trace)
                 # Yield the interaction back to the caller and wait for an updated trace
                 # that captures the evaluation of this iteration.
                 trace = yield self._get_interaction(
