@@ -2,7 +2,7 @@ import inspect
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
 
-from ..core.types import SyncOrAsync, SyncOrAsyncGenerator
+from ..core.types import GeneratorType, ProviderType, SyncOrAsync, SyncOrAsyncGenerator
 from ..utils.generator import a_generator
 from .parameter_injection import (
     CallableInjectionMapping,
@@ -17,7 +17,7 @@ class ValueProvider[**P, R]:
     @classmethod
     def from_mapping(
         cls,
-        value_or_callable: R | Callable[..., SyncOrAsync[R]],
+        value_or_callable: ProviderType[..., R],
         *args_reqs: ParameterInjectionRequirement,
         **kwargs_reqs: ParameterInjectionRequirement,
     ) -> "ValueProvider[P, R]":
@@ -66,8 +66,7 @@ class ValueGeneratorProvider[**P, R, S]:
     @classmethod
     def from_mapping(
         cls,
-        value_or_callable: R
-        | Callable[..., SyncOrAsync[R] | SyncOrAsyncGenerator[R, S]],
+        value_or_callable: GeneratorType[P, R, S],
         *args_reqs: ParameterInjectionRequirement,
         **kwargs_reqs: ParameterInjectionRequirement,
     ) -> "ValueGeneratorProvider[P, R, S]":

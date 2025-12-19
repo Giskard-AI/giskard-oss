@@ -1,11 +1,12 @@
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator
 from typing import Any, cast, override
 
 from pydantic import Field, PrivateAttr, model_validator
 
+from ..core.input_generator import InputGenerator
 from ..core.interaction import BaseInteractionSpec
 from ..core.trace import Interaction, Trace
-from ..core.types import SyncOrAsyncCallable, SyncOrAsyncGenerator
+from ..core.types import GeneratorType, ProviderType
 from ..utils.parameter_injection import ParameterInjectionRequirement
 from ..utils.value_provider import (
     ValueGeneratorProvider,
@@ -107,16 +108,13 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
     """
 
     inputs: (
-        InputType
-        | Callable[[], SyncOrAsyncGenerator[InputType, None]]
-        | Callable[[TraceType], SyncOrAsyncGenerator[InputType, TraceType]]
-        | SyncOrAsyncCallable[[], InputType]
-        | SyncOrAsyncCallable[[TraceType], InputType]
+        InputGenerator[InputType, TraceType]
+        | GeneratorType[[], InputType, None]
+        | GeneratorType[[TraceType], InputType, TraceType]
     ) = Field(..., description="The inputs of the interaction.")
     outputs: (
-        OutputType
-        | SyncOrAsyncCallable[[InputType], OutputType]
-        | SyncOrAsyncCallable[[InputType, TraceType], OutputType]
+        ProviderType[[InputType], OutputType]
+        | ProviderType[[InputType, TraceType], OutputType]
     ) = Field(..., description="The outputs of the interaction.")
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="The metadata of the interaction."

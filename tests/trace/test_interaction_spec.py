@@ -2,6 +2,8 @@ from collections.abc import AsyncGenerator, Generator
 
 import pytest
 from giskard.checks.core import Interaction, Trace
+from giskard.checks.core.interaction import BaseInteractionSpec
+from giskard.checks.generators.user import UserSimulator
 from giskard.checks.interaction import InteractionSpec
 
 
@@ -712,3 +714,31 @@ class TestInteractionSpec:
         interaction = await anext(generator)
         assert interaction.inputs == "message_10"
         assert interaction.outputs == "[0] message_10"
+
+    # ========== Tests for serialization ==========
+
+    def test_interaction_spec_serialization_with_user_simulator_inputs(self):
+        """Test that InteractionSpec with UserSimulator inputs and static outputs can be serialized and deserialized."""
+        user_simulator = UserSimulator(
+            instructions="Ask about the weather", max_steps=2
+        )
+        interaction_spec = InteractionSpec(
+            inputs=user_simulator, outputs="This is a static response"
+        )
+
+        # Serialize to JSON
+        json_str = interaction_spec.model_dump_json()
+
+        # Deserialize from JSON
+        restored_spec = BaseInteractionSpec.model_validate_json(json_str)
+
+        # Verify it's an InteractionSpec
+        assert isinstance(restored_spec, InteractionSpec)
+
+        # Verify the UserSimulator was restored correctly
+        assert isinstance(restored_spec.inputs, UserSimulator)
+        assert restored_spec.inputs.instructions == "Ask about the weather"
+        assert restored_spec.inputs.max_steps == 2
+
+        # Verify the static output was preserved
+        assert restored_spec.outputs == "This is a static response"

@@ -1,15 +1,14 @@
 from typing import Any, override
 
 from giskard.agents.chat import Message
-from giskard.agents.generators.base import BaseGenerator
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow, TemplateReference
 from pydantic import BaseModel, Field
 
 from ..core.check import Check
+from ..core.mixin import WithGeneratorMixin
 from ..core.result import CheckResult
 from ..core.trace import Trace
-from ..settings import get_default_generator
 
 
 class LLMCheckResult(BaseModel):
@@ -22,7 +21,7 @@ class LLMCheckResult(BaseModel):
 
 
 class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Check[InputType, OutputType, TraceType]
+    Check[InputType, OutputType, TraceType], WithGeneratorMixin
 ):
     """Abstract base class for LLM-based checks.
 
@@ -36,12 +35,6 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         Generator for LLM evaluation. Defaults to the global
         default generator if not specified.
     """
-
-    generator: BaseGenerator = Field(
-        default_factory=get_default_generator,
-        exclude=True,  # Not serializable
-        description="Generator for LLM evaluation",
-    )
 
     @property
     def output_type(self) -> type[BaseModel] | None:

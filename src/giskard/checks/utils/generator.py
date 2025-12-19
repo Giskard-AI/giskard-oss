@@ -3,6 +3,8 @@
 from collections.abc import AsyncGenerator, Generator
 from typing import Any
 
+from ..core.types import SyncOrAsyncGenerator
+
 
 async def _to_async_generator[YieldType, SendType](
     sync_generator: Generator[YieldType, SendType, None],
@@ -29,9 +31,7 @@ async def _single_value_to_async_generator[YieldType](
 
 
 def a_generator[YieldType, SendType](
-    value_or_generator: YieldType
-    | Generator[YieldType, SendType, None]
-    | AsyncGenerator[YieldType, SendType],
+    value_or_generator: YieldType | SyncOrAsyncGenerator[YieldType, SendType],
 ) -> AsyncGenerator[YieldType, SendType]:
     """Convert a value or generator (sync or async) into an async generator."""
     if isinstance(value_or_generator, AsyncGenerator):

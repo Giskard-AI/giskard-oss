@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from pydantic import BaseModel
+from typing_extensions import TypeVar
 
 
 class ParameterInjectionRequirement(BaseModel, frozen=True):
@@ -68,6 +69,10 @@ class CallableInjectionMapping(BaseModel, frozen=True):
         for idx, parameter in enumerate(signature.parameters.values()):
             param_name = parameter.name
             param_annotation = parameter.annotation
+
+            if isinstance(param_annotation, TypeVar):
+                param_annotation = param_annotation.__bound__ or Any
+
             param_default = parameter.default
 
             if param_default is not inspect.Parameter.empty:
