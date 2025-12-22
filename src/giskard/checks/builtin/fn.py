@@ -94,7 +94,7 @@ def from_fn[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     Example
     -------
     ```python
-    from giskard.checks.builtin import from_fn
+    from giskard.checks import from_fn
 
     chk = from_fn(lambda trace: trace.interactions[-1].outputs is not None, name="has_output")
     ```

@@ -18,7 +18,7 @@ modules, core abstractions, and expected workflows.
 ├─ CODEMAP.md                  # This file
 ├─ Makefile                    # Canonical dev workflow (lint, typecheck, tests)
 ├─ src/giskard/checks/
-│  ├─ __init__.py              # Public re-exports: builtin checks + settings helpers
+│  ├─ __init__.py              # Public re-exports: all core classes, builtin checks, and settings helpers
 │  ├─ builtin/                 # Built-in Check implementations (fn, equality, LLM, etc.)
 │  ├─ core/                    # Core abstractions: Check, Scenario, Trace, results, extraction
 │  ├─ interaction/             # `InteractionSpec` implementation
@@ -129,20 +129,34 @@ modules, core abstractions, and expected workflows.
 
 ## Public API surface
 
+All public classes and functions are exported from the main `giskard.checks` package:
+
 ```python
-from giskard.checks import builtin, set_default_generator, get_default_generator
-from giskard.checks.core import (
-    Check, CheckResult, CheckStatus,
+from giskard.checks import (
+    # Core classes
+    Check, CheckResult, CheckStatus, Metric,
     Scenario, ScenarioResult,
+    TestCase, TestCaseResult,
     Trace, Interaction,
-    TestCaseResult
+    BaseInteractionSpec, InteractionSpec,
+    Extractor, JsonPathExtractor,
+    # Builtin checks
+    BaseLLMCheck, LLMCheckResult,
+    Conformity, EqualityCheck, ExtractionCheck,
+    FnCheck, from_fn,
+    Groundedness, LLMJudge,
+    StringMatchingCheck,
+    # Testing utilities
+    WithSpy, TestCaseRunner, ScenarioRunner,
+    # Settings
+    set_default_generator, get_default_generator,
+    # Modules
+    builtin,
 )
-from giskard.checks.interaction import InteractionSpec
-from giskard.checks.scenarios import TestCase, execute_code, generate, with_params
 ```
 
-- Built-in checks live under `giskard.checks.builtin`.
-- Import `Trace`, `InteractionSpec`, `Scenario`, etc. from their dedicated subpackages.
+- All core types, builtin checks, and utilities are available directly from `giskard.checks`.
+- The `builtin` module is still accessible for accessing the submodule directly if needed.
 
 ## Environment knobs
 

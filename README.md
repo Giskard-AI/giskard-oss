@@ -34,10 +34,12 @@ Describe the interaction with an `InteractionSpec`, add checks, and execute a `T
 ```python
 from pydantic import BaseModel
 
-from giskard.checks.builtin import from_fn
-from giskard.checks.core.trace import Trace
-from giskard.checks.interaction import InteractionSpec
-from giskard.checks.scenarios import TestCase
+from giskard.checks import (
+    InteractionSpec,
+    TestCase,
+    Trace,
+    from_fn,
+)
 
 
 class Output(BaseModel):
@@ -92,27 +94,32 @@ API Overview
 ------------
 
 **Core types**
-- `giskard.checks.core.Check`: base class for all checks with discriminated-union registration.
-- `giskard.checks.core.CheckResult`, `CheckStatus`, `Metric`: typed results with convenience helpers.
-- `giskard.checks.core.trace.Interaction` / `Trace`: immutable interaction payloads plus accumulated history.
-- `giskard.checks.core.Scenario` and `ScenarioResult`: ordered sequence of components (InteractionSpecs and Checks) with shared trace. Execution stops at first failure.
-- `giskard.checks.core.TestCaseResult`: aggregate of multi-run executions with helper predicates.
+- `giskard.checks.Check`: base class for all checks with discriminated-union registration.
+- `giskard.checks.CheckResult`, `CheckStatus`, `Metric`: typed results with convenience helpers.
+- `giskard.checks.Interaction` / `Trace`: immutable interaction payloads plus accumulated history.
+- `giskard.checks.Scenario` and `ScenarioResult`: ordered sequence of components (InteractionSpecs and Checks) with shared trace. Execution stops at first failure.
+- `giskard.checks.TestCase` and `TestCaseResult`: high-level API for `[InteractionSpec + checks]` with aggregate of multi-run executions.
 
 **Interaction specs**
-- `giskard.checks.core.interaction.BaseInteractionSpec`: discriminated base for describing inputs/outputs. Subclasses implement `generate()` to yield interactions.
-- `giskard.checks.interaction.InteractionSpec`: batteries-included spec that supports static values, callables, or generators for both inputs and outputs. Supports multi-turn interactions via generators.
-- Helper utilities in `giskard.checks.scenarios.utils` (`generate`, `execute_code`, `with_params`) to wire callables into specs.
+- `giskard.checks.BaseInteractionSpec`: discriminated base for describing inputs/outputs. Subclasses implement `generate()` to yield interactions.
+- `giskard.checks.InteractionSpec`: batteries-included spec that supports static values, callables, or generators for both inputs and outputs. Supports multi-turn interactions via generators.
 
 **Scenarios and runners**
-- `giskard.checks.core.Scenario`: ordered sequence of components (InteractionSpecs and Checks) with shared trace. Components execute sequentially, stopping at first failure.
-- `giskard.checks.scenarios.TestCase`: high-level API for `[InteractionSpec + checks]`.
-- `giskard.checks.scenarios.runner.ScenarioRunner`: executes both scenarios and test cases with timing, error capture, and early-stop semantics.
+- `giskard.checks.Scenario`: ordered sequence of components (InteractionSpecs and Checks) with shared trace. Components execute sequentially, stopping at first failure.
+- `giskard.checks.ScenarioRunner`: executes both scenarios and test cases with timing, error capture, and early-stop semantics.
+- `giskard.checks.TestCaseRunner`: executes test cases with timing and error handling.
 
 **Built-in checks**
-- `giskard.checks.builtin.from_fn`, `FnCheck`: wrap arbitrary callables.
-- `giskard.checks.builtin.StringMatchingCheck`, `EqualityCheck`, `ExtractionCheck`.
-- `giskard.checks.builtin.BaseLLMCheck`, `Groundedness`, `Conformity`, `LLMJudge`.
+- `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
+- `giskard.checks.StringMatchingCheck`, `EqualityCheck`, `ExtractionCheck`.
+- `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
 - All extraction-capable checks share JSONPath selectors via `key` or custom `Extractor`s.
+
+**Extraction utilities**
+- `giskard.checks.Extractor`, `JsonPathExtractor`: base classes for extracting values from traces.
+
+**Testing utilities**
+- `giskard.checks.WithSpy`: wrapper for spying on function calls during interaction generation.
 
 **Settings**
 - `giskard.checks.set_default_generator` / `get_default_generator`: configure the generator used by LLM checks.
@@ -138,10 +145,7 @@ Serialization
 The library uses Pydantic's discriminated unions for polymorphic serialization.
 
 ```python
-from giskard.checks.core import Check, CheckResult
-from giskard.checks.core.trace import Trace
-from giskard.checks.interaction import InteractionSpec
-from giskard.checks.scenarios import TestCase
+from giskard.checks import Check, CheckResult, InteractionSpec, TestCase, Trace
 
 
 @Check.register("my_custom_check")
@@ -169,8 +173,7 @@ Creating Custom Checks and Interaction Specs
 ### Step 1: Define a custom check
 
 ```python
-from giskard.checks.core import Check, CheckResult
-from giskard.checks.core.trace import Trace
+from giskard.checks import Check, CheckResult, Trace
 
 
 @Check.register("advanced_security")
@@ -190,8 +193,7 @@ class AdvancedSecurityCheck(Check):
 ### Step 2: Define a custom interaction specification
 
 ```python
-from giskard.checks.core.interaction import BaseInteractionSpec
-from giskard.checks.core.trace import Interaction, Trace
+from giskard.checks import BaseInteractionSpec, Interaction, Trace
 
 
 @BaseInteractionSpec.register("chat_conversation")
@@ -212,7 +214,7 @@ class ChatInteraction(BaseInteractionSpec):
 ### Step 3: Verify registration
 
 ```python
-from giskard.checks.scenarios import TestCase
+from giskard.checks import TestCase
 
 chat = ChatInteraction(session_id="session_123", messages=["hi", "hello"])
 check = AdvancedSecurityCheck(name="security_test", threshold=0.7)
@@ -250,9 +252,12 @@ Structured data quickstart
 --------------------------
 
 ```python
-from giskard.checks.builtin import EqualityCheck, StringMatchingCheck
-from giskard.checks.interaction import InteractionSpec
-from giskard.checks.scenarios import TestCase
+from giskard.checks import (
+    EqualityCheck,
+    InteractionSpec,
+    StringMatchingCheck,
+    TestCase,
+)
 
 interaction = InteractionSpec(
     inputs={"question": "What is the capital of France?"},
@@ -285,9 +290,7 @@ Scenarios for multi-step workflows
 `Scenario` allows you to compose multiple interactions and checks in a single execution flow. Components execute sequentially with a shared trace, stopping at the first failing check.
 
 ```python
-from giskard.checks.builtin import EqualityCheck, LLMJudge
-from giskard.checks.core import Scenario
-from giskard.checks.interaction import InteractionSpec
+from giskard.checks import EqualityCheck, InteractionSpec, LLMJudge, Scenario
 
 scenario = Scenario(
     name="multi_step_conversation",
@@ -320,10 +323,7 @@ Dynamic interaction generation
 `InteractionSpec` accepts callables (sync/async) or generators. Multiple inputs can be produced by yielding from a generator.
 
 ```python
-from giskard.checks.builtin import from_fn
-from giskard.checks.core.trace import Trace
-from giskard.checks.interaction import InteractionSpec
-from giskard.checks.scenarios import TestCase
+from giskard.checks import InteractionSpec, TestCase, Trace, from_fn
 
 
 async def input_generator(trace: Trace):
@@ -350,10 +350,14 @@ LLM-based checks
 ```python
 from giskard.agents.generators import Generator
 
-from giskard.checks import set_default_generator
-from giskard.checks.builtin import Conformity, Groundedness, LLMJudge
-from giskard.checks.interaction import InteractionSpec
-from giskard.checks.scenarios import TestCase
+from giskard.checks import (
+    Conformity,
+    Groundedness,
+    InteractionSpec,
+    LLMJudge,
+    TestCase,
+    set_default_generator,
+)
 
 # Configure the default LLM generator
 set_default_generator(Generator(model="openai/gpt-4o-mini"))
@@ -395,9 +399,7 @@ Template customization & advanced LLM usage
 from giskard.agents.workflow import TemplateReference
 from pydantic import BaseModel
 
-from giskard.checks.builtin import BaseLLMCheck
-from giskard.checks.core import Check, CheckResult
-from giskard.checks.core.trace import Trace
+from giskard.checks import BaseLLMCheck, Check, CheckResult, Trace
 
 
 class CustomResult(BaseModel):

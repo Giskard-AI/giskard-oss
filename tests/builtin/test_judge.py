@@ -4,11 +4,7 @@ from typing import cast
 import pytest
 from giskard.agents.chat import Message
 from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
-from giskard.checks.builtin.judge import LLMJudge
-from giskard.checks.core import Interaction
-from giskard.checks.core.check import Check
-from giskard.checks.core.result import CheckStatus
-from giskard.checks.core.trace import Trace
+from giskard.checks import Check, CheckStatus, Interaction, LLMJudge, Trace
 from pydantic import Field, ValidationError
 
 

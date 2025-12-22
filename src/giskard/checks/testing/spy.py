@@ -2,8 +2,8 @@ from collections.abc import AsyncGenerator
 from typing import override
 from unittest.mock import MagicMock, patch
 
-from giskard.checks.core.interaction import BaseInteractionSpec
-from giskard.checks.core.trace import Interaction, Trace
+from ..core.interaction import BaseInteractionSpec
+from ..core.trace import Interaction, Trace
 
 
 @BaseInteractionSpec.register("with_spy")

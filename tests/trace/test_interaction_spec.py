@@ -1,10 +1,13 @@
 from collections.abc import AsyncGenerator, Generator
 
 import pytest
-from giskard.checks.core import Interaction, Trace
-from giskard.checks.core.interaction import BaseInteractionSpec
-from giskard.checks.generators.user import UserSimulator
-from giskard.checks.interaction import InteractionSpec
+from giskard.checks import (
+    BaseInteractionSpec,
+    Interaction,
+    InteractionSpec,
+    Trace,
+    UserSimulator,
+)
 
 
 class TestInteractionSpec:

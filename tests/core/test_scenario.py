@@ -7,14 +7,14 @@ from collections.abc import AsyncGenerator
 from typing import override
 
 import pytest
-from giskard.checks.core import (
+from giskard.checks import (
+    BaseInteractionSpec,
+    Check,
     CheckResult,
     Interaction,
     Scenario,
     Trace,
 )
-from giskard.checks.core.check import Check
-from giskard.checks.core.interaction import BaseInteractionSpec
 
 # Mock Components for Testing
 

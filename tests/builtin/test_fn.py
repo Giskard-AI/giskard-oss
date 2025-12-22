@@ -1,8 +1,12 @@
 import pytest
-from giskard.checks.builtin.fn import FnCheck, from_fn
-from giskard.checks.core import Interaction
-from giskard.checks.core.result import CheckResult, CheckStatus
-from giskard.checks.core.trace import Trace
+from giskard.checks import (
+    CheckResult,
+    CheckStatus,
+    FnCheck,
+    Interaction,
+    Trace,
+    from_fn,
+)
 
 
 async def test_sync_function_returns_true() -> None:

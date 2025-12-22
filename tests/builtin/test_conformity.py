@@ -2,10 +2,7 @@ import json
 
 from giskard.agents.chat import Message
 from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
-from giskard.checks.builtin.conformity import Conformity
-from giskard.checks.core import Interaction
-from giskard.checks.core.result import CheckStatus
-from giskard.checks.core.trace import Trace
+from giskard.checks import CheckStatus, Conformity, Interaction, Trace
 from pydantic import Field
 
 

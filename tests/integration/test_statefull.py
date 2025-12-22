@@ -6,11 +6,15 @@ from typing import Callable
 
 import pytest
 from giskard import agents
-from giskard.checks.builtin import EqualityCheck, LLMJudge
-from giskard.checks.core import Scenario
-from giskard.checks.core.trace import Interaction, Trace
-from giskard.checks.interaction import InteractionSpec
-from giskard.checks.testing import WithSpy
+from giskard.checks import (
+    EqualityCheck,
+    Interaction,
+    InteractionSpec,
+    LLMJudge,
+    Scenario,
+    Trace,
+    WithSpy,
+)
 from pydantic import BaseModel, Field, computed_field
 
 # Create mock agent

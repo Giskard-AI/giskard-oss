@@ -7,10 +7,15 @@ for test case execution.
 from typing import override
 
 import pytest
-from giskard.checks.builtin import EqualityCheck
-from giskard.checks.core import Check, CheckResult, TestCase
-from giskard.checks.core.trace import Interaction, Trace
-from giskard.checks.interaction import InteractionSpec
+from giskard.checks import (
+    Check,
+    CheckResult,
+    EqualityCheck,
+    Interaction,
+    InteractionSpec,
+    TestCase,
+    Trace,
+)
 
 # Test Classes
 

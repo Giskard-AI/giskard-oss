@@ -33,7 +33,7 @@ class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
     Examples
     --------
     >>> from giskard.agents.generators import Generator
-    >>> from giskard.checks.core import Interaction, Trace
+    >>> from giskard.checks import Interaction, Trace, Conformity
     >>> # Example of a dynamic rule accessing a field in the output object
     >>> check = Conformity(
     ...     rule="The response should contain the keywords '{{ interactions[-1].inputs.keywords }}' and be polite.",

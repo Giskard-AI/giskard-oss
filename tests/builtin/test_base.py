@@ -4,8 +4,7 @@ from typing import override
 import pytest
 from giskard.agents.chat import Message
 from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
-from giskard.checks.builtin.base import BaseLLMCheck
-from giskard.checks.core.trace import Trace
+from giskard.checks import BaseLLMCheck, Trace
 from pydantic import BaseModel, Field
 
 

@@ -3,10 +3,7 @@ from typing import cast, override
 
 from giskard.agents.chat import Message
 from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
-from giskard.checks.builtin.groundedness import Groundedness
-from giskard.checks.core import Interaction
-from giskard.checks.core.result import CheckStatus
-from giskard.checks.core.trace import Trace
+from giskard.checks import CheckStatus, Groundedness, Interaction, Trace
 from pydantic import Field
 
 
