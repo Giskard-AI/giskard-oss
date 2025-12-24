@@ -50,7 +50,7 @@ async def test_rule_templating() -> None:
     generator = MockGenerator(passed=True, reason=None)
     conformity = Conformity(
         generator=generator,
-        rule="The response should contain '{{ interactions[-1].outputs.response }}'",
+        rule="The response should contain '{{ trace.interactions[-1].outputs.response }}'",
     )
     result = await conformity.run(
         Trace(

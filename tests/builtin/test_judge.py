@@ -80,7 +80,7 @@ async def test_run_handle_template_reference() -> None:
     generator = MockGenerator(passed=True, reason=None)
     judge = LLMJudge(
         generator=generator,
-        prompt="Evaluate the answer: {{ interactions[-1].outputs.response }}",
+        prompt="Evaluate the answer: {{ trace.interactions[-1].outputs.response }}",
     )
     result = await judge.run(
         Trace(

@@ -133,19 +133,19 @@ async def test_single_message(
                 target="tests.integration.test_stateless.mock_apply_tool",
             ),
             LLMJudge(
-                prompt="The application has been saved and its uuid is stated: {{ messages[-1] }}."
+                prompt="The application has been saved and its uuid is stated: {{ trace.messages[-1] }}."
             ),
             Equality(
                 expected=1,
-                key="interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_count']",
+                key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_count']",
             ),
             Equality(
                 expected="test@test.com",
-                key="interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[0]",
+                key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[0]",
             ),
             Equality(
                 expected="Hello, I want to apply for a job.",
-                key="interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[1]",
+                key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[1]",
             ),
         ],
     )
@@ -219,7 +219,7 @@ async def test_user_simulator(
                 outputs=adapter,
             ),
             LLMJudge(
-                prompt="The application has been saved and its uuid is stated: {{ messages[-1] }}."
+                prompt="The application has been saved and its uuid is stated: {{ trace.messages[-1] }}."
             ),
             InteractionSpec(
                 inputs=partial(

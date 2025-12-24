@@ -74,7 +74,7 @@ async def test_answer_and_context_from_trace() -> None:
     assert "inputs" in result.details
     assert "answer" in result.details["inputs"]
     assert "context" in result.details["inputs"]
-    # answer_key defaults to "interactions[-1].outputs" which returns the entire dict
+    # answer_key defaults to "trace.interactions[-1].outputs" which returns the entire dict
     assert result.details["inputs"]["answer"] == str(
         {"response": "The Eiffel Tower is in Paris."}
     )
@@ -101,8 +101,8 @@ async def test_custom_keys() -> None:
     generator = MockGenerator(passed=True, reason=None)
     groundedness = Groundedness(
         generator=generator,
-        answer_key="interactions[0].outputs.response",
-        context_key="interactions[0].metadata.documents",
+        answer_key="trace.interactions[0].outputs.response",
+        context_key="trace.interactions[0].metadata.documents",
     )
     interaction = Interaction(
         inputs={"query": "What is AI?"},

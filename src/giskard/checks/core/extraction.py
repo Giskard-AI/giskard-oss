@@ -36,13 +36,36 @@ class Extractor[InputType, OutputType](Discriminated, ABC):
 
 @Extractor.register("jsonpath")
 class JsonPathExtractor[InputType, OutputType](Extractor[InputType, OutputType]):
-    """Extract values using a JSONPath expression evaluated on `trace.model_dump()`.
+    """Extract values using a JSONPath expression evaluated on `{"trace": trace.model_dump()}`.
 
     The extractor unwraps objects that expose a `value` attribute (e.g., jsonpath-ng DatumInContext)
     and returns a plain list of Python values.
+
+    Note
+    ----
+    JSONPath extraction operates on dictionaries, not objects, so it uses `trace.model_dump()`.
+    This means that `@property` methods are not accessible unless they are decorated with
+    `@computed_field` from Pydantic, which includes them in `model_dump()`.
+
+    Examples
+    --------
+    To make a custom property available to JSONPath extraction, use `@computed_field`::
+
+        from pydantic import computed_field
+
+        class MyTrace(Trace[str, str]):
+            @computed_field
+            @property
+            def messages(self) -> list[str]:
+                return [i.outputs for i in self.interactions]
+
+    Then JSONPath expressions like `trace.messages` will work.
     """
 
-    key: str = Field(..., description="JSONPath expression to extract values")
+    key: str = Field(
+        ...,
+        description="JSONPath expression to extract values (e.g., 'trace.interactions[-1].outputs')",
+    )
 
     @override
     def extract(self, trace: Trace[InputType, OutputType]) -> list[Any]:
@@ -59,7 +82,7 @@ class JsonPathExtractor[InputType, OutputType](Extractor[InputType, OutputType])
             List of extracted values.
         """
         expr = parse(self.key)
-        matches = expr.find(trace.model_dump())
+        matches = expr.find({"trace": trace.model_dump()})
         results: list[Any] = []
         for item in matches:
             value = getattr(item, "value", item)
@@ -77,7 +100,7 @@ def resolve[InputType, OutputType](
     trace : Trace
         The trace to resolve against.
     key : str
-        JSONPath expression to evaluate.
+        JSONPath expression to evaluate (e.g., 'trace.interactions[-1].outputs').
     multiple : bool
         If True, return a list of all matches. If False, return the first match or None.
 
@@ -85,9 +108,15 @@ def resolve[InputType, OutputType](
     -------
     list[Any] | Any | None
         The resolved value(s) or None if no matches found.
+
+    Note
+    ----
+    JSONPath extraction operates on dictionaries, not objects, so it uses `trace.model_dump()`.
+    This means that `@property` methods are not accessible unless they are decorated with
+    `@computed_field` from Pydantic, which includes them in `model_dump()`.
     """
     expr = parse(key)
-    matches = expr.find(trace.model_dump())
+    matches = expr.find({"trace": trace.model_dump()})
 
     if not matches:
         return [] if multiple else None

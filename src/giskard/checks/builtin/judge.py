@@ -21,16 +21,17 @@ class LLMJudge[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     or as a path to a template file.
 
     The prompt supports template interpolation using Jinja2 syntax. Available
-    template variables include the entire trace (via `trace.model_dump()`) and
+    template variables include the trace object (accessible via `trace`) and
     any custom variables provided by overriding `get_inputs()`.
 
     Common template variables:
-    - `interactions`: List of all interactions
-    - `interactions[-1]`: Most recent interaction
-    - `inputs`: Shortcut for `interactions[-1].inputs`
-    - `outputs`: Shortcut for `interactions[-1].outputs`
-    - `messages`: If using message-based interactions, all messages
-    - `transcript`: If using message-based interactions, full conversation transcript
+    - `trace`: The trace object containing all interactions
+    - `trace.interactions`: List of all interactions
+    - `trace.interactions[-1]`: Most recent interaction
+    - `trace.interactions[-1].inputs`: Inputs from the most recent interaction
+    - `trace.interactions[-1].outputs`: Outputs from the most recent interaction
+    - `trace.messages`: If using message-based interactions, all messages (if property exists)
+    - `trace.transcript`: If using message-based interactions, full conversation transcript (if property exists)
 
     The LLM is expected to return a structured output with a `passed` boolean field
     and an optional `reason` string field (see `LLMCheckResult`).
@@ -51,8 +52,8 @@ class LLMJudge[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         LLMJudge(
             prompt=(
                 "Evaluate if the response is helpful and accurate.\\n"
-                "Input: {{ interactions[-1].inputs }}\\n"
-                "Response: {{ interactions[-1].outputs }}\\n"
+                "Input: {{ trace.interactions[-1].inputs }}\\n"
+                "Response: {{ trace.interactions[-1].outputs }}\\n"
                 "Return passed=true if helpful, passed=false otherwise."
             )
         )

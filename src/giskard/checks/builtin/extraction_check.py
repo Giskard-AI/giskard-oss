@@ -47,7 +47,9 @@ class ExtractionCheck[InputType, OutputType, TraceType: Trace](  # pyright: igno
             return JsonPathExtractor(key=self.key).extract(trace)
         else:
             # Default to selecting the output field via JSONPath
-            return JsonPathExtractor(key="interactions[-1].outputs").extract(trace)
+            return JsonPathExtractor(key="trace.interactions[-1].outputs").extract(
+                trace
+            )
 
     @abstractmethod
     def _evaluate_value(self, value: Any) -> bool:

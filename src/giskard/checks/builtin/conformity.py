@@ -26,7 +26,7 @@ class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
     ----------
     rule : str
         The rule statement to evaluate against the interaction.
-        This string can contain Jinja2 placeholders (e.g., `{{ interactions[-1].outputs }}`).
+        This string can contain Jinja2 placeholders (e.g., `{{ trace.interactions[-1].outputs }}`).
     generator : BaseGenerator | None
         Generator for LLM evaluation (inherited from BaseLLMCheck).
 
@@ -36,7 +36,7 @@ class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
     >>> from giskard.checks import Interaction, Trace, Conformity
     >>> # Example of a dynamic rule accessing a field in the output object
     >>> check = Conformity(
-    ...     rule="The response should contain the keywords '{{ interactions[-1].inputs.keywords }}' and be polite.",
+    ...     rule="The response should contain the keywords '{{ trace.interactions[-1].inputs.keywords }}' and be polite.",
     ...     generator=Generator(model="openai/gpt-4o")
     ... )
     """
@@ -53,7 +53,7 @@ class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
     @override
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
         """Build template variables from the trace."""
-        formatted_rule = Template(self.rule).render(**trace.model_dump())
+        formatted_rule = Template(self.rule).render(trace=trace)
 
         interaction_json = "{}"
         if trace.interactions:
