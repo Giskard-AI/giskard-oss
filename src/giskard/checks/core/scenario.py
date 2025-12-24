@@ -40,7 +40,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         name="multi_step_test",
         sequence=[
             InteractionSpec(inputs="Hello", outputs="Hi"),
-            EqualityCheck(expected="Hi", key="interactions[-1].outputs"),
+            Equality(expected="Hi", key="interactions[-1].outputs"),
         ],
     )
     result = await scenario.run()

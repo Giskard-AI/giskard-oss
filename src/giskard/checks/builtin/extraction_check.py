@@ -17,7 +17,7 @@ class ExtractionCheck[InputType, OutputType, TraceType: Trace](  # pyright: igno
     """Abstract base class for checks that extract values from traces and evaluate them.
 
     This class provides common functionality for value extraction and evaluation patterns
-    used by checks like EqualityCheck, StringMatchingCheck, and future LLM-based checks
+    used by checks like Equality, StringMatching, and future LLM-based checks
     like ConformityCheck, RuleBasedCheck, etc.
     """
 

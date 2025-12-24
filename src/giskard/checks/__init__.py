@@ -8,13 +8,13 @@ from . import builtin
 from .builtin import (
     BaseLLMCheck,
     Conformity,
-    EqualityCheck,
+    Equality,
     ExtractionCheck,
     FnCheck,
     Groundedness,
     LLMCheckResult,
     LLMJudge,
-    StringMatchingCheck,
+    StringMatching,
     from_fn,
 )
 from .core import (
@@ -62,13 +62,13 @@ __all__ = [
     "BaseLLMCheck",
     "LLMCheckResult",
     "Conformity",
-    "EqualityCheck",
+    "Equality",
     "ExtractionCheck",
     "FnCheck",
     "from_fn",
     "Groundedness",
     "LLMJudge",
-    "StringMatchingCheck",
+    "StringMatching",
     # Interaction
     "InteractionSpec",
     # Generators

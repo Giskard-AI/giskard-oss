@@ -11,7 +11,7 @@ from .extraction_check import ExtractionCheck
 
 
 @Check.register("string_matching")
-class StringMatchingCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     ExtractionCheck[InputType, OutputType, TraceType]
 ):
     """Check that validates if a specific string content is present in trace outputs.

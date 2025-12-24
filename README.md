@@ -111,7 +111,7 @@ API Overview
 
 **Built-in checks**
 - `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
-- `giskard.checks.StringMatchingCheck`, `EqualityCheck`, `ExtractionCheck`.
+- `giskard.checks.StringMatching`, `Equality`, `ExtractionCheck`.
 - `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
 - All extraction-capable checks share JSONPath selectors via `key` or custom `Extractor`s.
 
@@ -253,9 +253,9 @@ Structured data quickstart
 
 ```python
 from giskard.checks import (
-    EqualityCheck,
+    Equality,
     InteractionSpec,
-    StringMatchingCheck,
+    StringMatching,
     TestCase,
 )
 
@@ -265,12 +265,12 @@ interaction = InteractionSpec(
 )
 
 checks = [
-    StringMatchingCheck(
+    StringMatching(
         name="contains_paris",
         content="Paris",
         key="interactions[-1].outputs.answer",
     ),
-    EqualityCheck(
+    Equality(
         name="high_confidence",
         expected=0.95,
         key="interactions[-1].outputs.confidence",
@@ -290,7 +290,7 @@ Scenarios for multi-step workflows
 `Scenario` allows you to compose multiple interactions and checks in a single execution flow. Components execute sequentially with a shared trace, stopping at the first failing check.
 
 ```python
-from giskard.checks import EqualityCheck, InteractionSpec, LLMJudge, Scenario
+from giskard.checks import Equality, InteractionSpec, LLMJudge, Scenario
 
 scenario = Scenario(
     name="multi_step_conversation",
@@ -306,7 +306,7 @@ scenario = Scenario(
             inputs="My email is test@example.com",
             outputs=lambda inputs: f"Thank you! I've saved your application with email: {inputs.split()[-1]}",
         ),
-        EqualityCheck(
+        Equality(
             expected="test@example.com",
             key="interactions[-1].outputs",
         ),
@@ -432,7 +432,7 @@ Notes
 -----
 
 - `Trace` captures every interaction; JSONPath keys like `interactions[-1].outputs` resolve against that structure.
-- `StringMatchingCheck` supports `evaluation_mode="any" | "all" | "none"` for lists.
+- `StringMatching` supports `evaluation_mode="any" | "all" | "none"` for lists.
 - Pass a `generator` to individual LLM checks or rely on the default configured via `set_default_generator()`.
 - Built-in LLM checks rely on templates bundled with `giskard-agents`; override `get_prompt` or `get_inputs` for customization.
 

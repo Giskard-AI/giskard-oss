@@ -7,7 +7,7 @@ from typing import Callable
 import pytest
 from giskard import agents
 from giskard.checks import (
-    EqualityCheck,
+    Equality,
     Interaction,
     InteractionSpec,
     LLMJudge,
@@ -135,15 +135,15 @@ async def test_single_message(
             LLMJudge(
                 prompt="The application has been saved and its uuid is stated: {{ messages[-1] }}."
             ),
-            EqualityCheck(
+            Equality(
                 expected=1,
                 key="interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_count']",
             ),
-            EqualityCheck(
+            Equality(
                 expected="test@test.com",
                 key="interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[0]",
             ),
-            EqualityCheck(
+            Equality(
                 expected="Hello, I want to apply for a job.",
                 key="interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[1]",
             ),

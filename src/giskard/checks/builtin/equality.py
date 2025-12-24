@@ -11,7 +11,7 @@ from .extraction_check import ExtractionCheck
 
 
 @Check.register("equality")
-class EqualityCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class Equality[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     ExtractionCheck[InputType, OutputType, TraceType]
 ):
     """Check that validates if extracted values equal an expected value.

@@ -86,7 +86,7 @@ modules, core abstractions, and expected workflows.
 
 ### Built-in checks (`builtin/`)
 - `from_fn`, `FnCheck`: wrap arbitrary callables (sync/async) that receive a `Trace`.
-- Extraction-based checks: `StringMatchingCheck`, `EqualityCheck`, `ExtractionCheck`.
+- Extraction-based checks: `StringMatching`, `Equality`, `ExtractionCheck`.
 - LLM checks: `BaseLLMCheck`, `LLMJudge`, `Groundedness`, `Conformity`.
   These integrate with `giskard-agents` via `TemplateReference` and respect
   global/default generators configured through `settings.py`.
@@ -142,10 +142,10 @@ from giskard.checks import (
     Extractor, JsonPathExtractor,
     # Builtin checks
     BaseLLMCheck, LLMCheckResult,
-    Conformity, EqualityCheck, ExtractionCheck,
+    Conformity, Equality, ExtractionCheck,
     FnCheck, from_fn,
     Groundedness, LLMJudge,
-    StringMatchingCheck,
+    StringMatching,
     # Testing utilities
     WithSpy, TestCaseRunner, ScenarioRunner,
     # Settings
