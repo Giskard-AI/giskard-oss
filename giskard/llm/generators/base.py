@@ -71,14 +71,76 @@ class _BaseLLMGenerator(BaseGenerator, ABC):
 
         generated = self._parse_output(out)
 
+        df = pd.DataFrame(generated)
+
+        # Ensure column names match the model's feature_names
+        # This handles cases where LLM generates different column names than expected
+        if model.feature_names:
+            df = self._align_columns_to_feature_names(df, model.feature_names)
+
         dataset = Dataset(
-            df=pd.DataFrame(generated),
+            df=df,
             name=self._make_dataset_name(model),
             validation=False,
             column_types=column_types,
         )
 
         return dataset
+
+    def _align_columns_to_feature_names(self, df: pd.DataFrame, feature_names: Sequence[str]) -> pd.DataFrame:
+        """Align DataFrame columns to match the model's feature_names.
+
+        If the generated columns don't match feature_names, attempt to rename them.
+        This handles the case where LLM generates data with different column names
+        than specified in the model's feature_names.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The generated DataFrame.
+        feature_names : Sequence[str]
+            The expected feature names from the model.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with columns aligned to feature_names.
+        """
+        current_columns = list(df.columns)
+
+        # If columns already match, return as-is
+        if set(current_columns) == set(feature_names):
+            return df[list(feature_names)]  # Reorder to match feature_names order
+
+        # If column count matches, assume positional mapping
+        if len(current_columns) == len(feature_names):
+            rename_map = dict(zip(current_columns, feature_names))
+            logger.debug(
+                f"Renaming generated columns to match feature_names: {rename_map}"
+            )
+            return df.rename(columns=rename_map)
+
+        # If we have fewer feature_names than columns, try to find matching columns
+        # or use the first N columns
+        if len(feature_names) < len(current_columns):
+            # First try exact matches
+            matching = [col for col in current_columns if col in feature_names]
+            if set(matching) == set(feature_names):
+                return df[list(feature_names)]
+            # Otherwise, use first N columns and rename
+            columns_to_use = current_columns[: len(feature_names)]
+            rename_map = dict(zip(columns_to_use, feature_names))
+            logger.debug(
+                f"Using first {len(feature_names)} columns and renaming: {rename_map}"
+            )
+            return df[columns_to_use].rename(columns=rename_map)
+
+        # If we have more feature_names than columns, log warning and return as-is
+        logger.warning(
+            f"Generated data has {len(current_columns)} columns but model expects "
+            f"{len(feature_names)} features. Column names may not match."
+        )
+        return df
 
     def _parse_output(self, raw_output: ChatMessage):
         try:
