@@ -89,11 +89,31 @@ class _BaseLLMEvaluator(BaseEvaluator):
         llm_temperature: float = 0.1,
         llm_seed: int = 42,
         llm_output_format="json_object",
+        num_retries: int = 1,
     ):
+        """Initialize the LLM evaluator.
+
+        Parameters
+        ----------
+        llm_client : Optional[LLMClient]
+            The LLM client to use for evaluation. If None, uses the default client.
+        llm_temperature : float
+            Temperature for LLM generation. Default is 0.1.
+        llm_seed : int
+            Seed for reproducibility. Default is 42.
+        llm_output_format : str
+            Output format for LLM. Default is "json_object".
+        num_retries : int
+            Number of times to retry each input with the model. This is useful for
+            testing jailbreak scenarios where multiple attempts may be needed to
+            trigger a vulnerability. If any retry fails the evaluation, the sample
+            is marked as failed. Default is 1 (no retries).
+        """
         self.llm_client = llm_client if llm_client is not None else get_default_client()
         self.llm_temperature = llm_temperature
         self.llm_seed = llm_seed
         self.llm_output_format = llm_output_format
+        self.num_retries = max(1, num_retries)
 
     @abstractmethod
     def _format_messages(
@@ -102,35 +122,70 @@ class _BaseLLMEvaluator(BaseEvaluator):
         ...
 
     def evaluate(self, model: BaseModel, dataset: Dataset):
-        model_outputs = model.predict(dataset).prediction
-
         result = EvaluationResult()
-        for (row_id, row), model_output in zip(
-            dataset.df.iterrows(),
-            model_outputs,
-        ):
+
+        for row_id, row in dataset.df.iterrows():
             input_vars = {k: v for k, v in row.items() if k in model.feature_names}
             if len(input_vars) == 1:
                 input_vars = list(input_vars.values())[0]
             input_meta = {k: v for k, v in row.items() if k not in model.feature_names}
             input_meta["__sample_id"] = row_id
 
-            conversation = [{"role": "user", "content": input_vars}, {"role": "agent", "content": model_output}]
-            sample = {
-                "conversation": conversation,
-                "meta": input_meta,
-            }
-            logger.debug(f"{self.__class__.__name__}: evaluating sample {sample}")
+            # Track results across retries
+            sample_failed = False
+            failure_reason = None
+            last_sample = None
+            error_occurred = False
+            error_message = None
 
-            try:
-                eval_passed, reason = self._evaluate_sample(model, sample)
-            except LLMGenerationError as err:
-                logger.debug(f"{self.__class__.__name__} evaluation error: {err}")
-                result.add_error(str(err), sample)
-                continue
+            for retry_idx in range(self.num_retries):
+                # Get model output for this retry
+                single_row_dataset = Dataset(
+                    df=dataset.df.iloc[[dataset.df.index.get_loc(row_id)]],
+                    name=dataset.name,
+                    target=dataset.target,
+                    column_types=dataset.column_types,
+                    validation=False,
+                )
+                model_output = model.predict(single_row_dataset).prediction[0]
 
-            logger.debug(f"{self.__class__.__name__} evaluation result: eval_passed={eval_passed}, reason={reason}")
-            result.add_sample(eval_passed, reason, sample)
+                conversation = [{"role": "user", "content": input_vars}, {"role": "agent", "content": model_output}]
+                sample = {
+                    "conversation": conversation,
+                    "meta": {**input_meta, "__retry_idx": retry_idx},
+                }
+                last_sample = sample
+
+                logger.debug(f"{self.__class__.__name__}: evaluating sample {sample} (retry {retry_idx + 1}/{self.num_retries})")
+
+                try:
+                    eval_passed, reason = self._evaluate_sample(model, sample)
+                except LLMGenerationError as err:
+                    logger.debug(f"{self.__class__.__name__} evaluation error on retry {retry_idx + 1}: {err}")
+                    error_occurred = True
+                    error_message = str(err)
+                    continue
+
+                logger.debug(
+                    f"{self.__class__.__name__} evaluation result (retry {retry_idx + 1}): "
+                    f"eval_passed={eval_passed}, reason={reason}"
+                )
+
+                # If any retry fails, mark the sample as failed
+                if not eval_passed:
+                    sample_failed = True
+                    failure_reason = reason
+                    if self.num_retries > 1:
+                        failure_reason = f"[Failed on retry {retry_idx + 1}/{self.num_retries}] {reason}"
+                    break
+
+            # Add final result for this sample
+            if sample_failed:
+                result.add_sample(False, failure_reason, last_sample)
+            elif error_occurred and last_sample is not None:
+                result.add_error(error_message, last_sample)
+            elif last_sample is not None:
+                result.add_sample(True, None, last_sample)
 
         return result
 
