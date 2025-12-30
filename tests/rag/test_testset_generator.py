@@ -191,3 +191,106 @@ def test_question_generation_fail(caplog):
         )
     assert len(testset.to_pandas()) == 2
     assert "Encountered error in question generation" in caplog.text
+
+
+def test_testset_checkpointing(tmp_path):
+    """Test that checkpointing saves progress during generation.
+
+    This tests the fix for issue #2022 where all progress was lost
+    if testset generation failed midway through.
+    """
+    checkpoint_file = tmp_path / "checkpoint.jsonl"
+
+    knowledge_base = MagicMock()
+    knowledge_base._document_index = {"0": Mock(topic_id=0), "1": Mock(topic_id=1)}
+    knowledge_base.__getitem__ = lambda obj, idx: getattr(obj, "_document_index")[idx]
+    knowledge_base.topics = ["Cheese", "Ski"]
+
+    question_generator = Mock()
+    question_generator.generate_questions.return_value = [q1, q2]
+
+    # Generate with checkpointing
+    test_set = generate_testset(
+        knowledge_base=knowledge_base,
+        num_questions=2,
+        question_generators=question_generator,
+        checkpoint_path=str(checkpoint_file),
+        checkpoint_every=1,
+    )
+
+    assert len(test_set) == 2
+    assert checkpoint_file.exists()
+
+    # Verify checkpoint contains the data
+    from giskard.rag import QATestset
+    loaded = QATestset.load(str(checkpoint_file))
+    assert len(loaded) == 2
+
+
+def test_testset_resume_from_checkpoint(tmp_path, caplog):
+    """Test that generation can resume from a checkpoint."""
+    checkpoint_file = tmp_path / "checkpoint.jsonl"
+
+    knowledge_base = MagicMock()
+    knowledge_base._document_index = {"0": Mock(topic_id=0), "1": Mock(topic_id=1)}
+    knowledge_base.__getitem__ = lambda obj, idx: getattr(obj, "_document_index")[idx]
+    knowledge_base.topics = ["Cheese", "Ski"]
+
+    # First, create a partial checkpoint manually
+    from giskard.rag import QATestset
+    initial_questions = [q1]
+    # Add topic metadata as generate_testset would
+    initial_questions[0].metadata["topic"] = "Ski"
+    QATestset(initial_questions).save(str(checkpoint_file))
+
+    # Now generate with resume - should only generate 1 more question
+    question_generator = Mock()
+    question_generator.generate_questions.return_value = [q2]
+
+    with caplog.at_level(logging.INFO, logger="giskard.rag"):
+        test_set = generate_testset(
+            knowledge_base=knowledge_base,
+            num_questions=2,
+            question_generators=question_generator,
+            checkpoint_path=str(checkpoint_file),
+        )
+
+    assert len(test_set) == 2
+    assert "Resuming from checkpoint: 1 questions already generated" in caplog.text
+    # Generator should be asked for only 1 question (2 - 1 existing)
+    question_generator.generate_questions.assert_called_once()
+    call_kwargs = question_generator.generate_questions.call_args[1]
+    assert call_kwargs["num_questions"] == 1
+
+
+def test_testset_checkpoint_complete(tmp_path, caplog):
+    """Test that generation skips if checkpoint already has all questions."""
+    checkpoint_file = tmp_path / "checkpoint.jsonl"
+
+    knowledge_base = MagicMock()
+    knowledge_base._document_index = {"0": Mock(topic_id=0), "1": Mock(topic_id=1)}
+    knowledge_base.__getitem__ = lambda obj, idx: getattr(obj, "_document_index")[idx]
+    knowledge_base.topics = ["Cheese", "Ski"]
+
+    # Create a complete checkpoint
+    from giskard.rag import QATestset
+    complete_questions = [q1, q2]
+    for q in complete_questions:
+        topic_id = knowledge_base[q.metadata["seed_document_id"]].topic_id
+        q.metadata["topic"] = knowledge_base.topics[topic_id]
+    QATestset(complete_questions).save(str(checkpoint_file))
+
+    question_generator = Mock()
+
+    with caplog.at_level(logging.INFO, logger="giskard.rag"):
+        test_set = generate_testset(
+            knowledge_base=knowledge_base,
+            num_questions=2,
+            question_generators=question_generator,
+            checkpoint_path=str(checkpoint_file),
+        )
+
+    assert len(test_set) == 2
+    assert "nothing to generate" in caplog.text
+    # Generator should NOT be called since we have all questions
+    question_generator.generate_questions.assert_not_called()
