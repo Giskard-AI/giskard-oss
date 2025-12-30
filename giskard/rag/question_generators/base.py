@@ -24,12 +24,14 @@ class _LLMBasedQuestionGenerator(QuestionGenerator):
         context_window_length: int = 8192,
         llm_client: Optional[LLMClient] = None,
         llm_temperature: float = 0.4,
+        num_retries: int = 2,
     ):
         self._context_window_length = context_window_length
         self._context_neighbors = context_neighbors
         self._context_similarity_threshold = context_similarity_threshold
         self._llm_client_instance = llm_client
         self._llm_temperature = llm_temperature
+        self._num_retries = max(1, num_retries)
 
     @property
     def _llm_client(self):
@@ -55,11 +57,18 @@ class GenerateFromSingleQuestionMixin:
         docs = knowledge_base.get_random_documents(num_questions)
 
         for doc in docs:
-            try:
-                yield self.generate_single_question(knowledge_base, *args, **kwargs, seed_document=doc)
-            except Exception as e:  # @TODO: specify exceptions
-                logger.error(f"Encountered error in question generation: {e}. Skipping.")
-                logger.exception(e)
+            num_retries = getattr(self, "_num_retries", 1)
+
+            for attempt in range(num_retries):
+                try:
+                    yield self.generate_single_question(knowledge_base, *args, **kwargs, seed_document=doc)
+                    break  # Success, exit retry loop
+                except Exception as e:
+                    if attempt < num_retries - 1:
+                        logger.debug(f"Attempt {attempt + 1}/{num_retries} failed: {e}. Retrying...")
+                    else:
+                        logger.error(f"Encountered error in question generation after {num_retries} attempts: {e}. Skipping.")
+                        logger.exception(e)
 
 
 class _BaseModifierGenerator(_LLMBasedQuestionGenerator):
@@ -76,8 +85,15 @@ class _BaseModifierGenerator(_LLMBasedQuestionGenerator):
 
         # Run the modifier for each
         for question in base_questions:
-            try:
-                yield self._modify_question(question, knowledge_base, *args, **kwargs)
-            except Exception as e:  # @TODO: specify exceptions
-                logger.error(f"Encountered error in question generation: {e}. Skipping.")
-                logger.exception(e)
+            num_retries = getattr(self, "_num_retries", 1)
+
+            for attempt in range(num_retries):
+                try:
+                    yield self._modify_question(question, knowledge_base, *args, **kwargs)
+                    break  # Success, exit retry loop
+                except Exception as e:
+                    if attempt < num_retries - 1:
+                        logger.debug(f"Attempt {attempt + 1}/{num_retries} failed: {e}. Retrying...")
+                    else:
+                        logger.error(f"Encountered error in question generation after {num_retries} attempts: {e}. Skipping.")
+                        logger.exception(e)
