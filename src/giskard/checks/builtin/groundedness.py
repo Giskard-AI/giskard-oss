@@ -4,7 +4,7 @@ from giskard.agents.workflow import TemplateReference
 from pydantic import Field
 
 from ..core.check import Check
-from ..core.extraction import resolve
+from ..core.extraction import provided_or_resolve
 from ..core.trace import Trace
 from .base import BaseLLMCheck
 
@@ -48,7 +48,7 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         default="trace.interactions[-1].outputs",
         description="Key to extract the answer from the trace",
     )
-    context: list[str] | None = Field(
+    context: str | list[str] | None = Field(
         default=None, description="Input source for the reference context"
     )
     context_key: str = Field(
@@ -75,8 +75,10 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             Template variables with 'answer' and 'context' keys.
         """
         return {
-            "answer": self.answer or str(resolve(trace, self.answer_key)),
+            "answer": str(provided_or_resolve(self.answer, trace, self.answer_key)),
             "context": str(
-                self.context or resolve(trace, self.context_key, multiple=True)
+                provided_or_resolve(
+                    self.context, trace, self.context_key, multiple=True
+                )
             ),
         }

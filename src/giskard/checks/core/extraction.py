@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, override
+from typing import Any, cast, override
 
 from giskard.core import Discriminated, discriminated_base
 from jsonpath_ng import parse
@@ -124,3 +124,23 @@ def resolve[InputType, OutputType](
     values = [m.value for m in matches]
 
     return values if multiple else values[0]
+
+
+def provided_or_resolve[ValueType, InputType, OutputType](
+    value: ValueType | None,
+    trace: Trace[InputType, OutputType],
+    key: str,
+    multiple: bool = False,
+) -> ValueType | None:
+    """Resolve a JSONPath expression against a trace.
+
+    Parameters
+    ----------
+    trace : Trace
+    key : str
+    multiple : bool
+    """
+    if value is not None:
+        return value
+
+    return cast(ValueType, resolve(trace, key, multiple))

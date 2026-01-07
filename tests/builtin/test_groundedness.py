@@ -97,6 +97,28 @@ async def test_direct_answer_and_context() -> None:
     assert "Context 2" in result.details["inputs"]["context"]
 
 
+async def test_direct_answer_and_single_string_context() -> None:
+    """Test that context can be a single string instead of a list."""
+    generator = MockGenerator(
+        passed=True, reason="Answer is grounded in single context string"
+    )
+    groundedness = Groundedness(
+        generator=generator,
+        answer="The Eiffel Tower is in Paris.",
+        context="Paris is the capital of France. The Eiffel Tower is a famous landmark located there.",
+    )
+    result = await groundedness.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    assert "inputs" in result.details
+    assert result.details["inputs"]["answer"] == "The Eiffel Tower is in Paris."
+    assert (
+        result.details["inputs"]["context"]
+        == "Paris is the capital of France. The Eiffel Tower is a famous landmark located there."
+    )
+    assert len(generator.calls) == 1
+
+
 async def test_custom_keys() -> None:
     generator = MockGenerator(passed=True, reason=None)
     groundedness = Groundedness(
@@ -151,6 +173,25 @@ async def test_context_priority_over_trace() -> None:
 
     assert result.status == CheckStatus.PASS
     assert result.details["inputs"]["context"] == "['Direct context']"
+
+
+async def test_empty_string_context_is_preserved() -> None:
+    """Test that an empty string context is preserved and does not fall back to trace."""
+    generator = MockGenerator(passed=True, reason=None)
+    groundedness = Groundedness(
+        generator=generator,
+        answer="Some answer",
+        context="",
+    )
+    interaction = Interaction(
+        inputs={"query": "Test"},
+        outputs={"response": "Answer"},
+        metadata={"context": ["Trace context"]},
+    )
+    result = await groundedness.run(Trace(interactions=[interaction]))
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["inputs"]["context"] == ""
 
 
 async def test_empty_context() -> None:
