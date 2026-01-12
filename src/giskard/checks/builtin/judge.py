@@ -27,11 +27,18 @@ class LLMJudge[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     Common template variables:
     - `trace`: The trace object containing all interactions
     - `trace.interactions`: List of all interactions
-    - `trace.interactions[-1]`: Most recent interaction
-    - `trace.interactions[-1].inputs`: Inputs from the most recent interaction
-    - `trace.interactions[-1].outputs`: Outputs from the most recent interaction
+    - `trace.last`: Most recent interaction (preferred in prompt templates)
+    - `trace.last.inputs`: Inputs from the most recent interaction
+    - `trace.last.outputs`: Outputs from the most recent interaction
+    - `trace.interactions[-1]`: Alternative way to access the most recent interaction
     - `trace.messages`: If using message-based interactions, all messages (if property exists)
     - `trace.transcript`: If using message-based interactions, full conversation transcript (if property exists)
+
+    Note
+    ----
+    In Jinja2 prompt templates and JSONPath expressions, prefer `trace.last` over
+    `trace.interactions[-1]` for better readability. The `trace.last` computed field
+    is available in both contexts.
 
     The LLM is expected to return a structured output with a `passed` boolean field
     and an optional `reason` string field (see `LLMCheckResult`).
@@ -52,8 +59,8 @@ class LLMJudge[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         LLMJudge(
             prompt=(
                 "Evaluate if the response is helpful and accurate.\\n"
-                "Input: {{ trace.interactions[-1].inputs }}\\n"
-                "Response: {{ trace.interactions[-1].outputs }}\\n"
+                "Input: {{ trace.last.inputs }}\\n"
+                "Response: {{ trace.last.outputs }}\\n"
                 "Return passed=true if helpful, passed=false otherwise."
             )
         )

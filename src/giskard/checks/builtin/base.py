@@ -83,7 +83,8 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         ----------
         trace : Trace
             The trace containing interaction history. Access the current
-            interaction via `trace.interactions[-1]` if available.
+            interaction via `trace.last` (preferred in prompt templates) or
+            `trace.interactions[-1]` if available.
 
         Returns
         -------

@@ -1,6 +1,6 @@
 from typing import Any, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from .protocols import InteractionGenerator
 
@@ -53,6 +53,10 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     interactions : list[Interaction[InputType, OutputType]]
         Ordered list of all interactions that have occurred. The most recent
         interaction is at `interactions[-1]`.
+    last : Interaction[InputType, OutputType] | None
+        Computed field that returns the last interaction in the trace, or None if empty.
+        Equivalent to `interactions[-1]` if interactions exist, None otherwise.
+        Available in Python code, Jinja2 prompt templates, and JSONPath expressions.
 
     Examples
     --------
@@ -62,8 +66,11 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
         Interaction(inputs="How are you?", outputs="I'm doing well, thanks!"),
     ])
 
-    # Access the most recent interaction
-    last_interaction = trace.interactions[-1]
+    # Access the most recent interaction (preferred in prompt templates and JSONPath)
+    last_interaction = trace.last
+
+    # Use in JSONPath expressions
+    check = Groundedness(answer_key="trace.last.outputs")
 
     # Access all outputs
     all_outputs = [interaction.outputs for interaction in trace.interactions]
@@ -71,6 +78,30 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     """
 
     interactions: list[Interaction[InputType, OutputType]] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def last(self) -> Interaction[InputType, OutputType] | None:
+        """The last interaction in the trace, or None if the trace is empty.
+
+        This computed field is equivalent to `interactions[-1]` when interactions exist.
+        It's convenient for use in Python code, Jinja2 prompt templates, and JSONPath
+        expressions (e.g., `trace.last.outputs`).
+
+        Examples
+        --------
+        ```python
+        # In Python code
+        last_interaction = trace.last
+
+        # In JSONPath expressions
+        check = Groundedness(answer_key="trace.last.outputs")
+
+        # In Jinja2 templates
+        # {{ trace.last.outputs }}
+        ```
+        """
+        return self.interactions[-1] if self.interactions else None
 
     @classmethod
     async def from_interactions(

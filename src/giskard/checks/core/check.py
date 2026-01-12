@@ -30,7 +30,8 @@ class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
         ----------
         trace : Trace
             The trace containing interaction history. Access the current
-            interaction via `trace.interactions[-1]` if available.
+            interaction via `trace.last` (preferred in prompt templates) or
+            `trace.interactions[-1]` if available.
 
         Returns
         -------

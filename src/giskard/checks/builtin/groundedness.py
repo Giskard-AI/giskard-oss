@@ -23,11 +23,17 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     answer : str | None
         The answer text to evaluate for groundedness.
     answer_key : str
-        Key to extract the answer from the trace (default: "trace.interactions[-1].outputs").
+        JSONPath expression to extract the answer from the trace
+        (default: "trace.last.outputs").
+
+        Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
     context : list[str] | None
         List of context documents that should support the answer.
     context_key : str
-        Key to extract the context from the trace (default: "trace.interactions[-1].metadata.context").
+        JSONPath expression to extract the context from the trace
+        (default: "trace.last.metadata.context").
+
+        Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
     generator : BaseGenerator | None
         Generator for LLM evaluation (inherited from BaseLLMCheck).
 
@@ -45,14 +51,14 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         default=None, description="Input source for the answer to evaluate"
     )
     answer_key: str = Field(
-        default="trace.interactions[-1].outputs",
+        default="trace.last.outputs",
         description="Key to extract the answer from the trace",
     )
     context: str | list[str] | None = Field(
         default=None, description="Input source for the reference context"
     )
     context_key: str = Field(
-        default="trace.interactions[-1].metadata.context",
+        default="trace.last.metadata.context",
         description="Key to extract the context from the trace",
     )
 

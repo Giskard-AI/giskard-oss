@@ -49,6 +49,11 @@ class JsonPathExtractor[InputType, OutputType](Extractor[InputType, OutputType])
 
     Examples
     --------
+    The `Trace.last` field is available as a computed field, so you can use it in JSONPath::
+
+        # Use trace.last in JSONPath expressions
+        extractor = JsonPathExtractor(key="trace.last.outputs")
+
     To make a custom property available to JSONPath extraction, use `@computed_field`::
 
         from pydantic import computed_field
@@ -64,7 +69,7 @@ class JsonPathExtractor[InputType, OutputType](Extractor[InputType, OutputType])
 
     key: str = Field(
         ...,
-        description="JSONPath expression to extract values (e.g., 'trace.interactions[-1].outputs')",
+        description="JSONPath expression to extract values (e.g., 'trace.last.outputs')",
     )
 
     @override
@@ -100,7 +105,7 @@ def resolve[InputType, OutputType](
     trace : Trace
         The trace to resolve against.
     key : str
-        JSONPath expression to evaluate (e.g., 'trace.interactions[-1].outputs').
+        JSONPath expression to evaluate (e.g., 'trace.last.outputs').
     multiple : bool
         If True, return a list of all matches. If False, return the first match or None.
 

@@ -74,7 +74,7 @@ async def test_answer_and_context_from_trace() -> None:
     assert "inputs" in result.details
     assert "answer" in result.details["inputs"]
     assert "context" in result.details["inputs"]
-    # answer_key defaults to "trace.interactions[-1].outputs" which returns the entire dict
+    # answer_key defaults to "trace.last.outputs" which returns the entire dict
     assert result.details["inputs"]["answer"] == str(
         {"response": "The Eiffel Tower is in Paris."}
     )
@@ -234,3 +234,54 @@ async def test_missing_context_in_trace() -> None:
     assert result.status == CheckStatus.PASS
     # When resolve returns None with multiple=True, it returns []
     assert result.details["inputs"]["context"] == "[]"
+
+
+async def test_using_trace_last_property() -> None:
+    """Test that demonstrates using trace.last instead of trace.interactions[-1]."""
+    generator = MockGenerator(passed=True, reason=None)
+    interaction1 = Interaction(
+        inputs={"query": "First question"},
+        outputs={"response": "First answer"},
+        metadata={"context": ["Context 1"]},
+    )
+    interaction2 = Interaction(
+        inputs={"query": "Second question"},
+        outputs={"response": "Second answer"},
+        metadata={"context": ["Context 2"]},
+    )
+    trace = Trace(interactions=[interaction1, interaction2])
+
+    # Verify trace.last works and equals the last interaction
+    assert trace.last is not None
+    assert trace.last == interaction2
+    assert trace.last.outputs == {"response": "Second answer"}
+    assert trace.last == trace.interactions[-1]
+
+    # Use trace.last to verify the groundedness check uses the last interaction
+    groundedness = Groundedness(
+        generator=generator,
+        answer_key="trace.last.outputs.response",
+        context_key="trace.last.metadata.context",
+    )
+    result = await groundedness.run(trace)
+
+    assert result.status == CheckStatus.PASS
+    # Verify it extracted from the last interaction
+    assert result.details["inputs"]["answer"] == "Second answer"
+    assert "Context 2" in result.details["inputs"]["context"]
+
+
+async def test_trace_last_with_empty_trace() -> None:
+    """Test that trace.last returns None for empty trace."""
+    generator = MockGenerator(passed=True, reason=None)
+    trace = Trace()
+
+    # Verify trace.last returns None for empty trace
+    assert trace.last is None
+
+    # Groundedness should handle empty trace gracefully
+    groundedness = Groundedness(generator=generator)
+    result = await groundedness.run(trace)
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["inputs"]["answer"] == "None"
