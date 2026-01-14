@@ -10,7 +10,7 @@ from .result import ScenarioResult
 from .trace import Interaction, Trace
 
 
-class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
+class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):  # pyright: ignore[reportMissingTypeArgument]
     """A scenario composed of an ordered sequence of components (InteractionSpecs
     and Checks) with shared trace.
 

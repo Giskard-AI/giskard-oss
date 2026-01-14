@@ -12,8 +12,8 @@ from giskard.checks import (
     Check,
     CheckResult,
     Interaction,
-    Scenario,
     Trace,
+    scenario,
 )
 
 # Mock Components for Testing
@@ -100,12 +100,8 @@ class TestScenarioNormalCases:
     async def test_scenario_with_single_passing_check(self):
         """Test scenario with a single check that passes."""
         check = MockCheck(result=CheckResult.success(message="Check passed"))
-        scenario = Scenario(
-            name="single_check",
-            sequence=[check],
-        )
 
-        result = await scenario.run()
+        result = await scenario("single_check").check(check).run()
 
         assert result.scenario_name == "single_check"
         assert len(result.steps) == 1
@@ -127,12 +123,7 @@ class TestScenarioNormalCases:
             )
             for i in range(3)
         ]
-        scenario = Scenario(
-            name="multiple_checks",
-            sequence=checks,
-        )
-
-        result = await scenario.run()
+        result = await scenario("multiple_checks").checks(*checks).run()
 
         assert result.scenario_name == "multiple_checks"
         assert len(result.steps) == 1  # All consecutive checks grouped into one step
@@ -151,12 +142,9 @@ class TestScenarioNormalCases:
             Interaction(inputs="input2", outputs="output2", metadata={"step": 2}),
         ]
         interaction_spec = MockInteractionSpec(interactions=interactions)
-        scenario = Scenario(
-            name="interactions_only",
-            sequence=[interaction_spec],
+        result = await (
+            scenario("interactions_only").add_interaction_spec(interaction_spec).run()
         )
-
-        result = await scenario.run()
 
         assert result.scenario_name == "interactions_only"
         assert len(result.steps) == 1
@@ -176,12 +164,12 @@ class TestScenarioNormalCases:
         interaction2 = Interaction(
             inputs="input2", outputs="output2", metadata={"step": 2}
         )
-        scenario = Scenario(
-            name="direct_interactions_only",
-            sequence=[interaction1, interaction2],
+        result = await (
+            scenario("direct_interactions_only")
+            .add_interaction(interaction1)
+            .add_interaction(interaction2)
+            .run()
         )
-
-        result = await scenario.run()
 
         assert result.scenario_name == "direct_interactions_only"
         assert len(result.steps) == 1
@@ -204,12 +192,14 @@ class TestScenarioNormalCases:
         check1 = MockCheck(result=CheckResult.success(message="Check 1"))
         check2 = MockCheck(result=CheckResult.success(message="Check 2"))
 
-        scenario = Scenario(
-            name="mixed_scenario",
-            sequence=[interaction_spec1, check1, interaction_spec2, check2],
+        result = await (
+            scenario("mixed_scenario")
+            .add_interaction_spec(interaction_spec1)
+            .check(check1)
+            .add_interaction_spec(interaction_spec2)
+            .check(check2)
+            .run()
         )
-
-        result = await scenario.run()
 
         assert result.scenario_name == "mixed_scenario"
         assert len(result.steps) == 2
@@ -231,12 +221,14 @@ class TestScenarioNormalCases:
         check1 = MockCheck(result=CheckResult.success(message="Check 1"))
         check2 = MockCheck(result=CheckResult.success(message="Check 2"))
 
-        scenario = Scenario(
-            name="direct_interactions_and_checks",
-            sequence=[interaction1, check1, interaction2, check2],
+        result = await (
+            scenario("direct_interactions_and_checks")
+            .add_interaction(interaction1)
+            .check(check1)
+            .add_interaction(interaction2)
+            .check(check2)
+            .run()
         )
-
-        result = await scenario.run()
 
         assert result.scenario_name == "direct_interactions_and_checks"
         assert len(result.steps) == 2
@@ -263,12 +255,14 @@ class TestScenarioNormalCases:
         check1 = MockCheck(result=CheckResult.success(message="Check 1"))
         check2 = MockCheck(result=CheckResult.success(message="Check 2"))
 
-        scenario = Scenario(
-            name="mixed_interaction_types",
-            sequence=[direct_interaction, check1, interaction_spec, check2],
+        result = await (
+            scenario("mixed_interaction_types")
+            .add_interaction(direct_interaction)
+            .check(check1)
+            .add_interaction_spec(interaction_spec)
+            .check(check2)
+            .run()
         )
-
-        result = await scenario.run()
 
         assert result.scenario_name == "mixed_interaction_types"
         assert len(result.steps) == 2
@@ -295,12 +289,9 @@ class TestScenarioNormalCases:
         check2 = MockCheck(result=CheckResult.failure(message="Check 2 failed"))
         check3 = MockCheck(result=CheckResult.success(message="Check 3 passed"))
 
-        scenario = Scenario(
-            name="all_checks_run",
-            sequence=[check1, check2, check3],
+        result = await (
+            scenario("all_checks_run").check(check1).check(check2).check(check3).run()
         )
-
-        result = await scenario.run()
 
         assert result.scenario_name == "all_checks_run"
         assert len(result.steps) == 1  # All checks in same step
@@ -319,12 +310,13 @@ class TestScenarioNormalCases:
         check2 = MockCheck(result=CheckResult.error(message="Check 2 errored"))
         check3 = MockCheck(result=CheckResult.success(message="Check 3 passed"))
 
-        scenario = Scenario(
-            name="all_checks_run_despite_error",
-            sequence=[check1, check2, check3],
+        result = await (
+            scenario("all_checks_run_despite_error")
+            .check(check1)
+            .check(check2)
+            .check(check3)
+            .run()
         )
-
-        result = await scenario.run()
 
         assert result.scenario_name == "all_checks_run_despite_error"
         assert len(result.steps) == 1  # All checks in same step
@@ -347,12 +339,14 @@ class TestScenarioNormalCases:
         check1 = MockCheck(result=CheckResult.failure(message="Check 1 failed"))
         check2 = MockCheck(result=CheckResult.success(message="Check 2 passed"))
 
-        scenario = Scenario(
-            name="skips_steps_on_failure",
-            sequence=[interaction_spec1, check1, interaction_spec2, check2],
+        result = await (
+            scenario("skips_steps_on_failure")
+            .add_interaction_spec(interaction_spec1)
+            .check(check1)
+            .add_interaction_spec(interaction_spec2)
+            .check(check2)
+            .run()
         )
-
-        result = await scenario.run()
 
         assert result.scenario_name == "skips_steps_on_failure"
         assert len(result.steps) == 2
@@ -381,12 +375,14 @@ class TestScenarioNormalCases:
         check1 = MockCheck(result=CheckResult.error(message="Check 1 errored"))
         check2 = MockCheck(result=CheckResult.success(message="Check 2 passed"))
 
-        scenario = Scenario(
-            name="skips_steps_on_error",
-            sequence=[interaction_spec1, check1, interaction_spec2, check2],
+        result = await (
+            scenario("skips_steps_on_error")
+            .add_interaction_spec(interaction_spec1)
+            .check(check1)
+            .add_interaction_spec(interaction_spec2)
+            .check(check2)
+            .run()
         )
-
-        result = await scenario.run()
 
         assert result.scenario_name == "skips_steps_on_error"
         assert len(result.steps) == 2
@@ -417,18 +413,15 @@ class TestScenarioNormalCases:
         check2 = MockCheck(result=CheckResult.success())
         interaction_spec3 = MockInteractionSpec(interactions=[interaction3])
 
-        scenario = Scenario(
-            name="trace_accumulation",
-            sequence=[
-                interaction_spec1,
-                check1,
-                interaction_spec2,
-                check2,
-                interaction_spec3,
-            ],
+        result = await (
+            scenario("trace_accumulation")
+            .add_interaction_spec(interaction_spec1)
+            .check(check1)
+            .add_interaction_spec(interaction_spec2)
+            .check(check2)
+            .add_interaction_spec(interaction_spec3)
+            .run()
         )
-
-        result = await scenario.run()
 
         assert len(result.final_trace.interactions) == 3
         assert result.final_trace.interactions[0] == interaction1
@@ -450,12 +443,13 @@ class TestScenarioNormalCases:
         interaction_spec2 = MockInteractionSpec(interactions=[interaction2])
         check = MockCheck(result=CheckResult.success())
 
-        scenario = Scenario(
-            name="check_receives_trace",
-            sequence=[interaction_spec1, interaction_spec2, check],
+        result = await (
+            scenario("check_receives_trace")
+            .add_interaction_spec(interaction_spec1)
+            .add_interaction_spec(interaction_spec2)
+            .check(check)
+            .run()
         )
-
-        result = await scenario.run()
 
         assert result.passed
         # Verify check received trace with both interactions
@@ -470,12 +464,9 @@ class TestScenarioNormalCases:
         check2 = MockCheck(result=CheckResult.success(message="Check 2 passed"))
         check3 = MockCheck(result=CheckResult.skip(message="Check 3 skipped"))
 
-        scenario = Scenario(
-            name="skipped_checks",
-            sequence=[check1, check2, check3],
+        result = await (
+            scenario("skipped_checks").check(check1).check(check2).check(check3).run()
         )
-
-        result = await scenario.run()
 
         assert len(result.steps) == 1  # All consecutive checks grouped into one step
         assert len(result.steps[0].results) == 3
@@ -494,12 +485,7 @@ class TestScenarioNormalCases:
             MockCheck(result=CheckResult.skip(message=f"Check {i} skipped"))
             for i in range(3)
         ]
-        scenario = Scenario(
-            name="all_skipped",
-            sequence=checks,
-        )
-
-        result = await scenario.run()
+        result = await scenario("all_skipped").checks(*checks).run()
 
         assert len(result.steps) == 1  # All consecutive checks grouped into one step
         assert len(result.steps[0].results) == 3
@@ -514,12 +500,7 @@ class TestScenarioEdgeCases:
 
     async def test_scenario_with_empty_sequence(self):
         """Test scenario with empty sequence."""
-        scenario = Scenario(
-            name="empty_sequence",
-            sequence=[],
-        )
-
-        result = await scenario.run()
+        result = await scenario("empty_sequence").run()
 
         assert result.scenario_name == "empty_sequence"
         assert len(result.steps) == 0
@@ -534,12 +515,7 @@ class TestScenarioEdgeCases:
     async def test_scenario_with_single_component(self):
         """Test scenario with single component."""
         check = MockCheck(result=CheckResult.success(message="Single check"))
-        scenario = Scenario(
-            name="single_component",
-            sequence=[check],
-        )
-
-        result = await scenario.run()
+        result = await scenario("single_component").check(check).run()
 
         assert len(result.steps) == 1
         assert result.steps[0].passed
@@ -552,12 +528,9 @@ class TestScenarioEdgeCases:
             for i in range(5)
         ]
         interaction_spec = MockInteractionSpec(interactions=interactions)
-        scenario = Scenario(
-            name="only_interactions",
-            sequence=[interaction_spec],
+        result = await (
+            scenario("only_interactions").add_interaction_spec(interaction_spec).run()
         )
-
-        result = await scenario.run()
 
         assert (
             len(result.steps) == 1
@@ -572,12 +545,9 @@ class TestScenarioEdgeCases:
             Interaction(inputs=str(i), outputs=str(i * 2), metadata={"index": i})
             for i in range(5)
         ]
-        scenario = Scenario(
-            name="only_direct_interactions",
-            sequence=interactions,
+        result = await (
+            scenario("only_direct_interactions").add_interactions(*interactions).run()
         )
-
-        result = await scenario.run()
 
         assert (
             len(result.steps) == 1
@@ -593,12 +563,7 @@ class TestScenarioEdgeCases:
             MockCheck(result=CheckResult.success(message=f"Check {i}"))
             for i in range(5)
         ]
-        scenario = Scenario(
-            name="only_checks",
-            sequence=checks,
-        )
-
-        result = await scenario.run()
+        result = await scenario("only_checks").checks(*checks).run()
 
         assert len(result.steps) == 1  # All consecutive checks grouped into one step
         assert len(result.steps[0].results) == 5
@@ -613,12 +578,11 @@ class TestScenarioEdgeCases:
             )
             for i in range(3)
         ]
-        scenario = Scenario(
-            name="consecutive_interactions",
-            sequence=interaction_specs,
+        result = await (
+            scenario("consecutive_interactions")
+            .add_interaction_specs(*interaction_specs)
+            .run()
         )
-
-        result = await scenario.run()
 
         assert (
             len(result.steps) == 1
@@ -634,12 +598,11 @@ class TestScenarioEdgeCases:
         interactions = [
             Interaction(inputs=str(i), outputs=str(i * 2)) for i in range(3)
         ]
-        scenario = Scenario(
-            name="consecutive_direct_interactions",
-            sequence=interactions,
+        result = await (
+            scenario("consecutive_direct_interactions")
+            .add_interactions(*interactions)
+            .run()
         )
-
-        result = await scenario.run()
 
         assert (
             len(result.steps) == 1
@@ -657,12 +620,7 @@ class TestScenarioEdgeCases:
             MockCheck(result=CheckResult.success(message=f"Check {i}"))
             for i in range(3)
         ]
-        scenario = Scenario(
-            name="consecutive_checks",
-            sequence=checks,
-        )
-
-        result = await scenario.run()
+        result = await scenario("consecutive_checks").checks(*checks).run()
 
         assert len(result.steps) == 1  # All consecutive checks grouped into one step
         assert len(result.steps[0].results) == 3
@@ -671,28 +629,20 @@ class TestScenarioEdgeCases:
 
     async def test_scenario_with_large_sequence(self):
         """Test scenario with a larger sequence of components."""
-        components: list[
-            BaseInteractionSpec[str, str, Trace[str, str]]
-            | Check[str, str, Trace[str, str]]
-        ] = []
+        builder = scenario("large_sequence")
         for i in range(10):
             if i % 2 == 0:
-                components.append(
+                builder.add_interaction_spec(
                     MockInteractionSpec(
                         interactions=[Interaction(inputs=str(i), outputs=str(i * 2))]
                     )
                 )
             else:
-                components.append(
+                builder.check(
                     MockCheck(result=CheckResult.success(message=f"Check {i}"))
                 )
 
-        scenario = Scenario(
-            name="large_sequence",
-            sequence=components,
-        )
-
-        result = await scenario.run()
+        result = await builder.run()
 
         # Pattern: interaction, check, interaction, check, ...
         # This creates separate steps when interactions come before checks
@@ -715,16 +665,18 @@ class TestScenarioErrorHandling:
         failing_component = FailingComponent(error_message="Component failed")
         check2 = MockCheck(result=CheckResult.success(message="Check 2 passed"))
 
-        scenario = Scenario(
-            name="component_exception",
-            sequence=[check1, failing_component, check2],
+        builder = (
+            scenario("component_exception")
+            .check(check1)
+            .check(failing_component)
+            .check(check2)
         )
 
         with pytest.raises(ValueError, match="Component failed"):
-            _ = await scenario.run()
+            _ = await builder.run()
 
         # Test with return_exception=True to return the exception
-        result = await scenario.run(return_exception=True)
+        result = await builder.run(return_exception=True)
 
         assert len(result.steps) == 1  # All consecutive checks grouped into one step
         assert len(result.steps[0].results) == 3  # All checks run even if one errors
@@ -744,16 +696,13 @@ class TestScenarioErrorHandling:
             name="custom_component", error_message="Named component failed"
         )
 
-        scenario = Scenario(
-            name="named_component_exception",
-            sequence=[failing_component],
-        )
+        builder = scenario("named_component_exception").check(failing_component)
 
         with pytest.raises(ValueError, match="Named component failed"):
-            _ = await scenario.run()
+            _ = await builder.run()
 
         # Test with return_exception=True to return the exception
-        result = await scenario.run(return_exception=True)
+        result = await builder.run(return_exception=True)
 
         assert len(result.steps) == 1
         assert result.steps[0].errored
@@ -774,16 +723,19 @@ class TestScenarioErrorHandling:
         check2 = MockCheck(result=CheckResult.success(message="Check 2"))
         check3 = MockCheck(result=CheckResult.success(message="Check 3"))
 
-        scenario = Scenario(
-            name="all_checks_run_despite_exception",
-            sequence=[check1, failing_component, check2, check3],
+        builder = (
+            scenario("all_checks_run_despite_exception")
+            .check(check1)
+            .check(failing_component)
+            .check(check2)
+            .check(check3)
         )
 
         with pytest.raises(ValueError, match="Error occurred"):
-            _ = await scenario.run()
+            _ = await builder.run()
 
         # Test with return_exception=True to return the exception
-        result = await scenario.run(return_exception=True)
+        result = await builder.run(return_exception=True)
 
         assert len(result.steps) == 1  # All consecutive checks grouped into one step
         assert len(result.steps[0].results) == 4  # All checks run even if one errors
@@ -800,15 +752,16 @@ class TestScenarioErrorHandling:
         generator_error_component = GeneratorErrorComponent()
         check2 = MockCheck(result=CheckResult.success(message="Check 2"))
 
-        scenario = Scenario(
-            name="generator_exception",
-            sequence=[check1, generator_error_component, check2],
-        )
-
         # InteractionSpec generator errors currently propagate and stop execution
         # The first interaction should be added before the error is raised
         with pytest.raises(RuntimeError, match="Generator error"):
-            _ = await scenario.run()
+            _ = await (
+                scenario("generator_exception")
+                .check(check1)
+                .add_interaction_spec(generator_error_component)
+                .check(check2)
+                .run()
+            )
 
     async def test_all_executed_results_collected(self):
         """Test that all checks in a step are executed and results collected."""
@@ -819,16 +772,20 @@ class TestScenarioErrorHandling:
         failing_component = FailingComponent(error_message="Error")
         check4 = MockCheck(result=CheckResult.success(message="Check 4"))
 
-        scenario = Scenario(
-            name="collects_all_results",
-            sequence=[*checks, failing_component, check4],
+        builder = (
+            scenario("collects_all_results")
+            .check(checks[0])
+            .check(checks[1])
+            .check(checks[2])
+            .check(failing_component)
+            .check(check4)
         )
 
         with pytest.raises(ValueError, match="Error"):
-            _ = await scenario.run()
+            _ = await builder.run()
 
         # Test with return_exception=True to return the exception
-        result = await scenario.run(return_exception=True)
+        result = await builder.run(return_exception=True)
 
         # All consecutive checks grouped into one step
         assert len(result.steps) == 1
@@ -842,16 +799,13 @@ class TestScenarioErrorHandling:
         """Test that error results contain traceback information."""
         failing_component = FailingComponent(error_message="Test error")
 
-        scenario = Scenario(
-            name="error_traceback",
-            sequence=[failing_component],
-        )
+        builder = scenario("error_traceback").check(failing_component)
 
         with pytest.raises(ValueError, match="Test error"):
-            _ = await scenario.run()
+            _ = await builder.run()
 
         # Test with return_exception=True to return the exception
-        result = await scenario.run(return_exception=True)
+        result = await builder.run(return_exception=True)
 
         assert len(result.steps) == 1
         assert result.steps[0].results[0].errored
@@ -867,16 +821,18 @@ class TestScenarioErrorHandling:
         interaction_spec2 = MockInteractionSpec(interactions=[interaction2])
         failing_component = FailingComponent(error_message="Error after interactions")
 
-        scenario = Scenario(
-            name="error_preserves_trace",
-            sequence=[interaction_spec1, interaction_spec2, failing_component],
+        builder = (
+            scenario("error_preserves_trace")
+            .add_interaction_spec(interaction_spec1)
+            .add_interaction_spec(interaction_spec2)
+            .check(failing_component)
         )
 
         with pytest.raises(ValueError, match="Error after interactions"):
-            _ = await scenario.run()
+            _ = await builder.run()
 
         # Test with return_exception=True to return the exception
-        result = await scenario.run(return_exception=True)
+        result = await builder.run(return_exception=True)
 
         # Trace should contain both interactions even though error occurred
         # All components (interactions + check) are grouped into one step
@@ -894,16 +850,18 @@ class TestScenarioErrorHandling:
             error_message="Error after direct interactions"
         )
 
-        scenario = Scenario(
-            name="error_preserves_trace_direct",
-            sequence=[interaction1, interaction2, failing_component],
+        builder = (
+            scenario("error_preserves_trace_direct")
+            .add_interaction(interaction1)
+            .add_interaction(interaction2)
+            .check(failing_component)
         )
 
         with pytest.raises(ValueError, match="Error after direct interactions"):
-            _ = await scenario.run()
+            _ = await builder.run()
 
         # Test with return_exception=True to return the exception
-        result = await scenario.run(return_exception=True)
+        result = await builder.run(return_exception=True)
 
         # Trace should contain both interactions even though error occurred
         # All components (interactions + check) are grouped into one step
@@ -916,14 +874,264 @@ class TestScenarioErrorHandling:
     async def test_duration_calculated_correctly(self):
         """Test that scenario duration is calculated and non-negative."""
         check = MockCheck(result=CheckResult.success(message="Test check"))
-        scenario = Scenario(
-            name="duration_test",
-            sequence=[check],
-        )
-
-        result = await scenario.run()
+        result = await scenario("duration_test").check(check).run()
 
         # Duration should be non-negative
         assert result.duration_ms >= 0
         # Duration should be reasonable (less than 1 second for a simple check)
         assert result.duration_ms < 1000
+
+    async def test_append_with_interaction(self):
+        """Test that append() method works with Interaction objects."""
+        interaction = Interaction(inputs="Hello", outputs="Hi", metadata={"test": True})
+        check = MockCheck(result=CheckResult.success())
+
+        result = await (
+            scenario("add_interaction_test").append(interaction).append(check).run()
+        )
+
+        assert result.passed
+        assert len(result.final_trace.interactions) == 1
+        assert result.final_trace.interactions[0] == interaction
+        assert result.final_trace.interactions[0].metadata == {"test": True}
+
+    async def test_append_with_interaction_spec(self):
+        """Test that append() method works with BaseInteractionSpec objects."""
+        interaction = Interaction(inputs="Hello", outputs="Hi")
+        interaction_spec = MockInteractionSpec(interactions=[interaction])
+        check = MockCheck(result=CheckResult.success())
+
+        result = await (
+            scenario("add_interaction_spec_test")
+            .append(interaction_spec)
+            .append(check)
+            .run()
+        )
+
+        assert result.passed
+        assert len(result.final_trace.interactions) == 1
+        assert result.final_trace.interactions[0] == interaction
+
+    async def test_append_with_check(self):
+        """Test that append() method works with Check objects."""
+        check1 = MockCheck(result=CheckResult.success(message="Check 1"))
+        check2 = MockCheck(result=CheckResult.success(message="Check 2"))
+
+        result = await scenario("add_check_test").append(check1).append(check2).run()
+
+        assert result.passed
+        assert len(result.steps) == 1
+        assert len(result.steps[0].results) == 2
+
+    async def test_extend_with_mixed_components(self):
+        """Test that extend() method works with mixed component types."""
+        interaction1 = Interaction(inputs="Hello", outputs="Hi")
+        interaction2 = Interaction(inputs="How are you?", outputs="Good")
+        interaction_spec = MockInteractionSpec(interactions=[interaction2])
+        check1 = MockCheck(result=CheckResult.success(message="Check 1"))
+        check2 = MockCheck(result=CheckResult.success(message="Check 2"))
+
+        result = await (
+            scenario("adds_mixed_test")
+            .extend(interaction1, interaction_spec, check1, check2)
+            .run()
+        )
+
+        assert result.passed
+        assert len(result.final_trace.interactions) == 2
+        assert result.final_trace.interactions[0] == interaction1
+        assert result.final_trace.interactions[1] == interaction2
+        assert (
+            len(result.steps) == 1
+        )  # All consecutive interactions grouped, then checks
+        assert len(result.steps[0].results) == 2  # Both checks run
+
+    async def test_extend_with_multiple_checks(self):
+        """Test that extend() method works with multiple checks."""
+        checks = [
+            MockCheck(result=CheckResult.success(message=f"Check {i}"))
+            for i in range(3)
+        ]
+
+        result = await scenario("adds_multiple_checks_test").extend(*checks).run()
+
+        assert result.passed
+        assert len(result.steps) == 1
+        assert len(result.steps[0].results) == 3
+
+    async def test_extend_with_multiple_interactions(self):
+        """Test that extend() method works with multiple Interaction objects."""
+        interactions = [
+            Interaction(inputs=str(i), outputs=str(i * 2)) for i in range(3)
+        ]
+
+        result = await (
+            scenario("adds_multiple_interactions_test").extend(*interactions).run()
+        )
+
+        assert result.passed
+        assert len(result.final_trace.interactions) == 3
+        assert result.final_trace.interactions == interactions
+
+    async def test_extend_with_empty_args(self):
+        """Test that extend() method works with no arguments."""
+        check = MockCheck(result=CheckResult.success())
+
+        result = await (
+            scenario("adds_empty_test")
+            .extend()  # No arguments
+            .append(check)
+            .run()
+        )
+
+        assert result.passed
+        assert len(result.steps) == 1
+        assert len(result.steps[0].results) == 1
+
+    async def test_append_and_extend_chaining(self):
+        """Test that append() and extend() can be chained together."""
+        interaction1 = Interaction(inputs="Hello", outputs="Hi")
+        interaction2 = Interaction(inputs="How are you?", outputs="Good")
+        check1 = MockCheck(result=CheckResult.success(message="Check 1"))
+        check2 = MockCheck(result=CheckResult.success(message="Check 2"))
+        check3 = MockCheck(result=CheckResult.success(message="Check 3"))
+
+        result = await (
+            scenario("add_adds_chain_test")
+            .append(interaction1)
+            .extend(check1, check2)
+            .append(interaction2)
+            .extend(check3)
+            .run()
+        )
+
+        assert result.passed
+        assert len(result.final_trace.interactions) == 2
+        assert len(result.steps) == 2  # interaction1+checks, then interaction2+check
+        assert len(result.steps[0].results) == 2
+        assert len(result.steps[1].results) == 1
+
+    async def test_interact_with_static_values(self):
+        """Test that interact() method works with static input/output values."""
+        check = MockCheck(result=CheckResult.success())
+
+        result = await (
+            scenario("interact_static_test").interact("Hello", "Hi").append(check).run()
+        )
+
+        assert result.passed
+        assert len(result.final_trace.interactions) == 1
+        assert result.final_trace.interactions[0].inputs == "Hello"
+        assert result.final_trace.interactions[0].outputs == "Hi"
+
+    async def test_interact_with_metadata(self):
+        """Test that interact() method accepts optional metadata."""
+        check = MockCheck(result=CheckResult.success())
+
+        result = await (
+            scenario("interact_metadata_test")
+            .interact("Hello", "Hi", metadata={"source": "test", "index": 1})
+            .append(check)
+            .run()
+        )
+
+        assert result.passed
+        assert len(result.final_trace.interactions) == 1
+        assert result.final_trace.interactions[0].inputs == "Hello"
+        assert result.final_trace.interactions[0].outputs == "Hi"
+        assert result.final_trace.interactions[0].metadata == {
+            "source": "test",
+            "index": 1,
+        }
+
+    async def test_interact_multiple_times(self):
+        """Test that interact() can be called multiple times."""
+        check = MockCheck(result=CheckResult.success())
+
+        result = await (
+            scenario("interact_multiple_test")
+            .interact("Hello", "Hi")
+            .interact("How are you?", "Good")
+            .interact("What's up?", "Nothing much")
+            .append(check)
+            .run()
+        )
+
+        assert result.passed
+        assert len(result.final_trace.interactions) == 3
+        assert result.final_trace.interactions[0].inputs == "Hello"
+        assert result.final_trace.interactions[0].outputs == "Hi"
+        assert result.final_trace.interactions[1].inputs == "How are you?"
+        assert result.final_trace.interactions[1].outputs == "Good"
+        assert result.final_trace.interactions[2].inputs == "What's up?"
+        assert result.final_trace.interactions[2].outputs == "Nothing much"
+
+    async def test_interact_without_metadata(self):
+        """Test that interact() works without metadata (defaults to empty dict)."""
+        check = MockCheck(result=CheckResult.success())
+
+        result = await (
+            scenario("interact_no_metadata_test")
+            .interact("Hello", "Hi")
+            .append(check)
+            .run()
+        )
+
+        assert result.passed
+        assert len(result.final_trace.interactions) == 1
+        assert result.final_trace.interactions[0].metadata == {}
+
+    async def test_interact_chained_with_checks(self):
+        """Test that interact() can be chained with checks."""
+        check1 = MockCheck(result=CheckResult.success(message="Check 1"))
+        check2 = MockCheck(result=CheckResult.success(message="Check 2"))
+
+        result = await (
+            scenario("interact_checks_chain_test")
+            .interact("Hello", "Hi")
+            .append(check1)
+            .interact("How are you?", "Good")
+            .append(check2)
+            .run()
+        )
+
+        assert result.passed
+        assert len(result.final_trace.interactions) == 2
+        assert len(result.steps) == 2  # interact+check, then interact+check
+        assert len(result.steps[0].results) == 1
+        assert len(result.steps[1].results) == 1
+
+    async def test_interact_with_callable_outputs(self):
+        """Test that interact() works with callable outputs."""
+        check = MockCheck(result=CheckResult.success())
+
+        result = await (
+            scenario("interact_callable_outputs_test")
+            .interact("Hello", lambda inputs: f"Echo: {inputs.upper()}")
+            .append(check)
+            .run()
+        )
+
+        assert result.passed
+        assert len(result.final_trace.interactions) == 1
+        assert result.final_trace.interactions[0].inputs == "Hello"
+        assert result.final_trace.interactions[0].outputs == "Echo: HELLO"
+
+    async def test_interact_with_trace_dependent_inputs(self):
+        """Test that interact() works with trace-dependent inputs."""
+        check = MockCheck(result=CheckResult.success())
+
+        result = await (
+            scenario("interact_trace_dependent_test")
+            .interact(
+                lambda trace: f"Message #{len(trace.interactions) + 1}",
+                lambda inputs, trace: f"Received: {inputs}",
+            )
+            .append(check)
+            .run()
+        )
+
+        assert result.passed
+        assert len(result.final_trace.interactions) == 1
+        assert result.final_trace.interactions[0].inputs == "Message #1"
+        assert result.final_trace.interactions[0].outputs == "Received: Message #1"

@@ -11,9 +11,9 @@ from giskard.checks import (
     Interaction,
     InteractionSpec,
     LLMJudge,
-    Scenario,
     Trace,
     WithSpy,
+    scenario,
 )
 from pydantic import BaseModel, Field, computed_field
 
@@ -118,10 +118,9 @@ async def test_single_message(
         Awaitable[agents.Message],
     ],
 ):
-    scenario = Scenario(
-        name="test_single_message",
-        trace_type=ConversationTraces,
-        sequence=[
+    result = await (
+        scenario("test_single_message", trace_type=ConversationTraces)
+        .add_interaction_spec(
             WithSpy(
                 interaction_generator=InteractionSpec(
                     inputs=agents.Message(
@@ -131,25 +130,33 @@ async def test_single_message(
                     outputs=adapter,
                 ),
                 target="tests.integration.test_stateless.mock_apply_tool",
-            ),
+            )
+        )
+        .check(
             LLMJudge(
                 prompt="The application has been saved and its uuid is stated: {{ trace.messages[-1] }}."
-            ),
+            )
+        )
+        .check(
             Equality(
                 expected=1,
                 key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_count']",
-            ),
+            )
+        )
+        .check(
             Equality(
                 expected="test@test.com",
                 key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[0]",
-            ),
+            )
+        )
+        .check(
             Equality(
                 expected="Hello, I want to apply for a job.",
                 key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[1]",
-            ),
-        ],
+            )
+        )
+        .run()
     )
-    result = await scenario.run()
     assert result.failed  # No tool call is made somehow
 
 
@@ -206,10 +213,9 @@ async def test_user_simulator(
             trace = yield agents.Message(role="user", content=output.message)
             current_step += 1
 
-    scenario = Scenario(
-        name="test_single_message",
-        trace_type=ConversationTraces,
-        sequence=[
+    result = await (
+        scenario("test_single_message", trace_type=ConversationTraces)
+        .add_interaction_spec(
             InteractionSpec(
                 inputs=partial(
                     user_simulator,
@@ -217,10 +223,14 @@ async def test_user_simulator(
                     3,
                 ),
                 outputs=adapter,
-            ),
+            )
+        )
+        .check(
             LLMJudge(
                 prompt="The application has been saved and its uuid is stated: {{ trace.messages[-1] }}."
-            ),
+            )
+        )
+        .add_interaction_spec(
             InteractionSpec(
                 inputs=partial(
                     user_simulator,
@@ -228,15 +238,17 @@ async def test_user_simulator(
                     3,
                 ),
                 outputs=adapter,
-            ),
+            )
+        )
+        .check(
             LLMJudge(
                 prompt="""The assistant refused to schedule a meeting with the CTO politely:
 
                 <transcript>
                 { transcript }
                 </transcript>""",
-            ),
-        ],
+            )
+        )
+        .run()
     )
-    result = await scenario.run()
     assert result.passed

@@ -13,6 +13,7 @@ from giskard.checks import (
     Scenario,
     Trace,
     WithSpy,
+    scenario,
 )
 from pydantic import BaseModel, Field, computed_field
 
@@ -182,10 +183,9 @@ async def test_user_simulator(
             trace = yield agents.Message(role="user", content=output.message)
             current_step += 1
 
-    scenario = Scenario(
-        name="test_single_message",
-        trace_type=MessageTraces,
-        sequence=[
+    result = await (
+        scenario("test_single_message", trace_type=MessageTraces)
+        .add_interaction_spec(
             InteractionSpec(
                 inputs=partial(
                     user_simulator,
@@ -193,10 +193,14 @@ async def test_user_simulator(
                     3,
                 ),
                 outputs=adapter,
-            ),
+            )
+        )
+        .check(
             LLMJudge(
                 prompt="The application has been saved and its uuid is stated: {{ trace.messages[-1] }}."
-            ),
+            )
+        )
+        .add_interaction_spec(
             InteractionSpec(
                 inputs=partial(
                     user_simulator,
@@ -204,15 +208,17 @@ async def test_user_simulator(
                     3,
                 ),
                 outputs=adapter,
-            ),
+            )
+        )
+        .check(
             LLMJudge(
                 prompt="""The assistant refused to schedule a meeting with the CTO politely:
 
                 <transcript>
                 {{ transcript }}
                 </transcript>""",
-            ),
-        ],
+            )
+        )
+        .run()
     )
-    result = await scenario.run()
     assert result.passed

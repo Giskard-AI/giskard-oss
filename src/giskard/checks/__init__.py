@@ -33,6 +33,7 @@ from .core.extraction import Extractor, JsonPathExtractor
 from .core.interaction import BaseInteractionSpec
 from .generators.user import UserSimulator
 from .interaction import InteractionSpec
+from .scenarios.builder import ScenarioBuilder, scenario
 from .scenarios.runner import ScenarioRunner
 from .settings import get_default_generator, set_default_generator
 from .testing import WithSpy
@@ -77,6 +78,8 @@ __all__ = [
     "WithSpy",
     "TestCaseRunner",
     # Scenarios
+    "ScenarioBuilder",
+    "scenario",
     "ScenarioRunner",
     # Settings
     "set_default_generator",
