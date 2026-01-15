@@ -27,6 +27,15 @@
                 "python"
             ],
             "enabled": false
+        },
+        {
+            "description": "Group giskard-core dependencies",
+            "matchPaths": [
+                "libs/giskard-core/**"
+            ],
+            "groupName": "giskard-core dependencies",
+            "groupSlug": "giskard-core-deps"
         }
     ]
 }
+
