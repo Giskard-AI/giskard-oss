@@ -1,0 +1,94 @@
+---
+description: All devs and agent must read this before creating a PR
+alwaysApply: false
+---
+# Development Workflow
+
+This project uses a Makefile for common development tasks. Always prefer using Makefile commands over direct tool invocations.
+
+## Quick Start
+
+```bash
+make setup    # Complete development setup (install deps + tools)
+make all      # Format, check, and test
+```
+
+## Common Commands
+
+- `make help` - Show all available commands with descriptions
+- `make setup` - Complete development setup (install deps + tools)
+- `make install` - Install project dependencies
+- `make install-tools` - Install development tools (ruff, vermin, pre-commit)
+- `make test` - Run all tests
+- `make lint` - Run linting checks
+- `make format` - Format code with ruff
+- `make check-format` - Check if code is formatted correctly
+- `make check-compat` - Check Python 3.12 compatibility
+- `make check` - Run all checks (lint, format, compatibility)
+- `make all` - Format, check, and test
+- `make ci` - Run the same checks as CI
+- `make clean` - Clean up build artifacts and caches
+
+## Pre-commit
+
+- `make pre-commit-install` - Setup pre-commit hooks
+- `make pre-commit-run` - Run pre-commit on all files
+
+## Guidelines
+
+1. Always use `make` commands instead of direct `uv` or tool invocations
+2. Run `make ci` before pushing to ensure CI will pass
+3. Use `make all` for a complete development cycle (format, check, test)
+4. Use `make setup` for initial project setup
+5. Use `make clean` to clean up build artifacts when needed
+
+## See Also
+
+- [Makefile](../Makefile) - Full command definitions and help
+- [README.md](../README.md) - Project overview and quickstart
+- [CODEMAP.md](../CODEMAP.md) - Detailed architecture and API documentation
+# Development Workflow
+
+This project uses a Makefile for common development tasks. Always prefer using Makefile commands over direct tool invocations.
+
+## Quick Start
+
+```bash
+make setup    # Complete development setup (install deps + tools)
+make all      # Format, check, and test
+```
+
+## Common Commands
+
+- `make help` - Show all available commands with descriptions
+- `make setup` - Complete development setup (install deps + tools)
+- `make install` - Install project dependencies
+- `make install-tools` - Install development tools (ruff, vermin, pre-commit)
+- `make test` - Run all tests
+- `make lint` - Run linting checks
+- `make format` - Format code with ruff
+- `make check-format` - Check if code is formatted correctly
+- `make check-compat` - Check Python 3.12 compatibility
+- `make check` - Run all checks (lint, format, compatibility)
+- `make all` - Format, check, and test
+- `make ci` - Run the same checks as CI
+- `make clean` - Clean up build artifacts and caches
+
+## Pre-commit
+
+- `make pre-commit-install` - Setup pre-commit hooks
+- `make pre-commit-run` - Run pre-commit on all files
+
+## Guidelines
+
+1. Always use `make` commands instead of direct `uv` or tool invocations
+2. Run `make ci` before pushing to ensure CI will pass
+3. Use `make all` for a complete development cycle (format, check, test)
+4. Use `make setup` for initial project setup
+5. Use `make clean` to clean up build artifacts when needed
+
+## See Also
+
+- [Makefile](../Makefile) - Full command definitions and help
+- [README.md](../README.md) - Project overview and quickstart
+- [CODEMAP.md](../CODEMAP.md) - Detailed architecture and API documentation

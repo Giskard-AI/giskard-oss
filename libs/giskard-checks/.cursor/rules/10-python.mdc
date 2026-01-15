@@ -1,0 +1,72 @@
+---
+description: Python best practices tailored to this project (Pydantic v2, pytest-asyncio, Pyright, Ruff, Hatch, uv)
+globs: **/*.py
+alwaysApply: false
+---
+# Python Best Practices
+
+## Project Structure
+- Use src-layout with `src/giskard/checks/` as the package root.
+- Place tests in `tests/` parallel to `src/`; follow similar module structure.
+- Store configuration in `pyproject.toml` and use environment variables for runtime knobs.
+- Build with Hatch; distribute `src/giskard/checks`, `README.md`, and `pyproject.toml`.
+
+## Tooling and Commands
+- Python version: >= 3.12 (enforced via `pyproject.toml`).
+- Linting: Ruff with `select = ["E", "W", "I"]` and `ignore = ["E501"]`.
+- Type checking: Pyright with `typeCheckingMode = "recommended"`.
+- Testing: pytest with `asyncio_mode = "auto"` and `pythonpath = ["src"]`.
+- Async tests: include `pytest-asyncio` where needed.
+- **Use Makefile commands for all development tasks** (see `make help` for full list):
+  - `make setup` - Complete development setup (install deps + tools)
+  - `make test` - Run all tests
+  - `make lint` - Run linting checks
+  - `make format` - Format code with ruff
+  - `make check` - Run all checks (lint, format, compatibility)
+  - `make all` - Format, check, and test
+  - `make ci` - Run the same checks as CI
+
+## Imports and Naming
+- Prefer absolute imports within the `giskard.checks` package.
+- Follow PEP 8 naming conventions:
+  - snake_case for functions and variables
+  - PascalCase for classes
+  - UPPER_CASE for constants
+- Keep public API names stable and descriptive.
+
+## Typing and Generics
+- Add type hints to all public function parameters and returns.
+- Use `TypeVar` and generics to model interactions and checks precisely.
+- Avoid `Any`; prefer precise types (including `Optional[...]` where appropriate).
+
+## Pydantic v2 Models
+- Use `pydantic.BaseModel` for structured inputs/outputs and results that need serialization.
+- Prefer immutable result-like objects; avoid mutating models after creation.
+- Validate external inputs at boundaries; keep internal code operating on typed objects.
+
+## Async-Friendly Design
+- Checks may be sync or async; design APIs to support both.
+- Avoid blocking calls inside async code; use `await` for I/O or long-running operations.
+- Keep checks pure (no global state, no side effects) for determinism and testability.
+
+## Testing
+- Co-locate tests under `tests/` mirroring package structure.
+- Parametrize tests for multiple interactions/checks.
+- Test success, failure, error, and skip paths for checks and runners.
+- Include serialization round-trips for models where relevant.
+
+## Error Handling and Results
+- Prefer explicit `CheckResult` objects to signal outcomes instead of exceptions for control flow.
+- Raise exceptions only for truly exceptional states (e.g., invalid configuration), and let the runner capture errors.
+- Provide clear failure messages and optional severities for checks.
+
+## Documentation
+- Document all public APIs with concise docstrings (purpose, parameters, returns, errors).
+- Keep `README.md` examples accurate (async patterns, Makefile commands, imports).
+- Use comments to explain why non-obvious choices are made.
+- Reference Makefile commands in documentation instead of direct tool invocations.
+
+## Dependencies
+- Declare runtime dependencies and Python version in `pyproject.toml`.
+- Keep dev-only tools (pytest, pytest-asyncio) in the `dev` dependency group.
+- Use tagged VCS dependencies (e.g., `giskard-agents`) via `tool.uv.sources` as configured.

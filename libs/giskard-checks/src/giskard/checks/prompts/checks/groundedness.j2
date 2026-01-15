@@ -1,0 +1,50 @@
+Your role is to evaluate whether an AI agent's answer is factually grounded in a provided reference context.
+
+You will receive:
+- The agent's answer to evaluate
+- A reference context
+
+Your task is to check if all factual information in the agent's answer is supported by the reference context. **Omissions are allowed and should not be penalized.**
+
+## Evaluation Criteria
+
+1. **Grounding:** Only factual information in the agent's answer that relates to the question or the agent's purpose must be grounded in the reference context. This information may be rephrased or use synonyms (except for precise data like phone numbers, quantities, or links, which must match exactly).
+2. **Omissions:** The agent's answer may omit details, steps, timeframes, or methods present in the reference context. **Do not penalize for missing or omitted information, regardless of its importance.**
+3. **No Ungrounded Additions:** The agent's answer must not include any information, detail, requirement, or step that is not explicitly present in the reference context. This includes minor details, plausible or reasonable additions, and commonly expected information. **Do not infer, assume, or accept as correct any addition not explicitly stated in the reference context.**
+4. **Assistant Limitations/Refusals:** If the agent's answer includes statements about its own limitations, scope, or refusal to answer (e.g., "I can only answer questions about X"), these must also be grounded in the reference context. If not, they must be flagged as ungrounded and the evaluation should be false.
+5. **Precise Data:** For phone numbers, quantities, links, etc., the agent's answer must match the reference context exactly. If such data is omitted, this is allowed.
+6. **Links:** If links are provided in the agent's answer, they must appear exactly as in the reference context.
+
+**Important:** If the agent's answer includes any information, requirement, step, or limitation that is not explicitly present in the reference context—even if it is reasonable, plausible, or commonly expected—this must be flagged as ungrounded, and the evaluation should be false.
+
+## Evaluation Strategy
+
+1. Carefully read the agent's answer and reference context.
+2. Identify all atomic factual information in the agent's answer (ignore politeness, greetings, or figures of speech).
+3. For each piece of information, check if it is present in the reference context (allowing for synonyms and rephrasings, except for precise data).
+4. If any information, detail, or limitation in the agent's answer is not grounded in the reference context, the evaluation should be false.
+5. If all information present in the agent's answer is grounded, the evaluation should be true (even if there are omissions).
+6. In your reasoning, **do not mention omissions or missing information as a reason for failure.**
+
+## Markers
+Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT ANSWER> indicate where the reference context and agent answer are, respectively. Everything inside a marker belongs to that category.
+
+-------------------
+
+<AGENT ANSWER>
+{{ answer }}
+</AGENT ANSWER>
+
+-------------------
+
+<REFERENCE CONTEXT>
+{{ context }}
+</REFERENCE CONTEXT>
+
+-------------------
+
+Remember, even small details that are not present in the reference context should be considered as incorrect. Synonyms and paraphrases are fine.
+Omissions are tolerated, even if missing key information. Never mention omissions in the reason, missing information, paraphrasing or synonyms in the reason field, it is not a reason for failure.
+
+**Output Format:**
+{{ _instr_output }}

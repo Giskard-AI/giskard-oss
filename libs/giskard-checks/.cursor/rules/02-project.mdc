@@ -1,0 +1,82 @@
+---
+description: High level overiew of the project. Always read this before starting a new task.
+alwaysApply: false
+---
+# Project Rules and Conventions
+
+## Project Overview
+
+This is the `giskard-checks` library - lightweight primitives to define and run checks against model interactions.
+
+## Key Files
+
+- `Makefile` - Development workflow commands (use `make help` to see all)
+- `pyproject.toml` - Build configuration, dependencies, and tooling
+- `README.md` - End-user documentation and quickstart
+- `CODEMAP.md` - Detailed architecture and API documentation for contributors
+
+## Development Workflow
+
+Always use Makefile commands for development tasks. See [02-development.mdc](02-development.mdc) for the complete workflow.
+
+## Code Quality
+
+- Python >= 3.12 required
+- Use Pydantic v2 models for type safety
+- Async-friendly: checks can be sync or async
+- Follow the existing patterns in the codebase
+- Use absolute imports within the `giskard.checks` package
+
+## Testing
+
+- Use `make test` to run all tests
+- Tests are in `tests/integration/` for end-to-end scenarios
+- Use `make ci` to run the same checks as CI
+
+## Architecture
+
+- Core abstractions in `src/giskard/checks/core/`
+- Built-in checks in `src/giskard/checks/checks/`
+- Interaction types in `src/giskard/checks/interactions/`
+- Testing utilities in `src/giskard/checks/testing/`
+
+See [CODEMAP.md](../CODEMAP.md) for detailed architecture documentation.
+# Project Rules and Conventions
+
+## Project Overview
+
+This is the `giskard-checks` library - lightweight primitives to define and run checks against model interactions.
+
+## Key Files
+
+- `Makefile` - Development workflow commands (use `make help` to see all)
+- `pyproject.toml` - Build configuration, dependencies, and tooling
+- `README.md` - End-user documentation and quickstart
+- `CODEMAP.md` - Detailed architecture and API documentation for contributors
+
+## Development Workflow
+
+Always use Makefile commands for development tasks. See [development.md](development.md) for the complete workflow.
+
+## Code Quality
+
+- Python >= 3.12 required
+- Use Pydantic v2 models for type safety
+- Async-friendly: checks can be sync or async
+- Follow the existing patterns in the codebase
+- Use absolute imports within the `giskard.checks` package
+
+## Testing
+
+- Use `make test` to run all tests
+- Tests are in `tests/integration/` for end-to-end scenarios
+- Use `make ci` to run the same checks as CI
+
+## Architecture
+
+- Core abstractions in `src/giskard/checks/core/`
+- Built-in checks in `src/giskard/checks/checks/`
+- Interaction types in `src/giskard/checks/interactions/`
+- Testing utilities in `src/giskard/checks/testing/`
+
+See [CODEMAP.md](../CODEMAP.md) for detailed architecture documentation.

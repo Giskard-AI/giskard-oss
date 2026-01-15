@@ -1,0 +1,54 @@
+[project]
+name = "giskard-checks"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jsonpath-ng>=1.7.0,<2",
+    "pydantic>=2.12,<3",
+    "giskard-agents>=0.3.1,<1",
+    "jinja2>=3.1.6,<4",
+    "giskard-core>=0.1.7,<1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["src"]
+markers = [
+    "integration: integration tests that are skipped unless --run-integration is provided",
+]
+
+[tool.ruff.lint]
+select = ["E", "W", "I", "F"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort.sections]
+"my_packages" = ["giskard"]
+
+[tool.pyright]
+failOnWarnings = false
+typeCheckingMode = "recommended"
+reportImportCycles = "warning"
+
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest==8.4.2",
+    "pytest-asyncio==1.2.0",
+    "pytest-coverage>=0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/giskard"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/giskard/checks",
+  "README.md",
+  "pyproject.toml",
+]
