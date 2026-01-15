@@ -1,0 +1,48 @@
+[project]
+name = "giskard-core"
+version = "0.1.7"
+description = "Core shared utilities and foundational components for the Giskard library ecosystem."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.11.0,<3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "W", "I", "F"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort.sections]
+"my_packages" = ["giskard"]
+
+[tool.pyright]
+failOnWarnings = false
+typeCheckingMode = "recommended"
+reportImportCycles = "warning"
+
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pip-audit==2.9.0",
+    "pytest==8.4.2",
+    "pytest-asyncio==1.2.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/giskard"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/giskard/core",
+  "README.md",
+  "pyproject.toml",
+]
