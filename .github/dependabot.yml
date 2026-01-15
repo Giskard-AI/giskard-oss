@@ -5,10 +5,6 @@
 
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "monthly"
 
   - package-ecosystem: "pip"
     directory: "/"
