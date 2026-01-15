@@ -1,5 +1,5 @@
 repos:
-  # General pre-commit hooks
+  # General pre-commit hooks (apply to all files)
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -11,39 +11,32 @@ repos:
       - id: check-case-conflict
       - id: mixed-line-ending
 
-  # Python hooks
+  # Python hooks for giskard-core
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    # Ruff version.
     rev: v0.12.5
     hooks:
-      # Run the linter.
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
-      # Run the formatter.
+        files: ^libs/giskard-core/
       - id: ruff-format
+        files: ^libs/giskard-core/
 
-  # Python type checking
+  # Python type checking for giskard-core
   - repo: local
     hooks:
      - id: basedpyright
        name: basedpyright
-       entry: bash -c 'uv run basedpyright --level error .'
+       entry: bash -c 'cd libs/giskard-core && uv run basedpyright --level error .'
        language: system
+       files: ^libs/giskard-core/
 
-  # Python compatibility checking
-  # Temporarily disabled due to incompatibility with Python 3.14
-  # - repo: https://github.com/netromdk/vermin
-  #   rev: v1.6.0
-  #   hooks:
-  #     - id: vermin
-  #       args: ['-t=3.11-', '--violations']
-
-  # Security and secrets scanning
+  # Security and secrets scanning for giskard-core
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
       - id: detect-secrets
-        args: ["--baseline", ".secrets.baseline"]
+        args: ["--baseline", "libs/giskard-core/.secrets.baseline"]
+        files: ^libs/giskard-core/
         exclude: |
           (?x)^(
             .*\.lock$|
@@ -58,3 +51,4 @@ repos:
             venv\.lock$|
             version\.json$
           )$
+
