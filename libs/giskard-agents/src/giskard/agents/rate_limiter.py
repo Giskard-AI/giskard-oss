@@ -4,7 +4,7 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
-from pydantic import BaseModel, Field, PrivateAttr, model_validator
+from pydantic import BaseModel, Field, PrivateAttr
 
 
 class RateLimiterStrategy(BaseModel):
@@ -81,24 +81,6 @@ class RateLimiter(BaseModel):
     def release(self) -> None:
         self._semaphore.release()
 
-    @model_validator(mode="wrap")
-    @classmethod
-    def _validate_singleton(cls, v, handler, _info) -> "RateLimiter":
-        # Determine the rate limiter ID from the input
-        rate_limiter_id = None
-        if isinstance(v, dict):
-            rate_limiter_id = v.get("rate_limiter_id")
-        elif isinstance(v, RateLimiter):
-            rate_limiter_id = v.rate_limiter_id
-
-        # If ID exists in our global registry, return the singleton
-        if rate_limiter_id and rate_limiter_id in _rate_limiters:
-            return _rate_limiters[rate_limiter_id]
-
-        # 3. Otherwise, proceed with standard validation/creation
-        instance = handler(v)
-        return instance
-
     def __deepcopy__(self, memo: dict[int, Any] | None = None) -> "RateLimiter":
         # RateLimiter is a shared resource, so we can just return the same instance.
         return self
@@ -108,7 +90,13 @@ _rate_limiters: dict[str, RateLimiter] = {}
 
 
 def _register_rate_limiter(rate_limiter: RateLimiter) -> None:
-    _rate_limiters[rate_limiter.rate_limiter_id] = rate_limiter
+    rate_limiter_id = rate_limiter.rate_limiter_id
+    existing = _rate_limiters.get(rate_limiter_id)
+    if existing is not None and existing is not rate_limiter:
+        raise ValueError(
+            f"Rate limiter with id {rate_limiter_id} is already registered"
+        )
+    _rate_limiters[rate_limiter_id] = rate_limiter
 
 
 def get_rate_limiter(
@@ -130,3 +118,44 @@ def get_rate_limiter(
         return _rate_limiters[rate_limiter_id]
     except KeyError as err:
         raise ValueError(f"Rate limiter with id {rate_limiter_id} not found") from err
+
+
+def get_or_create_rate_limiter(
+    *,
+    rate_limiter_id: str,
+    strategy: RateLimiterStrategy,
+) -> RateLimiter:
+    """Get an existing limiter from the registry, or create and register it.
+
+    This is the supported way to implement singleton semantics with Pydantic v2:
+    avoid returning cached instances from model validators during `__init__`.
+    """
+    try:
+        return get_rate_limiter(rate_limiter_id)
+    except ValueError:
+        try:
+            return RateLimiter(rate_limiter_id=rate_limiter_id, strategy=strategy)
+        except ValueError:
+            # Handle rare races where another coroutine registered the limiter between
+            # our lookup and creation attempt.
+            return get_rate_limiter(rate_limiter_id)
+
+
+def get_or_create_rate_limiter_from_rpm(
+    *,
+    rate_limiter_id: str,
+    rpm: int,
+    max_concurrent: int = 5,
+) -> RateLimiter:
+    """Get an existing limiter from the registry, or create/register one from RPM."""
+    try:
+        return get_rate_limiter(rate_limiter_id)
+    except ValueError:
+        try:
+            return RateLimiter.from_rpm(
+                rpm=rpm,
+                max_concurrent=max_concurrent,
+                rate_limiter_id=rate_limiter_id,
+            )
+        except ValueError:
+            return get_rate_limiter(rate_limiter_id)

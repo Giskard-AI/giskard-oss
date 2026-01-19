@@ -2,7 +2,8 @@ import asyncio
 import datetime
 import time
 
-from giskard.agents.rate_limiter import RateLimiter
+import pytest
+from giskard.agents.rate_limiter import RateLimiter, get_or_create_rate_limiter_from_rpm
 
 
 class MockRateLimitError(Exception):
@@ -127,3 +128,26 @@ def test_can_serialize_rate_limiter():
         "rate_limiter_id": "test_can_serialize_rate_limiter",
         "strategy": {"min_interval": 0.1, "max_concurrent": 10},
     }
+
+
+def test_rate_limiter_from_rpm_duplicate_id_raises():
+    rate_limiter_id = "test_rate_limiter_from_rpm_duplicate_id_raises"
+    rl1 = RateLimiter.from_rpm(rpm=500, rate_limiter_id=rate_limiter_id)
+    assert hasattr(rl1, "__pydantic_private__")
+    assert rl1._semaphore is not None
+
+    with pytest.raises(ValueError, match="already registered"):
+        RateLimiter.from_rpm(rpm=500, rate_limiter_id=rate_limiter_id)
+
+
+def test_get_or_create_rate_limiter_from_rpm_returns_singleton():
+    rate_limiter_id = "test_get_or_create_rate_limiter_from_rpm_returns_singleton"
+    rl1 = get_or_create_rate_limiter_from_rpm(
+        rate_limiter_id=rate_limiter_id, rpm=500, max_concurrent=5
+    )
+    rl2 = get_or_create_rate_limiter_from_rpm(
+        rate_limiter_id=rate_limiter_id, rpm=500, max_concurrent=5
+    )
+    assert rl1 is rl2
+    assert hasattr(rl2, "__pydantic_private__")
+    assert rl2._semaphore is not None

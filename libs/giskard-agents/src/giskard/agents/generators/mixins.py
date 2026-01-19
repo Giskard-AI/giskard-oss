@@ -17,8 +17,26 @@ class WithRateLimiter(BaseModel):
 
     @field_validator("rate_limiter", mode="before")
     def _validate_rate_limiter(cls, v: RateLimiter | str | None) -> RateLimiter | None:
+        # Supported singleton semantics are implemented at the container level:
+        # - If a string is provided, it must already exist in the registry.
+        # - If a dict is provided (e.g. from JSON deserialization), we reuse an
+        #   already-registered instance when possible, otherwise we let Pydantic
+        #   create a new RateLimiter from the dict.
+        if v is None or isinstance(v, RateLimiter):
+            return v
+
         if isinstance(v, str):
-            v = get_rate_limiter(v)
+            return get_rate_limiter(v)
+
+        if isinstance(v, dict):
+            rate_limiter_id = v.get("rate_limiter_id")
+            if rate_limiter_id:
+                try:
+                    return get_rate_limiter(rate_limiter_id)
+                except ValueError:
+                    return v  # let Pydantic create & register a new instance
+            return v
+
         return v
 
     def _rate_limiter_context(
