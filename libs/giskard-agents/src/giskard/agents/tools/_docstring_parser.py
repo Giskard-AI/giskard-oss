@@ -63,7 +63,7 @@ def parse_docstring(
         return "", {}
 
     # see https://github.com/mkdocstrings/griffe/issues/293
-    parent = cast(GriffeObject, sig)
+    parent = cast(GriffeObject, sig)  # pyright: ignore[reportInvalidCast]
 
     docstring_style = (
         _infer_docstring_style(doc) if docstring_format == "auto" else docstring_format

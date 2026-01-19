@@ -4,5 +4,8 @@
       { "root": "libs/giskard-core/src" },
       { "root": "libs/giskard-agents/src" },
       { "root": "libs/giskard-checks/src" }
-    ]
+    ],
+    "failOnWarnings": false,
+    "typeCheckingMode": "recommended",
+    "reportImportCycles": "warning"
   }

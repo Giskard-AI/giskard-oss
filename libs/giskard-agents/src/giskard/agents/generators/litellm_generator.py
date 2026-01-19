@@ -1,5 +1,8 @@
+from typing import cast
+
+from litellm import Choices, ModelResponse, acompletion
+from litellm import Message as LiteLLMMessage
 from litellm import _should_retry as litellm_should_retry
-from litellm import acompletion
 from pydantic import Field
 
 from ..chat import Message
@@ -32,14 +35,17 @@ class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
             params_["tools"] = [t.to_litellm_function() for t in tools]
 
         async with self._rate_limiter_context():
-            response = await acompletion(
-                messages=[m.to_litellm() for m in messages],
-                model=self.model,
-                **params_,
+            response = cast(
+                ModelResponse,
+                await acompletion(
+                    messages=[m.to_litellm() for m in messages],
+                    model=self.model,
+                    **params_,
+                ),
             )
 
-        choice = response.choices[0]
+        choice = cast(Choices, response.choices[0])
         return Response(
-            message=Message.from_litellm(choice.message),
-            finish_reason=choice.finish_reason,
+            message=Message.from_litellm(cast(LiteLLMMessage, choice.message)),
+            finish_reason=choice.finish_reason,  # pyright: ignore[reportArgumentType]
         )

@@ -87,7 +87,7 @@ class BaseGenerator(Discriminated, ABC):
         responses = await asyncio.gather(*completion_requests)
         return responses
 
-    def chat(self, message: str, role: Role = "user") -> "ChatWorkflow":
+    def chat(self, message: str, role: Role = "user") -> "ChatWorkflow[Any]":
         """Create a new chat pipeline with the given message.
 
         Parameters
@@ -104,7 +104,7 @@ class BaseGenerator(Discriminated, ABC):
 
         return ChatWorkflow(generator=self).chat(message, role)
 
-    def template(self, template_name: str) -> "ChatWorkflow":
+    def template(self, template_name: str) -> "ChatWorkflow[Any]":
         """Create a new chat pipeline with the given message.
 
         Parameters

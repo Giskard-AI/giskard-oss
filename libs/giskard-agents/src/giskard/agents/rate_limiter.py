@@ -2,6 +2,7 @@ import asyncio
 import time
 import uuid
 from contextlib import asynccontextmanager
+from typing import Any
 
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
@@ -11,7 +12,7 @@ class RateLimiterStrategy(BaseModel):
     max_concurrent: int = Field(default=5)
 
 
-class RateLimiter(BaseModel, frozen=True):
+class RateLimiter(BaseModel):
     rate_limiter_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     strategy: RateLimiterStrategy
 
@@ -98,7 +99,7 @@ class RateLimiter(BaseModel, frozen=True):
         instance = handler(v)
         return instance
 
-    def __deepcopy__(self, memo) -> "RateLimiter":
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> "RateLimiter":
         # RateLimiter is a shared resource, so we can just return the same instance.
         return self
 

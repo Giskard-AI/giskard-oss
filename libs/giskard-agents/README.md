@@ -392,7 +392,7 @@ We use [pip-audit](https://pypi.org/project/pip-audit/) to scan for known securi
 # Check for security vulnerabilities
 make security
 # or manually:
-uv run pip-audit .
+uv run pip-audit
 ```
 
 Both compatibility and security checks are automatically run in CI for every pull request.

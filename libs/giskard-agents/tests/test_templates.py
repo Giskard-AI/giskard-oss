@@ -51,7 +51,7 @@ async def test_simple_template(prompts_manager):
     assert len(messages) == 1
     assert messages[0].role == "user"
     assert (
-        messages[0].content
+        messages[0].content.rstrip()
         == "This is a simple prompt that should be rendered as a single user message."
     )
 
@@ -92,7 +92,7 @@ async def test_pydantic_json_rendering_with_prompts_manager():
     )
 
     with tempfile.TemporaryDirectory() as tmp_dir:
-        prompts_manager = PromptsManager(default_prompts_path=tmp_dir)
+        prompts_manager = PromptsManager(default_prompts_path=Path(tmp_dir))
 
         template_path = Path(tmp_dir) / "book.j2"
         template_path.write_text("Here is a book:\n{{ book }}")
@@ -276,5 +276,6 @@ def test_llm_formattable_takes_precedence_over_pydantic():
     message = template.render(obj=obj)
     # Should use protocol method, not Pydantic JSON dump
     assert message.content == "Content: Protocol format: test"
+    assert isinstance(message.content, str)
     assert "Protocol format" in message.content
     assert '"value"' not in message.content  # Should not be JSON

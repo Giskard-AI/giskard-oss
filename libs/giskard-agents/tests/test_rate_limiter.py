@@ -99,7 +99,7 @@ async def test_rate_limiter_max_concurrent():
         for _ in range(20)
     ]
 
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    results = await asyncio.gather(*tasks)
 
     # First 10 requests should be run immediately every 0.1 seconds
     first_start = results[0]

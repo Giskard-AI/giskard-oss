@@ -67,14 +67,17 @@ typecheck: ## Run type checking with basedpyright
 	uv tool run basedpyright --level error .
 
 security: ## Check for security vulnerabilities
-	uv run pip-audit . # FIXME: Error when running this
+	uv run pip-audit
 
 generate-licenses: ## Generate licenses
 	uv tool run licensecheck --license MIT \
-		--format markdown --file THIRD_PARTY_NOTICES.md # FIXME: Error when running this
+		--format markdown --file THIRD_PARTY_NOTICES.md \
+		--skip-dependencies giskard-agents giskard-checks giskard-core
 
 check-licenses: ## Check for licenses
-	uv tool run licensecheck --license MIT --show-only-failing --zero # FIXME: Error when running this
+	uv tool run licensecheck --license MIT \
+		--show-only-failing --zero \
+		--skip-dependencies giskard-agents giskard-checks giskard-core
 
 # Combined targets
 check: lint check-format check-compat typecheck security check-licenses ## Run all checks (lint, format, compatibility, typecheck)

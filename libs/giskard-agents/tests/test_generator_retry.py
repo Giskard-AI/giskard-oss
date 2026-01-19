@@ -52,6 +52,7 @@ def test_with_retries_helper_method():
     assert new_generator.retry_policy.base_delay == 0.5
 
     new_generator = generator.with_retries(4, base_delay=10)
+    assert new_generator.retry_policy is not None
     assert new_generator.retry_policy.max_retries == 4
     assert new_generator.retry_policy.base_delay == 10
 

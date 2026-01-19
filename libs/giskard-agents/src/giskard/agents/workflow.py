@@ -6,7 +6,6 @@ from typing import (
     Any,
     AsyncGenerator,
     AsyncIterator,
-    Dict,
     Generic,
     List,
     Optional,
@@ -47,8 +46,8 @@ class WorkflowStep(BaseModel):
     """A step in a workflow."""
 
     index: int = Field(default=0)
-    workflow: "ChatWorkflow"
-    chat: Chat
+    workflow: "ChatWorkflow[Any]"
+    chat: Chat[Any]
     message: Message
     previous: Optional["WorkflowStep"] = Field(default=None)
 
@@ -65,19 +64,19 @@ class _StepRunner:
 
     Parameters
     ----------
-    workflow : ChatWorkflow
+    workflow : ChatWorkflow[Any]
         The workflow instance.
     params : GenerationParams
         Generator parameters (including tools, response format).
-    init_chat : Chat
+    init_chat : Chat[Any]
         Initial chat (rendered messages + context).
     """
 
     def __init__(
         self,
-        workflow: "ChatWorkflow",
+        workflow: "ChatWorkflow[Any]",
         params: GenerationParams,
-        init_chat: Chat,
+        init_chat: Chat[Any],
     ):
         self._workflow = workflow
         self._params = params
@@ -101,14 +100,11 @@ class _StepRunner:
         if max_steps is not None and max_steps <= 0:
             return
 
-        if max_steps is None:
-            max_steps = float("inf")
-
         chat = self._init_chat  # will be cloned for each step
 
         step = None
         step_index = 0
-        while step_index < max_steps:
+        while max_steps is None or step_index < max_steps:
             # First, consume any pending tool calls on the current chat
             async for tool_message in self._run_tools(chat):
                 chat = chat.clone().add(tool_message)
@@ -127,7 +123,7 @@ class _StepRunner:
                 yield step
 
                 step_index += 1
-                if step_index >= max_steps:
+                if max_steps is not None and step_index >= max_steps:
                     return
 
             # Now we run the generator to create a completion
@@ -147,18 +143,21 @@ class _StepRunner:
             )
             yield step
             step_index += 1
-            if step_index >= max_steps:
+            if max_steps is not None and step_index >= max_steps:
                 break
 
             # If the last message has no tool calls, we're done.
             if not message.tool_calls:
                 break
 
-    async def _run_tools(self, chat: Chat) -> AsyncGenerator[Message, None]:
+    async def _run_tools(self, chat: Chat[Any]) -> AsyncGenerator[Message, None]:
         if not chat.last or not chat.last.tool_calls:
             return
 
         for tool_call in chat.last.tool_calls:
+            if tool_call.function.name not in self._workflow.tools:
+                continue  # TODO: raise an error?
+
             tool = self._workflow.tools[tool_call.function.name]
             tool_response = await tool.run(
                 json.loads(tool_call.function.arguments),
@@ -170,7 +169,7 @@ class _StepRunner:
                 content=json.dumps(tool_response),
             )
 
-    async def _run_completion(self, chat: Chat) -> Message:
+    async def _run_completion(self, chat: Chat[Any]) -> Message:
         # Determine if strict output parsing is enabled
         strict_parsing = chat.output_model and self._workflow.output_model_strict
         if strict_parsing:
@@ -192,7 +191,7 @@ class _StepRunner:
         return response.message
 
     async def _run_completion_with_output_validation(
-        self, chat: Chat, output_model: Type[OutputType]
+        self, chat: Chat[OutputType], output_model: type[OutputType]
     ) -> Message:
         response = await self._workflow.generator.complete(chat.messages, self._params)
 
@@ -233,19 +232,21 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
 
     generator: "BaseGenerator"
 
-    messages: List[Message | MessageTemplate | TemplateReference] = Field(
+    messages: list[Message | MessageTemplate | TemplateReference] = Field(
         default_factory=list
     )
-    tools: Dict[str, Tool] = Field(default_factory=dict)
-    inputs: Dict[str, Any] = Field(default_factory=dict)
-    output_model: Type[OutputType] | None = Field(default=None)
+    tools: dict[str, Tool] = Field(default_factory=dict)
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    output_model: type[OutputType] | None = Field(default=None)
     output_model_strict: bool = Field(default=True)
     output_model_num_retries: int | None = Field(default=2, ge=0)
     prompt_manager: PromptsManager = Field(default_factory=get_prompts_manager)
     context: RunContext = Field(default_factory=RunContext)
     error_policy: ErrorPolicy = Field(default=ErrorPolicy.RAISE)
 
-    def chat(self, message: str | Message, role: Role = "user") -> Self:
+    def chat(
+        self, message: str | Message | MessageTemplate, role: Role = "user"
+    ) -> Self:
         """Add a chat message to the workflow."""
         if isinstance(message, str):
             message = MessageTemplate(role=role, content_template=message)
@@ -469,8 +470,8 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
 
     @logfire.instrument("chat_workflow.run_batch")
     async def run_batch(
-        self, inputs: list[dict], max_steps: int | None = None
-    ) -> List[Chat[OutputType]]:
+        self, inputs: list[dict[str, Any]], max_steps: int | None = None
+    ) -> list[Chat[OutputType]]:
         """Run a batch of completions with different parameters.
 
         Parameters
@@ -529,7 +530,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
             yield result
 
     async def stream_batch(
-        self, inputs: list[dict], max_steps: int | None = None
+        self, inputs: list[dict[str, Any]], max_steps: int | None = None
     ) -> AsyncIterator[Chat[OutputType]]:
         """Stream a batch of completions as they complete.
 

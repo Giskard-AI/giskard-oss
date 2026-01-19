@@ -34,14 +34,14 @@ class Tool(BaseModel):
     name: str
     description: str
     parameters_schema: dict[str, Any] = Field(default_factory=dict)
-    fn: Callable
+    fn: Callable[..., Any]
     catch: Callable[[Exception], Any] | None = Field(default=None)
 
     run_context_param: str | None = Field(default=None)
 
     @classmethod
     def from_callable(
-        cls, fn: Callable, catch: Callable[[Exception], Any] | None = None
+        cls, fn: Callable[..., Any], catch: Callable[[Exception], Any] | None = None
     ) -> "Tool":
         """Create a Tool from a callable function.
 
@@ -195,7 +195,9 @@ class Tool(BaseModel):
 class ToolMethod:
     """Descriptor to handle tool methods on classes."""
 
-    def __init__(self, func: Callable, catch: Callable[[Exception], Any] | None = None):
+    def __init__(
+        self, func: Callable[..., Any], catch: Callable[[Exception], Any] | None = None
+    ):
         self.func = func
         self._catch = catch
 
@@ -259,9 +261,9 @@ def tool(
         sig = inspect.signature(func)
         first_param = next(iter(sig.parameters.keys()), None)
         if first_param == "self":
-            return ToolMethod(func, catch=catch)
+            return ToolMethod(func, catch=catch)  # pyright: ignore[reportReturnType]
         return Tool.from_callable(func, catch=catch)
 
     if _func is not None:
         return decorator(_func)
-    return decorator
+    return decorator  # pyright: ignore[reportReturnType]

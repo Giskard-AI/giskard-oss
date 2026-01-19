@@ -8,7 +8,7 @@ from jinja2.ext import Extension
 from jinja2.loaders import FileSystemLoader, PrefixLoader
 from pydantic import BaseModel
 
-from ..chat import Message
+from ..chat import Message, Role
 
 
 @runtime_checkable
@@ -52,7 +52,7 @@ class MessageExtension(Extension):
     def __init__(self, environment):
         super().__init__(environment)
         if not hasattr(environment, "_collected_messages"):
-            environment._collected_messages = []
+            environment._collected_messages = []  # pyright: ignore[reportAttributeAccessIssue]
 
     def parse(self, parser):
         """Parse a {% message role %}...{% endmessage %} block."""
@@ -60,15 +60,15 @@ class MessageExtension(Extension):
         role_node = parser.parse_expression()
         if isinstance(role_node, nodes.Name):
             role_node = nodes.Const(role_node.name)
-        body = parser.parse_statements(["name:endmessage"], drop_needle=True)
+        body = parser.parse_statements(("name:endmessage",), drop_needle=True)
         call_node = self.call_method("_handle_message", [role_node])
 
         return nodes.CallBlock(call_node, [], [], body).set_lineno(lineno)
 
-    async def _handle_message(self, role: str, caller):
+    async def _handle_message(self, role: Role, caller):
         """Handle a message block by rendering its content and storing it."""
         content = (await caller()).strip()
-        self.environment._collected_messages.append(Message(role=role, content=content))
+        self.environment._collected_messages.append(Message(role=role, content=content))  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
         return ""
 
 

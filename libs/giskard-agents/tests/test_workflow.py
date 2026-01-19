@@ -16,6 +16,7 @@ async def test_single_run(generator):
         .run()
     )
 
+    assert isinstance(chat.last.content, str)
     assert "testbot" in chat.last.content.lower()
 
 
@@ -99,20 +100,24 @@ async def test_workflow_with_mixed_templates(generator: LiteLLMGenerator):
     assert len(chat.messages) == 5
 
     assert chat.messages[0].role == "system"
+    assert isinstance(chat.messages[0].content, str)
     assert (
         "You are an impartial evaluator of scientific theories."
         in chat.messages[0].content
     )
 
     assert chat.messages[1].role == "user"
+    assert isinstance(chat.messages[1].content, str)
     assert (
         "Normandy is actually the center of the universe." in chat.messages[1].content
     )
 
     assert chat.messages[2].role == "assistant"
+    assert isinstance(chat.messages[2].content, str)
     assert "100" in chat.messages[2].content
 
     assert chat.messages[3].role == "user"
+    assert isinstance(chat.messages[3].content, str)
     assert "Well done TestBot!" in chat.messages[3].content
 
     assert chat.messages[4].role == "assistant"

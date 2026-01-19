@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from jinja2 import Template
 from pydantic import BaseModel, Field
@@ -10,8 +10,8 @@ from .environment import create_message_environment
 
 
 async def render_messages_template(
-    template: Template, variables: Dict[str, Any] = None
-) -> List[Message]:
+    template: Template, variables: dict[str, Any] | None = None
+) -> list[Message]:
     """
     Render a template and collect any messages defined with {% message %} blocks.
 
@@ -28,7 +28,7 @@ async def render_messages_template(
         List of parsed Message objects
     """
     rendered_output = await template.render_async(variables or {})
-    messages = template.environment._collected_messages
+    messages = template.environment._collected_messages  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
 
     # Two cases here:
     # 1. There are message blocks. In this case, the render output must be empty (at most whitespaces).
@@ -71,8 +71,8 @@ class PromptsManager(BaseModel):
         self.set_default_prompts_path(path)
 
     async def render_template(
-        self, template_name: str, variables: Dict[str, Any] = None
-    ) -> List[Message]:
+        self, template_name: str, variables: dict[str, Any] | None = None
+    ) -> list[Message]:
         """
         Load and parse a template file, returning a list of Message objects.
 
@@ -135,7 +135,7 @@ def remove_prompts_path(namespace: str):
 
 
 async def render_template(
-    template_name: str, variables: Dict[str, Any] = None
+    template_name: str, variables: dict[str, Any] | None = None
 ) -> list[Message]:
     """Load and parse a template file."""
     return await _prompts_manager.render_template(template_name, variables)

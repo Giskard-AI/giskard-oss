@@ -1,4 +1,4 @@
-from typing import Generic, Literal, Type, TypeVar
+from typing import Any, Generic, Literal, Type, TypeVar
 
 from litellm import Message as LiteLLMMessage
 from pydantic import BaseModel, Field
@@ -42,16 +42,16 @@ class Message(BaseModel):
     tool_calls: list[ToolCall] | None = None
     tool_call_id: str | None = None
 
-    def to_litellm(self) -> dict:
+    def to_litellm(self) -> dict[str, Any]:
         msg = self.model_dump(include={"role", "content", "tool_calls", "tool_call_id"})
         return msg
 
     @classmethod
-    def from_litellm(cls, msg: LiteLLMMessage | dict):
-        return cls.model_validate(msg.model_dump())
+    def from_litellm(cls, msg: LiteLLMMessage | dict[str, Any]):
+        return cls.model_validate(msg.model_dump())  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
 
-    def parse(self, model_type: Type[T]) -> T:
-        return model_type.model_validate_json(self.content)
+    def parse(self, model_type: type[T]) -> T:
+        return model_type.model_validate_json(self.content)  # pyright: ignore[reportArgumentType]
 
     @property
     def transcript(self) -> str:
@@ -92,9 +92,9 @@ class Chat(BaseModel, Generic[OutputType]):
     def failed(self) -> bool:
         return self.error is not None
 
-    def clone(self, deep: bool = True) -> "Chat":
+    def clone(self, deep: bool = True) -> "Chat[OutputType]":
         return self.model_copy(deep=deep)
 
-    def add(self, message: Message) -> "Chat":
+    def add(self, message: Message) -> "Chat[OutputType]":
         self.messages.append(message)
         return self

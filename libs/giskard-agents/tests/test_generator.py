@@ -52,6 +52,7 @@ async def test_generator_completion(generator: LiteLLMGenerator):
 
     assert isinstance(response, Response)
     assert response.message.role == "assistant"
+    assert isinstance(response.message.content, str)
     assert "I am TestBot" in response.message.content
     assert response.finish_reason == "stop"
 
@@ -123,7 +124,8 @@ async def test_generator_rate_limiter_context():
         rpm=100, rate_limiter_id="test_generator_rate_limiter_context"
     )
     generator = LiteLLMGenerator(
-        model="test-model", rate_limiter="test_generator_rate_limiter_context"
+        model="test-model",
+        rate_limiter="test_generator_rate_limiter_context",  # pyright: ignore[reportArgumentType]
     )
     assert generator.rate_limiter is rate_limiter
 
@@ -153,6 +155,7 @@ def test_generator_with_params_and_rate_limiter():
 
     # Call with_params and verify rate limiter is preserved
     generator_with_params = generator.with_params(temperature=0.5, max_tokens=100)
+    assert isinstance(generator_with_params, LiteLLMGenerator)
     assert generator_with_params.params.temperature == 0.5
     assert generator_with_params.params.max_tokens == 100
     # Verify rate limiter is preserved and the same instance
@@ -185,6 +188,7 @@ def test_generator_serialization_recreate_rate_limiter_instance_if_not_in_regist
     deserialized_generator = LiteLLMGenerator.model_validate_json(json_str)
 
     assert deserialized_generator.rate_limiter is not rate_limiter
+    assert deserialized_generator.rate_limiter is not None
     assert (
         deserialized_generator.rate_limiter.rate_limiter_id
         == rate_limiter.rate_limiter_id
