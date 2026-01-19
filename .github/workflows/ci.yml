@@ -1,0 +1,90 @@
+name: Full CI
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      giskard-core: ${{ steps.filter.outputs.giskard-core }}
+      giskard-agents: ${{ steps.filter.outputs.giskard-agents }}
+      giskard-checks: ${{ steps.filter.outputs.giskard-checks }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+
+      - name: Detect changed libraries
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            giskard-core:
+              - 'libs/giskard-core/**'
+            giskard-agents:
+              - 'libs/giskard-agents/**'
+            giskard-checks:
+              - 'libs/giskard-checks/**'
+
+  pre_checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7
+
+      - name: Setup development environment
+        run: make setup
+
+      - name: Run all checks
+        run: make check
+
+  test:
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      needs.detect-changes.outputs.giskard-core == 'true' ||
+      needs.detect-changes.outputs.giskard-agents == 'true' ||
+      needs.detect-changes.outputs.giskard-checks == 'true'
+    env:
+      TEST_MODEL: "gemini/gemini-2.0-flash"
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+
+      - name: Install uv and set the python version
+        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Setup development environment
+        run: make setup
+
+      - name: Run tests for giskard-core
+        if: needs.detect-changes.outputs.giskard-core == 'true'
+        run: make test-giskard-core
+
+      - name: Run tests for giskard-agents
+        if: needs.detect-changes.outputs.giskard-agents == 'true'
+        run: make test-giskard-agents
+
+      - name: Run tests for giskard-checks
+        if: needs.detect-changes.outputs.giskard-checks == 'true'
+        run: make test-giskard-checks
