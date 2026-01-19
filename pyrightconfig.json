@@ -1,0 +1,8 @@
+{
+    "include": ["libs"],
+    "executionEnvironments": [
+      { "root": "libs/giskard-core/src" },
+      { "root": "libs/giskard-agents/src" },
+      { "root": "libs/giskard-checks/src" }
+    ]
+  }

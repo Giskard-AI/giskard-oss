@@ -30,13 +30,6 @@ reportImportCycles = "warning"
 requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
-[dependency-groups]
-dev = [
-    "pip-audit==2.9.0",
-    "pytest==8.4.2",
-    "pytest-asyncio==1.2.0",
-]
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/giskard"]
 

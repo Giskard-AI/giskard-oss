@@ -25,10 +25,12 @@ Find a list of packages below
 |✔|click|
 |✔|colorama|
 |✔|distro|
+|✔|fastuuid|
 |✔|filelock|
 |✔|frozenlist|
 |✔|fsspec|
 |✔|griffe|
+|✔|grpcio|
 |✔|h11|
 |✔|hf-xet|
 |✔|httpcore|
@@ -36,9 +38,9 @@ Find a list of packages below
 |✔|huggingface-hub|
 |✔|idna|
 |✔|importlib-metadata|
-|✔|iniconfig|
 |✔|jinja2|
 |✔|jiter|
+|✔|jsonpath-ng|
 |✔|jsonschema|
 |✔|jsonschema-specifications|
 |✔|litellm|
@@ -47,24 +49,23 @@ Find a list of packages below
 |✔|multidict|
 |✔|openai|
 |✔|packaging|
-|✔|pluggy|
+|✔|ply|
 |✔|propcache|
 |✔|pydantic|
 |✔|pydantic-core|
-|✔|pygments|
-|✔|pytest|
-|✔|pytest-asyncio|
 |✔|python-dotenv|
 |✔|pyyaml|
 |✔|referencing|
 |✔|regex|
 |✔|requests|
 |✔|rpds-py|
+|✔|shellingham|
 |✔|sniffio|
 |✔|tenacity|
 |✔|tiktoken|
 |✔|tokenizers|
 |✔|tqdm|
+|✔|typer-slim|
 |✔|typing-extensions|
 |✔|typing-inspection|
 |✔|urllib3|
@@ -79,9 +80,9 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### aiohttp-3.12.15
+### aiohttp-3.13.3
 
-- HomePage: https://github.com/aio-libs/aiohttp
+- HomePage: UNKNOWN
 - Author: UNKNOWN
 - License: APACHE-2.0;; MIT
 - Compatible: True
@@ -103,7 +104,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### anyio-4.10.0
+### anyio-4.12.1
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -135,7 +136,7 @@ Find a list of packages below
 - Compatible: True
 - Size: 826776
 
-### click-8.2.1
+### click-8.3.1
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -159,7 +160,15 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### filelock-3.19.1
+### fastuuid-0.14.0
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: BSD LICENSE
+- Compatible: True
+- Size: -1
+
+### filelock-3.20.3
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -167,7 +176,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### frozenlist-1.7.0
+### frozenlist-1.8.0
 
 - HomePage: https://github.com/aio-libs/frozenlist
 - Author: UNKNOWN
@@ -175,7 +184,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### fsspec-2025.9.0
+### fsspec-2026.1.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -183,11 +192,19 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### griffe-1.7.3
+### griffe-1.15.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
 - License: ISC
+- Compatible: True
+- Size: -1
+
+### grpcio-1.76.0
+
+- HomePage: https://grpc.io
+- Author: The gRPC Authors
+- License: APACHE SOFTWARE LICENSE
 - Compatible: True
 - Size: -1
 
@@ -199,7 +216,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### hf-xet-1.1.9
+### hf-xet-1.2.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -223,7 +240,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### huggingface-hub-0.34.4
+### huggingface-hub-1.3.2
 
 - HomePage: https://github.com/huggingface/huggingface_hub
 - Author: Hugging Face, Inc.
@@ -239,19 +256,11 @@ Find a list of packages below
 - Compatible: True
 - Size: 349141
 
-### importlib-metadata-8.7.0
+### importlib-metadata-8.7.1
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
-- License: APACHE SOFTWARE LICENSE
-- Compatible: True
-- Size: -1
-
-### iniconfig-2.1.0
-
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: MIT
+- License: APACHE-2.0
 - Compatible: True
 - Size: -1
 
@@ -263,15 +272,23 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### jiter-0.10.0
+### jiter-0.12.0
 
 - HomePage: https://github.com/pydantic/jiter/
-- Author: Samuel Colvin <samuel@pydantic.dev>
+- Author: UNKNOWN
 - License: MIT LICENSE
 - Compatible: True
 - Size: -1
 
-### jsonschema-4.25.1
+### jsonpath-ng-1.7.0
+
+- HomePage: https://github.com/h2non/jsonpath-ng
+- Author: Tomas Aparicio
+- License: APACHE SOFTWARE LICENSE
+- Compatible: True
+- Size: -1
+
+### jsonschema-4.26.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -279,7 +296,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### jsonschema-specifications-2025.4.1
+### jsonschema-specifications-2025.9.1
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -287,7 +304,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### litellm-1.72.4
+### litellm-1.81.0
 
 - HomePage: UNKNOWN
 - Author: BerriAI
@@ -295,7 +312,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### logfire-api-3.22.0
+### logfire-api-4.19.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -303,15 +320,15 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### markupsafe-3.0.2
+### markupsafe-3.0.3
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
-- License: BSD LICENSE
+- License: BSD-3-CLAUSE
 - Compatible: True
 - Size: -1
 
-### multidict-6.6.4
+### multidict-6.7.0
 
 - HomePage: https://github.com/aio-libs/multidict
 - Author: Andrew Svetlov
@@ -319,7 +336,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### openai-1.104.2
+### openai-2.15.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -335,15 +352,15 @@ Find a list of packages below
 - Compatible: True
 - Size: 236486
 
-### pluggy-1.6.0
+### ply-3.11
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: MIT LICENSE
+- HomePage: http://www.dabeaz.com/ply/
+- Author: David Beazley
+- License: BSD
 - Compatible: True
 - Size: -1
 
-### propcache-0.3.2
+### propcache-0.4.1
 
 - HomePage: https://github.com/aio-libs/propcache
 - Author: Andrew Svetlov
@@ -351,7 +368,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### pydantic-2.11.5
+### pydantic-2.12.5
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -359,47 +376,23 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### pydantic-core-2.33.2
+### pydantic-core-2.41.5
 
 - HomePage: https://github.com/pydantic/pydantic-core
 - Author: UNKNOWN
-- License: MIT LICENSE
+- License: MIT
 - Compatible: True
 - Size: -1
 
-### pygments-2.19.2
+### python-dotenv-1.2.1
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
-- License: BSD LICENSE
-- Compatible: True
-- Size: 4467170
-
-### pytest-8.4.1
-
-- HomePage: UNKNOWN
-- Author: Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin, Others (See AUTHORS)
-- License: MIT LICENSE
+- License: BSD-3-CLAUSE
 - Compatible: True
 - Size: -1
 
-### pytest-asyncio-1.0.0
-
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: APACHE-2.0
-- Compatible: True
-- Size: -1
-
-### python-dotenv-1.1.1
-
-- HomePage: https://github.com/theskumar/python-dotenv
-- Author: Saurabh Kumar
-- License: BSD LICENSE
-- Compatible: True
-- Size: -1
-
-### pyyaml-6.0.2
+### pyyaml-6.0.3
 
 - HomePage: https://pyyaml.org/
 - Author: Kirill Simonov
@@ -407,7 +400,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### referencing-0.36.2
+### referencing-0.37.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -415,7 +408,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### regex-2025.9.1
+### regex-2026.1.15
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -431,11 +424,19 @@ Find a list of packages below
 - Compatible: True
 - Size: 202504
 
-### rpds-py-0.27.1
+### rpds-py-0.30.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
 - License: MIT
+- Compatible: True
+- Size: -1
+
+### shellingham-1.5.4
+
+- HomePage: https://github.com/sarugaku/shellingham
+- Author: Tzu-ping Chung
+- License: ISC LICENSE _ISCL_
 - Compatible: True
 - Size: -1
 
@@ -455,7 +456,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### tiktoken-0.11.0
+### tiktoken-0.12.0
 
 - HomePage: UNKNOWN
 - Author: Shantanu Jain
@@ -463,7 +464,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### tokenizers-0.22.0
+### tokenizers-0.22.2
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -479,7 +480,15 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### typing-extensions-4.14.0
+### typer-slim-0.21.1
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: MIT
+- Compatible: True
+- Size: -1
+
+### typing-extensions-4.15.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -487,7 +496,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### typing-inspection-0.4.1
+### typing-inspection-0.4.2
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -503,7 +512,7 @@ Find a list of packages below
 - Compatible: True
 - Size: 421374
 
-### yarl-1.20.1
+### yarl-1.22.0
 
 - HomePage: https://github.com/aio-libs/yarl
 - Author: Andrew Svetlov
@@ -518,3 +527,4 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 - Size: -1
+

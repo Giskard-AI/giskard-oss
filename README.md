@@ -250,6 +250,3 @@ We thank the following companies which are sponsoring our project with monthly d
 **[Biolevate](https://www.biolevate.com/)**
 
 <img src="https://awsmp-logos.s3.amazonaws.com/seller-wgamx5z6umune/2d10badd2ccac49699096ea7fb986b98.png" alt="Biolevate logo" width="400"/>
-
-
-

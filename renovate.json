@@ -13,13 +13,9 @@
     ],
     "packageRules": [
         {
-            "groupName": "{{manager}} dependencies",
-            "groupSlug": "{{manager}}-deps",
-            "matchUpdateTypes": [
-                "*"
-            ],
-            "matchPackageNames": [
-                "*"
+            "rangeStrategy": "widen",
+            "matchManagers": [
+                "pep621"
             ]
         },
         {
@@ -29,13 +25,13 @@
             "enabled": false
         },
         {
-            "description": "Group giskard-core dependencies",
-            "matchPaths": [
-                "libs/giskard-core/**"
+            "description": "Group workspace dependencies together",
+            "matchPackageNames": [
+                "giskard-core",
+                "giskard-agents",
+                "giskard-checks"
             ],
-            "groupName": "giskard-core dependencies",
-            "groupSlug": "giskard-core-deps"
+            "groupName": "workspace dependencies"
         }
     ]
 }
-

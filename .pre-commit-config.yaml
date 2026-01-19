@@ -11,44 +11,38 @@ repos:
       - id: check-case-conflict
       - id: mixed-line-ending
 
-  # Python hooks for giskard-core
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.5
+    rev: v0.14.11
     hooks:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
-        files: ^libs/giskard-core/
       - id: ruff-format
-        files: ^libs/giskard-core/
 
-  # Python type checking for giskard-core
   - repo: local
     hooks:
-     - id: basedpyright
-       name: basedpyright
-       entry: bash -c 'cd libs/giskard-core && uv run basedpyright --level error .'
-       language: system
-       files: ^libs/giskard-core/
+      - id: basedpyright
+        name: basedpyright
+        # Use uv run to ensure the workspace environment is used
+        entry: uv run basedpyright
+        language: system
+        types: [python]
+        # Only run on changed files to save time,
+        # but let basedpyright handle the context
+        pass_filenames: true
 
   # Security and secrets scanning for giskard-core
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
       - id: detect-secrets
-        args: ["--baseline", "libs/giskard-core/.secrets.baseline"]
-        files: ^libs/giskard-core/
+        args: ["--baseline", ".secrets.baseline"]
+        # Simplified exclude: most of these are ignored by git anyway
         exclude: |
           (?x)^(
-            .*\.lock$|
-            .*\.log$|
-            .*\.dump$|
-            .*/\.venv/.*|
-            .*/\.uv/.*|
-            .*/dist/.*|
-            .*/build/.*|
-            \.secrets\.baseline$|
-            \.python-version$|
-            venv\.lock$|
-            version\.json$
+            .*\.lock|
+            .*\.log|
+            .*\.dump|
+            \..*|
+            dist/|
+            build/
           )$
-

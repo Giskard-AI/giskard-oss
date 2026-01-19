@@ -15,7 +15,7 @@ There are 5 ways you can contribute to Giskard:
 * Implementing new ML tests (performance tests, drifts, metamorphic, etc.);
 * Implementing new features to Giskard
 
-### Did you find a bug? 
+### Did you find a bug?
 
 First, we would really appreciate it if you could **make sure the bug was not
 already reported** (use the search bar on Github under Issues).
