@@ -8,9 +8,29 @@ Understanding the key concepts in Giskard Checks will help you write effective t
 Overview
 --------
 
-Giskard Checks is built around a few core primitives that work together:
+Giskard Checks provides a fluent API that makes it easy to write tests. The recommended way to create tests is using ``scenario().interact().check()``:
 
-TODO
+.. code-block:: python
+
+   from giskard.checks import scenario, StringMatchingCheck
+
+   async def run_example():
+       result = await (
+           scenario("my_test")
+           .interact("Hello", lambda inputs: my_bot(inputs))
+           .check(StringMatchingCheck(content="Hi", key="interactions[-1].outputs"))
+           .run()
+       )
+       print(f"Test passed: {result.passed}")
+
+   import asyncio
+   asyncio.run(run_example())
+
+This fluent API handles all the underlying concepts automatically. For advanced use cases, you can work with the core primitives directly (see :ref:`advanced-concepts` below).
+
+
+Core Concepts
+=============
 
 Interaction
 -----------
@@ -39,7 +59,11 @@ Interactions are **immutable**, as they represent something that has already hap
 InteractionSpec
 ---------------
 
-An ``InteractionSpec`` describes *how* to generate an interaction. Both inputs and outputs can be generated dynamically:
+.. _advanced-concepts:
+
+**Advanced Usage**: An ``InteractionSpec`` describes *how* to generate an interaction. Both inputs and outputs can be generated dynamically. In most cases, you'll use the fluent API (``scenario().interact()``) which creates ``InteractionSpec`` objects automatically.
+
+For advanced use cases where you need direct control:
 
 .. code-block:: python
 
@@ -67,7 +91,7 @@ An ``InteractionSpec`` describes *how* to generate an interaction. Both inputs a
        }
    )
 
-This is very common when you are testing multi-turn scenarios, where inputs and outputs are generated based on previous interactions. See TODO for practical examples.
+This is useful when you need fine-grained control over interaction generation, but for most use cases, the fluent API is simpler. See :doc:`multi-turn` for practical examples.
 
 Trace
 -----
@@ -104,15 +128,42 @@ A ``Check`` validates something about a trace and returns a ``CheckResult``. The
 TODO
 
 
-TestCase
---------
+Scenarios (Recommended)
+------------------------
 
-A ``TestCase`` is combines a trace and the checks that will be applied to it.
+The recommended way to create tests is using the fluent API with ``scenario()``:
 
 .. code-block:: python
 
-   from giskard.checks import TestCase, InteractionSpec, from_fn
+   from giskard.checks import scenario, Conformity
 
+   async def run_conversation_example():
+       result = await (
+           scenario("conversation_test")
+           .interact("Hello", lambda inputs: generate_answer(inputs))
+           .check(Conformity(key="interactions[-1].outputs", rule="response should be a friendly greeting"))
+           .interact("Who invented the HTML?", lambda inputs: generate_answer(inputs))
+           .check(Conformity(key="interactions[-1].outputs", rule="response should mention Tim Berners-Lee as the inventor of HTML"))
+           .run()
+       )
+       print(f"Test passed: {result.passed}")
+
+   import asyncio
+   asyncio.run(run_conversation_example())
+
+This creates a ``Scenario`` internally that executes interactions and checks sequentially. The fluent API is easier to read and write than manually constructing scenarios.
+
+
+Advanced: TestCase and Scenario Classes
+----------------------------------------
+
+**Advanced Usage**: For programmatic test generation or advanced use cases, you can work with ``TestCase`` and ``Scenario`` classes directly:
+
+.. code-block:: python
+
+   from giskard.checks import TestCase, Scenario, InteractionSpec, from_fn
+
+   # TestCase combines a trace with checks
    test_case = TestCase(
         trace=trace,
         checks=[check1, check2]
@@ -120,25 +171,15 @@ A ``TestCase`` is combines a trace and the checks that will be applied to it.
 
    result = await test_case.run()
 
-This will give us a result object with the results of the checks.
-
-
-Scenario
---------
-
-A ``Scenario`` allows you to compose multiple steps of testing in sequences alternating some interactions and some checks. This is useful when you are testing complex multi-turn scenarios and you want to test intermediate checkpoints.
-
-For example, we can test a simple conversation flow with two turns:
-
-.. code-block:: python
-
-   from giskard.checks import Scenario, InteractionSpec, from_fn
-
-   scenario = Scenario.from_sequence(
-        InteractionSpec(inputs="Hello", outputs=generate_answer),
-        Conformity(key="last.outputs", rule="response should be a friendly greeting"),
-        InteractionSpec(inputs="Who invented the HTML?", outputs=generate_answer),
-        Conformity(key="last.outputs", rule="response should mention Tim Berners-Lee as the inventor of HTML"),
+   # Scenario allows manual construction of sequences
+   scenario = Scenario(
+       name="my_scenario",
+       sequence=[
+           InteractionSpec(inputs="Hello", outputs=generate_answer),
+           Conformity(key="interactions[-1].outputs", rule="response should be friendly"),
+       ]
    )
 
    result = await scenario.run()
+
+For most use cases, prefer the fluent API (``scenario().interact().check()``) as it's simpler and more readable.

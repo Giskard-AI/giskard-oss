@@ -17,17 +17,20 @@ from .trace import Trace
 
 
 class TestCase[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
-    """Bundle an interaction specification with a set of checks to execute.
+    """Bundle a trace with a set of checks to execute.
+
+    **Note**: For most use cases, the fluent API (`scenario().interact().check()`) is
+    recommended as it's simpler and more readable. This class is useful for advanced
+    use cases where you need direct control over test case construction.
 
     Attributes
     ----------
     name:
         Optional label for the test case.
-    interaction:
-        The interaction specification that produces interactions for testing. Custom
-        subclasses of `BaseInteractionSpec` can encapsulate callable logic or generators.
+    trace:
+        The trace containing interactions to test against.
     checks:
-        Sequence of checks to run against the generated interaction.
+        Sequence of checks to run against the trace.
     """
 
     # Prevent pytest from attempting to collect this class as a test

@@ -145,10 +145,8 @@ Test that the system answers questions correctly:
 
    from giskard.agents.generators import Generator
    from giskard.checks import (
-       InteractionSpec,
-       TestCase,
+       scenario,
        StringMatchingCheck,
-       EqualityCheck,
        from_fn,
        set_default_generator
    )
@@ -156,50 +154,40 @@ Test that the system answers questions correctly:
    # Configure LLM for checks
    set_default_generator(Generator(model="openai/gpt-4o-mini"))
 
-   # Test case
-   interaction = InteractionSpec(
-       inputs="What is the capital of France?",
-       outputs=lambda inputs: rag.answer(inputs)
-   )
-
-   checks = [
-       # Check that answer mentions Paris
-       StringMatchingCheck(
-           name="mentions_paris",
-           content="Paris",
-           key="interactions[-1].outputs.answer"
-       ),
-       # Check that documents were retrieved
-       from_fn(
-           lambda trace: len(trace.interactions[-1].outputs.retrieved_docs) > 0,
-           name="retrieved_documents",
-           success_message="Retrieved relevant documents",
-           failure_message="No documents retrieved"
-       ),
-       # Check confidence is reasonable
-       from_fn(
-           lambda trace: trace.interactions[-1].outputs.confidence > 0.5,
-           name="confident_answer",
-           success_message="High confidence answer",
-           failure_message="Low confidence answer"
-       ),
-   ]
-
-   async def test_basic_qa():
-       tc = TestCase(
-           interaction=interaction,
-           checks=checks,
-           name="basic_qa_france_capital"
+   async def run_basic_qa_example():
+       result = await (
+           scenario("basic_qa_france_capital")
+           .interact(
+               "What is the capital of France?",
+               lambda inputs: rag.answer(inputs)
+           )
+           .check(StringMatchingCheck(
+               name="mentions_paris",
+               content="Paris",
+               key="interactions[-1].outputs.answer"
+           ))
+           .check(from_fn(
+               lambda trace: len(trace.interactions[-1].outputs.retrieved_docs) > 0,
+               name="retrieved_documents",
+               success_message="Retrieved relevant documents",
+               failure_message="No documents retrieved"
+           ))
+           .check(from_fn(
+               lambda trace: trace.interactions[-1].outputs.confidence > 0.5,
+               name="confident_answer",
+               success_message="High confidence answer",
+               failure_message="Low confidence answer"
+           ))
+           .run()
        )
-       result = await tc.run()
 
        print(f"Test passed: {result.passed}")
        for check_result in result.results:
            print(f"  {check_result.name}: {check_result.status.value}")
 
-   # Run the test
+   # Run the example
    import asyncio
-   asyncio.run(test_basic_qa())
+   asyncio.run(run_basic_qa_example())
 
 
 Test 2: Groundedness Check
@@ -209,33 +197,31 @@ Verify that answers are grounded in retrieved context:
 
 .. code-block:: python
 
-   from giskard.checks import Groundedness, InteractionSpec, TestCase
+   from giskard.checks import scenario, Groundedness, StringMatchingCheck
 
-   interaction = InteractionSpec(
-       inputs="When was the Eiffel Tower completed?",
-       outputs=lambda inputs: rag.answer(inputs)
-   )
-
-   checks = [
-       Groundedness(
-           name="answer_grounded",
-           description="Answer should be based on retrieved documents"
-       ),
-       StringMatchingCheck(
-           name="mentions_year",
-           content="1889",
-           key="interactions[-1].outputs.answer"
-       ),
-   ]
-
-   async def test_groundedness():
-       tc = TestCase(
-           interaction=interaction,
-           checks=checks,
-           name="groundedness_eiffel_tower"
+   async def run_groundedness_example():
+       result = await (
+           scenario("groundedness_eiffel_tower")
+           .interact(
+               "When was the Eiffel Tower completed?",
+               lambda inputs: rag.answer(inputs)
+           )
+           .check(Groundedness(
+               name="answer_grounded",
+               description="Answer should be based on retrieved documents"
+           ))
+           .check(StringMatchingCheck(
+               name="mentions_year",
+               content="1889",
+               key="interactions[-1].outputs.answer"
+           ))
+           .run()
        )
-       result = await tc.run()
        assert result.passed
+       print(f"Groundedness check passed: {result.passed}")
+
+   import asyncio
+   asyncio.run(run_groundedness_example())
 
 
 Test 3: Retrieval Quality
@@ -245,12 +231,7 @@ Test that the right documents are retrieved:
 
 .. code-block:: python
 
-   from giskard.checks import from_fn, InteractionSpec, TestCase
-
-   interaction = InteractionSpec(
-       inputs="Tell me about the Eiffel Tower",
-       outputs=lambda inputs: rag.answer(inputs)
-   )
+   from giskard.checks import scenario, from_fn
 
    def check_retrieved_topics(trace) -> bool:
        """Verify retrieved docs are about the right topic."""
@@ -258,26 +239,31 @@ Test that the right documents are retrieved:
        topics = [doc.metadata.get("topic") for doc in docs]
        return "Eiffel Tower" in topics or "France" in topics
 
-   checks = [
-       from_fn(
-           lambda trace: len(trace.interactions[-1].outputs.retrieved_docs) >= 2,
-           name="sufficient_context",
-           success_message="Retrieved multiple documents",
-           failure_message="Not enough documents retrieved"
-       ),
-       from_fn(
-           check_retrieved_topics,
-           name="relevant_topics",
-           success_message="Retrieved documents are topically relevant",
-           failure_message="Retrieved documents are off-topic"
-       ),
-   ]
+   async def run_retrieval_quality_example():
+       result = await (
+           scenario("retrieval_quality")
+           .interact(
+               "Tell me about the Eiffel Tower",
+               lambda inputs: rag.answer(inputs)
+           )
+           .check(from_fn(
+               lambda trace: len(trace.interactions[-1].outputs.retrieved_docs) >= 2,
+               name="sufficient_context",
+               success_message="Retrieved multiple documents",
+               failure_message="Not enough documents retrieved"
+           ))
+           .check(from_fn(
+               check_retrieved_topics,
+               name="relevant_topics",
+               success_message="Retrieved documents are topically relevant",
+               failure_message="Retrieved documents are off-topic"
+           ))
+           .run()
+       )
+       print(f"Retrieval quality check passed: {result.passed}")
 
-   tc = TestCase(
-       interaction=interaction,
-       checks=checks,
-       name="retrieval_quality"
-   )
+   import asyncio
+   asyncio.run(run_retrieval_quality_example())
 
 
 Test 4: Out-of-Scope Questions
@@ -287,39 +273,39 @@ Test how the system handles questions it can't answer:
 
 .. code-block:: python
 
-   from giskard.checks import LLMJudge, InteractionSpec, TestCase, from_fn
+   from giskard.checks import scenario, LLMJudge, from_fn
+   import asyncio
 
-   interaction = InteractionSpec(
-       inputs="What is the weather in Tokyo today?",
-       outputs=lambda inputs: rag.answer(inputs)
-   )
+   async def run_out_of_scope_example():
+       result = await (
+           scenario("out_of_scope_handling")
+           .interact(
+               "What is the weather in Tokyo today?",
+               lambda inputs: rag.answer(inputs)
+           )
+           .check(from_fn(
+               lambda trace: len(trace.interactions[-1].outputs.retrieved_docs) == 0,
+               name="no_irrelevant_docs",
+               success_message="Correctly retrieved no documents",
+               failure_message="Retrieved documents for out-of-scope question"
+           ))
+           .check(LLMJudge(
+               name="appropriate_fallback",
+               prompt="""
+               Evaluate if the system appropriately indicates it cannot answer.
 
-   checks = [
-       from_fn(
-           lambda trace: len(trace.interactions[-1].outputs.retrieved_docs) == 0,
-           name="no_irrelevant_docs",
-           success_message="Correctly retrieved no documents",
-           failure_message="Retrieved documents for out-of-scope question"
-       ),
-       LLMJudge(
-           name="appropriate_fallback",
-           prompt="""
-           Evaluate if the system appropriately indicates it cannot answer.
+               Question: {{ inputs }}
+               Answer: {{ outputs.answer }}
 
-           Question: {{ inputs }}
-           Answer: {{ outputs.answer }}
+               The answer should politely indicate insufficient information.
+               Return 'passed: true' if appropriate, 'passed: false' if it makes up an answer.
+               """
+           ))
+           .run()
+       )
+       print(f"Out-of-scope handling check passed: {result.passed}")
 
-           The answer should politely indicate insufficient information.
-           Return 'passed: true' if appropriate, 'passed: false' if it makes up an answer.
-           """
-       ),
-   ]
-
-   tc = TestCase(
-       interaction=interaction,
-       checks=checks,
-       name="out_of_scope_handling"
-   )
+   asyncio.run(run_out_of_scope_example())
 
 
 Test 5: Answer Quality with LLM Judge
@@ -329,40 +315,40 @@ Use an LLM to evaluate answer quality comprehensively:
 
 .. code-block:: python
 
-   from giskard.checks import LLMJudge, InteractionSpec, TestCase
+   from giskard.checks import scenario, LLMJudge
+   import asyncio
 
-   interaction = InteractionSpec(
-       inputs="What is machine learning?",
-       outputs=lambda inputs: rag.answer(inputs)
-   )
+   async def run_comprehensive_quality_example():
+       result = await (
+           scenario("comprehensive_quality_check")
+           .interact(
+               "What is machine learning?",
+               lambda inputs: rag.answer(inputs)
+           )
+           .check(LLMJudge(
+               name="answer_quality",
+               prompt="""
+               Evaluate the answer quality based on these criteria:
 
-   checks = [
-       LLMJudge(
-           name="answer_quality",
-           prompt="""
-           Evaluate the answer quality based on these criteria:
+               Question: {{ inputs }}
+               Answer: {{ outputs.answer }}
+               Retrieved Context: {{ outputs.retrieved_docs }}
 
-           Question: {{ inputs }}
-           Answer: {{ outputs.answer }}
-           Retrieved Context: {{ outputs.retrieved_docs }}
+               Criteria:
+               1. Accuracy: Is the answer factually correct?
+               2. Completeness: Does it fully address the question?
+               3. Clarity: Is it well-written and understandable?
+               4. Relevance: Does it stay on topic?
 
-           Criteria:
-           1. Accuracy: Is the answer factually correct?
-           2. Completeness: Does it fully address the question?
-           3. Clarity: Is it well-written and understandable?
-           4. Relevance: Does it stay on topic?
+               Return 'passed: true' if the answer meets all criteria.
+               Provide brief reasoning.
+               """
+           ))
+           .run()
+       )
+       print(f"Comprehensive quality check passed: {result.passed}")
 
-           Return 'passed: true' if the answer meets all criteria.
-           Provide brief reasoning.
-           """
-       ),
-   ]
-
-   tc = TestCase(
-       interaction=interaction,
-       checks=checks,
-       name="comprehensive_quality_check"
-   )
+   asyncio.run(run_comprehensive_quality_example())
 
 
 Test 6: Multi-Turn Conversational RAG
@@ -373,9 +359,9 @@ Test a conversational RAG that handles follow-up questions:
 .. code-block:: python
 
    from giskard.checks import (
-       Scenario,
-       InteractionSpec,
+       scenario,
        Groundedness,
+       StringMatchingCheck,
        from_fn,
        LLMJudge
    )
@@ -413,28 +399,27 @@ Test a conversational RAG that handles follow-up questions:
 
    conv_rag = ConversationalRAG(documents=knowledge_base)
 
-   scenario = Scenario(
-       name="conversational_rag_flow",
-       sequence=[
+   async def run_conversational_rag_example():
+       result = await (
+           scenario("conversational_rag_flow")
            # First question
-           InteractionSpec(
-               inputs="What is the capital of France?",
-               outputs=lambda inputs: conv_rag.answer(inputs)
-           ),
-           Groundedness(name="first_answer_grounded"),
-           StringMatchingCheck(
+           .interact(
+               "What is the capital of France?",
+               lambda inputs: conv_rag.answer(inputs)
+           )
+           .check(Groundedness(name="first_answer_grounded"))
+           .check(StringMatchingCheck(
                name="first_mentions_paris",
                content="Paris",
                key="interactions[-1].outputs.answer"
-           ),
-
+           ))
            # Follow-up question with reference
-           InteractionSpec(
-               inputs="What is it known for?",
-               outputs=lambda inputs: conv_rag.answer(inputs)
-           ),
-           Groundedness(name="followup_grounded"),
-           LLMJudge(
+           .interact(
+               "What is it known for?",
+               lambda inputs: conv_rag.answer(inputs)
+           )
+           .check(Groundedness(name="followup_grounded"))
+           .check(LLMJudge(
                name="resolves_reference",
                prompt="""
                Check if the answer appropriately addresses the follow-up question
@@ -448,13 +433,13 @@ Test a conversational RAG that handles follow-up questions:
                The follow-up should discuss what Paris is known for.
                Return 'passed: true' if the context was maintained correctly.
                """
-           ),
-       ]
-   )
+           ))
+           .run()
+       )
+       print(f"Conversational RAG example passed: {result.passed}")
 
-   async def test_conversational_rag():
-       result = await scenario.run()
-       print(f"Conversational RAG test passed: {result.passed}")
+   import asyncio
+   asyncio.run(run_conversational_rag_example())
 
 
 Complete Test Suite
@@ -466,87 +451,75 @@ Combine all tests into a comprehensive suite:
 
    import asyncio
    from typing import List
-   from giskard.checks import TestCase
+   from giskard.checks import scenario, Scenario
 
    class RAGTestSuite:
        def __init__(self, rag_system: SimpleRAG):
            self.rag = rag_system
-           self.test_cases = []
-           self._build_test_cases()
+           self.scenarios = []
+           self._build_scenarios()
 
-       def _build_test_cases(self):
-           """Build all test cases."""
+       def _build_scenarios(self):
+           """Build all scenarios."""
            # Add basic QA tests
-           self.test_cases.extend(self._create_qa_tests())
+           self.scenarios.extend(self._create_qa_tests())
 
            # Add groundedness tests
-           self.test_cases.extend(self._create_groundedness_tests())
+           self.scenarios.extend(self._create_groundedness_tests())
 
            # Add edge case tests
-           self.test_cases.extend(self._create_edge_case_tests())
+           self.scenarios.extend(self._create_edge_case_tests())
 
-       def _create_qa_tests(self) -> List[TestCase]:
-           """Create basic QA test cases."""
+       def _create_qa_tests(self) -> List[Scenario]:
+           """Create basic QA test scenarios."""
            test_data = [
                ("What is the capital of France?", "Paris"),
                ("When was the Eiffel Tower completed?", "1889"),
-               ("What is Python?", "programming language"),
+               ("What is Python?", "programming_language"),
            ]
 
-           tests = []
+           scenarios = []
            for question, expected_content in test_data:
-               interaction = InteractionSpec(
-                   inputs=question,
-                   outputs=lambda q: self.rag.answer(q)
-               )
-
-               checks = [
-                   StringMatchingCheck(
+               test_scenario = (
+                   scenario(f"qa_{expected_content.replace(' ', '_')}")
+                   .interact(question, lambda inputs: self.rag.answer(inputs))
+                   .check(StringMatchingCheck(
                        name=f"contains_{expected_content}",
                        content=expected_content,
                        key="interactions[-1].outputs.answer"
-                   ),
-                   from_fn(
+                   ))
+                   .check(from_fn(
                        lambda trace: len(trace.interactions[-1].outputs.retrieved_docs) > 0,
                        name="has_context"
-                   ),
-               ]
+                   ))
+                   .build()
+               )
+               scenarios.append(test_scenario)
 
-               tests.append(TestCase(
-                   interaction=interaction,
-                   checks=checks,
-                   name=f"qa_{expected_content.replace(' ', '_')}"
-               ))
+           return scenarios
 
-           return tests
-
-       def _create_groundedness_tests(self) -> List[TestCase]:
-           """Create groundedness test cases."""
+       def _create_groundedness_tests(self) -> List[Scenario]:
+           """Create groundedness test scenarios."""
            questions = [
                "What is the capital of France?",
                "Tell me about the Eiffel Tower",
                "What is machine learning?",
            ]
 
-           tests = []
+           scenarios = []
            for question in questions:
-               interaction = InteractionSpec(
-                   inputs=question,
-                   outputs=lambda q: self.rag.answer(q)
+               test_scenario = (
+                   scenario(f"groundedness_{question[:20]}")
+                   .interact(question, lambda inputs: self.rag.answer(inputs))
+                   .check(Groundedness(name="grounded"))
+                   .build()
                )
+               scenarios.append(test_scenario)
 
-               checks = [Groundedness(name="grounded")]
+           return scenarios
 
-               tests.append(TestCase(
-                   interaction=interaction,
-                   checks=checks,
-                   name=f"groundedness_{question[:20]}"
-               ))
-
-           return tests
-
-       def _create_edge_case_tests(self) -> List[TestCase]:
-           """Create edge case test cases."""
+       def _create_edge_case_tests(self) -> List[Scenario]:
+           """Create edge case test scenarios."""
            edge_cases = [
                ("", "empty_query"),
                ("   ", "whitespace_query"),
@@ -554,36 +527,29 @@ Combine all tests into a comprehensive suite:
                ("askdjhaksjdhaksjdh", "gibberish"),
            ]
 
-           tests = []
+           scenarios = []
            for question, case_name in edge_cases:
-               interaction = InteractionSpec(
-                   inputs=question,
-                   outputs=lambda q: self.rag.answer(q)
-               )
-
-               checks = [
-                   from_fn(
+               test_scenario = (
+                   scenario(f"edge_case_{case_name}")
+                   .interact(question, lambda inputs: self.rag.answer(inputs))
+                   .check(from_fn(
                        lambda trace: trace.interactions[-1].outputs.answer,
                        name="provides_response",
                        success_message="System provided a response"
-                   ),
-               ]
+                   ))
+                   .build()
+               )
+               scenarios.append(test_scenario)
 
-               tests.append(TestCase(
-                   interaction=interaction,
-                   checks=checks,
-                   name=f"edge_case_{case_name}"
-               ))
-
-           return tests
+           return scenarios
 
        async def run_all(self):
-           """Run all tests and report results."""
+           """Run all scenarios and report results."""
            results = []
 
-           for tc in self.test_cases:
-               result = await tc.run()
-               results.append((tc.name, result))
+           for test_scenario in self.scenarios:
+               result = await test_scenario.run()
+               results.append((test_scenario.name, result))
 
            # Summary
            passed = sum(1 for _, r in results if r.passed)

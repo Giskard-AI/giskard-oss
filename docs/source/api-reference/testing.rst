@@ -179,7 +179,7 @@ Parameterized Tests
 .. code-block:: python
 
    import pytest
-   from giskard.checks import TestCase, InteractionSpec, StringMatchingCheck
+   from giskard.checks import scenario, StringMatchingCheck
 
    test_data = [
        ("What is 2+2?", "4"),
@@ -190,24 +190,19 @@ Parameterized Tests
    @pytest.mark.parametrize("question,expected", test_data)
    @pytest.mark.asyncio
    async def test_calculator(question, expected):
-       interaction = InteractionSpec(
-           inputs=question,
-           outputs=lambda inputs: calculator(inputs)
+       result = await (
+           scenario(f"calc_{expected}")
+           .interact(
+               question,
+               lambda inputs: calculator(inputs)
+           )
+           .check(StringMatchingCheck(
+               name="correct_answer",
+               content=expected,
+               key="interactions[-1].outputs"
+           ))
+           .run()
        )
-
-       check = StringMatchingCheck(
-           name="correct_answer",
-           content=expected,
-           key="interactions[-1].outputs"
-       )
-
-       tc = TestCase(
-           interaction=interaction,
-           checks=[check],
-           name=f"calc_{expected}"
-       )
-
-       result = await tc.run()
        assert result.passed
 
 

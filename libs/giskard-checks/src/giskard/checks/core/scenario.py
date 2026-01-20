@@ -14,6 +14,10 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
     """A scenario composed of an ordered sequence of components (InteractionSpecs
     and Checks) with shared trace.
 
+    **Note**: For most use cases, the fluent API (`scenario().interact().check()`) is
+    recommended as it's simpler and more readable. This class is useful for advanced
+    use cases where you need direct control over scenario construction.
+
     A scenario executes components sequentially, maintaining a shared trace that
     accumulates all interactions. Execution stops immediately if any check fails.
 
@@ -35,12 +39,27 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
 
     Examples
     --------
+    **Recommended**: Use the fluent API:
     ```python
+    from giskard.checks import scenario, Equality
+
+    result = await (
+        scenario("multi_step_test")
+        .interact("Hello", lambda inputs: "Hi")
+        .check(Equality(expected="Hi", key="interactions[-1].outputs"))
+        .run()
+    )
+    ```
+
+    **Advanced**: Direct instantiation:
+    ```python
+    from giskard.checks import Scenario, InteractionSpec, Equality
+
     scenario = Scenario(
         name="multi_step_test",
         sequence=[
             InteractionSpec(inputs="Hello", outputs="Hi"),
-            Equality(expected="Hi", key="trace.interactions[-1].outputs"),
+            Equality(expected="Hi", key="interactions[-1].outputs"),
         ],
     )
     result = await scenario.run()
