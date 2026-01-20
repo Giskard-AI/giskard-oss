@@ -30,6 +30,10 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
 ):
     """Flexible interaction specification supporting static values, callables, and generators.
 
+    **Note**: For most use cases, the fluent API (`scenario().interact()`) is recommended
+    as it automatically creates `InteractionSpec` objects and is simpler to use. This class
+    is useful for advanced use cases where you need direct control over interaction specification.
+
     This is the default implementation of `BaseInteractionSpec` that provides
     a convenient way to specify interactions with varying levels of dynamism:
 

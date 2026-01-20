@@ -141,62 +141,57 @@ Test a simple greeting and name exchange:
 
 .. code-block:: python
 
-   from giskard.checks import Scenario, InteractionSpec, from_fn, StringMatchingCheck
+   from giskard.checks import scenario, from_fn, StringMatchingCheck
 
    bot = SimpleChatbot()
 
-   scenario = Scenario(
-       name="greeting_and_introduction",
-       sequence=[
+   import asyncio
+
+   async def run_basic_conversation_example():
+       result = await (
+           scenario("greeting_and_introduction")
            # User greets
-           InteractionSpec(
-               inputs="Hello",
-               outputs=lambda inputs: bot.chat(inputs)
-           ),
-           StringMatchingCheck(
+           .interact(
+               "Hello",
+               lambda inputs: bot.chat(inputs)
+           )
+           .check(StringMatchingCheck(
                name="polite_greeting",
                content="help",
                key="interactions[-1].outputs.message"
-           ),
-
+           ))
            # User introduces themselves
-           InteractionSpec(
-               inputs="My name is Alice",
-               outputs=lambda inputs: bot.chat(inputs)
-           ),
-           StringMatchingCheck(
+           .interact(
+               "My name is Alice",
+               lambda inputs: bot.chat(inputs)
+           )
+           .check(StringMatchingCheck(
                name="acknowledges_name",
                content="Alice",
                key="interactions[-1].outputs.message"
-           ),
-           from_fn(
+           ))
+           .check(from_fn(
                lambda trace: trace.interactions[-1].outputs.context.user_name == "Alice",
                name="stored_name",
                success_message="Chatbot stored the user's name",
                failure_message="Chatbot failed to store name"
-           ),
-
+           ))
            # Verify name recall
-           InteractionSpec(
-               inputs="What is my name?",
-               outputs=lambda inputs: bot.chat(inputs)
-           ),
-           StringMatchingCheck(
+           .interact(
+               "What is my name?",
+               lambda inputs: bot.chat(inputs)
+           )
+           .check(StringMatchingCheck(
                name="recalls_name",
                content="Alice",
                key="interactions[-1].outputs.message"
-           ),
-       ]
-   )
-
-   import asyncio
-
-   async def test_basic_conversation():
-       result = await scenario.run()
+           ))
+           .run()
+       )
        assert result.passed
-       print("✓ Basic conversation flow test passed")
+       print("✓ Basic conversation flow example passed")
 
-   asyncio.run(test_basic_conversation())
+   asyncio.run(run_basic_conversation_example())
 
 
 Test 2: Context Switching
@@ -208,8 +203,7 @@ Verify the chatbot handles different conversation types:
 
    from giskard.agents.generators import Generator
    from giskard.checks import (
-       Scenario,
-       InteractionSpec,
+       scenario,
        LLMJudge,
        EqualityCheck,
        set_default_generator
@@ -219,31 +213,30 @@ Verify the chatbot handles different conversation types:
 
    bot = SimpleChatbot()
 
-   scenario = Scenario(
-       name="context_switching",
-       sequence=[
+   async def run_context_switching_example():
+       result = await (
+           scenario("context_switching")
            # Start with casual conversation
-           InteractionSpec(
-               inputs="Hi there!",
-               outputs=lambda inputs: bot.chat(inputs)
-           ),
-           EqualityCheck(
+           .interact(
+               "Hi there!",
+               lambda inputs: bot.chat(inputs)
+           )
+           .check(EqualityCheck(
                name="casual_context",
                expected="casual",
                key="interactions[-1].outputs.context.conversation_type"
-           ),
-
+           ))
            # Switch to support
-           InteractionSpec(
-               inputs="I'm having a problem with my account",
-               outputs=lambda inputs: bot.chat(inputs)
-           ),
-           EqualityCheck(
+           .interact(
+               "I'm having a problem with my account",
+               lambda inputs: bot.chat(inputs)
+           )
+           .check(EqualityCheck(
                name="support_context",
                expected="support",
                key="interactions[-1].outputs.context.conversation_type"
-           ),
-           LLMJudge(
+           ))
+           .check(LLMJudge(
                name="support_tone",
                prompt="""
                Evaluate if the response is appropriate for a support inquiry.
@@ -254,20 +247,23 @@ Verify the chatbot handles different conversation types:
                The response should be helpful and professional.
                Return 'passed: true' if appropriate.
                """
-           ),
-
+           ))
            # Switch to sales
-           InteractionSpec(
-               inputs="How much does it cost?",
-               outputs=lambda inputs: bot.chat(inputs)
-           ),
-           EqualityCheck(
+           .interact(
+               "How much does it cost?",
+               lambda inputs: bot.chat(inputs)
+           )
+           .check(EqualityCheck(
                name="sales_context",
                expected="sales",
                key="interactions[-1].outputs.context.conversation_type"
-           ),
-       ]
-   )
+           ))
+           .run()
+       )
+       print(f"Context switching example passed: {result.passed}")
+
+   import asyncio
+   asyncio.run(run_context_switching_example())
 
 
 Test 3: Response Quality and Tone
@@ -277,56 +273,56 @@ Evaluate response quality using LLM-as-a-judge:
 
 .. code-block:: python
 
-   from giskard.checks import TestCase, InteractionSpec, LLMJudge
+   from giskard.checks import scenario, LLMJudge
 
    bot = SimpleChatbot(personality="professional")
 
-   interaction = InteractionSpec(
-       inputs="I need help understanding your pricing",
-       outputs=lambda inputs: bot.chat(inputs)
-   )
+   async def run_response_quality_example():
+       result = await (
+           scenario("response_quality_test")
+           .interact(
+               "I need help understanding your pricing",
+               lambda inputs: bot.chat(inputs)
+           )
+           .check(LLMJudge(
+               name="tone_check",
+               prompt="""
+               Evaluate the tone of this chatbot response.
 
-   checks = [
-       LLMJudge(
-           name="tone_check",
-           prompt="""
-           Evaluate the tone of this chatbot response.
+               User message: {{ inputs }}
+               Bot response: {{ outputs.message }}
+               Expected personality: professional
 
-           User message: {{ inputs }}
-           Bot response: {{ outputs.message }}
-           Expected personality: professional
+               Check:
+               1. Is the tone professional?
+               2. Is it helpful and clear?
+               3. Does it address the user's question?
 
-           Check:
-           1. Is the tone professional?
-           2. Is it helpful and clear?
-           3. Does it address the user's question?
+               Return 'passed: true' if tone is appropriate.
+               """
+           ))
+           .check(LLMJudge(
+               name="completeness",
+               prompt="""
+               Evaluate if the response is complete.
 
-           Return 'passed: true' if tone is appropriate.
-           """
-       ),
-       LLMJudge(
-           name="completeness",
-           prompt="""
-           Evaluate if the response is complete.
+               User: {{ inputs }}
+               Bot: {{ outputs.message }}
 
-           User: {{ inputs }}
-           Bot: {{ outputs.message }}
+               Does the response:
+               1. Acknowledge the user's question?
+               2. Provide next steps or information?
+               3. Offer to help further?
 
-           Does the response:
-           1. Acknowledge the user's question?
-           2. Provide next steps or information?
-           3. Offer to help further?
+               Return 'passed: true' if response is complete.
+               """
+           ))
+           .run()
+       )
+       print(f"Response quality example passed: {result.passed}")
 
-           Return 'passed: true' if response is complete.
-           """
-       ),
-   ]
-
-   tc = TestCase(
-       interaction=interaction,
-       checks=checks,
-       name="response_quality_test"
-   )
+   import asyncio
+   asyncio.run(run_response_quality_example())
 
 
 Test 4: Information Extraction and Storage
@@ -336,41 +332,39 @@ Test the chatbot's ability to extract and remember user information:
 
 .. code-block:: python
 
-   from giskard.checks import Scenario, InteractionSpec, from_fn, EqualityCheck
+   from giskard.checks import scenario, from_fn, EqualityCheck
 
    bot = SimpleChatbot()
 
-   scenario = Scenario(
-       name="information_collection",
-       sequence=[
+   async def run_information_collection_example():
+       result = await (
+           scenario("information_collection")
            # Collect name
-           InteractionSpec(
-               inputs="Hi, I'm Bob Johnson",
-               outputs=lambda inputs: bot.chat(inputs)
-           ),
-           EqualityCheck(
+           .interact(
+               "Hi, I'm Bob Johnson",
+               lambda inputs: bot.chat(inputs)
+           )
+           .check(EqualityCheck(
                name="extracted_name",
                expected="Bob",
                key="interactions[-1].outputs.context.user_name"
-           ),
-
+           ))
            # Collect email
-           InteractionSpec(
-               inputs="My email is bob.johnson@example.com",
-               outputs=lambda inputs: bot.chat(inputs)
-           ),
-           EqualityCheck(
+           .interact(
+               "My email is bob.johnson@example.com",
+               lambda inputs: bot.chat(inputs)
+           )
+           .check(EqualityCheck(
                name="extracted_email",
                expected="bob.johnson@example.com",
                key="interactions[-1].outputs.context.user_email"
-           ),
-
+           ))
            # Verify information persists
-           InteractionSpec(
-               inputs="Can you remind me what information you have about me?",
-               outputs=lambda inputs: bot.chat(inputs)
-           ),
-           from_fn(
+           .interact(
+               "Can you remind me what information you have about me?",
+               lambda inputs: bot.chat(inputs)
+           )
+           .check(from_fn(
                lambda trace: (
                    trace.interactions[-1].outputs.context.user_name == "Bob" and
                    trace.interactions[-1].outputs.context.user_email == "bob.johnson@example.com"
@@ -378,9 +372,13 @@ Test the chatbot's ability to extract and remember user information:
                name="information_persisted",
                success_message="Chatbot retained user information",
                failure_message="Chatbot lost user information"
-           ),
-       ]
-   )
+           ))
+           .run()
+       )
+       print(f"Information collection example passed: {result.passed}")
+
+   import asyncio
+   asyncio.run(run_information_collection_example())
 
 
 Test 5: Edge Cases and Error Handling
@@ -390,54 +388,52 @@ Test how the chatbot handles unusual inputs:
 
 .. code-block:: python
 
-   from giskard.checks import TestCase, InteractionSpec, from_fn, LLMJudge
+   from giskard.checks import scenario, from_fn, LLMJudge
 
    bot = SimpleChatbot()
 
-   # Test empty input
-   tc_empty = TestCase(
-       name="empty_input_handling",
-       interaction=InteractionSpec(
-           inputs="",
-           outputs=lambda inputs: bot.chat(inputs) if inputs else ChatResponse(
-               message="I didn't receive a message. Could you try again?",
-               context=bot.context
+   async def run_edge_case_examples():
+       # Test empty input
+       result_empty = await (
+           scenario("empty_input_handling")
+           .interact(
+               "",
+               lambda inputs: bot.chat(inputs) if inputs else ChatResponse(
+                   message="I didn't receive a message. Could you try again?",
+                   context=bot.context
+               )
            )
-       ),
-       checks=[
-           from_fn(
+           .check(from_fn(
                lambda trace: len(trace.interactions[-1].outputs.message) > 0,
                name="provides_response",
                success_message="Bot provided a response to empty input"
-           ),
-       ]
-   )
+           ))
+           .run()
+       )
 
-   # Test very long input
-   tc_long = TestCase(
-       name="long_input_handling",
-       interaction=InteractionSpec(
-           inputs="Hello " * 1000,
-           outputs=lambda inputs: bot.chat(inputs)
-       ),
-       checks=[
-           from_fn(
+       # Test very long input
+       result_long = await (
+           scenario("long_input_handling")
+           .interact(
+               "Hello " * 1000,
+               lambda inputs: bot.chat(inputs)
+           )
+           .check(from_fn(
                lambda trace: len(trace.interactions[-1].outputs.message) > 0,
                name="handles_long_input",
                success_message="Bot handled long input"
-           ),
-       ]
-   )
+           ))
+           .run()
+       )
 
-   # Test gibberish
-   tc_gibberish = TestCase(
-       name="gibberish_handling",
-       interaction=InteractionSpec(
-           inputs="asdfghjkl qwertyuiop zxcvbnm",
-           outputs=lambda inputs: bot.chat(inputs)
-       ),
-       checks=[
-           LLMJudge(
+       # Test gibberish
+       result_gibberish = await (
+           scenario("gibberish_handling")
+           .interact(
+               "asdfghjkl qwertyuiop zxcvbnm",
+               lambda inputs: bot.chat(inputs)
+           )
+           .check(LLMJudge(
                name="graceful_response",
                prompt="""
                Evaluate if the bot handles gibberish gracefully.
@@ -452,9 +448,16 @@ Test how the chatbot handles unusual inputs:
 
                Return 'passed: true' if handled well.
                """
-           ),
-       ]
-   )
+           ))
+           .run()
+       )
+
+       print(f"Empty input handling: {result_empty.passed}")
+       print(f"Long input handling: {result_long.passed}")
+       print(f"Gibberish handling: {result_gibberish.passed}")
+
+   import asyncio
+   asyncio.run(run_edge_case_examples())
 
 
 Test 6: Conversation State Management
@@ -464,7 +467,7 @@ Test complex stateful interactions:
 
 .. code-block:: python
 
-   from giskard.checks import Scenario, InteractionSpec, from_fn, LLMJudge
+   from giskard.checks import scenario, from_fn, LLMJudge, StringMatchingCheck
 
    class StatefulChatbot(SimpleChatbot):
        def __init__(self):
@@ -502,36 +505,35 @@ Test complex stateful interactions:
 
    stateful_bot = StatefulChatbot()
 
-   scenario = Scenario(
-       name="confirmation_flow",
-       sequence=[
+   async def run_confirmation_flow_example():
+       result = await (
+           scenario("confirmation_flow")
            # Request action requiring confirmation
-           InteractionSpec(
-               inputs="I want to delete my account",
-               outputs=lambda inputs: stateful_bot.chat(inputs)
-           ),
-           from_fn(
+           .interact(
+               "I want to delete my account",
+               lambda inputs: stateful_bot.chat(inputs)
+           )
+           .check(from_fn(
                lambda trace: stateful_bot.awaiting_confirmation,
                name="requested_confirmation",
                success_message="Bot requested confirmation"
-           ),
-           StringMatchingCheck(
+           ))
+           .check(StringMatchingCheck(
                name="asks_confirmation",
                content="confirm",
                key="interactions[-1].outputs.message"
-           ),
-
+           ))
            # User cancels
-           InteractionSpec(
-               inputs="No, nevermind",
-               outputs=lambda inputs: stateful_bot.chat(inputs)
-           ),
-           from_fn(
+           .interact(
+               "No, nevermind",
+               lambda inputs: stateful_bot.chat(inputs)
+           )
+           .check(from_fn(
                lambda trace: not stateful_bot.awaiting_confirmation,
                name="cleared_confirmation_state",
                success_message="Bot cleared confirmation state"
-           ),
-           LLMJudge(
+           ))
+           .check(LLMJudge(
                name="acknowledged_cancellation",
                prompt="""
                Check if the bot acknowledged the cancellation appropriately.
@@ -541,9 +543,13 @@ Test complex stateful interactions:
 
                Return 'passed: true' if the bot handled cancellation well.
                """
-           ),
-       ]
-   )
+           ))
+           .run()
+       )
+       print(f"Confirmation flow example passed: {result.passed}")
+
+   import asyncio
+   asyncio.run(run_confirmation_flow_example())
 
 
 Complete Chatbot Test Suite
@@ -554,37 +560,27 @@ Combine all tests into a comprehensive suite:
 .. code-block:: python
 
    import asyncio
-   from giskard.checks import TestCase, Scenario
+   from giskard.checks import Scenario
 
    class ChatbotTestSuite:
        def __init__(self, chatbot):
            self.chatbot = chatbot
            self.scenarios = []
-           self.test_cases = []
 
-       def add_scenario(self, scenario: Scenario):
-           self.scenarios.append(scenario)
-
-       def add_test(self, test_case: TestCase):
-           self.test_cases.append(test_case)
+       def add_scenario(self, test_scenario: Scenario):
+           self.scenarios.append(test_scenario)
 
        async def run_all(self):
-           """Run all tests and report results."""
+           """Run all scenarios and report results."""
            print("🤖 Running Chatbot Test Suite\n")
 
            results = []
 
            # Run scenarios
-           for scenario in self.scenarios:
-               print(f"  Running scenario: {scenario.name}")
-               result = await scenario.run()
-               results.append(("scenario", scenario.name, result))
-
-           # Run test cases
-           for tc in self.test_cases:
-               print(f"  Running test: {tc.name}")
-               result = await tc.run()
-               results.append(("test", tc.name, result))
+           for test_scenario in self.scenarios:
+               print(f"  Running scenario: {test_scenario.name}")
+               result = await test_scenario.run()
+               results.append(("scenario", test_scenario.name, result))
 
            # Report
            self._print_report(results)
@@ -614,9 +610,8 @@ Combine all tests into a comprehensive suite:
        bot = SimpleChatbot()
        suite = ChatbotTestSuite(bot)
 
-       # Add all scenarios and tests
+       # Add all scenarios
        # suite.add_scenario(...)
-       # suite.add_test(...)
 
        await suite.run_all()
 
@@ -632,12 +627,18 @@ Don't just test individual responses—test complete conversation flows:
 
 .. code-block:: python
 
-   scenario = Scenario(
-       name="complete_support_flow",
-       sequence=[
+   async def run_complete_support_flow():
+       result = await (
+           scenario("complete_support_flow")
            # Greeting -> Problem statement -> Information collection -> Resolution
-       ]
-   )
+           .interact(...)
+           .check(...)
+           .run()
+       )
+       print(f"Complete support flow passed: {result.passed}")
+
+   import asyncio
+   asyncio.run(run_complete_support_flow())
 
 **2. Validate Context Retention**
 

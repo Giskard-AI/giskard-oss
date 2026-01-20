@@ -142,44 +142,41 @@ Verify that the agent selects appropriate tools:
 
 .. code-block:: python
 
-   from giskard.checks import InteractionSpec, TestCase, from_fn, EqualityCheck
+   from giskard.checks import scenario, from_fn, EqualityCheck
 
    agent = SimpleAgent()
 
-   # Test calculator selection
-   interaction = InteractionSpec(
-       inputs="What is 15 * 23?",
-       outputs=lambda inputs: agent.run(inputs)
-   )
-
-   checks = [
-       from_fn(
-           lambda trace: len(trace.interactions[-1].outputs.steps) > 0,
-           name="used_tools",
-           success_message="Agent used tools",
-           failure_message="Agent didn't use any tools"
-       ),
-       EqualityCheck(
-           name="selected_calculator",
-           expected="calculator",
-           key="interactions[-1].outputs.steps[0].tool"
-       ),
-       from_fn(
-           lambda trace: trace.interactions[-1].outputs.success,
-           name="task_successful",
-           success_message="Agent completed task successfully",
-           failure_message="Agent failed to complete task"
-       ),
-   ]
-
-   async def test_tool_selection():
-       tc = TestCase(
-           interaction=interaction,
-           checks=checks,
-           name="tool_selection_calculator"
+   async def run_tool_selection_example():
+       result = await (
+           scenario("tool_selection_calculator")
+           .interact(
+               "What is 15 * 23?",
+               lambda inputs: agent.run(inputs)
+           )
+           .check(from_fn(
+               lambda trace: len(trace.interactions[-1].outputs.steps) > 0,
+               name="used_tools",
+               success_message="Agent used tools",
+               failure_message="Agent didn't use any tools"
+           ))
+           .check(EqualityCheck(
+               name="selected_calculator",
+               expected="calculator",
+               key="interactions[-1].outputs.steps[0].tool"
+           ))
+           .check(from_fn(
+               lambda trace: trace.interactions[-1].outputs.success,
+               name="task_successful",
+               success_message="Agent completed task successfully",
+               failure_message="Agent failed to complete task"
+           ))
+           .run()
        )
-       result = await tc.run()
        assert result.passed
+       print(f"Tool selection example passed: {result.passed}")
+
+   import asyncio
+   asyncio.run(run_tool_selection_example())
 
 
 Test 2: Reasoning Quality
@@ -190,46 +187,46 @@ Evaluate the quality of the agent's reasoning:
 .. code-block:: python
 
    from giskard.agents.generators import Generator
-   from giskard.checks import LLMJudge, InteractionSpec, TestCase, set_default_generator
+   from giskard.checks import scenario, LLMJudge, from_fn, set_default_generator
 
    set_default_generator(Generator(model="openai/gpt-4o-mini"))
 
-   interaction = InteractionSpec(
-       inputs="Find information about quantum computing",
-       outputs=lambda inputs: agent.run(inputs)
-   )
+   async def run_reasoning_quality_example():
+       result = await (
+           scenario("reasoning_quality_test")
+           .interact(
+               "Find information about quantum computing",
+               lambda inputs: agent.run(inputs)
+           )
+           .check(LLMJudge(
+               name="reasoning_quality",
+               prompt="""
+               Evaluate the agent's reasoning process.
 
-   checks = [
-       LLMJudge(
-           name="reasoning_quality",
-           prompt="""
-           Evaluate the agent's reasoning process.
+               Task: {{ inputs }}
+               Thought: {{ outputs.steps[0].thought if outputs.steps else "No reasoning" }}
+               Tool Selected: {{ outputs.steps[0].tool if outputs.steps else "None" }}
 
-           Task: {{ inputs }}
-           Thought: {{ outputs.steps[0].thought if outputs.steps else "No reasoning" }}
-           Tool Selected: {{ outputs.steps[0].tool if outputs.steps else "None" }}
+               Criteria:
+               1. Is the reasoning logical?
+               2. Is the tool selection appropriate for the task?
+               3. Does the thought explain why the tool was chosen?
 
-           Criteria:
-           1. Is the reasoning logical?
-           2. Is the tool selection appropriate for the task?
-           3. Does the thought explain why the tool was chosen?
+               Return 'passed: true' if the reasoning is sound.
+               """
+           ))
+           .check(from_fn(
+               lambda trace: trace.interactions[-1].outputs.steps[0].tool == "search",
+               name="correct_tool_for_research",
+               success_message="Selected search for research task",
+               failure_message="Wrong tool selected"
+           ))
+           .run()
+       )
+       print(f"Reasoning quality example passed: {result.passed}")
 
-           Return 'passed: true' if the reasoning is sound.
-           """
-       ),
-       from_fn(
-           lambda trace: trace.interactions[-1].outputs.steps[0].tool == "search",
-           name="correct_tool_for_research",
-           success_message="Selected search for research task",
-           failure_message="Wrong tool selected"
-       ),
-   ]
-
-   tc = TestCase(
-       interaction=interaction,
-       checks=checks,
-       name="reasoning_quality_test"
-   )
+   import asyncio
+   asyncio.run(run_reasoning_quality_example())
 
 
 Test 3: Multi-Step Agent Workflow
@@ -275,22 +272,23 @@ Test agents that perform multiple steps:
 
    multi_agent = MultiStepAgent()
 
-   from giskard.checks import Scenario, InteractionSpec, from_fn, LLMJudge
+   from giskard.checks import scenario, from_fn, LLMJudge
+   import asyncio
 
-   scenario = Scenario(
-       name="multi_step_agent_workflow",
-       sequence=[
-           InteractionSpec(
-               inputs="Research the market size and calculate projected growth",
-               outputs=lambda inputs: multi_agent.run(inputs)
-           ),
-           from_fn(
+   async def run_multi_step_workflow_example():
+       result = await (
+           scenario("multi_step_agent_workflow")
+           .interact(
+               "Research the market size and calculate projected growth",
+               lambda inputs: multi_agent.run(inputs)
+           )
+           .check(from_fn(
                lambda trace: len(trace.interactions[-1].outputs.steps) >= 2,
                name="multiple_steps_taken",
                success_message="Agent performed multiple steps",
                failure_message="Agent didn't perform enough steps"
-           ),
-           from_fn(
+           ))
+           .check(from_fn(
                lambda trace: any(
                    step.tool == "search"
                    for step in trace.interactions[-1].outputs.steps
@@ -298,8 +296,8 @@ Test agents that perform multiple steps:
                name="performed_research",
                success_message="Agent performed research",
                failure_message="Agent skipped research step"
-           ),
-           from_fn(
+           ))
+           .check(from_fn(
                lambda trace: any(
                    step.tool == "calculator"
                    for step in trace.interactions[-1].outputs.steps
@@ -307,8 +305,8 @@ Test agents that perform multiple steps:
                name="performed_calculation",
                success_message="Agent performed calculation",
                failure_message="Agent skipped calculation step"
-           ),
-           LLMJudge(
+           ))
+           .check(LLMJudge(
                name="steps_logical_order",
                prompt="""
                Evaluate if the agent's steps are in a logical order.
@@ -321,9 +319,12 @@ Test agents that perform multiple steps:
 
                Return 'passed: true' if steps are well-ordered.
                """
-           ),
-       ]
-   )
+           ))
+           .run()
+       )
+       print(f"Multi-step workflow example passed: {result.passed}")
+
+   asyncio.run(run_multi_step_workflow_example())
 
 
 Test 4: Error Handling
@@ -371,46 +372,46 @@ Verify that agents handle errors gracefully:
 
    robust_agent = RobustAgent()
 
-   interaction = InteractionSpec(
-       inputs="What is the meaning of life?",  # Not a valid calculation
-       outputs=lambda inputs: robust_agent.run(inputs)
-   )
+   async def run_error_handling_example():
+       result = await (
+           scenario("error_handling_test")
+           .interact(
+               "What is the meaning of life?",  # Not a valid calculation
+               lambda inputs: robust_agent.run(inputs)
+           )
+           .check(from_fn(
+               lambda trace: len(trace.interactions[-1].outputs.steps) > 1,
+               name="tried_fallback",
+               success_message="Agent tried fallback strategy",
+               failure_message="Agent didn't attempt recovery"
+           ))
+           .check(from_fn(
+               lambda trace: trace.interactions[-1].outputs.success,
+               name="eventually_succeeded",
+               success_message="Agent completed task despite initial failure",
+               failure_message="Agent failed to complete task"
+           ))
+           .check(LLMJudge(
+               name="error_recovery_appropriate",
+               prompt="""
+               Evaluate if the agent's error recovery was appropriate.
 
-   checks = [
-       from_fn(
-           lambda trace: len(trace.interactions[-1].outputs.steps) > 1,
-           name="tried_fallback",
-           success_message="Agent tried fallback strategy",
-           failure_message="Agent didn't attempt recovery"
-       ),
-       from_fn(
-           lambda trace: trace.interactions[-1].outputs.success,
-           name="eventually_succeeded",
-           success_message="Agent completed task despite initial failure",
-           failure_message="Agent failed to complete task"
-       ),
-       LLMJudge(
-           name="error_recovery_appropriate",
-           prompt="""
-           Evaluate if the agent's error recovery was appropriate.
+               Task: {{ inputs }}
+               Steps taken:
+               {% for step in outputs.steps %}
+               {{ loop.index }}. {{ step.thought }} ({{ step.tool }})
+                  Result: {{ step.observation }}
+               {% endfor %}
 
-           Task: {{ inputs }}
-           Steps taken:
-           {% for step in outputs.steps %}
-           {{ loop.index }}. {{ step.thought }} ({{ step.tool }})
-              Result: {{ step.observation }}
-           {% endfor %}
+               Return 'passed: true' if the agent handled the error well.
+               """
+           ))
+           .run()
+       )
+       print(f"Error handling example passed: {result.passed}")
 
-           Return 'passed: true' if the agent handled the error well.
-           """
-       ),
-   ]
-
-   tc = TestCase(
-       interaction=interaction,
-       checks=checks,
-       name="error_handling_test"
-   )
+   import asyncio
+   asyncio.run(run_error_handling_example())
 
 
 Test 5: Stateful Agent Interactions
@@ -463,31 +464,30 @@ Test agents that maintain state across turns:
 
    stateful_agent = StatefulAgent()
 
-   scenario = Scenario(
-       name="stateful_agent_memory",
-       sequence=[
+   async def run_stateful_agent_example():
+       result = await (
+           scenario("stateful_agent_memory")
            # First interaction
-           InteractionSpec(
-               inputs="Search for Python tutorials",
-               outputs=lambda inputs: stateful_agent.run(inputs)
-           ),
-           from_fn(
+           .interact(
+               "Search for Python tutorials",
+               lambda inputs: stateful_agent.run(inputs)
+           )
+           .check(from_fn(
                lambda trace: trace.interactions[-1].outputs.success,
                name="first_task_completed"
-           ),
-
+           ))
            # Second interaction references first
-           InteractionSpec(
-               inputs="What was my last request?",
-               outputs=lambda inputs: stateful_agent.run(inputs)
-           ),
-           from_fn(
+           .interact(
+               "What was my last request?",
+               lambda inputs: stateful_agent.run(inputs)
+           )
+           .check(from_fn(
                lambda trace: "Python tutorials" in trace.interactions[-1].outputs.final_answer,
                name="recalls_previous_task",
                success_message="Agent correctly recalled previous task",
                failure_message="Agent failed to recall previous task"
-           ),
-           LLMJudge(
+           ))
+           .check(LLMJudge(
                name="context_maintained",
                prompt="""
                Evaluate if the agent maintained context correctly.
@@ -499,9 +499,13 @@ Test agents that maintain state across turns:
                The second response should reference the first task.
                Return 'passed: true' if context was maintained.
                """
-           ),
-       ]
-   )
+           ))
+           .run()
+       )
+       print(f"Stateful agent example passed: {result.passed}")
+
+   import asyncio
+   asyncio.run(run_stateful_agent_example())
 
 
 Test 6: Task Completion Validation
@@ -511,7 +515,7 @@ Verify that complex tasks are fully completed:
 
 .. code-block:: python
 
-   from giskard.checks import Scenario, InteractionSpec, LLMJudge, from_fn
+   from giskard.checks import scenario, LLMJudge, from_fn
 
    class TaskTrackingAgent(SimpleAgent):
        def __init__(self):
@@ -561,39 +565,37 @@ Verify that complex tasks are fully completed:
 
    task_agent = TaskTrackingAgent()
 
-   scenario = Scenario(
-       name="task_completion_workflow",
-       sequence=[
+   async def run_task_completion_example():
+       result = await (
+           scenario("task_completion_workflow")
            # Add tasks
-           InteractionSpec(
-               inputs="add task: Write documentation",
-               outputs=lambda inputs: task_agent.run(inputs)
-           ),
-           InteractionSpec(
-               inputs="add task: Review code",
-               outputs=lambda inputs: task_agent.run(inputs)
-           ),
-           from_fn(
+           .interact(
+               "add task: Write documentation",
+               lambda inputs: task_agent.run(inputs)
+           )
+           .interact(
+               "add task: Review code",
+               lambda inputs: task_agent.run(inputs)
+           )
+           .check(from_fn(
                lambda trace: len(task_agent.pending_tasks) == 2,
                name="tasks_added"
-           ),
-
+           ))
            # Complete first task
-           InteractionSpec(
-               inputs="complete next task",
-               outputs=lambda inputs: task_agent.run(inputs)
-           ),
-           from_fn(
+           .interact(
+               "complete next task",
+               lambda inputs: task_agent.run(inputs)
+           )
+           .check(from_fn(
                lambda trace: len(task_agent.completed_tasks) == 1,
                name="task_completed"
-           ),
-
+           ))
            # Check status
-           InteractionSpec(
-               inputs="what's the status?",
-               outputs=lambda inputs: task_agent.run(inputs)
-           ),
-           from_fn(
+           .interact(
+               "what's the status?",
+               lambda inputs: task_agent.run(inputs)
+           )
+           .check(from_fn(
                lambda trace: (
                    "Pending: 1" in trace.interactions[-1].outputs.final_answer and
                    "Completed: 1" in trace.interactions[-1].outputs.final_answer
@@ -601,9 +603,13 @@ Verify that complex tasks are fully completed:
                name="status_accurate",
                success_message="Agent tracking state correctly",
                failure_message="Agent state tracking is incorrect"
-           ),
-       ]
-   )
+           ))
+           .run()
+       )
+       print(f"Task completion example passed: {result.passed}")
+
+   import asyncio
+   asyncio.run(run_task_completion_example())
 
 
 Complete Agent Test Suite
@@ -615,33 +621,24 @@ Combine all tests into a comprehensive suite:
 
    import asyncio
    from typing import List
-   from giskard.checks import TestCase, Scenario
+   from giskard.checks import Scenario
 
    class AgentTestSuite:
        def __init__(self, agent):
            self.agent = agent
-           self.test_cases: List[TestCase] = []
            self.scenarios: List[Scenario] = []
 
-       def add_test(self, test_case: TestCase):
-           self.test_cases.append(test_case)
-
-       def add_scenario(self, scenario: Scenario):
-           self.scenarios.append(scenario)
+       def add_scenario(self, test_scenario: Scenario):
+           self.scenarios.append(test_scenario)
 
        async def run_all(self):
-           """Run all tests and scenarios."""
+           """Run all scenarios."""
            results = []
 
-           print("Running test cases...")
-           for tc in self.test_cases:
-               result = await tc.run()
-               results.append(("test", tc.name, result))
-
            print("Running scenarios...")
-           for scenario in self.scenarios:
-               result = await scenario.run()
-               results.append(("scenario", scenario.name, result))
+           for test_scenario in self.scenarios:
+               result = await test_scenario.run()
+               results.append(("scenario", test_scenario.name, result))
 
            # Report
            self._report_results(results)

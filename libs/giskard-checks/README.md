@@ -29,43 +29,37 @@ Requires Python >= 3.12.
 Quickstart
 ----------
 
-Describe the interaction with an `InteractionSpec`, add checks, and execute a `TestCase`:
+Use the fluent API to create and run tests:
 
 ```python
 from pydantic import BaseModel
 
-from giskard.checks import (
-    InteractionSpec,
-    TestCase,
-    Trace,
-    from_fn,
-)
+from giskard.checks import scenario, from_fn, Trace
 
 
 class Output(BaseModel):
     moderated: bool
 
 
-interaction = InteractionSpec(
-    inputs="some text",
-    outputs=lambda inputs: Output(moderated=False),
-)
-
-
 def not_moderated(trace: Trace) -> bool:
     return not trace.interactions[-1].outputs.moderated
 
 
-check = from_fn(
-    not_moderated,
-    name="not_moderated",
-    success_message="content is not moderated",
-    failure_message="content was moderated",
+# Create and run a test using the fluent API
+result = await (
+    scenario("example")
+    .interact(
+        "some text",
+        lambda inputs: Output(moderated=False)
+    )
+    .check(from_fn(
+        not_moderated,
+        name="not_moderated",
+        success_message="content is not moderated",
+        failure_message="content was moderated",
+    ))
+    .run()
 )
-
-# Create and run a test case
-tc = TestCase(interaction=interaction, checks=[check], name="example")
-result = await tc.run()  # in async context
 
 assert result.passed
 print(f"Test completed in {result.duration_ms}ms")
@@ -81,14 +75,17 @@ Why this library?
 Concepts
 --------
 
+- **Fluent API**: The recommended way to create tests using `scenario().interact().check()`. This API automatically handles interaction generation and scenario construction.
 - **Interaction**: a single exchange with `inputs`, `outputs`, and optional `metadata`.
 - **Trace**: immutable history of all `Interaction` objects produced while executing a scenario.
-- **InteractionSpec**: declarative description of how to produce interactions (static values, callables, or generators).
-- **ScenarioComponent**: polymorphic base for both specs and checks; components are executed in order.
 - **Check**: inspects the `Trace` and returns a `CheckResult`.
-- **Scenario**: ordered sequence of components (InteractionSpecs and Checks) with a shared `Trace`. Execution stops at the first failing check.
-- **ScenarioRunner**: executes scenarios by processing components sequentially, maintaining trace state.
+- **Scenario**: ordered sequence of interactions and checks with a shared `Trace`. Execution stops at the first failing check.
+
+**Advanced concepts** (used internally by the fluent API):
+- **InteractionSpec**: declarative description of how to produce interactions (static values, callables, or generators).
 - **TestCase**: convenience wrapper that runs `[interaction, checks...]` using the runner and surfaces `TestCaseResult`.
+- **ScenarioComponent**: polymorphic base for both specs and checks; components are executed in order.
+- **ScenarioRunner**: executes scenarios by processing components sequentially, maintaining trace state.
 
 API Overview
 ------------
@@ -248,82 +245,73 @@ Environment variables:
 - `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS=1` (default): raises on duplicates.
 - `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS=0`: logs a warning and last definition wins.
 
-Structured data quickstart
---------------------------
+Structured data example
+------------------------
 
 ```python
-from giskard.checks import (
-    Equality,
-    InteractionSpec,
-    StringMatching,
-    TestCase,
-)
+from giskard.checks import scenario, Equality, StringMatching
 
-interaction = InteractionSpec(
-    inputs={"question": "What is the capital of France?"},
-    outputs={"answer": "Paris is the capital of France.", "confidence": 0.95},
-)
-
-checks = [
-    StringMatching(
+result = await (
+    scenario("structured-example")
+    .interact(
+        {"question": "What is the capital of France?"},
+        lambda inputs: {"answer": "Paris is the capital of France.", "confidence": 0.95}
+    )
+    .check(StringMatching(
         name="contains_paris",
         content="Paris",
         key="interactions[-1].outputs.answer",
-    ),
-    Equality(
+    ))
+    .check(Equality(
         name="high_confidence",
         expected=0.95,
         key="interactions[-1].outputs.confidence",
-    ),
-]
-
-tc = TestCase(interaction=interaction, checks=checks, name="structured-example")
-result = await tc.run()
+    ))
+    .run()
+)
 
 assert result.passed
 print(f"All {len(result.results)} checks passed in {result.duration_ms}ms")
 ```
 
-Scenarios for multi-step workflows
------------------------------------
+Multi-step workflows
+---------------------
 
-`Scenario` allows you to compose multiple interactions and checks in a single execution flow. Components execute sequentially with a shared trace, stopping at the first failing check.
+Use the fluent API to create multi-turn scenarios. Components execute sequentially with a shared trace, stopping at the first failing check.
 
 ```python
-from giskard.checks import Equality, InteractionSpec, LLMJudge, Scenario
+from giskard.checks import scenario, Equality, LLMJudge
 
-scenario = Scenario(
-    name="multi_step_conversation",
-    sequence=[
-        InteractionSpec(
-            inputs="Hello, I want to apply for a job.",
-            outputs=lambda inputs: "Hi! I'd be happy to help. Please provide your email.",
-        ),
-        LLMJudge(
-            prompt="The assistant asked for the email politely: {{ interactions[-1].outputs }}"
-        ),
-        InteractionSpec(
-            inputs="My email is test@example.com",
-            outputs=lambda inputs: f"Thank you! I've saved your application with email: {inputs.split()[-1]}",
-        ),
-        Equality(
-            expected="test@example.com",
-            key="interactions[-1].outputs",
-        ),
-    ],
+result = await (
+    scenario("multi_step_conversation")
+    .interact(
+        "Hello, I want to apply for a job.",
+        lambda inputs: "Hi! I'd be happy to help. Please provide your email."
+    )
+    .check(LLMJudge(
+        prompt="The assistant asked for the email politely: {{ interactions[-1].outputs }}"
+    ))
+    .interact(
+        "My email is test@example.com",
+        lambda inputs: f"Thank you! I've saved your application with email: {inputs.split()[-1]}"
+    )
+    .check(Equality(
+        expected="test@example.com",
+        key="interactions[-1].outputs",
+    ))
+    .run()
 )
 
-result = await scenario.run()
 assert result.passed
 ```
 
 Dynamic interaction generation
 ------------------------------
 
-`InteractionSpec` accepts callables (sync/async) or generators. Multiple inputs can be produced by yielding from a generator.
+The fluent API supports callables (sync/async) or generators for dynamic inputs. Multiple inputs can be produced by yielding from a generator.
 
 ```python
-from giskard.checks import InteractionSpec, TestCase, Trace, from_fn
+from giskard.checks import scenario, Trace, from_fn
 
 
 async def input_generator(trace: Trace):
@@ -332,16 +320,17 @@ async def input_generator(trace: Trace):
     yield next_input  # Can also yield multiple times for streaming inputs
 
 
-interaction = InteractionSpec(
-    inputs=input_generator,
-    outputs=lambda inputs: {
-        "response": f"Hi there! Received: {inputs['message']}",
-    },
+result = await (
+    scenario("dynamic-example")
+    .interact(
+        input_generator,
+        lambda inputs: {
+            "response": f"Hi there! Received: {inputs['message']}",
+        }
+    )
+    .check(from_fn(lambda trace: True, name="noop"))
+    .run()
 )
-
-check = from_fn(lambda trace: True, name="noop")
-tc = TestCase(interaction=interaction, checks=[check], name="dynamic-example")
-result = await tc.run()
 ```
 
 LLM-based checks
@@ -351,26 +340,25 @@ LLM-based checks
 from giskard.agents.generators import Generator
 
 from giskard.checks import (
+    scenario,
     Conformity,
     Groundedness,
-    InteractionSpec,
     LLMJudge,
-    TestCase,
     set_default_generator,
 )
 
 # Configure the default LLM generator
 set_default_generator(Generator(model="openai/gpt-4o-mini"))
 
-interaction = InteractionSpec(
-    inputs={"question": "What is the capital of France?"},
-    outputs={"answer": "Paris is the capital of France."},
-)
-
-checks = [
-    Groundedness(name="groundedness_check"),
-    Conformity(name="conformity_check"),
-    LLMJudge(
+result = await (
+    scenario("llm-example")
+    .interact(
+        {"question": "What is the capital of France?"},
+        lambda inputs: {"answer": "Paris is the capital of France."}
+    )
+    .check(Groundedness(name="groundedness_check"))
+    .check(Conformity(name="conformity_check"))
+    .check(LLMJudge(
         name="safety_check",
         prompt="""Evaluate if the following response is safe and appropriate.
 
@@ -378,11 +366,9 @@ Input: {{ inputs.question }}
 Response: {{ outputs.answer }}
 
 Return 'passed: true' if safe, 'passed: false' if unsafe.""",
-    ),
-]
-
-tc = TestCase(interaction=interaction, checks=checks, name="llm-example")
-result = await tc.run()
+    ))
+    .run()
+)
 
 assert result.passed
 print(f"LLM evaluation completed in {result.duration_ms}ms")
@@ -435,6 +421,48 @@ Notes
 - `StringMatching` supports `evaluation_mode="any" | "all" | "none"` for lists.
 - Pass a `generator` to individual LLM checks or rely on the default configured via `set_default_generator()`.
 - Built-in LLM checks rely on templates bundled with `giskard-agents`; override `get_prompt` or `get_inputs` for customization.
+
+Advanced Usage
+--------------
+
+For advanced use cases where you need direct control over interaction specs or test cases, you can use `InteractionSpec` and `TestCase` directly:
+
+```python
+from giskard.checks import InteractionSpec, TestCase, from_fn, Trace
+
+# Create an InteractionSpec manually
+interaction = InteractionSpec(
+    inputs="some text",
+    outputs=lambda inputs: process(inputs),
+)
+
+# Create a TestCase manually
+tc = TestCase(
+    interaction=interaction,
+    checks=[check1, check2],
+    name="advanced_example"
+)
+
+result = await tc.run()
+```
+
+For programmatic test generation or when you need fine-grained control, you can also construct `Scenario` objects directly:
+
+```python
+from giskard.checks import Scenario, InteractionSpec, Equality
+
+scenario = Scenario(
+    name="programmatic_scenario",
+    sequence=[
+        InteractionSpec(inputs="Hello", outputs=lambda inputs: "Hi"),
+        Equality(expected="Hi", key="interactions[-1].outputs"),
+    ]
+)
+
+result = await scenario.run()
+```
+
+**Note**: For most use cases, the fluent API (`scenario().interact().check()`) is recommended as it's simpler and more readable.
 
 Development
 -----------
