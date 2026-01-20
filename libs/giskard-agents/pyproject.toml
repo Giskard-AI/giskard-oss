@@ -1,6 +1,6 @@
 [project]
 name = "giskard-agents"
-version = "0.3.1"
+version = "0.3.3"
 description = " A lightweight library that orchestrates LLM completions and agents in parallel workflows "
 readme = "README.md"
 license = { text = "MIT" }
