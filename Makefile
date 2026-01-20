@@ -93,3 +93,6 @@ clean: ## Clean up build artifacts and caches
 	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
 	rm -rf build/ dist/ .coverage htmlcov/
+
+serve-docs: ## Serve documentation locally
+	uv run sphinx-autobuild docs/source docs/build

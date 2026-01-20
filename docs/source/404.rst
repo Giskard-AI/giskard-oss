@@ -1,0 +1,27 @@
+:orphan:
+
+404 - Page Not Found
+====================
+
+Sorry, the page you're looking for doesn't exist.
+
+The page may have been moved, deleted, or you may have entered an incorrect URL.
+
+What you can do:
+----------------
+
+* Check the URL for typos
+* Use the search function to find what you're looking for
+* Navigate back to the home page
+* Browse our documentation sections
+
+.. raw:: html
+
+   <div style="margin-top: 2rem;">
+     <a href="/" class="btn btn-primary" style="margin-right: 0.5rem;">← Go to Home</a>
+     <a href="/hub/ui/index.html" class="btn btn-outline-primary">Hub Documentation</a>
+   </div>
+
+----
+
+If you believe this is an error, please contact our support team.
