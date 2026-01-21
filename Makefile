@@ -8,7 +8,7 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z0-9_%-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 # Installation targets
 install: ## Install project dependencies
-	uv sync
+	uv sync --all-groups
 
 sync: install ## Alias for install
 
