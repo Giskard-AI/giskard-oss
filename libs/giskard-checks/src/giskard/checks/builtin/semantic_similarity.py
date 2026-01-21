@@ -16,14 +16,10 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     vec_b = np.asarray(b)
 
     dot_product = np.dot(vec_a, vec_b)
-    print(vec_a, vec_b)
-    print(dot_product)
     norm = np.linalg.norm(vec_a) * np.linalg.norm(vec_b)
-    print(norm)
     if norm == 0:
         raise ValueError("Cannot calculate cosine similarity for null vectors")
 
-    print(dot_product / norm)
     return float(dot_product / norm)
 
 
@@ -42,7 +38,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         description="The key to extract the reference text from the trace",
     )
     actual_answer_key: str = Field(
-        default="trace.last.outputs.response",
+        default="trace.last.outputs",
         description="The key to extract the actual answer from the trace",
     )
 
@@ -62,8 +58,8 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         CheckResult
             The result of the check evaluation.
         """
-        reference_text = str(
-            provided_or_resolve(self.reference_text, trace, self.reference_text_key)
+        reference_text = provided_or_resolve(
+            self.reference_text, trace, self.reference_text_key
         )
         if not reference_text:
             return CheckResult.failure(
@@ -73,7 +69,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                     "reference_text": reference_text,
                 },
             )
-        actual_answer = str(resolve(trace, self.actual_answer_key))
+        actual_answer = resolve(trace, self.actual_answer_key)
         if not actual_answer:
             return CheckResult.failure(
                 message="No actual answer found",
@@ -82,6 +78,9 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                     "actual_answer_key": self.actual_answer_key,
                 },
             )
+
+        actual_answer = str(actual_answer)
+        reference_text = str(reference_text)
 
         emb_a, emb_b = await self.get_embeddings([actual_answer, reference_text])
         similarity = cosine_similarity(emb_a, emb_b)

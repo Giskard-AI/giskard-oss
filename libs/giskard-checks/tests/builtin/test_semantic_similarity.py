@@ -212,6 +212,7 @@ async def test_custom_reference_text_key() -> None:
         embedding_model=embedding_model,
         threshold=0.90,
         reference_text_key="trace.last.metadata.custom_ref",
+        actual_answer_key="trace.last.outputs.response",
     )
     interaction = Interaction(
         inputs={"query": "Test"},
@@ -314,8 +315,11 @@ async def test_empty_trace() -> None:
     )
     result = await check.run(Trace())
 
-    # When trace is empty, resolve returns None, str(None) = "None"
-    assert result.details["actual_answer"] == "None"
+    # When trace is empty, resolve returns None which causes check to fail
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "No actual answer found" in result.message
+    assert result.details["actual_answer"] is None
 
 
 async def test_serialization_roundtrip() -> None:
@@ -374,8 +378,12 @@ async def test_missing_reference_text_in_trace() -> None:
     )
     result = await check.run(Trace(interactions=[interaction]))
 
-    # When reference is not found, resolve returns None, str(None) = "None"
-    assert result.details["reference_text"] == "None"
+    # When reference is not found, check fails early
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "No reference text found" in result.message
+    assert result.details["reference_text"] is None
+    assert "reference_text_key" in result.details
 
 
 async def test_missing_actual_answer_in_trace() -> None:
@@ -399,8 +407,12 @@ async def test_missing_actual_answer_in_trace() -> None:
     )
     result = await check.run(Trace(interactions=[interaction]))
 
-    # When answer field is not found, resolve returns None, str(None) = "None"
-    assert result.details["actual_answer"] == "None"
+    # When answer field is not found, check fails early
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "No actual answer found" in result.message
+    assert result.details["actual_answer"] is None
+    assert "actual_answer_key" in result.details
 
 
 async def test_both_reference_and_answer_missing() -> None:
@@ -423,12 +435,11 @@ async def test_both_reference_and_answer_missing() -> None:
     )
     result = await check.run(Trace(interactions=[interaction]))
 
-    # Both should be "None"
-    assert result.details["actual_answer"] == "None"
-    assert result.details["reference_text"] == "None"
-    # Similarity between "None" and "None" should be 1.0
-    assert result.details["similarity"] == 1.0
-    assert result.status == CheckStatus.PASS
+    # Check fails when reference text is missing (checked first)
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "No reference text found" in result.message
+    assert result.details["reference_text"] is None
 
 
 async def test_empty_trace_with_no_direct_reference() -> None:
@@ -444,12 +455,11 @@ async def test_empty_trace_with_no_direct_reference() -> None:
     )
     result = await check.run(Trace())
 
-    # Both actual_answer and reference_text should be "None"
-    assert result.details["actual_answer"] == "None"
-    assert result.details["reference_text"] == "None"
-    # Similarity between identical "None" strings should be 1.0
-    assert result.details["similarity"] == 1.0
-    assert result.status == CheckStatus.PASS
+    # Check fails when reference text is missing
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "No reference text found" in result.message
+    assert result.details["reference_text"] is None
 
 
 async def test_missing_outputs_field_in_interaction() -> None:
@@ -472,9 +482,11 @@ async def test_missing_outputs_field_in_interaction() -> None:
     )
     result = await check.run(Trace(interactions=[interaction]))
 
-    # When response field doesn't exist in outputs, should return None
-    assert result.details["actual_answer"] == "None"
-    assert result.details["reference_text"] == "Reference"
+    # When response field doesn't exist in outputs, check fails
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "No actual answer found" in result.message
+    assert result.details["actual_answer"] is None
 
 
 async def test_missing_metadata_in_interaction() -> None:
@@ -498,9 +510,11 @@ async def test_missing_metadata_in_interaction() -> None:
     )
     result = await check.run(Trace(interactions=[interaction]))
 
-    # When metadata doesn't exist, accessing reference should return None
-    assert result.details["actual_answer"] == "Answer"
-    assert result.details["reference_text"] == "None"
+    # When metadata doesn't exist, check fails (reference not found)
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "No reference text found" in result.message
+    assert result.details["reference_text"] is None
 
 
 async def test_invalid_jsonpath_key() -> None:
@@ -523,9 +537,11 @@ async def test_invalid_jsonpath_key() -> None:
     )
     result = await check.run(Trace(interactions=[interaction]))
 
-    # Invalid path should resolve to None
-    assert result.details["actual_answer"] == "Answer"
-    assert result.details["reference_text"] == "None"
+    # Invalid path resolves to None, causing check to fail
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "No reference text found" in result.message
+    assert result.details["reference_text"] is None
 
 
 async def test_similarity_at_exact_threshold() -> None:
