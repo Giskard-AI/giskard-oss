@@ -1,0 +1,12 @@
+name: Release Giskard Agents
+on:
+  push:
+    branches: [main]
+    paths: ["libs/giskard-agents/pyproject.toml"] # Only triggers if pyproject.toml changes (potential version bump)
+
+jobs:
+  call-release:
+    uses: ./.github/workflows/_release_template.yml
+    with:
+      package_name: "giskard-agents"
+    secrets: inherit

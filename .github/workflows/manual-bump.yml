@@ -1,0 +1,66 @@
+name: Manual Version Bump
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Library to bump'
+        required: true
+        type: choice
+        options:
+          - giskard-core
+          - giskard-agents
+          - giskard-checks
+      bump_type:
+        description: 'Bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  create-bump-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+
+      - name: Install uv
+        uses: stral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7
+
+      - name: Bump version
+        id: bump
+        env:
+          PACKAGE: ${{ github.event.inputs.package }}
+          BUMP_TYPE: ${{ github.event.inputs.bump_type }}
+        run: |
+          # Get old version
+          OLD_V=$(grep '^version\s*=' libs/$PACKAGE/pyproject.toml | cut -d '"' -f2)
+
+          NEW_V=$(uv run python -c "
+          import semver
+          v = semver.VersionInfo.parse('$OLD_V')
+          print(v.bump_${{ env.BUMP_TYPE }}())
+          ")
+
+          # Update the file
+          sed -i "s/^version = \"$OLD_V\"/version = \"$NEW_V\"/" pyproject.toml
+          echo "new_version=$NEW_V" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        env:
+          PACKAGE: ${{ github.event.inputs.package }}
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(${{ env.PACKAGE }}): bump version to ${{ env.NEW_VERSION }}"
+          branch: "bump/${{ env.PACKAGE }}-${{ env.NEW_VERSION }}"
+          title: "chore(${{ env.PACKAGE }}): bump version to ${{ env.NEW_VERSION }}"
+          body: |
+            This is an automated version bump for `${{ env.PACKAGE }}`.
+            Merging this PR to `main` will trigger the official release to PyPI.
