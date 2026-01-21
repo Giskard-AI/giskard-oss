@@ -1,5 +1,6 @@
 from .chat import Chat, Message
 from .context import RunContext
+from .embeddings import EmbeddingModel
 from .errors import Error, WorkflowError
 from .generators import Generator
 from .rate_limiter import (
@@ -42,4 +43,5 @@ __all__ = [
     "ErrorPolicy",
     "WorkflowError",
     "Error",
+    "EmbeddingModel",
 ]
