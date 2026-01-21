@@ -146,37 +146,33 @@ Verify that the agent selects appropriate tools:
 
    agent = SimpleAgent()
 
-   async def run_tool_selection_example():
-       result = await (
-           scenario("tool_selection_calculator")
-           .interact(
-               "What is 15 * 23?",
-               lambda inputs: agent.run(inputs)
-           )
-           .check(from_fn(
-               lambda trace: len(trace.interactions[-1].outputs.steps) > 0,
-               name="used_tools",
-               success_message="Agent used tools",
-               failure_message="Agent didn't use any tools"
-           ))
-           .check(EqualityCheck(
-               name="selected_calculator",
-               expected="calculator",
-               key="interactions[-1].outputs.steps[0].tool"
-           ))
-           .check(from_fn(
-               lambda trace: trace.interactions[-1].outputs.success,
-               name="task_successful",
-               success_message="Agent completed task successfully",
-               failure_message="Agent failed to complete task"
-           ))
-           .run()
+   result = await (
+       scenario("tool_selection_calculator")
+       .interact(
+           "What is 15 * 23?",
+           lambda inputs: agent.run(inputs)
        )
-       assert result.passed
-       print(f"Tool selection example passed: {result.passed}")
-
-   import asyncio
-   asyncio.run(run_tool_selection_example())
+       .check(from_fn(
+           lambda trace: len(trace.interactions[-1].outputs.steps) > 0,
+           name="used_tools",
+           success_message="Agent used tools",
+           failure_message="Agent didn't use any tools"
+       ))
+       .check(EqualityCheck(
+           name="selected_calculator",
+           expected="calculator",
+           key="interactions[-1].outputs.steps[0].tool"
+       ))
+       .check(from_fn(
+           lambda trace: trace.interactions[-1].outputs.success,
+           name="task_successful",
+           success_message="Agent completed task successfully",
+           failure_message="Agent failed to complete task"
+       ))
+       .run()
+   )
+   assert result.passed
+   print(f"Tool selection example passed: {result.passed}")
 
 
 Test 2: Reasoning Quality
@@ -191,42 +187,38 @@ Evaluate the quality of the agent's reasoning:
 
    set_default_generator(Generator(model="openai/gpt-4o-mini"))
 
-   async def run_reasoning_quality_example():
-       result = await (
-           scenario("reasoning_quality_test")
-           .interact(
-               "Find information about quantum computing",
-               lambda inputs: agent.run(inputs)
-           )
-           .check(LLMJudge(
-               name="reasoning_quality",
-               prompt="""
-               Evaluate the agent's reasoning process.
-
-               Task: {{ inputs }}
-               Thought: {{ outputs.steps[0].thought if outputs.steps else "No reasoning" }}
-               Tool Selected: {{ outputs.steps[0].tool if outputs.steps else "None" }}
-
-               Criteria:
-               1. Is the reasoning logical?
-               2. Is the tool selection appropriate for the task?
-               3. Does the thought explain why the tool was chosen?
-
-               Return 'passed: true' if the reasoning is sound.
-               """
-           ))
-           .check(from_fn(
-               lambda trace: trace.interactions[-1].outputs.steps[0].tool == "search",
-               name="correct_tool_for_research",
-               success_message="Selected search for research task",
-               failure_message="Wrong tool selected"
-           ))
-           .run()
+   result = await (
+       scenario("reasoning_quality_test")
+       .interact(
+           "Find information about quantum computing",
+           lambda inputs: agent.run(inputs)
        )
-       print(f"Reasoning quality example passed: {result.passed}")
+       .check(LLMJudge(
+           name="reasoning_quality",
+           prompt="""
+           Evaluate the agent's reasoning process.
 
-   import asyncio
-   asyncio.run(run_reasoning_quality_example())
+           Task: {{ inputs }}
+           Thought: {{ outputs.steps[0].thought if outputs.steps else "No reasoning" }}
+           Tool Selected: {{ outputs.steps[0].tool if outputs.steps else "None" }}
+
+           Criteria:
+           1. Is the reasoning logical?
+           2. Is the tool selection appropriate for the task?
+           3. Does the thought explain why the tool was chosen?
+
+           Return 'passed: true' if the reasoning is sound.
+           """
+       ))
+       .check(from_fn(
+           lambda trace: trace.interactions[-1].outputs.steps[0].tool == "search",
+           name="correct_tool_for_research",
+           success_message="Selected search for research task",
+           failure_message="Wrong tool selected"
+       ))
+       .run()
+   )
+   print(f"Reasoning quality example passed: {result.passed}")
 
 
 Test 3: Multi-Step Agent Workflow
@@ -273,58 +265,54 @@ Test agents that perform multiple steps:
    multi_agent = MultiStepAgent()
 
    from giskard.checks import scenario, from_fn, LLMJudge
-   import asyncio
 
-   async def run_multi_step_workflow_example():
-       result = await (
-           scenario("multi_step_agent_workflow")
-           .interact(
-               "Research the market size and calculate projected growth",
-               lambda inputs: multi_agent.run(inputs)
-           )
-           .check(from_fn(
-               lambda trace: len(trace.interactions[-1].outputs.steps) >= 2,
-               name="multiple_steps_taken",
-               success_message="Agent performed multiple steps",
-               failure_message="Agent didn't perform enough steps"
-           ))
-           .check(from_fn(
-               lambda trace: any(
-                   step.tool == "search"
-                   for step in trace.interactions[-1].outputs.steps
-               ),
-               name="performed_research",
-               success_message="Agent performed research",
-               failure_message="Agent skipped research step"
-           ))
-           .check(from_fn(
-               lambda trace: any(
-                   step.tool == "calculator"
-                   for step in trace.interactions[-1].outputs.steps
-               ),
-               name="performed_calculation",
-               success_message="Agent performed calculation",
-               failure_message="Agent skipped calculation step"
-           ))
-           .check(LLMJudge(
-               name="steps_logical_order",
-               prompt="""
-               Evaluate if the agent's steps are in a logical order.
-
-               Task: {{ interactions[0].inputs }}
-               Steps:
-               {% for step in interactions[0].outputs.steps %}
-               {{ loop.index }}. {{ step.thought }} -> {{ step.tool }}
-               {% endfor %}
-
-               Return 'passed: true' if steps are well-ordered.
-               """
-           ))
-           .run()
+   result = await (
+       scenario("multi_step_agent_workflow")
+       .interact(
+           "Research the market size and calculate projected growth",
+           lambda inputs: multi_agent.run(inputs)
        )
-       print(f"Multi-step workflow example passed: {result.passed}")
+       .check(from_fn(
+           lambda trace: len(trace.interactions[-1].outputs.steps) >= 2,
+           name="multiple_steps_taken",
+           success_message="Agent performed multiple steps",
+           failure_message="Agent didn't perform enough steps"
+       ))
+       .check(from_fn(
+           lambda trace: any(
+               step.tool == "search"
+               for step in trace.interactions[-1].outputs.steps
+           ),
+           name="performed_research",
+           success_message="Agent performed research",
+           failure_message="Agent skipped research step"
+       ))
+       .check(from_fn(
+           lambda trace: any(
+               step.tool == "calculator"
+               for step in trace.interactions[-1].outputs.steps
+           ),
+           name="performed_calculation",
+           success_message="Agent performed calculation",
+           failure_message="Agent skipped calculation step"
+       ))
+       .check(LLMJudge(
+           name="steps_logical_order",
+           prompt="""
+           Evaluate if the agent's steps are in a logical order.
 
-   asyncio.run(run_multi_step_workflow_example())
+           Task: {{ interactions[0].inputs }}
+           Steps:
+           {% for step in interactions[0].outputs.steps %}
+           {{ loop.index }}. {{ step.thought }} -> {{ step.tool }}
+           {% endfor %}
+
+           Return 'passed: true' if steps are well-ordered.
+           """
+       ))
+       .run()
+   )
+   print(f"Multi-step workflow example passed: {result.passed}")
 
 
 Test 4: Error Handling
@@ -372,46 +360,42 @@ Verify that agents handle errors gracefully:
 
    robust_agent = RobustAgent()
 
-   async def run_error_handling_example():
-       result = await (
-           scenario("error_handling_test")
-           .interact(
-               "What is the meaning of life?",  # Not a valid calculation
-               lambda inputs: robust_agent.run(inputs)
-           )
-           .check(from_fn(
-               lambda trace: len(trace.interactions[-1].outputs.steps) > 1,
-               name="tried_fallback",
-               success_message="Agent tried fallback strategy",
-               failure_message="Agent didn't attempt recovery"
-           ))
-           .check(from_fn(
-               lambda trace: trace.interactions[-1].outputs.success,
-               name="eventually_succeeded",
-               success_message="Agent completed task despite initial failure",
-               failure_message="Agent failed to complete task"
-           ))
-           .check(LLMJudge(
-               name="error_recovery_appropriate",
-               prompt="""
-               Evaluate if the agent's error recovery was appropriate.
-
-               Task: {{ inputs }}
-               Steps taken:
-               {% for step in outputs.steps %}
-               {{ loop.index }}. {{ step.thought }} ({{ step.tool }})
-                  Result: {{ step.observation }}
-               {% endfor %}
-
-               Return 'passed: true' if the agent handled the error well.
-               """
-           ))
-           .run()
+   result = await (
+       scenario("error_handling_test")
+       .interact(
+           "What is the meaning of life?",  # Not a valid calculation
+           lambda inputs: robust_agent.run(inputs)
        )
-       print(f"Error handling example passed: {result.passed}")
+       .check(from_fn(
+           lambda trace: len(trace.interactions[-1].outputs.steps) > 1,
+           name="tried_fallback",
+           success_message="Agent tried fallback strategy",
+           failure_message="Agent didn't attempt recovery"
+       ))
+       .check(from_fn(
+           lambda trace: trace.interactions[-1].outputs.success,
+           name="eventually_succeeded",
+           success_message="Agent completed task despite initial failure",
+           failure_message="Agent failed to complete task"
+       ))
+       .check(LLMJudge(
+           name="error_recovery_appropriate",
+           prompt="""
+           Evaluate if the agent's error recovery was appropriate.
 
-   import asyncio
-   asyncio.run(run_error_handling_example())
+           Task: {{ inputs }}
+           Steps taken:
+           {% for step in outputs.steps %}
+           {{ loop.index }}. {{ step.thought }} ({{ step.tool }})
+              Result: {{ step.observation }}
+           {% endfor %}
+
+           Return 'passed: true' if the agent handled the error well.
+           """
+       ))
+       .run()
+   )
+   print(f"Error handling example passed: {result.passed}")
 
 
 Test 5: Stateful Agent Interactions
@@ -464,48 +448,44 @@ Test agents that maintain state across turns:
 
    stateful_agent = StatefulAgent()
 
-   async def run_stateful_agent_example():
-       result = await (
-           scenario("stateful_agent_memory")
-           # First interaction
-           .interact(
-               "Search for Python tutorials",
-               lambda inputs: stateful_agent.run(inputs)
-           )
-           .check(from_fn(
-               lambda trace: trace.interactions[-1].outputs.success,
-               name="first_task_completed"
-           ))
-           # Second interaction references first
-           .interact(
-               "What was my last request?",
-               lambda inputs: stateful_agent.run(inputs)
-           )
-           .check(from_fn(
-               lambda trace: "Python tutorials" in trace.interactions[-1].outputs.final_answer,
-               name="recalls_previous_task",
-               success_message="Agent correctly recalled previous task",
-               failure_message="Agent failed to recall previous task"
-           ))
-           .check(LLMJudge(
-               name="context_maintained",
-               prompt="""
-               Evaluate if the agent maintained context correctly.
-
-               First task: {{ interactions[0].inputs }}
-               Second task: {{ interactions[1].inputs }}
-               Second response: {{ interactions[1].outputs.final_answer }}
-
-               The second response should reference the first task.
-               Return 'passed: true' if context was maintained.
-               """
-           ))
-           .run()
+   result = await (
+       scenario("stateful_agent_memory")
+       # First interaction
+       .interact(
+           "Search for Python tutorials",
+           lambda inputs: stateful_agent.run(inputs)
        )
-       print(f"Stateful agent example passed: {result.passed}")
+       .check(from_fn(
+           lambda trace: trace.interactions[-1].outputs.success,
+           name="first_task_completed"
+       ))
+       # Second interaction references first
+       .interact(
+           "What was my last request?",
+           lambda inputs: stateful_agent.run(inputs)
+       )
+       .check(from_fn(
+           lambda trace: "Python tutorials" in trace.interactions[-1].outputs.final_answer,
+           name="recalls_previous_task",
+           success_message="Agent correctly recalled previous task",
+           failure_message="Agent failed to recall previous task"
+       ))
+       .check(LLMJudge(
+           name="context_maintained",
+           prompt="""
+           Evaluate if the agent maintained context correctly.
 
-   import asyncio
-   asyncio.run(run_stateful_agent_example())
+           First task: {{ interactions[0].inputs }}
+           Second task: {{ interactions[1].inputs }}
+           Second response: {{ interactions[1].outputs.final_answer }}
+
+           The second response should reference the first task.
+           Return 'passed: true' if context was maintained.
+           """
+       ))
+       .run()
+   )
+   print(f"Stateful agent example passed: {result.passed}")
 
 
 Test 6: Task Completion Validation
@@ -565,51 +545,47 @@ Verify that complex tasks are fully completed:
 
    task_agent = TaskTrackingAgent()
 
-   async def run_task_completion_example():
-       result = await (
-           scenario("task_completion_workflow")
-           # Add tasks
-           .interact(
-               "add task: Write documentation",
-               lambda inputs: task_agent.run(inputs)
-           )
-           .interact(
-               "add task: Review code",
-               lambda inputs: task_agent.run(inputs)
-           )
-           .check(from_fn(
-               lambda trace: len(task_agent.pending_tasks) == 2,
-               name="tasks_added"
-           ))
-           # Complete first task
-           .interact(
-               "complete next task",
-               lambda inputs: task_agent.run(inputs)
-           )
-           .check(from_fn(
-               lambda trace: len(task_agent.completed_tasks) == 1,
-               name="task_completed"
-           ))
-           # Check status
-           .interact(
-               "what's the status?",
-               lambda inputs: task_agent.run(inputs)
-           )
-           .check(from_fn(
-               lambda trace: (
-                   "Pending: 1" in trace.interactions[-1].outputs.final_answer and
-                   "Completed: 1" in trace.interactions[-1].outputs.final_answer
-               ),
-               name="status_accurate",
-               success_message="Agent tracking state correctly",
-               failure_message="Agent state tracking is incorrect"
-           ))
-           .run()
+   result = await (
+       scenario("task_completion_workflow")
+       # Add tasks
+       .interact(
+           "add task: Write documentation",
+           lambda inputs: task_agent.run(inputs)
        )
-       print(f"Task completion example passed: {result.passed}")
-
-   import asyncio
-   asyncio.run(run_task_completion_example())
+       .interact(
+           "add task: Review code",
+           lambda inputs: task_agent.run(inputs)
+       )
+       .check(from_fn(
+           lambda trace: len(task_agent.pending_tasks) == 2,
+           name="tasks_added"
+       ))
+       # Complete first task
+       .interact(
+           "complete next task",
+           lambda inputs: task_agent.run(inputs)
+       )
+       .check(from_fn(
+           lambda trace: len(task_agent.completed_tasks) == 1,
+           name="task_completed"
+       ))
+       # Check status
+       .interact(
+           "what's the status?",
+           lambda inputs: task_agent.run(inputs)
+       )
+       .check(from_fn(
+           lambda trace: (
+               "Pending: 1" in trace.interactions[-1].outputs.final_answer and
+               "Completed: 1" in trace.interactions[-1].outputs.final_answer
+           ),
+           name="status_accurate",
+           success_message="Agent tracking state correctly",
+           failure_message="Agent state tracking is incorrect"
+       ))
+       .run()
+   )
+   print(f"Task completion example passed: {result.passed}")
 
 
 Complete Agent Test Suite
@@ -666,17 +642,14 @@ Combine all tests into a comprehensive suite:
                        print(f"      ↳ {result.message}")
 
    # Usage
-   async def main():
-       agent = SimpleAgent()
-       suite = AgentTestSuite(agent)
+   agent = SimpleAgent()
+   suite = AgentTestSuite(agent)
 
-       # Add tests (from examples above)
-       # suite.add_test(...)
-       # suite.add_scenario(...)
+   # Add tests (from examples above)
+   # suite.add_test(...)
+   # suite.add_scenario(...)
 
-       await suite.run_all()
-
-   asyncio.run(main())
+   await suite.run_all()
 
 
 Best Practices

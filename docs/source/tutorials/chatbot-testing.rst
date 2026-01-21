@@ -145,53 +145,48 @@ Test a simple greeting and name exchange:
 
    bot = SimpleChatbot()
 
-   import asyncio
-
-   async def run_basic_conversation_example():
-       result = await (
-           scenario("greeting_and_introduction")
-           # User greets
-           .interact(
-               "Hello",
-               lambda inputs: bot.chat(inputs)
-           )
-           .check(StringMatchingCheck(
-               name="polite_greeting",
-               content="help",
-               key="interactions[-1].outputs.message"
-           ))
-           # User introduces themselves
-           .interact(
-               "My name is Alice",
-               lambda inputs: bot.chat(inputs)
-           )
-           .check(StringMatchingCheck(
-               name="acknowledges_name",
-               content="Alice",
-               key="interactions[-1].outputs.message"
-           ))
-           .check(from_fn(
-               lambda trace: trace.interactions[-1].outputs.context.user_name == "Alice",
-               name="stored_name",
-               success_message="Chatbot stored the user's name",
-               failure_message="Chatbot failed to store name"
-           ))
-           # Verify name recall
-           .interact(
-               "What is my name?",
-               lambda inputs: bot.chat(inputs)
-           )
-           .check(StringMatchingCheck(
-               name="recalls_name",
-               content="Alice",
-               key="interactions[-1].outputs.message"
-           ))
-           .run()
+   result = await (
+       scenario("greeting_and_introduction")
+       # User greets
+       .interact(
+           "Hello",
+           lambda inputs: bot.chat(inputs)
        )
-       assert result.passed
-       print("✓ Basic conversation flow example passed")
-
-   asyncio.run(run_basic_conversation_example())
+       .check(StringMatchingCheck(
+           name="polite_greeting",
+           content="help",
+           key="interactions[-1].outputs.message"
+       ))
+       # User introduces themselves
+       .interact(
+           "My name is Alice",
+           lambda inputs: bot.chat(inputs)
+       )
+       .check(StringMatchingCheck(
+           name="acknowledges_name",
+           content="Alice",
+           key="interactions[-1].outputs.message"
+       ))
+       .check(from_fn(
+           lambda trace: trace.interactions[-1].outputs.context.user_name == "Alice",
+           name="stored_name",
+           success_message="Chatbot stored the user's name",
+           failure_message="Chatbot failed to store name"
+       ))
+       # Verify name recall
+       .interact(
+           "What is my name?",
+           lambda inputs: bot.chat(inputs)
+       )
+       .check(StringMatchingCheck(
+           name="recalls_name",
+           content="Alice",
+           key="interactions[-1].outputs.message"
+       ))
+       .run()
+   )
+   assert result.passed
+   print("✓ Basic conversation flow example passed")
 
 
 Test 2: Context Switching
@@ -213,57 +208,53 @@ Verify the chatbot handles different conversation types:
 
    bot = SimpleChatbot()
 
-   async def run_context_switching_example():
-       result = await (
-           scenario("context_switching")
-           # Start with casual conversation
-           .interact(
-               "Hi there!",
-               lambda inputs: bot.chat(inputs)
-           )
-           .check(EqualityCheck(
-               name="casual_context",
-               expected="casual",
-               key="interactions[-1].outputs.context.conversation_type"
-           ))
-           # Switch to support
-           .interact(
-               "I'm having a problem with my account",
-               lambda inputs: bot.chat(inputs)
-           )
-           .check(EqualityCheck(
-               name="support_context",
-               expected="support",
-               key="interactions[-1].outputs.context.conversation_type"
-           ))
-           .check(LLMJudge(
-               name="support_tone",
-               prompt="""
-               Evaluate if the response is appropriate for a support inquiry.
-
-               User: {{ interactions[1].inputs }}
-               Assistant: {{ interactions[1].outputs.message }}
-
-               The response should be helpful and professional.
-               Return 'passed: true' if appropriate.
-               """
-           ))
-           # Switch to sales
-           .interact(
-               "How much does it cost?",
-               lambda inputs: bot.chat(inputs)
-           )
-           .check(EqualityCheck(
-               name="sales_context",
-               expected="sales",
-               key="interactions[-1].outputs.context.conversation_type"
-           ))
-           .run()
+   result = await (
+       scenario("context_switching")
+       # Start with casual conversation
+       .interact(
+           "Hi there!",
+           lambda inputs: bot.chat(inputs)
        )
-       print(f"Context switching example passed: {result.passed}")
+       .check(EqualityCheck(
+           name="casual_context",
+           expected="casual",
+           key="interactions[-1].outputs.context.conversation_type"
+       ))
+       # Switch to support
+       .interact(
+           "I'm having a problem with my account",
+           lambda inputs: bot.chat(inputs)
+       )
+       .check(EqualityCheck(
+           name="support_context",
+           expected="support",
+           key="interactions[-1].outputs.context.conversation_type"
+       ))
+       .check(LLMJudge(
+           name="support_tone",
+           prompt="""
+           Evaluate if the response is appropriate for a support inquiry.
 
-   import asyncio
-   asyncio.run(run_context_switching_example())
+           User: {{ interactions[1].inputs }}
+           Assistant: {{ interactions[1].outputs.message }}
+
+           The response should be helpful and professional.
+           Return 'passed: true' if appropriate.
+           """
+       ))
+       # Switch to sales
+       .interact(
+           "How much does it cost?",
+           lambda inputs: bot.chat(inputs)
+       )
+       .check(EqualityCheck(
+           name="sales_context",
+           expected="sales",
+           key="interactions[-1].outputs.context.conversation_type"
+       ))
+       .run()
+   )
+   print(f"Context switching example passed: {result.passed}")
 
 
 Test 3: Response Quality and Tone
@@ -277,52 +268,48 @@ Evaluate response quality using LLM-as-a-judge:
 
    bot = SimpleChatbot(personality="professional")
 
-   async def run_response_quality_example():
-       result = await (
-           scenario("response_quality_test")
-           .interact(
-               "I need help understanding your pricing",
-               lambda inputs: bot.chat(inputs)
-           )
-           .check(LLMJudge(
-               name="tone_check",
-               prompt="""
-               Evaluate the tone of this chatbot response.
-
-               User message: {{ inputs }}
-               Bot response: {{ outputs.message }}
-               Expected personality: professional
-
-               Check:
-               1. Is the tone professional?
-               2. Is it helpful and clear?
-               3. Does it address the user's question?
-
-               Return 'passed: true' if tone is appropriate.
-               """
-           ))
-           .check(LLMJudge(
-               name="completeness",
-               prompt="""
-               Evaluate if the response is complete.
-
-               User: {{ inputs }}
-               Bot: {{ outputs.message }}
-
-               Does the response:
-               1. Acknowledge the user's question?
-               2. Provide next steps or information?
-               3. Offer to help further?
-
-               Return 'passed: true' if response is complete.
-               """
-           ))
-           .run()
+   result = await (
+       scenario("response_quality_test")
+       .interact(
+           "I need help understanding your pricing",
+           lambda inputs: bot.chat(inputs)
        )
-       print(f"Response quality example passed: {result.passed}")
+       .check(LLMJudge(
+           name="tone_check",
+           prompt="""
+           Evaluate the tone of this chatbot response.
 
-   import asyncio
-   asyncio.run(run_response_quality_example())
+           User message: {{ inputs }}
+           Bot response: {{ outputs.message }}
+           Expected personality: professional
+
+           Check:
+           1. Is the tone professional?
+           2. Is it helpful and clear?
+           3. Does it address the user's question?
+
+           Return 'passed: true' if tone is appropriate.
+           """
+       ))
+       .check(LLMJudge(
+           name="completeness",
+           prompt="""
+           Evaluate if the response is complete.
+
+           User: {{ inputs }}
+           Bot: {{ outputs.message }}
+
+           Does the response:
+           1. Acknowledge the user's question?
+           2. Provide next steps or information?
+           3. Offer to help further?
+
+           Return 'passed: true' if response is complete.
+           """
+       ))
+       .run()
+   )
+   print(f"Response quality example passed: {result.passed}")
 
 
 Test 4: Information Extraction and Storage
@@ -336,49 +323,45 @@ Test the chatbot's ability to extract and remember user information:
 
    bot = SimpleChatbot()
 
-   async def run_information_collection_example():
-       result = await (
-           scenario("information_collection")
-           # Collect name
-           .interact(
-               "Hi, I'm Bob Johnson",
-               lambda inputs: bot.chat(inputs)
-           )
-           .check(EqualityCheck(
-               name="extracted_name",
-               expected="Bob",
-               key="interactions[-1].outputs.context.user_name"
-           ))
-           # Collect email
-           .interact(
-               "My email is bob.johnson@example.com",
-               lambda inputs: bot.chat(inputs)
-           )
-           .check(EqualityCheck(
-               name="extracted_email",
-               expected="bob.johnson@example.com",
-               key="interactions[-1].outputs.context.user_email"
-           ))
-           # Verify information persists
-           .interact(
-               "Can you remind me what information you have about me?",
-               lambda inputs: bot.chat(inputs)
-           )
-           .check(from_fn(
-               lambda trace: (
-                   trace.interactions[-1].outputs.context.user_name == "Bob" and
-                   trace.interactions[-1].outputs.context.user_email == "bob.johnson@example.com"
-               ),
-               name="information_persisted",
-               success_message="Chatbot retained user information",
-               failure_message="Chatbot lost user information"
-           ))
-           .run()
+   result = await (
+       scenario("information_collection")
+       # Collect name
+       .interact(
+           "Hi, I'm Bob Johnson",
+           lambda inputs: bot.chat(inputs)
        )
-       print(f"Information collection example passed: {result.passed}")
-
-   import asyncio
-   asyncio.run(run_information_collection_example())
+       .check(EqualityCheck(
+           name="extracted_name",
+           expected="Bob",
+           key="interactions[-1].outputs.context.user_name"
+       ))
+       # Collect email
+       .interact(
+           "My email is bob.johnson@example.com",
+           lambda inputs: bot.chat(inputs)
+       )
+       .check(EqualityCheck(
+           name="extracted_email",
+           expected="bob.johnson@example.com",
+           key="interactions[-1].outputs.context.user_email"
+       ))
+       # Verify information persists
+       .interact(
+           "Can you remind me what information you have about me?",
+           lambda inputs: bot.chat(inputs)
+       )
+       .check(from_fn(
+           lambda trace: (
+               trace.interactions[-1].outputs.context.user_name == "Bob" and
+               trace.interactions[-1].outputs.context.user_email == "bob.johnson@example.com"
+           ),
+           name="information_persisted",
+           success_message="Chatbot retained user information",
+           failure_message="Chatbot lost user information"
+       ))
+       .run()
+   )
+   print(f"Information collection example passed: {result.passed}")
 
 
 Test 5: Edge Cases and Error Handling
@@ -392,72 +375,68 @@ Test how the chatbot handles unusual inputs:
 
    bot = SimpleChatbot()
 
-   async def run_edge_case_examples():
-       # Test empty input
-       result_empty = await (
-           scenario("empty_input_handling")
-           .interact(
-               "",
-               lambda inputs: bot.chat(inputs) if inputs else ChatResponse(
-                   message="I didn't receive a message. Could you try again?",
-                   context=bot.context
-               )
+   # Test empty input
+   result_empty = await (
+       scenario("empty_input_handling")
+       .interact(
+           "",
+           lambda inputs: bot.chat(inputs) if inputs else ChatResponse(
+               message="I didn't receive a message. Could you try again?",
+               context=bot.context
            )
-           .check(from_fn(
-               lambda trace: len(trace.interactions[-1].outputs.message) > 0,
-               name="provides_response",
-               success_message="Bot provided a response to empty input"
-           ))
-           .run()
        )
+       .check(from_fn(
+           lambda trace: len(trace.interactions[-1].outputs.message) > 0,
+           name="provides_response",
+           success_message="Bot provided a response to empty input"
+       ))
+       .run()
+   )
 
-       # Test very long input
-       result_long = await (
-           scenario("long_input_handling")
-           .interact(
-               "Hello " * 1000,
-               lambda inputs: bot.chat(inputs)
-           )
-           .check(from_fn(
-               lambda trace: len(trace.interactions[-1].outputs.message) > 0,
-               name="handles_long_input",
-               success_message="Bot handled long input"
-           ))
-           .run()
+   # Test very long input
+   result_long = await (
+       scenario("long_input_handling")
+       .interact(
+           "Hello " * 1000,
+           lambda inputs: bot.chat(inputs)
        )
+       .check(from_fn(
+           lambda trace: len(trace.interactions[-1].outputs.message) > 0,
+           name="handles_long_input",
+           success_message="Bot handled long input"
+       ))
+       .run()
+   )
 
-       # Test gibberish
-       result_gibberish = await (
-           scenario("gibberish_handling")
-           .interact(
-               "asdfghjkl qwertyuiop zxcvbnm",
-               lambda inputs: bot.chat(inputs)
-           )
-           .check(LLMJudge(
-               name="graceful_response",
-               prompt="""
-               Evaluate if the bot handles gibberish gracefully.
-
-               User input: {{ inputs }}
-               Bot response: {{ outputs.message }}
-
-               The bot should:
-               1. Not error out
-               2. Provide a polite response
-               3. Maybe ask for clarification
-
-               Return 'passed: true' if handled well.
-               """
-           ))
-           .run()
+   # Test gibberish
+   result_gibberish = await (
+       scenario("gibberish_handling")
+       .interact(
+           "asdfghjkl qwertyuiop zxcvbnm",
+           lambda inputs: bot.chat(inputs)
        )
+       .check(LLMJudge(
+           name="graceful_response",
+           prompt="""
+           Evaluate if the bot handles gibberish gracefully.
 
-       print(f"Empty input handling: {result_empty.passed}")
-       print(f"Long input handling: {result_long.passed}")
-       print(f"Gibberish handling: {result_gibberish.passed}")
+           User input: {{ inputs }}
+           Bot response: {{ outputs.message }}
 
-   import asyncio
-   asyncio.run(run_edge_case_examples())
+           The bot should:
+           1. Not error out
+           2. Provide a polite response
+           3. Maybe ask for clarification
+
+           Return 'passed: true' if handled well.
+           """
+       ))
+       .run()
+   )
+
+   print(f"Empty input handling: {result_empty.passed}")
+   print(f"Long input handling: {result_long.passed}")
+   print(f"Gibberish handling: {result_gibberish.passed}")
 
 
 Test 6: Conversation State Management
@@ -505,51 +484,47 @@ Test complex stateful interactions:
 
    stateful_bot = StatefulChatbot()
 
-   async def run_confirmation_flow_example():
-       result = await (
-           scenario("confirmation_flow")
-           # Request action requiring confirmation
-           .interact(
-               "I want to delete my account",
-               lambda inputs: stateful_bot.chat(inputs)
-           )
-           .check(from_fn(
-               lambda trace: stateful_bot.awaiting_confirmation,
-               name="requested_confirmation",
-               success_message="Bot requested confirmation"
-           ))
-           .check(StringMatchingCheck(
-               name="asks_confirmation",
-               content="confirm",
-               key="interactions[-1].outputs.message"
-           ))
-           # User cancels
-           .interact(
-               "No, nevermind",
-               lambda inputs: stateful_bot.chat(inputs)
-           )
-           .check(from_fn(
-               lambda trace: not stateful_bot.awaiting_confirmation,
-               name="cleared_confirmation_state",
-               success_message="Bot cleared confirmation state"
-           ))
-           .check(LLMJudge(
-               name="acknowledged_cancellation",
-               prompt="""
-               Check if the bot acknowledged the cancellation appropriately.
-
-               User: {{ interactions[1].inputs }}
-               Bot: {{ interactions[1].outputs.message }}
-
-               Return 'passed: true' if the bot handled cancellation well.
-               """
-           ))
-           .run()
+   result = await (
+       scenario("confirmation_flow")
+       # Request action requiring confirmation
+       .interact(
+           "I want to delete my account",
+           lambda inputs: stateful_bot.chat(inputs)
        )
-       print(f"Confirmation flow example passed: {result.passed}")
+       .check(from_fn(
+           lambda trace: stateful_bot.awaiting_confirmation,
+           name="requested_confirmation",
+           success_message="Bot requested confirmation"
+       ))
+       .check(StringMatchingCheck(
+           name="asks_confirmation",
+           content="confirm",
+           key="interactions[-1].outputs.message"
+       ))
+       # User cancels
+       .interact(
+           "No, nevermind",
+           lambda inputs: stateful_bot.chat(inputs)
+       )
+       .check(from_fn(
+           lambda trace: not stateful_bot.awaiting_confirmation,
+           name="cleared_confirmation_state",
+           success_message="Bot cleared confirmation state"
+       ))
+       .check(LLMJudge(
+           name="acknowledged_cancellation",
+           prompt="""
+           Check if the bot acknowledged the cancellation appropriately.
 
-   import asyncio
-   asyncio.run(run_confirmation_flow_example())
+           User: {{ interactions[1].inputs }}
+           Bot: {{ interactions[1].outputs.message }}
+
+           Return 'passed: true' if the bot handled cancellation well.
+           """
+       ))
+       .run()
+   )
+   print(f"Confirmation flow example passed: {result.passed}")
 
 
 Complete Chatbot Test Suite
@@ -606,16 +581,13 @@ Combine all tests into a comprehensive suite:
                                print(f"    → {check_result.name}: {check_result.message}")
 
    # Usage
-   async def main():
-       bot = SimpleChatbot()
-       suite = ChatbotTestSuite(bot)
+   bot = SimpleChatbot()
+   suite = ChatbotTestSuite(bot)
 
-       # Add all scenarios
-       # suite.add_scenario(...)
+   # Add all scenarios
+   # suite.add_scenario(...)
 
-       await suite.run_all()
-
-   asyncio.run(main())
+   await suite.run_all()
 
 
 Best Practices
@@ -627,18 +599,14 @@ Don't just test individual responses—test complete conversation flows:
 
 .. code-block:: python
 
-   async def run_complete_support_flow():
-       result = await (
-           scenario("complete_support_flow")
-           # Greeting -> Problem statement -> Information collection -> Resolution
-           .interact(...)
-           .check(...)
-           .run()
-       )
-       print(f"Complete support flow passed: {result.passed}")
-
-   import asyncio
-   asyncio.run(run_complete_support_flow())
+   result = await (
+       scenario("complete_support_flow")
+       # Greeting -> Problem statement -> Information collection -> Resolution
+       .interact(...)
+       .check(...)
+       .run()
+   )
+   print(f"Complete support flow passed: {result.passed}")
 
 **2. Validate Context Retention**
 

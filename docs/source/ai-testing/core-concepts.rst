@@ -14,17 +14,13 @@ Giskard Checks provides a fluent API that makes it easy to write tests. The reco
 
    from giskard.checks import scenario, StringMatchingCheck
 
-   async def run_example():
-       result = await (
-           scenario("my_test")
-           .interact("Hello", lambda inputs: my_bot(inputs))
-           .check(StringMatchingCheck(content="Hi", key="interactions[-1].outputs"))
-           .run()
-       )
-       print(f"Test passed: {result.passed}")
-
-   import asyncio
-   asyncio.run(run_example())
+   result = await (
+       scenario("my_test")
+       .interact("Hello", lambda inputs: my_bot(inputs))
+       .check(StringMatchingCheck(content="Hi", key="interactions[-1].outputs"))
+       .run()
+   )
+   print(f"Test passed: {result.passed}")
 
 This fluent API handles all the underlying concepts automatically. For advanced use cases, you can work with the core primitives directly (see :ref:`advanced-concepts` below).
 
@@ -137,19 +133,15 @@ The recommended way to create tests is using the fluent API with ``scenario()``:
 
    from giskard.checks import scenario, Conformity
 
-   async def run_conversation_example():
-       result = await (
-           scenario("conversation_test")
-           .interact("Hello", lambda inputs: generate_answer(inputs))
-           .check(Conformity(key="interactions[-1].outputs", rule="response should be a friendly greeting"))
-           .interact("Who invented the HTML?", lambda inputs: generate_answer(inputs))
-           .check(Conformity(key="interactions[-1].outputs", rule="response should mention Tim Berners-Lee as the inventor of HTML"))
-           .run()
-       )
-       print(f"Test passed: {result.passed}")
-
-   import asyncio
-   asyncio.run(run_conversation_example())
+   result = await (
+       scenario("conversation_test")
+       .interact("Hello", lambda inputs: generate_answer(inputs))
+       .check(Conformity(key="interactions[-1].outputs", rule="response should be a friendly greeting"))
+       .interact("Who invented the HTML?", lambda inputs: generate_answer(inputs))
+       .check(Conformity(key="interactions[-1].outputs", rule="response should mention Tim Berners-Lee as the inventor of HTML"))
+       .run()
+   )
+   print(f"Test passed: {result.passed}")
 
 This creates a ``Scenario`` internally that executes interactions and checks sequentially. The fluent API is easier to read and write than manually constructing scenarios.
 

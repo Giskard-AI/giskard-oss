@@ -4,6 +4,9 @@ Quickstart
 
 This guide will walk you through creating your first test with Giskard Checks in under 5 minutes.
 
+.. note::
+   All code examples in this documentation use async/await syntax. To run these examples, you can use ``asyncio.run()`` or run them within an async context (e.g., in a Jupyter notebook with async support, or in an async test framework like pytest-asyncio).
+
 
 A simple example
 ----------------
@@ -32,26 +35,22 @@ The easiest way to create a test is using the fluent API with ``scenario().inter
        return "The capital of France is Paris."
 
    # Create and run a test scenario
-   async def run_example():
-       result = await (
-           scenario("my_first_test")
-           .interact(
-               "What is the capital of France?",
-               lambda inputs: qa_bot(inputs)
-           )
-           .check(Groundedness(
-               name="answer is grounded",
-               answer_key="interactions[-1].outputs",
-               context="""France is a country in Western Europe. Its capital
-                          and largest city is Paris, known for the Eiffel Tower
-                          and the Louvre Museum."""
-           ))
-           .run()
+   result = await (
+       scenario("my_first_test")
+       .interact(
+           "What is the capital of France?",
+           lambda inputs: qa_bot(inputs)
        )
-       print(f"Test passed: {result.passed}")
-
-   import asyncio
-   asyncio.run(run_example())
+       .check(Groundedness(
+           name="answer is grounded",
+           answer_key="interactions[-1].outputs",
+           context="""France is a country in Western Europe. Its capital
+                      and largest city is Paris, known for the Eiffel Tower
+                      and the Louvre Museum."""
+       ))
+       .run()
+   )
+   print(f"Test passed: {result.passed}")
 
 Note how we created the groundedness check:
 
@@ -96,29 +95,25 @@ We can easily test this structured format using the fluent API:
             ]
         }
 
-    async def run_structured_example():
-        result = await (
-            scenario("structured_qa_test")
-            .interact(
-                {"role": "user", "content": "What is the capital of France?"},
-                lambda inputs: structured_qa_bot(inputs)
-            )
-            .check(Groundedness(
-                name="answer is grounded",
-                answer_key="interactions[-1].outputs.answer",
-                context_key="interactions[-1].outputs.documents",
-            ))
-            .check(GreaterThan(
-                name="confidence is high",
-                key="interactions[-1].outputs.confidence",
-                threshold=0.90,
-            ))
-            .run()
+    result = await (
+        scenario("structured_qa_test")
+        .interact(
+            {"role": "user", "content": "What is the capital of France?"},
+            lambda inputs: structured_qa_bot(inputs)
         )
-        print(f"Test passed: {result.passed}")
-
-    import asyncio
-    asyncio.run(run_structured_example())
+        .check(Groundedness(
+            name="answer is grounded",
+            answer_key="interactions[-1].outputs.answer",
+            context_key="interactions[-1].outputs.documents",
+        ))
+        .check(GreaterThan(
+            name="confidence is high",
+            key="interactions[-1].outputs.confidence",
+            threshold=0.90,
+        ))
+        .run()
+    )
+    print(f"Test passed: {result.passed}")
 
 Note how this time we used ``context_key`` to obtain the context from the documents present in the trace itself. This is a common case for RAG systems. We also added a check to ensure the confidence is high.
 
@@ -146,26 +141,22 @@ For example, our simple Q&A bot could be implemented using the OpenAI API:
         return response.choices[0].message.content
 
     # Use the function directly in the scenario
-    async def run_dynamic_example():
-        result = await (
-            scenario("dynamic_qa_test")
-            .interact(
-                "What is the capital of France?",
-                lambda inputs: get_answer(inputs)
-            )
-            .check(Groundedness(
-                name="answer is grounded",
-                answer_key="interactions[-1].outputs",
-                context="""France is a country in Western Europe. Its capital
-                           and largest city is Paris, known for the Eiffel Tower
-                           and the Louvre Museum."""
-            ))
-            .run()
+    result = await (
+        scenario("dynamic_qa_test")
+        .interact(
+            "What is the capital of France?",
+            lambda inputs: get_answer(inputs)
         )
-        print(f"Test passed: {result.passed}")
-
-    import asyncio
-    asyncio.run(run_dynamic_example())
+        .check(Groundedness(
+            name="answer is grounded",
+            answer_key="interactions[-1].outputs",
+            context="""France is a country in Western Europe. Its capital
+                       and largest city is Paris, known for the Eiffel Tower
+                       and the Louvre Museum."""
+        ))
+        .run()
+    )
+    print(f"Test passed: {result.passed}")
 
 No need to specify outputs manually - they're generated automatically when the test runs!
 

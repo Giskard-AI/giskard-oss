@@ -170,7 +170,6 @@ Running Multiple Test Cases
 
 .. code-block:: python
 
-   import asyncio
    from giskard.checks import TestCase
 
    test_cases = [
@@ -178,16 +177,13 @@ Running Multiple Test Cases
        TestCase(name="test2", interaction=..., checks=[...]),
    ]
 
-   async def run_all():
-       results = []
-       for tc in test_cases:
-           result = await tc.run()
-           results.append((tc.name, result))
+   results = []
+   for tc in test_cases:
+       result = await tc.run()
+       results.append((tc.name, result))
 
-       passed = sum(1 for _, r in results if r.passed)
-       print(f"Passed: {passed}/{len(results)}")
-
-   asyncio.run(run_all())
+   passed = sum(1 for _, r in results if r.passed)
+   print(f"Passed: {passed}/{len(results)}")
 
 
 Scenario with Dynamic Interactions
