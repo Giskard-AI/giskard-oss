@@ -9,7 +9,7 @@ from .base import BaseEmbeddingModel
 class LitellmEmbeddingModel(BaseEmbeddingModel):
     """An embedding model that uses Litellm."""
 
-    model: str = Field(default="text-embedding-3-small")
+    model: str = Field(default="gemini/gemini-embedding-001")
 
     async def _embed(self, texts: list[str]) -> list[np.ndarray]:
         result = await aembedding(
