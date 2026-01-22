@@ -51,6 +51,7 @@ Quick Reference
        from_fn,
        StringMatchingCheck,
        EqualityCheck,
+       SemanticSimilarity,
        Groundedness,
        Conformity,
        LLMJudge,
@@ -80,6 +81,7 @@ Package Structure
    │   ├── fn.py             # from_fn
    │   ├── string_matching.py
    │   ├── equality.py
+   │   ├── semantic_similarity.py
    │   ├── groundedness.py
    │   ├── conformity.py
    │   ├── judge.py          # LLMJudge

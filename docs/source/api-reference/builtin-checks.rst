@@ -98,6 +98,33 @@ Check if extracted value equals expected value.
    )
 
 
+Similarity Checks
+-----------------
+
+SemanticSimilarity
+~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: SemanticSimilarity
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Check if outputs are semantically similar to a reference text using cosine similarity of embeddings.
+
+**Example:**
+
+.. code-block:: python
+
+   from giskard.checks import SemanticSimilarity
+
+   check = SemanticSimilarity(
+       name="answer_similarity",
+       reference_text="The capital of France is Paris",
+       threshold=0.95,
+       actual_answer_key="interactions[-1].outputs"
+   )
+
+
 Extraction Checks
 -----------------
 
