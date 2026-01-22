@@ -146,7 +146,7 @@ Test that the system answers questions correctly:
    from giskard.agents.generators import Generator
    from giskard.checks import (
        scenario,
-       StringMatchingCheck,
+       StringMatching,
        from_fn,
        set_default_generator
    )
@@ -160,10 +160,9 @@ Test that the system answers questions correctly:
            "What is the capital of France?",
            lambda inputs: rag.answer(inputs)
        )
-       .check(StringMatchingCheck(
-           name="mentions_paris",
-           content="Paris",
-           key="interactions[-1].outputs.answer"
+       .check(StringMatching(
+           keyword="Paris",
+           text_key="trace.last.outputs.answer"
        ))
        .check(from_fn(
            lambda trace: len(trace.interactions[-1].outputs.retrieved_docs) > 0,
@@ -192,7 +191,7 @@ Verify that answers are grounded in retrieved context:
 
 .. code-block:: python
 
-   from giskard.checks import scenario, Groundedness, StringMatchingCheck
+   from giskard.checks import scenario, Groundedness, StringMatching
 
    result = await (
        scenario("groundedness_eiffel_tower")
@@ -204,10 +203,9 @@ Verify that answers are grounded in retrieved context:
            name="answer_grounded",
            description="Answer should be based on retrieved documents"
        ))
-       .check(StringMatchingCheck(
-           name="mentions_year",
-           content="1889",
-           key="interactions[-1].outputs.answer"
+       .check(StringMatching(
+           keyword="1889",
+           text_key="trace.last.outputs.answer"
        ))
        .run()
    )
@@ -340,7 +338,7 @@ Test a conversational RAG that handles follow-up questions:
    from giskard.checks import (
        scenario,
        Groundedness,
-       StringMatchingCheck,
+       StringMatching,
        from_fn,
        LLMJudge
    )
@@ -386,10 +384,9 @@ Test a conversational RAG that handles follow-up questions:
            lambda inputs: conv_rag.answer(inputs)
        )
        .check(Groundedness(name="first_answer_grounded"))
-       .check(StringMatchingCheck(
-           name="first_mentions_paris",
-           content="Paris",
-           key="interactions[-1].outputs.answer"
+       .check(StringMatching(
+           keyword="Paris",
+           text_key="trace.last.outputs.answer"
        ))
        # Follow-up question with reference
        .interact(
@@ -458,10 +455,9 @@ Combine all tests into a comprehensive suite:
                test_scenario = (
                    scenario(f"qa_{expected_content.replace(' ', '_')}")
                    .interact(question, lambda inputs: self.rag.answer(inputs))
-                   .check(StringMatchingCheck(
-                       name=f"contains_{expected_content}",
-                       content=expected_content,
-                       key="interactions[-1].outputs.answer"
+                   .check(StringMatching(
+                       keyword=expected_content,
+                       text_key="trace.last.outputs.answer"
                    ))
                    .check(from_fn(
                        lambda trace: len(trace.interactions[-1].outputs.retrieved_docs) > 0,

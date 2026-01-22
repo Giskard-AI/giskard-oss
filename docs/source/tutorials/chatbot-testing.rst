@@ -141,7 +141,7 @@ Test a simple greeting and name exchange:
 
 .. code-block:: python
 
-   from giskard.checks import scenario, from_fn, StringMatchingCheck
+   from giskard.checks import scenario, from_fn, StringMatching
 
    bot = SimpleChatbot()
 
@@ -152,20 +152,18 @@ Test a simple greeting and name exchange:
            "Hello",
            lambda inputs: bot.chat(inputs)
        )
-       .check(StringMatchingCheck(
-           name="polite_greeting",
-           content="help",
-           key="interactions[-1].outputs.message"
+       .check(StringMatching(
+           keyword="help",
+           text_key="trace.last.outputs.message"
        ))
        # User introduces themselves
        .interact(
            "My name is Alice",
            lambda inputs: bot.chat(inputs)
        )
-       .check(StringMatchingCheck(
-           name="acknowledges_name",
-           content="Alice",
-           key="interactions[-1].outputs.message"
+       .check(StringMatching(
+           keyword="Alice",
+           text_key="trace.last.outputs.message"
        ))
        .check(from_fn(
            lambda trace: trace.interactions[-1].outputs.context.user_name == "Alice",
@@ -178,10 +176,9 @@ Test a simple greeting and name exchange:
            "What is my name?",
            lambda inputs: bot.chat(inputs)
        )
-       .check(StringMatchingCheck(
-           name="recalls_name",
-           content="Alice",
-           key="interactions[-1].outputs.message"
+       .check(StringMatching(
+           keyword="Alice",
+           text_key="trace.last.outputs.message"
        ))
        .run()
    )
@@ -446,7 +443,7 @@ Test complex stateful interactions:
 
 .. code-block:: python
 
-   from giskard.checks import scenario, from_fn, LLMJudge, StringMatchingCheck
+   from giskard.checks import scenario, from_fn, LLMJudge, StringMatching
 
    class StatefulChatbot(SimpleChatbot):
        def __init__(self):
@@ -496,10 +493,9 @@ Test complex stateful interactions:
            name="requested_confirmation",
            success_message="Bot requested confirmation"
        ))
-       .check(StringMatchingCheck(
-           name="asks_confirmation",
-           content="confirm",
-           key="interactions[-1].outputs.message"
+       .check(StringMatching(
+           keyword="confirm",
+           text_key="trace.last.outputs.message"
        ))
        # User cancels
        .interact(

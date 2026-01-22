@@ -49,8 +49,8 @@ Quick Reference
 
        # Built-in checks
        from_fn,
-       StringMatchingCheck,
-       EqualityCheck,
+       StringMatching,
+       Equality,
        Groundedness,
        Conformity,
        LLMJudge,
