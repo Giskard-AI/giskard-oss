@@ -85,6 +85,12 @@ EqualityCheck
 
 Check if extracted value equals expected value.
 
+.. warning::
+   For object instances, this check uses Python's ``__eq__`` method for
+   comparison. The behavior depends on how the object's ``__eq__`` method
+   is implemented. For custom objects, ensure that ``__eq__`` is properly
+   defined to match your comparison requirements.
+
 **Example:**
 
 .. code-block:: python
