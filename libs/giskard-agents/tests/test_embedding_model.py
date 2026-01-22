@@ -66,12 +66,12 @@ async def test_embedding_model_real_embedding(
 
 def test_batched_embeddings_simple() -> None:
     """Test basic batching behavior."""
-    model = LitellmEmbeddingModel(
-        params=EmbeddingParams(max_batch_size=2, max_total_chars=100)
-    )
+    model = LitellmEmbeddingModel()
     texts = ["text1", "text2", "text3", "text4"]
 
-    batches = list(model.batched_embeddings(texts))
+    batches = list(
+        model.batched_embeddings(texts, max_batch_size=2, max_total_chars=100)
+    )
 
     # Should create 2 batches of 2 texts each
     assert len(batches) == 2
@@ -81,12 +81,12 @@ def test_batched_embeddings_simple() -> None:
 
 def test_batched_embeddings_with_char_limit() -> None:
     """Test batching with character limit."""
-    model = LitellmEmbeddingModel(
-        params=EmbeddingParams(max_batch_size=10, max_total_chars=20)
-    )
+    model = LitellmEmbeddingModel()
     texts = ["short", "a bit longer text", "tiny"]
 
-    batches = list(model.batched_embeddings(texts))
+    batches = list(
+        model.batched_embeddings(texts, max_batch_size=10, max_total_chars=20)
+    )
 
     # First batch: "short" (5 chars)
     # Adding "a bit longer text" (17 chars) would exceed 20 total chars
@@ -100,13 +100,13 @@ def test_batched_embeddings_with_char_limit() -> None:
 
 def test_batched_embeddings_truncate_long_text() -> None:
     """Test that overly long texts are truncated."""
-    model = LitellmEmbeddingModel(
-        params=EmbeddingParams(max_batch_size=2, max_total_chars=10)
-    )
+    model = LitellmEmbeddingModel()
     long_text = "a" * 50  # 50 characters, well over the limit
     texts = [long_text, "short"]
 
-    batches = list(model.batched_embeddings(texts))
+    batches = list(
+        model.batched_embeddings(texts, max_batch_size=2, max_total_chars=10)
+    )
 
     # Long text should be truncated to max_total_chars
     assert len(batches) == 2
@@ -116,9 +116,7 @@ def test_batched_embeddings_truncate_long_text() -> None:
 
 def test_batched_embeddings_custom_limits() -> None:
     """Test batching with custom limits passed to method."""
-    model = LitellmEmbeddingModel(
-        params=EmbeddingParams(max_batch_size=100, max_total_chars=1000)
-    )
+    model = LitellmEmbeddingModel()
     texts = ["text1", "text2", "text3"]
 
     # Override with smaller limits
@@ -133,10 +131,7 @@ def test_batched_embeddings_custom_limits() -> None:
 
 async def test_embed_with_multiple_batches() -> None:
     """Test that embed() correctly handles multiple batches."""
-    model = LitellmEmbeddingModel(
-        model="test-model",
-        params=EmbeddingParams(max_batch_size=2, max_total_chars=100),
-    )
+    model = LitellmEmbeddingModel(model="test-model")
 
     # Create a mock that returns different embeddings for each call
     call_count = 0
@@ -161,7 +156,7 @@ async def test_embed_with_multiple_batches() -> None:
         side_effect=mock_aembedding_side_effect,
     ) as mock_aembedding:
         texts = ["text1", "text2", "text3", "text4", "text5"]
-        embeddings = await model.embed(texts)
+        embeddings = await model.embed(texts, max_batch_size=2, max_total_chars=100)
 
         # With max_batch_size=2, we should have 3 batches: [2, 2, 1]
         assert mock_aembedding.call_count == 3
@@ -173,7 +168,7 @@ def test_embedding_model_serialization() -> None:
     """Test that embedding model can be serialized and deserialized."""
     model = LitellmEmbeddingModel(
         model="test-model",
-        params=EmbeddingParams(dimensions=768, max_batch_size=512),
+        params=EmbeddingParams(dimensions=768),
     )
 
     # Serialize
@@ -185,7 +180,6 @@ def test_embedding_model_serialization() -> None:
     assert isinstance(deserialized_model, LitellmEmbeddingModel)
     assert deserialized_model.model == "test-model"
     assert deserialized_model.params.dimensions == 768
-    assert deserialized_model.params.max_batch_size == 512
 
 
 def test_embedding_params_defaults() -> None:
@@ -193,32 +187,22 @@ def test_embedding_params_defaults() -> None:
     params = EmbeddingParams()
 
     assert params.dimensions == 1536
-    assert params.max_batch_size == 1024
-    assert params.max_total_chars == 20_000
-    assert params.params == {}
 
 
 def test_embedding_params_custom_values() -> None:
     """Test that EmbeddingParams accepts custom values."""
     params = EmbeddingParams(
         dimensions=512,
-        max_batch_size=256,
-        max_total_chars=10_000,
-        params={"api_key": "test-key"},  # pragma: allowlist-secret
     )
 
     assert params.dimensions == 512
-    assert params.max_batch_size == 256
-    assert params.max_total_chars == 10_000
 
 
 async def test_litellm_embedding_model_passes_params() -> None:
     """Test that custom params are passed to litellm aembedding."""
     model = LitellmEmbeddingModel(
         model="test-model",
-        params=EmbeddingParams(
-            dimensions=768, params={"api_base": "http://custom-endpoint.com"}
-        ),
+        params=EmbeddingParams(dimensions=768),
     )
 
     mock_response = MockEmbeddingResponse(embeddings=[[0.1, 0.2, 0.3]])
@@ -228,15 +212,16 @@ async def test_litellm_embedding_model_passes_params() -> None:
         return_value=mock_response,
     ) as mock_aembedding:
         texts = ["test"]
-        _ = await model.embed(texts)
+        # Pass custom params via the params argument
+        custom_params = EmbeddingParams(dimensions=512)
+        _ = await model.embed(texts, params=custom_params)
 
         # Verify that aembedding was called with correct parameters
         mock_aembedding.assert_called_once()
         call_kwargs = mock_aembedding.call_args.kwargs
         assert call_kwargs["model"] == "test-model"
         assert call_kwargs["input"] == ["test"]
-        assert call_kwargs["dimensions"] == 768
-        assert call_kwargs["api_base"] == "http://custom-endpoint.com"
+        assert call_kwargs["dimensions"] == 512
 
 
 def test_batched_embeddings_empty_list() -> None:

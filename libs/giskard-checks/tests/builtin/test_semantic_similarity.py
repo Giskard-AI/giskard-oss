@@ -2,7 +2,7 @@ from typing import cast
 
 import numpy as np
 import pytest
-from giskard.agents.embeddings.base import BaseEmbeddingModel
+from giskard.agents.embeddings.base import BaseEmbeddingModel, EmbeddingParams
 from giskard.checks import Check, CheckStatus, Interaction, SemanticSimilarity, Trace
 from giskard.checks.builtin.semantic_similarity import cosine_similarity
 
@@ -12,7 +12,9 @@ class MockEmbeddingModel(BaseEmbeddingModel):
 
     embeddings: dict[str, list[float]]
 
-    async def _embed(self, texts: list[str]) -> list[np.ndarray]:
+    async def _embed(
+        self, texts: list[str], params: EmbeddingParams | None = None
+    ) -> list[np.ndarray]:
         """Return predefined embeddings based on text content."""
         result = []
         for text in texts:

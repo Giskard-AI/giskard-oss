@@ -1,21 +1,31 @@
+import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any
 
 import numpy as np
 from giskard.core import Discriminated, discriminated_base
 from pydantic import BaseModel, Field
 
 
+def _parse_environ_or_default(env_var: str, default: int) -> int:
+    try:
+        return int(os.environ.get(env_var, default))
+    except ValueError:
+        return default
+
+
+DEFAULT_MAX_BATCH_SIZE = _parse_environ_or_default(
+    "GISKARD_AGENTS_DEFAULT_MAX_BATCH_SIZE", 1024
+)
+DEFAULT_MAX_TOTAL_CHARS = _parse_environ_or_default(
+    "GISKARD_AGENTS_DEFAULT_MAX_TOTAL_CHARS", 20000
+)
+
+
 class EmbeddingParams(BaseModel):
     """Parameters for embedding model."""
 
     dimensions: int = Field(default=1536)
-    params: dict[str, Any] = Field(
-        default_factory=dict
-    )  # Optional parameters for the embedding model (e.g. api_endpoint, api_key, etc.). Prefer using environment variables if available.
-    max_batch_size: int = Field(default=1024)
-    max_total_chars: int = Field(default=20_000)
 
 
 @discriminated_base
@@ -23,14 +33,20 @@ class BaseEmbeddingModel(Discriminated, ABC):
     params: EmbeddingParams = Field(default_factory=EmbeddingParams)
 
     @abstractmethod
-    async def _embed(self, texts: list[str]) -> list[np.ndarray]: ...
+    async def _embed(
+        self, texts: list[str], params: EmbeddingParams | None = None
+    ) -> list[np.ndarray]: ...
 
-    async def embed(self, texts: list[str]) -> list[np.ndarray]:
+    async def embed(
+        self,
+        texts: list[str],
+        params: EmbeddingParams | None = None,
+        max_batch_size: int | None = None,
+        max_total_chars: int | None = None,
+    ) -> list[np.ndarray]:
         embedding_batches = []
-        for batch in self.batched_embeddings(
-            texts, self.params.max_batch_size, self.params.max_total_chars
-        ):
-            embedding_batches.extend(await self._embed(batch))
+        for batch in self.batched_embeddings(texts, max_batch_size, max_total_chars):
+            embedding_batches.extend(await self._embed(batch, params))
         return embedding_batches
 
     def batched_embeddings(
@@ -45,9 +61,9 @@ class BaseEmbeddingModel(Discriminated, ABC):
         and total number of input tokens.
         """
         if max_batch_size is None:
-            max_batch_size = self.params.max_batch_size
+            max_batch_size = DEFAULT_MAX_BATCH_SIZE
         if max_total_chars is None:
-            max_total_chars = self.params.max_total_chars
+            max_total_chars = DEFAULT_MAX_TOTAL_CHARS
 
         current_batch = []
 

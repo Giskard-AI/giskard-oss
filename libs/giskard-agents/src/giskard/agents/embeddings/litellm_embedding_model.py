@@ -2,7 +2,7 @@ import numpy as np
 from litellm import aembedding
 from pydantic import Field
 
-from .base import BaseEmbeddingModel
+from .base import BaseEmbeddingModel, EmbeddingParams
 
 
 @BaseEmbeddingModel.register("litellm")
@@ -11,12 +11,18 @@ class LitellmEmbeddingModel(BaseEmbeddingModel):
 
     model: str = Field(default="gemini/gemini-embedding-001")
 
-    async def _embed(self, texts: list[str]) -> list[np.ndarray]:
+    async def _embed(
+        self, texts: list[str], params: EmbeddingParams | None = None
+    ) -> list[np.ndarray]:
+        params_ = self.params.model_dump()
+
+        if params is not None:
+            params_.update(params.model_dump(exclude_unset=True))
+
         result = await aembedding(
             model=self.model,
             input=texts,
-            dimensions=self.params.dimensions,
-            **self.params.params,
+            **params_,
         )
         embeddings = [np.array(elt["embedding"]) for elt in result.data]
         return embeddings
