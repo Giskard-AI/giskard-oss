@@ -11,6 +11,7 @@ dependencies = [
     "giskard-agents>=0.3.1,<1",
     "jinja2>=3.1.6,<4",
     "giskard-core>=0.1.7,<1",
+    "numpy>=2.4.1",
 ]
 
 [tool.pytest.ini_options]

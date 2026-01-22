@@ -886,6 +886,7 @@ dependencies = [
     { name = "jinja2" },
     { name = "litellm" },
     { name = "logfire-api" },
+    { name = "numpy" },
     { name = "pydantic" },
     { name = "tenacity" },
     { name = "typing-extensions" },
@@ -898,6 +899,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.6,<4" },
     { name = "litellm", specifier = ">=1.72.0,<2" },
     { name = "logfire-api", specifier = ">=3.22.0,<5" },
+    { name = "numpy", specifier = ">=2.4.1" },
     { name = "pydantic", specifier = ">=2.11.0,<3" },
     { name = "tenacity", specifier = ">=9.1.0,<10" },
     { name = "typing-extensions", specifier = ">=4.14.0,<5" },
@@ -912,6 +914,7 @@ dependencies = [
     { name = "giskard-core" },
     { name = "jinja2" },
     { name = "jsonpath-ng" },
+    { name = "numpy" },
     { name = "pydantic" },
 ]
 
@@ -921,6 +924,7 @@ requires-dist = [
     { name = "giskard-core", editable = "libs/giskard-core" },
     { name = "jinja2", specifier = ">=3.1.6,<4" },
     { name = "jsonpath-ng", specifier = ">=1.7.0,<2" },
+    { name = "numpy", specifier = ">=2.4.1" },
     { name = "pydantic", specifier = ">=2.12,<3" },
 ]
 
