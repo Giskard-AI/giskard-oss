@@ -21,7 +21,7 @@ Basic Multi-Turn Flow
 
 .. code-block:: python
 
-   from giskard.checks import scenario, StringMatchingCheck
+   from giskard.checks import scenario, StringMatching
 
    result = await (
        scenario("greeting_conversation")
@@ -30,20 +30,18 @@ Basic Multi-Turn Flow
            "Hello",
            lambda inputs: "Hi! How can I help you?"
        )
-       .check(StringMatchingCheck(
-           name="polite_greeting",
-           content="help",
-           key="interactions[-1].outputs"
+       .check(StringMatching(
+           keyword="help",
+           text_key="trace.last.outputs"
        ))
        # Second interaction
        .interact(
            "What's the weather?",
            lambda inputs: "It's sunny and 72°F."
        )
-       .check(StringMatchingCheck(
-           name="provides_weather",
-           content="sunny",
-           key="interactions[-1].outputs"
+       .check(StringMatching(
+           keyword="sunny",
+           text_key="trace.last.outputs"
        ))
        .run()
    )

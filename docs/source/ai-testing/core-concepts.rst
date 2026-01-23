@@ -12,12 +12,12 @@ Giskard Checks provides a fluent API that makes it easy to write tests. The reco
 
 .. code-block:: python
 
-   from giskard.checks import scenario, StringMatchingCheck
+   from giskard.checks import scenario, StringMatching
 
    result = await (
        scenario("my_test")
        .interact("Hello", lambda inputs: my_bot(inputs))
-       .check(StringMatchingCheck(content="Hi", key="interactions[-1].outputs"))
+       .check(StringMatching(keyword="Hi", text_key="trace.last.outputs"))
        .run()
    )
    print(f"Test passed: {result.passed}")

@@ -89,7 +89,7 @@ High-level API for running one interaction with multiple checks.
 
 .. code-block:: python
 
-   from giskard.checks import TestCase, InteractionSpec, StringMatchingCheck
+   from giskard.checks import TestCase, InteractionSpec, StringMatching
 
    tc = TestCase(
        name="qa_test",
@@ -98,10 +98,9 @@ High-level API for running one interaction with multiple checks.
            outputs=lambda inputs: "Paris"
        ),
        checks=[
-           StringMatchingCheck(
-               name="contains_paris",
-               content="Paris",
-               key="interactions[-1].outputs"
+           StringMatching(
+               keyword="Paris",
+               text_key="trace.last.outputs"
            )
        ]
    )
