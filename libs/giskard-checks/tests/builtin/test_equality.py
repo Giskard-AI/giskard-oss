@@ -540,3 +540,318 @@ class TestEqualityEdgeCases:
         )
         assert result.status == CheckStatus.FAIL
         assert result.failed
+
+
+class TestEqualityListExpressions:
+    """Test Equality check with JSONPath list expressions (wildcard and single index)."""
+
+    async def test_wildcard_expression_with_list_expected_multiple_items(self):
+        """Test that wildcard expression [*] returns a list and matches expected list."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test1", outputs="message 1"),
+            Interaction(inputs="test2", outputs="Message 2"),
+        )
+        check = Equality(
+            expected_value=["message 1", "Message 2"],
+            actual_value_key="trace.interactions[*].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert isinstance(result.details["actual_value"], list)
+        assert result.details["actual_value"] == ["message 1", "Message 2"]
+        assert result.details["expected_value"] == ["message 1", "Message 2"]
+
+    async def test_wildcard_expression_with_list_expected_single_item(self):
+        """Test that wildcard expression [*] returns a list even with single item."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test1", outputs="message 1"),
+        )
+        check = Equality(
+            expected_value=["message 1"],
+            actual_value_key="trace.interactions[*].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert isinstance(result.details["actual_value"], list)
+        assert result.details["actual_value"] == ["message 1"]
+        assert result.details["expected_value"] == ["message 1"]
+
+    async def test_wildcard_expression_with_single_value_expected_fails(self):
+        """Test that wildcard expression [*] fails when expected is a single value."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test1", outputs="message 1"),
+        )
+        check = Equality(
+            expected_value="message 1",
+            actual_value_key="trace.interactions[*].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert isinstance(result.details["actual_value"], list)
+        assert result.details["actual_value"] == ["message 1"]
+        assert result.details["expected_value"] == "message 1"
+        assert isinstance(result.message, str)
+        assert "Expected value 'message 1' but got ['message 1']" in result.message
+
+    async def test_single_index_expression_with_single_value_expected(self):
+        """Test that single index expression [-1] returns a single value."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test1", outputs="message 1"),
+            Interaction(inputs="test2", outputs="Message 2"),
+        )
+        check = Equality(
+            expected_value="Message 2",
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert not isinstance(result.details["actual_value"], list)
+        assert result.details["actual_value"] == "Message 2"
+        assert result.details["expected_value"] == "Message 2"
+
+    async def test_single_index_expression_with_list_expected_fails(self):
+        """Test that single index expression [-1] fails when expected is a list."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test1", outputs="message 1"),
+            Interaction(inputs="test2", outputs="Message 2"),
+        )
+        check = Equality(
+            expected_value=["Message 2"],
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert not isinstance(result.details["actual_value"], list)
+        assert result.details["actual_value"] == "Message 2"
+        assert isinstance(result.details["expected_value"], list)
+        assert result.details["expected_value"] == ["Message 2"]
+        assert isinstance(result.message, str)
+        assert "Expected value ['Message 2'] but got 'Message 2'" in result.message
+
+    async def test_single_index_expression_with_different_value_fails(self):
+        """Test that single index expression [-1] fails when value doesn't match."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test1", outputs="message 1"),
+            Interaction(inputs="test2", outputs="Message 2"),
+        )
+        check = Equality(
+            expected_value="Wrong message",
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert result.details["actual_value"] == "Message 2"
+        assert result.details["expected_value"] == "Wrong message"
+        assert isinstance(result.message, str)
+        assert "Expected value 'Wrong message' but got 'Message 2'" in result.message
+
+    async def test_wildcard_expression_with_different_list_fails(self):
+        """Test that wildcard expression [*] fails when list doesn't match."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test1", outputs="message 1"),
+            Interaction(inputs="test2", outputs="Message 2"),
+        )
+        check = Equality(
+            expected_value=["wrong", "list"],
+            actual_value_key="trace.interactions[*].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert isinstance(result.details["actual_value"], list)
+        assert result.details["actual_value"] == ["message 1", "Message 2"]
+        assert result.details["expected_value"] == ["wrong", "list"]
+        assert isinstance(result.message, str)
+        assert (
+            "Expected value ['wrong', 'list'] but got ['message 1', 'Message 2']"
+            in result.message
+        )
+
+
+class TestEqualityUnicodeNormalization:
+    """Test Equality check with Unicode normalization edge cases.
+
+    Note: The Equality check does not currently use normalization, so different
+    Unicode representations of the same character (e.g., 'é' as U+00E9 vs
+    U+0065 U+0301) will not match. These tests document this behavior.
+    """
+
+    async def test_unicode_e_acute_different_representations_fail(self):
+        """Test that 'é' (U+00E9) vs 'é' (U+0065 U+0301) fails without normalization.
+
+        This test documents that Equality check does not normalize strings,
+        so different Unicode representations of the same character will not match.
+        """
+        # U+00E9 is the composed form (NFC)
+        # U+0065 U+0301 is the decomposed form (NFD): 'e' + combining acute accent
+        text_nfc = "café"  # Uses U+00E9
+        text_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
+
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs=text_nfc)
+        )
+        check = Equality(
+            expected_value=text_nfd,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        # Without normalization, they should NOT match (different byte sequences)
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert result.details["actual_value"] == text_nfc
+        assert result.details["expected_value"] == text_nfd
+
+    async def test_unicode_e_acute_same_representation_passes(self):
+        """Test that 'é' in the same Unicode representation passes."""
+        # Both use U+00E9 (NFC form)
+        text = "café"  # Uses U+00E9
+
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=text))
+        check = Equality(
+            expected_value=text,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        # Same representation should match
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert result.details["actual_value"] == text
+        assert result.details["expected_value"] == text
+
+    async def test_unicode_e_acute_list_extraction_different_representations_fail(self):
+        """Test that 'é' in list extraction fails with different Unicode representations.
+
+        When extracting messages[*].content from {"messages": [{"content": "café"}]},
+        it returns ["café"]. Different Unicode representations should not match.
+        """
+        # U+00E9 is the composed form (NFC)
+        # U+0065 U+0301 is the decomposed form (NFD): 'e' + combining acute accent
+        text_nfc = "café"  # Uses U+00E9
+        text_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
+
+        trace = await Trace.from_interactions(
+            Interaction(
+                inputs="test",
+                outputs={"messages": [{"content": text_nfc}]},
+            )
+        )
+        check = Equality(
+            expected_value=[text_nfd],  # Expected list with NFD form
+            actual_value_key="trace.interactions[-1].outputs.messages[*].content",
+        )
+
+        result = await check.run(trace)
+
+        # Without normalization, they should NOT match (different byte sequences)
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert result.details["actual_value"] == [text_nfc]
+        assert result.details["expected_value"] == [text_nfd]
+
+    async def test_unicode_e_acute_list_extraction_same_representation_passes(self):
+        """Test that 'é' in list extraction passes with same Unicode representation."""
+        # Both use U+00E9 (NFC form)
+        text = "café"  # Uses U+00E9
+
+        trace = await Trace.from_interactions(
+            Interaction(
+                inputs="test",
+                outputs={"messages": [{"content": text}]},
+            )
+        )
+        check = Equality(
+            expected_value=[text],
+            actual_value_key="trace.interactions[-1].outputs.messages[*].content",
+        )
+
+        result = await check.run(trace)
+
+        # Same representation should match
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert result.details["actual_value"] == [text]
+        assert result.details["expected_value"] == [text]
+
+    async def test_unicode_e_acute_dict_list_extraction_different_representations_fail(
+        self,
+    ):
+        """Test that 'é' in dict list extraction fails with different Unicode representations.
+
+        When extracting messages[*] from {"messages": [{"content": "café"}]},
+        it returns [{"content": "café"}]. Different Unicode representations should not match.
+        """
+        # U+00E9 is the composed form (NFC)
+        # U+0065 U+0301 is the decomposed form (NFD): 'e' + combining acute accent
+        text_nfc = "café"  # Uses U+00E9
+        text_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
+
+        trace = await Trace.from_interactions(
+            Interaction(
+                inputs="test",
+                outputs={"messages": [{"content": text_nfc}]},
+            )
+        )
+        check = Equality(
+            expected_value=[
+                {"content": text_nfd}
+            ],  # Expected list with dict containing NFD form
+            actual_value_key="trace.interactions[-1].outputs.messages[*]",
+        )
+
+        result = await check.run(trace)
+
+        # Without normalization, they should NOT match (different byte sequences)
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert result.details["actual_value"] == [{"content": text_nfc}]
+        assert result.details["expected_value"] == [{"content": text_nfd}]
+
+    async def test_unicode_e_acute_dict_list_extraction_same_representation_passes(
+        self,
+    ):
+        """Test that 'é' in dict list extraction passes with same Unicode representation."""
+        # Both use U+00E9 (NFC form)
+        text = "café"  # Uses U+00E9
+
+        trace = await Trace.from_interactions(
+            Interaction(
+                inputs="test",
+                outputs={"messages": [{"content": text}]},
+            )
+        )
+        check = Equality(
+            expected_value=[{"content": text}],
+            actual_value_key="trace.interactions[-1].outputs.messages[*]",
+        )
+
+        result = await check.run(trace)
+
+        # Same representation should match
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert result.details["actual_value"] == [{"content": text}]
+        assert result.details["expected_value"] == [{"content": text}]

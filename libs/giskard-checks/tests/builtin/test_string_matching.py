@@ -334,3 +334,72 @@ async def test_empty_keyword() -> None:
     result = await check.run(Trace())
     # Empty string should be found in any text
     assert result.status == CheckStatus.PASS
+
+
+async def test_unicode_e_acute_nfc_nfd_matching() -> None:
+    """Test that 'é' (U+00E9) matches 'é' (U+0065 U+0301) with NFC normalization."""
+    # U+00E9 is the composed form (NFC)
+    # U+0065 U+0301 is the decomposed form (NFD): 'e' + combining acute accent
+    text_nfc = "café"  # Uses U+00E9
+    keyword_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
+
+    # With NFC normalization, both should normalize to the same form
+    check = StringMatching(
+        text=text_nfc,
+        keyword=keyword_nfd,
+        normalization_form="NFC",
+        case_sensitive=False,
+    )
+    result = await check.run(Trace())
+    assert result.status == CheckStatus.PASS
+
+
+async def test_unicode_e_acute_nfd_nfc_matching() -> None:
+    """Test that 'é' (U+0065 U+0301) matches 'é' (U+00E9) with NFD normalization."""
+    # U+0065 U+0301 is the decomposed form (NFD)
+    # U+00E9 is the composed form (NFC)
+    text_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
+    keyword_nfc = "café"  # Uses U+00E9
+
+    # With NFD normalization, both should normalize to the same form
+    check = StringMatching(
+        text=text_nfd,
+        keyword=keyword_nfc,
+        normalization_form="NFD",
+        case_sensitive=False,
+    )
+    result = await check.run(Trace())
+    assert result.status == CheckStatus.PASS
+
+
+async def test_unicode_e_acute_nfkc_matching() -> None:
+    """Test that 'é' in different forms matches with NFKC normalization."""
+    # NFKC should also normalize both forms to the same representation
+    text_nfc = "café"  # Uses U+00E9
+    keyword_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
+
+    check = StringMatching(
+        text=text_nfc,
+        keyword=keyword_nfd,
+        normalization_form="NFKC",
+        case_sensitive=False,
+    )
+    result = await check.run(Trace())
+    assert result.status == CheckStatus.PASS
+
+
+async def test_unicode_e_acute_no_normalization_fails() -> None:
+    """Test that 'é' in different forms does NOT match without normalization."""
+    # Without normalization, different Unicode representations should not match
+    text_nfc = "café"  # Uses U+00E9
+    keyword_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
+
+    check = StringMatching(
+        text=text_nfc,
+        keyword=keyword_nfd,
+        normalization_form=None,
+        case_sensitive=False,
+    )
+    result = await check.run(Trace())
+    # Without normalization, they should not match
+    assert result.status == CheckStatus.FAIL

@@ -7,9 +7,7 @@ and flexible text/keyword extraction from traces.
 
 from __future__ import annotations
 
-import re
-import unicodedata
-from typing import Literal, Self, override
+from typing import Self, override
 
 from giskard.core import provide_not_none
 from pydantic import Field, model_validator
@@ -18,9 +16,7 @@ from ..core.check import Check
 from ..core.extraction import NoMatch, provided_or_resolve
 from ..core.result import CheckResult
 from ..core.trace import Trace
-
-# Type alias for Unicode normalization forms
-_NormalizationForm = Literal["NFC", "NFD", "NFKC", "NFKD"]
+from ..utils.normalization import NormalizationForm, normalize_string
 
 
 @Check.register("string_matching")
@@ -107,7 +103,7 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
         default=None,
         description="JSONPath expression to extract the keyword from the trace (e.g., 'trace.last.inputs.expected'). Either this or keyword must be provided.",
     )
-    normalization_form: _NormalizationForm | None = Field(
+    normalization_form: NormalizationForm | None = Field(
         default="NFKC",
         description="Unicode normalization form to apply (NFC, NFD, NFKC, NFKD). Defaults to NFKC.",
     )
@@ -153,17 +149,12 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
         str
             The formatted string ready for comparison.
         """
-        # Apply Unicode normalization if specified
-        if self.normalization_form:
-            value = unicodedata.normalize(self.normalization_form, value)
+        value = normalize_string(value, self.normalization_form)
 
-        # Convert to lowercase if case-insensitive matching is enabled
         if not self.case_sensitive:
             value = value.lower()
 
-        # Normalize whitespace: collapse multiple spaces/tabs/newlines to single space
-        # and trim leading/trailing whitespace
-        return re.sub(r"\s+", " ", value).strip()
+        return value
 
     @override
     async def run(self, trace: TraceType) -> CheckResult:
