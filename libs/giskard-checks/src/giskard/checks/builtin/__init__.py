@@ -3,7 +3,6 @@
 from .base import BaseLLMCheck, LLMCheckResult
 from .conformity import Conformity
 from .equality import Equality
-from .extraction_check import ExtractionCheck
 from .fn import FnCheck, from_fn
 from .groundedness import Groundedness
 from .judge import LLMJudge
@@ -14,7 +13,6 @@ __all__ = [
     "FnCheck",
     "StringMatching",
     "Equality",
-    "ExtractionCheck",
     "Groundedness",
     "Conformity",
     "LLMJudge",

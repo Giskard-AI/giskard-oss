@@ -11,10 +11,11 @@ import re
 import unicodedata
 from typing import Literal, Self, override
 
+from giskard.core import provide_not_none
 from pydantic import Field, model_validator
 
 from ..core.check import Check
-from ..core.extraction import provided_or_resolve
+from ..core.extraction import NoMatch, provided_or_resolve
 from ..core.result import CheckResult
 from ..core.trace import Trace
 
@@ -183,14 +184,14 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
             Success if keyword is found in text, failure otherwise. Includes
             details about the text, keyword, normalization form, and case sensitivity.
         """
-        # Extract text: use provided value or resolve from trace
-        text = provided_or_resolve(self.text, trace, self.text_key)
-        # Extract keyword: use provided value or resolve from trace
-        # If keyword_key is None, keyword must be provided (validated by model_validator)
-        if self.keyword_key is not None:
-            keyword = provided_or_resolve(self.keyword, trace, self.keyword_key)
-        else:
-            keyword = self.keyword
+        text = provided_or_resolve(
+            trace, key=self.text_key, value=provide_not_none(self.text)
+        )
+        keyword = provided_or_resolve(
+            trace,
+            key=provide_not_none(self.keyword_key),
+            value=provide_not_none(self.keyword),
+        )
 
         details = {
             "text": text,
@@ -199,16 +200,27 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
             "case_sensitive": self.case_sensitive,
         }
 
-        # Validate that keyword was successfully extracted
-        if keyword is None:
+        if isinstance(keyword, NoMatch):
             return CheckResult.failure(
-                message=f"Unable to extract keyword from path '{self.keyword_key}'.",
+                message=f"No value found for keyword key '{self.keyword_key}'.",
                 details=details,
             )
-        # Validate that text was successfully extracted
-        if text is None:
+
+        if not isinstance(keyword, str):
             return CheckResult.failure(
-                message=f"Unable to extract text from path '{self.text_key}'.",
+                message=f"Value for keyword key '{self.keyword_key}' is not a string, expected string but got {type(keyword)}.",
+                details=details,
+            )
+
+        if isinstance(text, NoMatch):
+            return CheckResult.failure(
+                message=f"No value found for text key '{self.text_key}', expected string to contain '{keyword}'.",
+                details=details,
+            )
+
+        if not isinstance(text, str):
+            return CheckResult.failure(
+                message=f"Value for text key '{self.text_key}' is not a string, expected string to contain '{keyword}' but got {type(text)}.",
                 details=details,
             )
 

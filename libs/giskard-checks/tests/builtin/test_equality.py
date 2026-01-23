@@ -7,6 +7,7 @@ Tests cover different types (str, number, bool) and various comparison scenarios
 """
 
 from giskard.checks import CheckStatus, Equality, Interaction, Trace
+from giskard.checks.core.extraction import NoMatch
 
 
 class TestEqualityString:
@@ -420,7 +421,11 @@ class TestEqualityEdgeCases:
 
         assert result.status == CheckStatus.FAIL
         assert result.failed
-        assert result.details["actual_value"] is None
+        assert isinstance(result.details["actual_value"], NoMatch)
+        assert (
+            result.details["actual_value"].key
+            == "trace.interactions[-1].outputs.missing"
+        )
         assert result.details["expected_value"] == "expected"
         assert isinstance(result.message, str)
         assert "No value found for key" in result.message
@@ -439,3 +444,99 @@ class TestEqualityEdgeCases:
         assert result.passed
         assert result.details["actual_value"] is None
         assert result.details["expected_value"] is None
+
+    async def test_nomatch_with_trace_last(self):
+        """Test equality check when using trace.last syntax and key is missing."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs={"other": "value"})
+        )
+        check = Equality(
+            expected_value="expected",
+            actual_value_key="trace.last.outputs.missing",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert isinstance(result.details["actual_value"], NoMatch)
+        assert result.details["actual_value"].key == "trace.last.outputs.missing"
+        assert result.details["expected_value"] == "expected"
+
+    async def test_nomatch_with_deeply_nested_path(self):
+        """Test equality check with deeply nested path that doesn't exist."""
+        trace = await Trace.from_interactions(
+            Interaction(
+                inputs="test",
+                outputs={"level1": {"level2": {"level3": "value"}}},
+            )
+        )
+        check = Equality(
+            expected_value="expected",
+            actual_value_key="trace.interactions[-1].outputs.level1.level2.missing",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert isinstance(result.details["actual_value"], NoMatch)
+        assert (
+            result.details["actual_value"].key
+            == "trace.interactions[-1].outputs.level1.level2.missing"
+        )
+
+    async def test_nomatch_with_empty_trace(self):
+        """Test equality check with empty trace (no interactions)."""
+        trace = Trace()
+        check = Equality(
+            expected_value="expected",
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert isinstance(result.details["actual_value"], NoMatch)
+        assert result.details["actual_value"].key == "trace.interactions[-1].outputs"
+
+    async def test_nomatch_equality_when_both_are_nomatch_same_key(self):
+        """Test equality check when both expected and actual are NoMatch with same key."""
+        trace = Trace()
+        expected_nomatch = NoMatch(key="trace.interactions[-1].outputs")
+        check = Equality(
+            expected_value=expected_nomatch,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        # When both are NoMatch with the same key, they should be equal
+        assert isinstance(result.details["actual_value"], NoMatch)
+        assert isinstance(result.details["expected_value"], NoMatch)
+        assert (
+            result.details["actual_value"].key == result.details["expected_value"].key
+        )
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+
+    async def test_nomatch_equality_when_both_are_nomatch_different_keys(self):
+        """Test equality check when both expected and actual are NoMatch with different keys."""
+        trace = Trace()
+        expected_nomatch = NoMatch(key="different.key")
+        check = Equality(
+            expected_value=expected_nomatch,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        # When both are NoMatch but with different keys, they should not be equal
+        assert isinstance(result.details["actual_value"], NoMatch)
+        assert isinstance(result.details["expected_value"], NoMatch)
+        assert (
+            result.details["actual_value"].key != result.details["expected_value"].key
+        )
+        assert result.status == CheckStatus.FAIL
+        assert result.failed

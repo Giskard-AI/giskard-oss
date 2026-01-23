@@ -9,7 +9,6 @@ from .builtin import (
     BaseLLMCheck,
     Conformity,
     Equality,
-    ExtractionCheck,
     FnCheck,
     Groundedness,
     LLMCheckResult,
@@ -29,7 +28,6 @@ from .core import (
     TestCaseResult,
     Trace,
 )
-from .core.extraction import Extractor, JsonPathExtractor
 from .core.interaction import BaseInteractionSpec
 from .generators.user import UserSimulator
 from .interaction import InteractionSpec
@@ -57,14 +55,11 @@ __all__ = [
     "Trace",
     "Interaction",
     "BaseInteractionSpec",
-    "Extractor",
-    "JsonPathExtractor",
     # Builtin checks
     "BaseLLMCheck",
     "LLMCheckResult",
     "Conformity",
     "Equality",
-    "ExtractionCheck",
     "FnCheck",
     "from_fn",
     "Groundedness",

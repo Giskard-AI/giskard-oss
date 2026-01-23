@@ -1,6 +1,7 @@
 """Tests for the StringMatching check."""
 
 from giskard.checks import CheckStatus, Interaction, StringMatching, Trace
+from giskard.checks.core.extraction import NoMatch
 
 
 async def test_run_returns_success_with_direct_values() -> None:
@@ -153,8 +154,12 @@ async def test_missing_keyword_in_trace() -> None:
     result = await check.run(Trace())
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
-    assert "Unable to extract keyword" in result.message
-    assert result.details["keyword"] is None
+    assert (
+        "No value found for keyword key 'trace.last.inputs.nonexistent'."
+        in result.message
+    )
+    assert isinstance(result.details["keyword"], NoMatch)
+    assert result.details["keyword"].key == "trace.last.inputs.nonexistent"
 
 
 async def test_missing_text_in_trace() -> None:
@@ -166,8 +171,12 @@ async def test_missing_text_in_trace() -> None:
     result = await check.run(Trace())
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
-    assert "Unable to extract text" in result.message
-    assert result.details["text"] is None
+    assert (
+        "No value found for text key 'trace.last.outputs.nonexistent', expected string to contain 'test'."
+        in result.message
+    )
+    assert isinstance(result.details["text"], NoMatch)
+    assert result.details["text"].key == "trace.last.outputs.nonexistent"
 
 
 async def test_default_text_key() -> None:
@@ -175,7 +184,7 @@ async def test_default_text_key() -> None:
     check = StringMatching(keyword="response")
     interaction = Interaction(
         inputs={"query": "Test"},
-        outputs={"response": "This is a response"},
+        outputs="This is a response",
     )
     result = await check.run(Trace(interactions=[interaction]))
     # Default text_key extracts trace.last.outputs which is a dict

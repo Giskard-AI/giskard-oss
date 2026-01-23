@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from ..core.check import Check
-from ..core.extraction import provided_or_resolve
+from ..core.extraction import NoMatch, resolve
 from ..core.result import CheckResult
 from ..core.trace import Trace
 
@@ -50,14 +50,16 @@ class Equality[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrigh
             interaction via `trace.last` (preferred in prompt templates) or
             `trace.interactions[-1]` if available.
         """
-        actual_value = provided_or_resolve(None, trace, self.actual_value_key)
+        actual_value = resolve(trace, self.actual_value_key)
 
         details = {
             "actual_value": actual_value,
             "expected_value": self.expected_value,
         }
 
-        if actual_value is None and self.expected_value is not None:
+        if isinstance(actual_value, NoMatch) and not isinstance(
+            self.expected_value, NoMatch
+        ):
             return CheckResult.failure(
                 message=f"No value found for key '{self.actual_value_key}', expected {repr(self.expected_value)}.",
                 details=details,
