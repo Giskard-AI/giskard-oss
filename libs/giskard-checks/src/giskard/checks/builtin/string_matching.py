@@ -1,64 +1,229 @@
+"""String matching check implementation.
+
+This module provides a check that validates whether a keyword appears within
+a text string. It supports Unicode normalization, case sensitivity control,
+and flexible text/keyword extraction from traces.
+"""
+
 from __future__ import annotations
 
-from typing import Any, override
+import re
+import unicodedata
+from typing import Literal, Self, override
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ..core.check import Check
+from ..core.extraction import provided_or_resolve
 from ..core.result import CheckResult
 from ..core.trace import Trace
-from .extraction_check import ExtractionCheck
+
+# Type alias for Unicode normalization forms
+_NormalizationForm = Literal["NFC", "NFD", "NFKC", "NFKD"]
 
 
 @Check.register("string_matching")
 class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    ExtractionCheck[InputType, OutputType, TraceType]
+    Check[InputType, OutputType, TraceType]
 ):
-    """Check that validates if a specific string content is present in trace outputs.
+    """Check that validates if a keyword appears within a text string.
 
-    This check extracts values from a trace (typically the output field) and
-    verifies that the specified content string is contained within the extracted values.
-    It supports 'any', 'all', and 'none' evaluation modes for handling multiple extracted values.
+    This check performs substring matching between a keyword and text, with
+    support for Unicode normalization and case sensitivity control. Both the
+    text and keyword can be provided directly or extracted from a trace using
+    JSONPath expressions.
+
+    The matching process:
+    1. Extracts text and keyword (from provided values or trace)
+    2. Applies Unicode normalization if specified
+    3. Normalizes case if case-insensitive matching is enabled
+    4. Normalizes whitespace (collapses multiple spaces, trims)
+    5. Checks if the formatted keyword appears in the formatted text
 
     Attributes
     ----------
-    content : str
-        The string content to search for in the extracted values
-    """
+    text : str | None
+        The text string to search within. If None, will be extracted from
+        trace using `text_key`.
+    text_key : str
+        JSONPath expression to extract the text from the trace. Defaults to
+        "trace.last.outputs" which extracts the last interaction's outputs.
+    keyword : str | None
+        The keyword to search for within the text. If None, must provide
+        `keyword_key` to extract from trace.
+    keyword_key : str | None
+        JSONPath expression to extract the keyword from the trace. Either
+        `keyword` or `keyword_key` must be provided.
+    normalization_form : _NormalizationForm | None
+        Unicode normalization form to apply before matching. Options:
+        - "NFC": Canonical Composition (default)
+        - "NFD": Canonical Decomposition
+        - "NFKC": Compatibility Composition
+        - "NFKD": Compatibility Decomposition
+        If None, no normalization is applied. Defaults to "NFKC".
+    case_sensitive : bool
+        If True, matching is case-sensitive. If False, both text and keyword
+        are converted to lowercase before comparison. Defaults to True.
 
-    content: str = Field(..., description="The string to match in the output")
+    Examples
+    --------
+    Direct text and keyword::
 
-    @override
-    def _evaluate_value(self, value: Any) -> bool:
-        """Check if the content string is contained in the value."""
-        # Convert value to string for comparison
-        item_value = getattr(value, "value", value)
-        text = item_value if isinstance(item_value, str) else str(item_value)
-
-        return self.content in text
-
-    @override
-    def _create_success_result(self, values: list[Any]) -> CheckResult:
-        """Create a success result for string matching check."""
-        return CheckResult.success(
-            message=f"String '{self.content}' found in extracted values",
-            details={
-                "matched_values": values,
-                "content": self.content,
-                "key": self.key,
-                "evaluation_mode": self.evaluation_mode,
-            },
+        check = StringMatching(
+            text="Hello World",
+            keyword="world",
+            case_sensitive=False
         )
 
+    Extract text from trace::
+
+        check = StringMatching(
+            keyword="Paris",
+            text_key="trace.last.outputs.response"
+        )
+
+    Extract both from trace::
+
+        check = StringMatching(
+            text_key="trace.last.outputs.answer",
+            keyword_key="trace.last.inputs.expected_keyword"
+        )
+    """
+
+    text: str | None = Field(
+        default=None,
+        description="The text string to search within. If None, extracted from trace using text_key.",
+    )
+    text_key: str = Field(
+        default="trace.last.outputs",
+        description="JSONPath expression to extract the text from the trace (e.g., 'trace.last.outputs.response').",
+    )
+    keyword: str | None = Field(
+        default=None,
+        description="The keyword to search for within the text. Either this or keyword_key must be provided.",
+    )
+    keyword_key: str | None = Field(
+        default=None,
+        description="JSONPath expression to extract the keyword from the trace (e.g., 'trace.last.inputs.expected'). Either this or keyword must be provided.",
+    )
+    normalization_form: _NormalizationForm | None = Field(
+        default="NFKC",
+        description="Unicode normalization form to apply (NFC, NFD, NFKC, NFKD). Defaults to NFKC.",
+    )
+    case_sensitive: bool = Field(
+        default=True,
+        description="If True, matching is case-sensitive. If False, both strings are lowercased before comparison.",
+    )
+
+    @model_validator(mode="after")
+    def validate_keyword_or_keyword_key(self) -> Self:
+        """Validate that exactly one of keyword or keyword_key is provided.
+
+        Returns
+        -------
+        Self
+            The validated instance.
+
+        Raises
+        ------
+        ValueError
+            If neither keyword nor keyword_key is provided.
+        """
+        if self.keyword is None and self.keyword_key is None:
+            raise ValueError("Either 'keyword' or 'keyword_key' must be provided")
+
+        return self
+
+    def _format_str(self, value: str) -> str:
+        """Format a string for matching by applying normalization and case handling.
+
+        This method:
+        1. Applies Unicode normalization if specified
+        2. Converts to lowercase if case-insensitive matching is enabled
+        3. Normalizes whitespace (collapses multiple spaces to single space, trims)
+
+        Parameters
+        ----------
+        value : str
+            The string to format.
+
+        Returns
+        -------
+        str
+            The formatted string ready for comparison.
+        """
+        # Apply Unicode normalization if specified
+        if self.normalization_form:
+            value = unicodedata.normalize(self.normalization_form, value)
+
+        # Convert to lowercase if case-insensitive matching is enabled
+        if not self.case_sensitive:
+            value = value.lower()
+
+        # Normalize whitespace: collapse multiple spaces/tabs/newlines to single space
+        # and trim leading/trailing whitespace
+        return re.sub(r"\s+", " ", value).strip()
+
     @override
-    def _create_failure_result(self, values: list[Any]) -> CheckResult:
-        """Create a failure result for string matching check."""
+    async def run(self, trace: TraceType) -> CheckResult:
+        """Execute the string matching check.
+
+        Extracts text and keyword (from provided values or trace), formats them,
+        and checks if the keyword appears within the text.
+
+        Parameters
+        ----------
+        trace : TraceType
+            The trace containing interaction history. Used to extract text/keyword
+            if not provided directly.
+
+        Returns
+        -------
+        CheckResult
+            Success if keyword is found in text, failure otherwise. Includes
+            details about the text, keyword, normalization form, and case sensitivity.
+        """
+        # Extract text: use provided value or resolve from trace
+        text = provided_or_resolve(self.text, trace, self.text_key)
+        # Extract keyword: use provided value or resolve from trace
+        # If keyword_key is None, keyword must be provided (validated by model_validator)
+        if self.keyword_key is not None:
+            keyword = provided_or_resolve(self.keyword, trace, self.keyword_key)
+        else:
+            keyword = self.keyword
+
+        details = {
+            "text": text,
+            "keyword": keyword,
+            "normalization_form": self.normalization_form,
+            "case_sensitive": self.case_sensitive,
+        }
+
+        # Validate that keyword was successfully extracted
+        if keyword is None:
+            return CheckResult.failure(
+                message=f"Unable to extract keyword from path '{self.keyword_key}'.",
+                details=details,
+            )
+        # Validate that text was successfully extracted
+        if text is None:
+            return CheckResult.failure(
+                message=f"Unable to extract text from path '{self.text_key}'.",
+                details=details,
+            )
+
+        # Format both strings for comparison
+        formatted_text = self._format_str(str(text))
+        formatted_keyword = self._format_str(str(keyword))
+
+        # Check if keyword appears in text
+        if formatted_keyword in formatted_text:
+            return CheckResult.success(
+                message=f"The answer contains the keyword '{keyword}'.",
+                details=details,
+            )
+
         return CheckResult.failure(
-            message=f"String '{self.content}' not found in extracted values",
-            details={
-                "searched_values": values,
-                "content": self.content,
-                "key": self.key,
-                "evaluation_mode": self.evaluation_mode,
-            },
+            message=f"The answer does not contain the keyword '{keyword}'",
+            details=details,
         )

@@ -48,27 +48,47 @@ Check class created by ``from_fn``.
 String Matching
 ---------------
 
-StringMatchingCheck
-~~~~~~~~~~~~~~~~~~~
+StringMatching
+~~~~~~~~~~~~~~
 
-.. autoclass:: StringMatchingCheck
+.. autoclass:: StringMatching
    :members:
    :undoc-members:
    :show-inheritance:
 
-Check if text contains, starts with, ends with, or exactly matches a pattern.
+Check if a keyword appears within a text string. Supports Unicode normalization,
+case sensitivity control, and flexible text/keyword extraction from traces.
 
 **Example:**
 
+Direct text and keyword::
+
 .. code-block:: python
 
-   from giskard.checks import StringMatchingCheck
+   from giskard.checks import StringMatching
 
-   check = StringMatchingCheck(
-       name="contains_answer",
-       content="Paris",
-       key="interactions[-1].outputs.answer",
-       evaluation_mode="contains"  # or "exact", "starts_with", "ends_with"
+   check = StringMatching(
+       text="Hello World",
+       keyword="world",
+       case_sensitive=False
+   )
+
+Extract text from trace::
+
+.. code-block:: python
+
+   check = StringMatching(
+       keyword="Paris",
+       text_key="trace.last.outputs.response"
+   )
+
+Extract both from trace::
+
+.. code-block:: python
+
+   check = StringMatching(
+       text_key="trace.last.outputs.answer",
+       keyword_key="trace.last.inputs.expected_keyword"
    )
 
 

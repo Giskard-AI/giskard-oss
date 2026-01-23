@@ -179,7 +179,7 @@ Parameterized Tests
 .. code-block:: python
 
    import pytest
-   from giskard.checks import scenario, StringMatchingCheck
+   from giskard.checks import scenario, StringMatching
 
    test_data = [
        ("What is 2+2?", "4"),
@@ -196,10 +196,9 @@ Parameterized Tests
                question,
                lambda inputs: calculator(inputs)
            )
-           .check(StringMatchingCheck(
-               name="correct_answer",
-               content=expected,
-               key="interactions[-1].outputs"
+           .check(StringMatching(
+               keyword=expected,
+               text_key="trace.last.outputs"
            ))
            .run()
        )

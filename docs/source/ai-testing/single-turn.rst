@@ -43,7 +43,7 @@ Basic RAG Test
    from giskard.checks import (
        scenario,
        Groundedness,
-       StringMatchingCheck,
+       StringMatching,
        set_default_generator
    )
 
@@ -65,10 +65,9 @@ Basic RAG Test
            name="grounded_in_context",
            description="Answer should be grounded in retrieved context"
        ))
-       .check(StringMatchingCheck(
-           name="has_answer",
-           content="Paris",
-           key="interactions[-1].outputs.answer"
+       .check(StringMatching(
+           keyword="Paris",
+           text_key="trace.last.outputs.answer"
        ))
        .run()
    )
@@ -375,7 +374,7 @@ Use test fixtures for reusable test data:
 .. code-block:: python
 
    import pytest
-   from giskard.checks import scenario, StringMatchingCheck
+   from giskard.checks import scenario, StringMatching
 
    @pytest.fixture
    def qa_test_cases():
@@ -394,10 +393,9 @@ Use test fixtures for reusable test data:
                    question,
                    lambda inputs: my_qa_system(inputs)
                )
-               .check(StringMatchingCheck(
-                   name="contains_answer",
-                   content=expected_answer,
-                   key="interactions[-1].outputs"
+               .check(StringMatching(
+                   keyword=expected_answer,
+                   text_key="trace.last.outputs"
                ))
                .run()
            )
@@ -411,7 +409,7 @@ Evaluate multiple test cases and aggregate results:
 
 .. code-block:: python
 
-   from giskard.checks import scenario, StringMatchingCheck
+   from giskard.checks import scenario, StringMatching
 
    test_cases = [
        ("What is 2+2?", "4"),
@@ -428,10 +426,9 @@ Evaluate multiple test cases and aggregate results:
                question,
                lambda inputs: my_system(inputs)
            )
-           .check(StringMatchingCheck(
-               name="contains_answer",
-               content=expected,
-               key="interactions[-1].outputs"
+           .check(StringMatching(
+               keyword=expected,
+               text_key="trace.last.outputs"
            ))
            .run()
        )
