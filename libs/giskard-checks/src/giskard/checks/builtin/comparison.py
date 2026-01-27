@@ -231,7 +231,7 @@ class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  
         return "<="
 
 
-@Check.register("greater_equals")
+@Check.register("greater_than_equals")
 class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
@@ -274,7 +274,7 @@ class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # p
         return ">="
 
 
-@Check.register("equality")
+@Check.register("equals")
 class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
