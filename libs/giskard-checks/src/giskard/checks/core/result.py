@@ -3,9 +3,39 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+from rich.console import Console, ConsoleOptions, RenderResult
+from rich.rule import Rule
 
+from .protocols import RichConsoleProtocol, RichProtocol
 from .trace import Trace
+
+STATUS_MAPPING = {
+    "pass": {
+        "color": "green",
+        "title": "✅ PASSED",
+    },
+    "error": {
+        "color": "yellow",
+        "title": "⚠️ ERROR",
+    },
+    "fail": {
+        "color": "red",
+        "title": "❌ FAILED",
+    },
+    "skip": {
+        "color": "gray",
+        "title": "⚠️ SKIPPED",
+    },
+}
+
+
+def _pluralize(count: int, word: str, plural: str | None = None) -> str:
+    if count == 1:
+        return f"1 {word}"
+    if plural is None:
+        plural = word + "s"
+    return f"{count} {plural}"
 
 
 class CheckStatus(str, Enum):
@@ -140,6 +170,27 @@ class CheckResult(BaseModel):
         """Return True if `status` is `SKIP`."""
         return self.status == CheckStatus.SKIP
 
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        status = STATUS_MAPPING[self.status]
+
+        name = self.details.get("check_name", "[dim italic]Unnamed check[/dim italic]")
+
+        yield f"[{status['color']} bold]{name}[/{status['color']} bold]\t[{status['color']}]{self.status.value.upper()}[/{status['color']}]"
+
+        if self.status == CheckStatus.FAIL or self.status == CheckStatus.ERROR:
+            yield self.message or "No specific error message provided"
+
+
+class ScenarioStatus(str, Enum):
+    """Outcome categories for a scenario execution."""
+
+    PASS = "pass"
+    FAIL = "fail"
+    ERROR = "error"
+    SKIP = "skip"
+
 
 class ScenarioResult[InputType, OutputType](BaseModel):
     """Result of executing an entire scenario.
@@ -163,25 +214,74 @@ class ScenarioResult[InputType, OutputType](BaseModel):
         ..., description="Final trace state after execution"
     )
 
+    @computed_field
+    @property
+    def status(self) -> ScenarioStatus:
+        """The status of the scenario."""
+        if not self.steps:
+            return ScenarioStatus.PASS
+
+        # Priority-based evaluation
+        if any(step.errored for step in self.steps):
+            return ScenarioStatus.ERROR
+        if any(step.failed for step in self.steps):
+            return ScenarioStatus.FAIL
+        if all(step.skipped for step in self.steps):
+            return ScenarioStatus.SKIP
+
+        return ScenarioStatus.PASS
+
     @property
     def passed(self) -> bool:
-        """Whether all executed steps passed."""
-        return all(step.passed for step in self.steps)
+        """True when all steps passed."""
+        return self.status == ScenarioStatus.PASS
 
     @property
     def failed(self) -> bool:
-        """Whether at least one executed step failed."""
-        return any(step.failed for step in self.steps)
+        """True when at least one step failed and none errored."""
+        return self.status == ScenarioStatus.FAIL
 
     @property
     def errored(self) -> bool:
-        """Whether at least one executed step errored."""
-        return any(step.errored for step in self.steps)
+        """True when at least one step errored."""
+        return self.status == ScenarioStatus.ERROR
 
     @property
     def skipped(self) -> bool:
-        """Whether all executed steps were skipped."""
-        return len(self.steps) > 0 and all(step.skipped for step in self.steps)
+        """True when all steps were skipped."""
+        return self.status == ScenarioStatus.SKIP
+
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        status = STATUS_MAPPING[self.status]
+        yield Rule(status["title"], style=f"{status['color']} bold")
+
+        for step in self.steps:
+            for result in step.results:
+                yield from result.__rich_console__(console, options)
+
+        yield Rule("Trace", style=f"{status['color']} bold")
+        if isinstance(self.final_trace, RichConsoleProtocol):
+            yield from self.final_trace.__rich_console__(console, options)
+        elif isinstance(self.final_trace, RichProtocol):
+            yield self.final_trace.__rich__()
+        else:
+            yield repr(self.final_trace)
+
+        yield Rule(
+            f"{_pluralize(len(self.steps), 'step')} in {self.duration_ms}ms",
+            style=f"{status['color']} bold",
+        )
+
+
+class TestCaseStatus(str, Enum):
+    """Outcome categories for a test case execution."""
+
+    PASS = "pass"
+    FAIL = "fail"
+    ERROR = "error"
+    SKIP = "skip"
 
 
 class TestCaseResult(BaseModel):
@@ -198,29 +298,42 @@ class TestCaseResult(BaseModel):
     results: list[CheckResult] = Field(..., description="Check results for each run")
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
 
+    @computed_field
+    @property
+    def status(self) -> TestCaseStatus:
+        """The status of the test case."""
+        if not self.results:
+            return TestCaseStatus.PASS
+
+        # Priority-based evaluation
+        if any(r.errored for r in self.results):
+            return TestCaseStatus.ERROR
+        if any(r.failed for r in self.results):
+            return TestCaseStatus.FAIL
+        if all(r.skipped for r in self.results):
+            return TestCaseStatus.SKIP
+
+        return TestCaseStatus.PASS
+
     @property
     def passed(self) -> bool:
         """True when all checks passed in the final run, or when there are no checks."""
-        return all(result.passed for result in self.results)
+        return self.status == TestCaseStatus.PASS
 
     @property
     def failed(self) -> bool:
         """True when at least one check failed and none errored in the final run."""
-        return (
-            not self.errored
-            and any(result.failed for result in self.results)
-            and len(self.results) > 0
-        )
+        return self.status == TestCaseStatus.FAIL
 
     @property
     def errored(self) -> bool:
         """True when at least one check errored in the final run."""
-        return any(result.errored for result in self.results) and len(self.results) > 0
+        return self.status == TestCaseStatus.ERROR
 
     @property
     def skipped(self) -> bool:
         """True when all checks were skipped in the final run."""
-        return all(result.skipped for result in self.results) and len(self.results) > 0
+        return self.status == TestCaseStatus.SKIP
 
     def format_failures(self) -> list[str]:
         """Format failed check results into a list of readable error messages.
@@ -263,3 +376,40 @@ class TestCaseResult(BaseModel):
                 failure_messages
             )
             raise AssertionError(error_msg)
+
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        status = STATUS_MAPPING[self.status]
+        yield Rule(status["title"], style=f"{status['color']} bold")
+
+        for result in self.results:
+            yield from result.__rich_console__(console, options)
+
+        # Build subtitle with counts
+        counts = {
+            "errored": sum(1 for r in self.results if r.errored),
+            "failed": sum(1 for r in self.results if r.failed),
+            "skipped": sum(1 for r in self.results if r.skipped),
+            "passed": sum(1 for r in self.results if r.passed),
+        }
+        count_parts: list[str] = []
+        if counts["errored"]:
+            count_parts.append(
+                f"[{STATUS_MAPPING['error']['color']} bold]{counts['errored']} errored[/{STATUS_MAPPING['error']['color']} bold]"
+            )
+        if counts["failed"]:
+            count_parts.append(
+                f"[{STATUS_MAPPING['fail']['color']} bold]{counts['failed']} failed[/{STATUS_MAPPING['fail']['color']} bold]"
+            )
+        if counts["skipped"]:
+            count_parts.append(
+                f"[{STATUS_MAPPING['skip']['color']} bold]{counts['skipped']} skipped[/{STATUS_MAPPING['skip']['color']} bold]"
+            )
+        if counts["passed"]:
+            count_parts.append(
+                f"[{STATUS_MAPPING['pass']['color']} bold]{counts['passed']} passed[/{STATUS_MAPPING['pass']['color']} bold]"
+            )
+        subtitle = ", ".join(count_parts) + f" in {self.duration_ms}ms"
+
+        yield Rule(subtitle, style=f"{status['color']} bold")

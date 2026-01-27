@@ -473,8 +473,8 @@ class TestScenarioNormalCases:
         assert result.steps[0].results[0].skipped
         assert result.steps[0].results[1].passed
         assert result.steps[0].results[2].skipped
-        # Scenario should not be marked as passed because not all checks passed
-        assert not result.passed
+        # Scenario should be marked as passed when at least one check passed and no checks errored or failed
+        assert result.passed
         assert not result.failed
         assert not result.errored
         assert not result.skipped  # Not all skipped
