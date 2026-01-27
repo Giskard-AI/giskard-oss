@@ -13,6 +13,7 @@ from giskard.checks import (
     Interaction,
     LesserThan,
     LesserThanEquals,
+    NotEquals,
     Trace,
 )
 from giskard.checks.core.extraction import NoMatch
@@ -657,3 +658,245 @@ class TestComparisonEdgeCases:
         assert result.status == CheckStatus.FAIL
         assert result.failed
         assert result.details["actual_value"] == 15
+
+
+class TestNotEquals:
+    """Test NotEquals check."""
+
+    async def test_number_not_equals_success(self):
+        """Test that 5 != 10 passes."""
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
+        check = NotEquals(
+            expected_value=10,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert result.details["actual_value"] == 5
+        assert result.details["expected_value"] == 10
+
+    async def test_number_not_equals_failure(self):
+        """Test that 5 != 5 fails (equal values)."""
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
+        check = NotEquals(
+            expected_value=5,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert result.details["actual_value"] == 5
+        assert result.details["expected_value"] == 5
+        assert isinstance(result.message, str)
+        assert "Expected value not equal to 5 but got 5" in result.message
+
+    async def test_float_not_equals_success(self):
+        """Test that 3.14 != 5.0 passes."""
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
+        check = NotEquals(
+            expected_value=5.0,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+
+    async def test_string_not_equals_success(self):
+        """Test that 'hello' != 'world' passes."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs="hello")
+        )
+        check = NotEquals(
+            expected_value="world",
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert result.details["actual_value"] == "hello"
+        assert result.details["expected_value"] == "world"
+
+    async def test_string_not_equals_failure(self):
+        """Test that 'hello' != 'hello' fails (equal values)."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs="hello")
+        )
+        check = NotEquals(
+            expected_value="hello",
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert result.details["actual_value"] == "hello"
+        assert result.details["expected_value"] == "hello"
+
+    async def test_bool_not_equals_success(self):
+        """Test that True != False passes."""
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
+        check = NotEquals(
+            expected_value=False,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert result.details["actual_value"] is True
+        assert result.details["expected_value"] is False
+
+    async def test_bool_not_equals_failure(self):
+        """Test that True != True fails (equal values)."""
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
+        check = NotEquals(
+            expected_value=True,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert result.details["actual_value"] is True
+        assert result.details["expected_value"] is True
+
+    async def test_different_types_string_vs_int_success(self):
+        """Test that '5' != 5 passes (different types)."""
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs="5"))
+        check = NotEquals(
+            expected_value=5,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert result.details["actual_value"] == "5"
+        assert result.details["expected_value"] == 5
+
+    async def test_different_types_string_vs_bool_success(self):
+        """Test that 'True' != True passes (different types)."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs="True")
+        )
+        check = NotEquals(
+            expected_value=True,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert result.details["actual_value"] == "True"
+        assert result.details["expected_value"] is True
+
+    async def test_missing_key(self):
+        """Test NotEquals check when the key is missing from trace."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs={"other": "value"})
+        )
+        check = NotEquals(
+            expected_value=10,
+            actual_value_key="trace.interactions[-1].outputs.missing",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert isinstance(result.details["actual_value"], NoMatch)
+        assert result.message is not None
+
+    async def test_nested_outputs(self):
+        """Test NotEquals check with nested outputs."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs={"value": 5})
+        )
+        check = NotEquals(
+            expected_value=10,
+            actual_value_key="trace.interactions[-1].outputs.value",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert result.details["actual_value"] == 5
+
+    async def test_none_value_not_equals_success(self):
+        """Test that None != 10 passes."""
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
+        check = NotEquals(
+            expected_value=10,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert result.details["actual_value"] is None
+        assert result.details["expected_value"] == 10
+
+    async def test_none_value_not_equals_failure(self):
+        """Test that None != None fails (equal values)."""
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
+        check = NotEquals(
+            expected_value=None,
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert result.details["actual_value"] is None
+        assert result.details["expected_value"] is None
+
+    async def test_list_not_equals_success(self):
+        """Test that [1, 2] != [3, 4] passes."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs=[1, 2])
+        )
+        check = NotEquals(
+            expected_value=[3, 4],
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert result.details["actual_value"] == [1, 2]
+        assert result.details["expected_value"] == [3, 4]
+
+    async def test_list_not_equals_failure(self):
+        """Test that [1, 2] != [1, 2] fails (equal values)."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs=[1, 2])
+        )
+        check = NotEquals(
+            expected_value=[1, 2],
+            actual_value_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert result.details["actual_value"] == [1, 2]
+        assert result.details["expected_value"] == [1, 2]

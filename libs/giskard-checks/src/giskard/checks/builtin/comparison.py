@@ -315,3 +315,46 @@ class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright:
     def _operator_symbol(self) -> str:
         """Get the operator symbol for error messages."""
         return "=="
+
+
+@Check.register("not_equals")
+class NotEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
+):
+    """Check that validates if extracted values do not equal an expected value.
+
+    This check extracts values from a trace and compares them against a
+    specified expected value using Python's ``__ne__`` method.
+
+    .. warning::
+        For object instances, this check uses Python's ``__ne__`` method for
+        comparison. The behavior depends on how the object's ``__ne__`` method
+        is implemented. For custom objects, ensure that ``__ne__`` is properly
+        defined to match your comparison requirements. If the comparison is not
+        supported (e.g., incompatible types or missing method), the check will
+        return a failure result.
+
+    Attributes
+    ----------
+    expected_value : ExpectedType
+        The expected value to compare against the extracted values
+    actual_value_key : str
+        The key to extract the actual value from the trace
+    """
+
+    @override
+    def _compare(self, actual_value: Any, expected_value: ExpectedType) -> bool:
+        """Compare the actual value with the expected value."""
+        return actual_value != expected_value
+
+    @property
+    @override
+    def _comparison_message(self) -> str:
+        """Get the human-readable comparison message."""
+        return "not equal to"
+
+    @property
+    @override
+    def _operator_symbol(self) -> str:
+        """Get the operator symbol for error messages."""
+        return "!="

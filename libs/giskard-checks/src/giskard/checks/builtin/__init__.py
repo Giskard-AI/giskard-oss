@@ -7,6 +7,7 @@ from .comparison import (
     GreaterThan,
     LesserThan,
     LesserThanEquals,
+    NotEquals,
 )
 from .conformity import Conformity
 from .fn import FnCheck, from_fn
@@ -19,6 +20,7 @@ __all__ = [
     "FnCheck",
     "StringMatching",
     "Equals",
+    "NotEquals",
     "LesserThan",
     "GreaterThan",
     "LesserThanEquals",

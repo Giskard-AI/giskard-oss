@@ -17,6 +17,7 @@ from .builtin import (
     LesserThanEquals,
     LLMCheckResult,
     LLMJudge,
+    NotEquals,
     StringMatching,
     from_fn,
 )
@@ -64,6 +65,7 @@ __all__ = [
     "LLMCheckResult",
     "Conformity",
     "Equals",
+    "NotEquals",
     "LesserThan",
     "GreaterThan",
     "LesserThanEquals",
