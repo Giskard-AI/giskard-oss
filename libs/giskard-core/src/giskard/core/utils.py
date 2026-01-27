@@ -1,10 +1,14 @@
 """Utility constants and helpers for the Giskard library ecosystem."""
 
+from typing import Literal
 
-class NotProvided:
+from pydantic import BaseModel
+
+
+class NotProvided(BaseModel):
     """Sentinel class to indicate that a value was not provided."""
 
-    pass
+    __type__: Literal["not_provided"] = "not_provided"
 
 
 NOT_PROVIDED = NotProvided()

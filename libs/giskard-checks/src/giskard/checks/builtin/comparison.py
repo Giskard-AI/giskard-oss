@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, override
+from typing import Any, Self, override
 
-from pydantic import Field
+from giskard.core import NOT_PROVIDED, NotProvided, provide_not_none
+from pydantic import Field, model_validator
 
 from ..core.check import Check
-from ..core.extraction import NoMatch, resolve
+from ..core.extraction import NoMatch, provided_or_resolve, resolve
 from ..core.result import CheckResult
 from ..core.trace import Trace
 from ..utils.normalization import NormalizationForm, normalize_data
@@ -36,9 +37,13 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     actual_value_key: str = Field(
         ..., description="The key to extract the actual value from the trace"
     )
-    expected_value: ExpectedType = Field(
-        ...,
-        description="The expected value to compare against.",
+    expected_value: ExpectedType | None = Field(
+        default=None,
+        description="The expected value to compare against. If None, the expected value is extracted from the trace using the expected_value_key.",
+    )
+    expected_value_key: str | NotProvided = Field(
+        default=NOT_PROVIDED,
+        description="The key to extract the expected value from the trace. If None, the expected value is used as is. If provided, the expected value is extracted from the trace using the expected_value_key.",
     )
     normalization_form: NormalizationForm | None = Field(
         default="NFKC",
@@ -62,19 +67,39 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         """Get the operator symbol (e.g., '<', '>', '<=') for error messages."""
         ...
 
+    @model_validator(mode="after")
+    def validate_expected_value_or_expected_value_key(self) -> Self:
+        """Validate that exactly one of expected_value or expected_value_key is provided."""
+        if isinstance(self.expected_value, NotProvided) and isinstance(
+            self.expected_value_key, NotProvided
+        ):
+            raise ValueError(
+                "Either 'expected_value' or 'expected_value_key' must be provided"
+            )
+        return self
+
     @override
     async def run(self, trace: TraceType) -> CheckResult:
         """Execute the check against the provided trace."""
         actual_value = resolve(trace, self.actual_value_key)
+        expected_value = provided_or_resolve(
+            trace,
+            key=provide_not_none(self.expected_value_key),
+            value=self.expected_value,
+        )
 
         details = {
             "actual_value": actual_value,
-            "expected_value": self.expected_value,
+            "expected_value": expected_value,
         }
 
-        if isinstance(actual_value, NoMatch) and not isinstance(
-            self.expected_value, NoMatch
-        ):
+        if isinstance(expected_value, NoMatch):
+            return CheckResult.failure(
+                message=f"No value found for expected value key '{self.expected_value_key}'.",
+                details=details,
+            )
+
+        if isinstance(actual_value, NoMatch):
             return CheckResult.failure(
                 message=f"No value found for key '{self.actual_value_key}', expected a value {self._comparison_message} {repr(self.expected_value)}.",
                 details=details,
@@ -82,22 +107,22 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
 
         normalized_actual_value = normalize_data(actual_value, self.normalization_form)
         normalized_expected_value = normalize_data(
-            self.expected_value, self.normalization_form
+            expected_value, self.normalization_form
         )
         try:
             if self._compare(normalized_actual_value, normalized_expected_value):
                 return CheckResult.success(
-                    message=f"The actual value {repr(actual_value)} is {self._comparison_message} the expected value {repr(self.expected_value)}.",
+                    message=f"The actual value {repr(actual_value)} is {self._comparison_message} the expected value {repr(expected_value)}.",
                     details=details,
                 )
         except Exception:
             return CheckResult.failure(
-                message=f"Comparison not supported: {type(actual_value).__name__} does not support {self._operator_symbol} comparison with {type(self.expected_value).__name__}",
+                message=f"Comparison not supported: {type(actual_value).__name__} does not support {self._operator_symbol} comparison with {type(expected_value).__name__}",
                 details=details,
             )
 
         return CheckResult.failure(
-            message=f"Expected value {self._comparison_message} {repr(self.expected_value)} but got {repr(actual_value)}",
+            message=f"Expected value {self._comparison_message} {repr(expected_value)} but got {repr(actual_value)}",
             details=details,
         )
 

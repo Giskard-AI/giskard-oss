@@ -512,14 +512,14 @@ class TestEqualsEdgeCases:
 
         result = await check.run(trace)
 
-        # When both are NoMatch with the same key, they should be equal
+        # When expected_value is a NoMatch, the check fails immediately
         assert isinstance(result.details["actual_value"], NoMatch)
         assert isinstance(result.details["expected_value"], NoMatch)
         assert (
             result.details["actual_value"].key == result.details["expected_value"].key
         )
-        assert result.status == CheckStatus.PASS
-        assert result.passed
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
 
     async def test_nomatch_equality_when_both_are_nomatch_different_keys(self):
         """Test equality check when both expected and actual are NoMatch with different keys."""
