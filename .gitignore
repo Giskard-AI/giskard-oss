@@ -175,3 +175,6 @@ generated
 # npm
 node_modules/
 mlruns
+
+# VSCode
+.vscode/
