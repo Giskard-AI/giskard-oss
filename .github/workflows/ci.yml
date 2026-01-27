@@ -54,6 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [detect-changes]
     if: |
+      github.ref == 'refs/heads/main' ||
       needs.detect-changes.outputs.giskard-core == 'true' ||
       needs.detect-changes.outputs.giskard-agents == 'true' ||
       needs.detect-changes.outputs.giskard-checks == 'true'
@@ -78,13 +79,22 @@ jobs:
         run: make setup
 
       - name: Run tests for giskard-core
-        if: needs.detect-changes.outputs.giskard-core == 'true'
+        if: |
+          github.ref == 'refs/heads/main' ||
+          needs.detect-changes.outputs.giskard-core == 'true'
         run: make test-giskard-core
 
       - name: Run tests for giskard-agents
-        if: needs.detect-changes.outputs.giskard-agents == 'true'
+        if: |
+          github.ref == 'refs/heads/main' ||
+          needs.detect-changes.outputs.giskard-core == 'true' ||
+          needs.detect-changes.outputs.giskard-agents == 'true'
         run: make test-giskard-agents
 
       - name: Run tests for giskard-checks
-        if: needs.detect-changes.outputs.giskard-checks == 'true'
+        if: |
+          github.ref == 'refs/heads/main' ||
+          needs.detect-changes.outputs.giskard-core == 'true' ||
+          needs.detect-changes.outputs.giskard-agents == 'true' ||
+          needs.detect-changes.outputs.giskard-checks == 'true'
         run: make test-giskard-checks
