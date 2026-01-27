@@ -8,7 +8,7 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z0-9_%-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 # Installation targets
 install: ## Install project dependencies
-	uv sync --all-groups
+	uv sync
 
 sync: install ## Alias for install
 
@@ -93,6 +93,3 @@ clean: ## Clean up build artifacts and caches
 	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
 	rm -rf build/ dist/ .coverage htmlcov/
-
-serve-docs: ## Serve documentation locally
-	uv run sphinx-autobuild docs/source docs/build
