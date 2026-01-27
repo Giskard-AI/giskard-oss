@@ -1,4 +1,4 @@
-"""Unit tests for Equality check.
+"""Unit tests for Equals check.
 
 Tests cover different types (str, number, bool) and various comparison scenarios:
 - Same type, same value (should pass)
@@ -6,19 +6,19 @@ Tests cover different types (str, number, bool) and various comparison scenarios
 - Same value, different type (should fail)
 """
 
-from giskard.checks import CheckStatus, Equality, Interaction, Trace
+from giskard.checks import CheckStatus, Equals, Interaction, Trace
 from giskard.checks.core.extraction import NoMatch
 
 
-class TestEqualityString:
-    """Test Equality check with string values."""
+class TestEqualsString:
+    """Test Equals check with string values."""
 
     async def test_string_same_value_same_type(self):
         """Test that same string value and type passes."""
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="hello")
         )
-        check = Equality(
+        check = Equals(
             expected_value="hello",
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -35,7 +35,7 @@ class TestEqualityString:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="hello")
         )
-        check = Equality(
+        check = Equals(
             expected_value="world",
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -47,12 +47,12 @@ class TestEqualityString:
         assert result.details["actual_value"] == "hello"
         assert result.details["expected_value"] == "world"
         assert isinstance(result.message, str)
-        assert "Expected value 'world' but got 'hello'" in result.message
+        assert "Expected value equal to 'world' but got 'hello'" in result.message
 
     async def test_string_same_value_different_type_string_vs_number(self):
         """Test that string '123' vs number 123 fails (type mismatch)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="123"))
-        check = Equality(
+        check = Equals(
             expected_value=123,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -69,7 +69,7 @@ class TestEqualityString:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="True")
         )
-        check = Equality(
+        check = Equals(
             expected_value=True,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -82,13 +82,13 @@ class TestEqualityString:
         assert result.details["expected_value"] is True
 
 
-class TestEqualityNumber:
-    """Test Equality check with numeric values."""
+class TestEqualsNumber:
+    """Test Equals check with numeric values."""
 
     async def test_number_same_value_same_type_int(self):
         """Test that same integer value and type passes."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=42))
-        check = Equality(
+        check = Equals(
             expected_value=42,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -103,7 +103,7 @@ class TestEqualityNumber:
     async def test_number_same_value_same_type_float(self):
         """Test that same float value and type passes."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
-        check = Equality(
+        check = Equals(
             expected_value=3.14,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -118,7 +118,7 @@ class TestEqualityNumber:
     async def test_number_different_value_same_type_int(self):
         """Test that different integer values fail."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=42))
-        check = Equality(
+        check = Equals(
             expected_value=100,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -133,7 +133,7 @@ class TestEqualityNumber:
     async def test_number_different_value_same_type_float(self):
         """Test that different float values fail."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
-        check = Equality(
+        check = Equals(
             expected_value=2.71,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -148,7 +148,7 @@ class TestEqualityNumber:
     async def test_number_same_value_different_type_int_vs_float(self):
         """Test that int 1 vs float 1.0 fails (type mismatch)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=1))
-        check = Equality(
+        check = Equals(
             expected_value=1.0,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -163,7 +163,7 @@ class TestEqualityNumber:
     async def test_number_same_value_different_type_string_vs_int(self):
         """Test that string '1' vs int 1 fails (type mismatch)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="1"))
-        check = Equality(
+        check = Equals(
             expected_value=1,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -178,7 +178,7 @@ class TestEqualityNumber:
     async def test_number_same_value_different_type_string_vs_float(self):
         """Test that string '1.0' vs float 1.0 fails (type mismatch)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="1.0"))
-        check = Equality(
+        check = Equals(
             expected_value=1.0,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -191,13 +191,13 @@ class TestEqualityNumber:
         assert result.details["expected_value"] == 1.0
 
 
-class TestEqualityBool:
-    """Test Equality check with boolean values."""
+class TestEqualsBool:
+    """Test Equals check with boolean values."""
 
     async def test_bool_same_value_same_type_true(self):
         """Test that same boolean True value and type passes."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
-        check = Equality(
+        check = Equals(
             expected_value=True,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -212,7 +212,7 @@ class TestEqualityBool:
     async def test_bool_same_value_same_type_false(self):
         """Test that same boolean False value and type passes."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=False))
-        check = Equality(
+        check = Equals(
             expected_value=False,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -227,7 +227,7 @@ class TestEqualityBool:
     async def test_bool_different_value_same_type(self):
         """Test that different boolean values fail."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
-        check = Equality(
+        check = Equals(
             expected_value=False,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -244,7 +244,7 @@ class TestEqualityBool:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="True")
         )
-        check = Equality(
+        check = Equals(
             expected_value=True,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -261,7 +261,7 @@ class TestEqualityBool:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="False")
         )
-        check = Equality(
+        check = Equals(
             expected_value=False,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -280,7 +280,7 @@ class TestEqualityBool:
         but this test documents the actual behavior.
         """
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=1))
-        check = Equality(
+        check = Equals(
             expected_value=True,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -299,7 +299,7 @@ class TestEqualityBool:
         but this test documents the actual behavior.
         """
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=0))
-        check = Equality(
+        check = Equals(
             expected_value=False,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -316,7 +316,7 @@ class TestEqualityBool:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="True")
         )
-        check = Equality(
+        check = Equals(
             expected_value=1,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -331,7 +331,7 @@ class TestEqualityBool:
     async def test_string_one_vs_bool_true(self):
         """Test that string '1' vs bool True fails (type mismatch)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="1"))
-        check = Equality(
+        check = Equals(
             expected_value=True,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -344,8 +344,8 @@ class TestEqualityBool:
         assert result.details["expected_value"] is True
 
 
-class TestEqualityEdgeCases:
-    """Test edge cases for Equality check."""
+class TestEqualsEdgeCases:
+    """Test edge cases for Equals check."""
 
     async def test_nested_outputs_string(self):
         """Test equality check with nested outputs (dict structure)."""
@@ -355,7 +355,7 @@ class TestEqualityEdgeCases:
                 outputs={"result": "success", "code": 200},
             )
         )
-        check = Equality(
+        check = Equals(
             expected_value="success",
             actual_value_key="trace.interactions[-1].outputs.result",
         )
@@ -375,7 +375,7 @@ class TestEqualityEdgeCases:
                 outputs={"result": "success", "code": 200},
             )
         )
-        check = Equality(
+        check = Equals(
             expected_value=200,
             actual_value_key="trace.interactions[-1].outputs.code",
         )
@@ -395,7 +395,7 @@ class TestEqualityEdgeCases:
                 outputs={"result": "success", "valid": True},
             )
         )
-        check = Equality(
+        check = Equals(
             expected_value=True,
             actual_value_key="trace.interactions[-1].outputs.valid",
         )
@@ -412,7 +412,7 @@ class TestEqualityEdgeCases:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs={"other": "value"})
         )
-        check = Equality(
+        check = Equals(
             expected_value="expected",
             actual_value_key="trace.interactions[-1].outputs.missing",
         )
@@ -433,7 +433,7 @@ class TestEqualityEdgeCases:
     async def test_none_value(self):
         """Test equality check with None values."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
-        check = Equality(
+        check = Equals(
             expected_value=None,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -450,7 +450,7 @@ class TestEqualityEdgeCases:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs={"other": "value"})
         )
-        check = Equality(
+        check = Equals(
             expected_value="expected",
             actual_value_key="trace.last.outputs.missing",
         )
@@ -471,7 +471,7 @@ class TestEqualityEdgeCases:
                 outputs={"level1": {"level2": {"level3": "value"}}},
             )
         )
-        check = Equality(
+        check = Equals(
             expected_value="expected",
             actual_value_key="trace.interactions[-1].outputs.level1.level2.missing",
         )
@@ -489,7 +489,7 @@ class TestEqualityEdgeCases:
     async def test_nomatch_with_empty_trace(self):
         """Test equality check with empty trace (no interactions)."""
         trace = Trace()
-        check = Equality(
+        check = Equals(
             expected_value="expected",
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -505,27 +505,27 @@ class TestEqualityEdgeCases:
         """Test equality check when both expected and actual are NoMatch with same key."""
         trace = Trace()
         expected_nomatch = NoMatch(key="trace.interactions[-1].outputs")
-        check = Equality(
+        check = Equals(
             expected_value=expected_nomatch,
             actual_value_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
 
-        # When both are NoMatch with the same key, they should be equal
+        # When expected_value is a NoMatch, the check fails immediately
         assert isinstance(result.details["actual_value"], NoMatch)
         assert isinstance(result.details["expected_value"], NoMatch)
         assert (
             result.details["actual_value"].key == result.details["expected_value"].key
         )
-        assert result.status == CheckStatus.PASS
-        assert result.passed
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
 
     async def test_nomatch_equality_when_both_are_nomatch_different_keys(self):
         """Test equality check when both expected and actual are NoMatch with different keys."""
         trace = Trace()
         expected_nomatch = NoMatch(key="different.key")
-        check = Equality(
+        check = Equals(
             expected_value=expected_nomatch,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -542,8 +542,8 @@ class TestEqualityEdgeCases:
         assert result.failed
 
 
-class TestEqualityListExpressions:
-    """Test Equality check with JSONPath list expressions (wildcard and single index)."""
+class TestEqualsListExpressions:
+    """Test Equals check with JSONPath list expressions (wildcard and single index)."""
 
     async def test_wildcard_expression_with_list_expected_multiple_items(self):
         """Test that wildcard expression [*] returns a list and matches expected list."""
@@ -551,7 +551,7 @@ class TestEqualityListExpressions:
             Interaction(inputs="test1", outputs="message 1"),
             Interaction(inputs="test2", outputs="Message 2"),
         )
-        check = Equality(
+        check = Equals(
             expected_value=["message 1", "Message 2"],
             actual_value_key="trace.interactions[*].outputs",
         )
@@ -569,7 +569,7 @@ class TestEqualityListExpressions:
         trace = await Trace.from_interactions(
             Interaction(inputs="test1", outputs="message 1"),
         )
-        check = Equality(
+        check = Equals(
             expected_value=["message 1"],
             actual_value_key="trace.interactions[*].outputs",
         )
@@ -587,7 +587,7 @@ class TestEqualityListExpressions:
         trace = await Trace.from_interactions(
             Interaction(inputs="test1", outputs="message 1"),
         )
-        check = Equality(
+        check = Equals(
             expected_value="message 1",
             actual_value_key="trace.interactions[*].outputs",
         )
@@ -600,7 +600,10 @@ class TestEqualityListExpressions:
         assert result.details["actual_value"] == ["message 1"]
         assert result.details["expected_value"] == "message 1"
         assert isinstance(result.message, str)
-        assert "Expected value 'message 1' but got ['message 1']" in result.message
+        assert (
+            "Expected value equal to 'message 1' but got ['message 1']"
+            in result.message
+        )
 
     async def test_single_index_expression_with_single_value_expected(self):
         """Test that single index expression [-1] returns a single value."""
@@ -608,7 +611,7 @@ class TestEqualityListExpressions:
             Interaction(inputs="test1", outputs="message 1"),
             Interaction(inputs="test2", outputs="Message 2"),
         )
-        check = Equality(
+        check = Equals(
             expected_value="Message 2",
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -627,7 +630,7 @@ class TestEqualityListExpressions:
             Interaction(inputs="test1", outputs="message 1"),
             Interaction(inputs="test2", outputs="Message 2"),
         )
-        check = Equality(
+        check = Equals(
             expected_value=["Message 2"],
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -641,7 +644,10 @@ class TestEqualityListExpressions:
         assert isinstance(result.details["expected_value"], list)
         assert result.details["expected_value"] == ["Message 2"]
         assert isinstance(result.message, str)
-        assert "Expected value ['Message 2'] but got 'Message 2'" in result.message
+        assert (
+            "Expected value equal to ['Message 2'] but got 'Message 2'"
+            in result.message
+        )
 
     async def test_single_index_expression_with_different_value_fails(self):
         """Test that single index expression [-1] fails when value doesn't match."""
@@ -649,7 +655,7 @@ class TestEqualityListExpressions:
             Interaction(inputs="test1", outputs="message 1"),
             Interaction(inputs="test2", outputs="Message 2"),
         )
-        check = Equality(
+        check = Equals(
             expected_value="Wrong message",
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -661,7 +667,10 @@ class TestEqualityListExpressions:
         assert result.details["actual_value"] == "Message 2"
         assert result.details["expected_value"] == "Wrong message"
         assert isinstance(result.message, str)
-        assert "Expected value 'Wrong message' but got 'Message 2'" in result.message
+        assert (
+            "Expected value equal to 'Wrong message' but got 'Message 2'"
+            in result.message
+        )
 
     async def test_wildcard_expression_with_different_list_fails(self):
         """Test that wildcard expression [*] fails when list doesn't match."""
@@ -669,7 +678,7 @@ class TestEqualityListExpressions:
             Interaction(inputs="test1", outputs="message 1"),
             Interaction(inputs="test2", outputs="Message 2"),
         )
-        check = Equality(
+        check = Equals(
             expected_value=["wrong", "list"],
             actual_value_key="trace.interactions[*].outputs",
         )
@@ -683,24 +692,24 @@ class TestEqualityListExpressions:
         assert result.details["expected_value"] == ["wrong", "list"]
         assert isinstance(result.message, str)
         assert (
-            "Expected value ['wrong', 'list'] but got ['message 1', 'Message 2']"
+            "Expected value equal to ['wrong', 'list'] but got ['message 1', 'Message 2']"
             in result.message
         )
 
 
-class TestEqualityUnicodeNormalization:
-    """Test Equality check with Unicode normalization edge cases.
+class TestEqualsUnicodeNormalization:
+    """Test Equals check with Unicode normalization edge cases.
 
-    Note: The Equality check does not currently use normalization, so different
+    Note: The Equals check uses normalization (default NFKC), so different
     Unicode representations of the same character (e.g., 'é' as U+00E9 vs
-    U+0065 U+0301) will not match. These tests document this behavior.
+    U+0065 U+0301) should match when normalized. These tests document this behavior.
     """
 
-    async def test_unicode_e_acute_different_representations_fail(self):
-        """Test that 'é' (U+00E9) vs 'é' (U+0065 U+0301) fails without normalization.
+    async def test_unicode_e_acute_different_representations_pass(self):
+        """Test that 'é' (U+00E9) vs 'é' (U+0065 U+0301) passes with normalization.
 
-        This test documents that Equality check does not normalize strings,
-        so different Unicode representations of the same character will not match.
+        This test documents that Equals check normalizes strings (default NFKC),
+        so different Unicode representations of the same character will match.
         """
         # U+00E9 is the composed form (NFC)
         # U+0065 U+0301 is the decomposed form (NFD): 'e' + combining acute accent
@@ -710,16 +719,16 @@ class TestEqualityUnicodeNormalization:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs=text_nfc)
         )
-        check = Equality(
+        check = Equals(
             expected_value=text_nfd,
             actual_value_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
 
-        # Without normalization, they should NOT match (different byte sequences)
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        # With normalization (default NFKC), they should match
+        assert result.status == CheckStatus.PASS
+        assert result.passed
         assert result.details["actual_value"] == text_nfc
         assert result.details["expected_value"] == text_nfd
 
@@ -729,7 +738,7 @@ class TestEqualityUnicodeNormalization:
         text = "café"  # Uses U+00E9
 
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=text))
-        check = Equality(
+        check = Equals(
             expected_value=text,
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -742,11 +751,11 @@ class TestEqualityUnicodeNormalization:
         assert result.details["actual_value"] == text
         assert result.details["expected_value"] == text
 
-    async def test_unicode_e_acute_list_extraction_different_representations_fail(self):
-        """Test that 'é' in list extraction fails with different Unicode representations.
+    async def test_unicode_e_acute_list_extraction_different_representations_pass(self):
+        """Test that 'é' in list extraction passes with different Unicode representations.
 
         When extracting messages[*].content from {"messages": [{"content": "café"}]},
-        it returns ["café"]. Different Unicode representations should not match.
+        it returns ["café"]. Different Unicode representations should match with normalization.
         """
         # U+00E9 is the composed form (NFC)
         # U+0065 U+0301 is the decomposed form (NFD): 'e' + combining acute accent
@@ -759,16 +768,16 @@ class TestEqualityUnicodeNormalization:
                 outputs={"messages": [{"content": text_nfc}]},
             )
         )
-        check = Equality(
+        check = Equals(
             expected_value=[text_nfd],  # Expected list with NFD form
             actual_value_key="trace.interactions[-1].outputs.messages[*].content",
         )
 
         result = await check.run(trace)
 
-        # Without normalization, they should NOT match (different byte sequences)
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        # With normalization (default NFKC), they should match
+        assert result.status == CheckStatus.PASS
+        assert result.passed
         assert result.details["actual_value"] == [text_nfc]
         assert result.details["expected_value"] == [text_nfd]
 
@@ -783,7 +792,7 @@ class TestEqualityUnicodeNormalization:
                 outputs={"messages": [{"content": text}]},
             )
         )
-        check = Equality(
+        check = Equals(
             expected_value=[text],
             actual_value_key="trace.interactions[-1].outputs.messages[*].content",
         )
@@ -796,13 +805,13 @@ class TestEqualityUnicodeNormalization:
         assert result.details["actual_value"] == [text]
         assert result.details["expected_value"] == [text]
 
-    async def test_unicode_e_acute_dict_list_extraction_different_representations_fail(
+    async def test_unicode_e_acute_dict_list_extraction_different_representations_pass(
         self,
     ):
-        """Test that 'é' in dict list extraction fails with different Unicode representations.
+        """Test that 'é' in dict list extraction passes with different Unicode representations.
 
         When extracting messages[*] from {"messages": [{"content": "café"}]},
-        it returns [{"content": "café"}]. Different Unicode representations should not match.
+        it returns [{"content": "café"}]. Different Unicode representations should match with normalization.
         """
         # U+00E9 is the composed form (NFC)
         # U+0065 U+0301 is the decomposed form (NFD): 'e' + combining acute accent
@@ -815,7 +824,7 @@ class TestEqualityUnicodeNormalization:
                 outputs={"messages": [{"content": text_nfc}]},
             )
         )
-        check = Equality(
+        check = Equals(
             expected_value=[
                 {"content": text_nfd}
             ],  # Expected list with dict containing NFD form
@@ -824,9 +833,9 @@ class TestEqualityUnicodeNormalization:
 
         result = await check.run(trace)
 
-        # Without normalization, they should NOT match (different byte sequences)
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        # With normalization (default NFKC), they should match
+        assert result.status == CheckStatus.PASS
+        assert result.passed
         assert result.details["actual_value"] == [{"content": text_nfc}]
         assert result.details["expected_value"] == [{"content": text_nfd}]
 
@@ -843,7 +852,7 @@ class TestEqualityUnicodeNormalization:
                 outputs={"messages": [{"content": text}]},
             )
         )
-        check = Equality(
+        check = Equals(
             expected_value=[{"content": text}],
             actual_value_key="trace.interactions[-1].outputs.messages[*]",
         )

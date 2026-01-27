@@ -10,7 +10,7 @@ import pytest
 from giskard.checks import (
     Check,
     CheckResult,
-    Equality,
+    Equals,
     Interaction,
     InteractionSpec,
     TestCase,
@@ -28,7 +28,7 @@ class TestTestCaseNormalCases:
         trace = await Trace.from_interactions(
             Interaction(inputs="test_input", outputs="test_output")
         )
-        check = Equality(
+        check = Equals(
             expected_value="test_output",
             actual_value_key="trace.interactions[-1].outputs",
         )
@@ -53,11 +53,11 @@ class TestTestCaseNormalCases:
             Interaction(inputs={"value": 42}, outputs={"result": 42, "status": "ok"})
         )
         checks = [
-            Equality(
+            Equals(
                 expected_value=42,
                 actual_value_key="trace.interactions[-1].outputs.result",
             ),
-            Equality(
+            Equals(
                 expected_value="ok",
                 actual_value_key="trace.interactions[-1].outputs.status",
             ),
@@ -79,7 +79,7 @@ class TestTestCaseNormalCases:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equality(
+        check = Equals(
             expected_value="expected", actual_value_key="trace.interactions[-1].outputs"
         )
         test_case = TestCase(
@@ -102,15 +102,15 @@ class TestTestCaseNormalCases:
             Interaction(inputs="input", outputs="output")
         )
         checks = [
-            Equality(
+            Equals(
                 expected_value="output",
                 actual_value_key="trace.interactions[-1].outputs",
             ),  # Passes
-            Equality(
+            Equals(
                 expected_value="wrong",
                 actual_value_key="trace.interactions[-1].outputs",
             ),  # Fails
-            Equality(
+            Equals(
                 expected_value="output",
                 actual_value_key="trace.interactions[-1].outputs",
             ),  # Passes
@@ -135,19 +135,19 @@ class TestTestCaseNormalCases:
             Interaction(inputs="input", outputs="output")
         )
         checks = [
-            Equality(
+            Equals(
                 expected_value="output",
                 actual_value_key="trace.interactions[-1].outputs",
             ),  # Passes
-            Equality(
+            Equals(
                 expected_value="wrong1",
                 actual_value_key="trace.interactions[-1].outputs",
             ),  # Fails
-            Equality(
+            Equals(
                 expected_value="wrong2",
                 actual_value_key="trace.interactions[-1].outputs",
             ),  # Fails
-            Equality(
+            Equals(
                 expected_value="output",
                 actual_value_key="trace.interactions[-1].outputs",
             ),  # Passes
@@ -172,7 +172,7 @@ class TestTestCaseNormalCases:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equality(
+        check = Equals(
             expected_value="output", actual_value_key="trace.interactions[-1].outputs"
         )
         test_case = TestCase(
@@ -195,7 +195,7 @@ class TestTestCaseResult:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equality(
+        check = Equals(
             expected_value="output", actual_value_key="trace.interactions[-1].outputs"
         )
         test_case = TestCase(
@@ -218,11 +218,11 @@ class TestTestCaseResult:
             Interaction(inputs="input", outputs="output")
         )
         checks = [
-            Equality(
+            Equals(
                 expected_value="output",
                 actual_value_key="trace.interactions[-1].outputs",
             ),  # Passes
-            Equality(
+            Equals(
                 expected_value="wrong",
                 actual_value_key="trace.interactions[-1].outputs",
             ),  # Fails
@@ -275,7 +275,7 @@ class TestTestCaseResult:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equality(
+        check = Equals(
             expected_value="output", actual_value_key="trace.interactions[-1].outputs"
         )
         test_case = TestCase(
@@ -294,7 +294,7 @@ class TestTestCaseResult:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equality(
+        check = Equals(
             expected_value="output", actual_value_key="trace.interactions[-1].outputs"
         )
         test_case = TestCase(
@@ -313,7 +313,7 @@ class TestTestCaseResult:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equality(
+        check = Equals(
             expected_value="wrong", actual_value_key="trace.interactions[-1].outputs"
         )
         test_case = TestCase(
@@ -340,7 +340,7 @@ class TestTestCaseAssertPassed:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equality(
+        check = Equals(
             expected_value="output", actual_value_key="trace.interactions[-1].outputs"
         )
         test_case = TestCase(
@@ -357,7 +357,7 @@ class TestTestCaseAssertPassed:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equality(
+        check = Equals(
             expected_value="wrong", actual_value_key="trace.interactions[-1].outputs"
         )
         test_case = TestCase(
@@ -385,7 +385,7 @@ class TestTestCaseEdgeCases:
                 metadata={"timestamp": "2024-01-01"},
             )
         )
-        check = Equality(
+        check = Equals(
             expected_value="Hi Alice!",
             actual_value_key="trace.interactions[-1].outputs.response",
         )
@@ -409,7 +409,7 @@ class TestTestCaseEdgeCases:
         trace = await Trace.from_interactions(
             InteractionSpec(inputs="test", outputs=output_func)
         )
-        check = Equality(
+        check = Equals(
             expected_value="Processed: test",
             actual_value_key="trace.interactions[-1].outputs",
         )

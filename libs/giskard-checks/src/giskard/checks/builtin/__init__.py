@@ -1,8 +1,15 @@
 """Built-in check implementations and helpers."""
 
 from .base import BaseLLMCheck, LLMCheckResult
+from .comparison import (
+    Equals,
+    GreaterEquals,
+    GreaterThan,
+    LesserThan,
+    LesserThanEquals,
+    NotEquals,
+)
 from .conformity import Conformity
-from .equality import Equality
 from .fn import FnCheck, from_fn
 from .groundedness import Groundedness
 from .judge import LLMJudge
@@ -12,7 +19,12 @@ __all__ = [
     "from_fn",
     "FnCheck",
     "StringMatching",
-    "Equality",
+    "Equals",
+    "NotEquals",
+    "LesserThan",
+    "GreaterThan",
+    "LesserThanEquals",
+    "GreaterEquals",
     "Groundedness",
     "Conformity",
     "LLMJudge",
