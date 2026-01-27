@@ -29,7 +29,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         .interact("Hello", "Hi")
         .check(StringMatching(content="Hi", key="trace.last.outputs"))
         .interact("How are you?", "Good")
-        .check(Equality(expected="Good", key="trace.last.outputs"))
+        .check(Equals(expected="Good", key="trace.last.outputs"))
         .build()
     )
 

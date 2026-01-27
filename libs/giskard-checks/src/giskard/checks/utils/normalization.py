@@ -25,10 +25,10 @@ def normalize_data[T](
     match data:
         case dict():
             return type(data)(
-                {k: normalize_string(v, normalization_form) for k, v in data.items()}
+                {k: normalize_data(v, normalization_form) for k, v in data.items()}
             )
         case list() | tuple() | set():
-            return type(data)(normalize_string(v, normalization_form) for v in data)
+            return type(data)(normalize_data(v, normalization_form) for v in data)
         case str():
             return normalize_string(data, normalization_form)
         case _:
