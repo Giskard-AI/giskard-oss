@@ -1,4 +1,4 @@
-"""Scenario runner for executing sequences of ScenarioComponents.
+"""Scenario runner for executing sequences of scenario components.
 
 This module provides a runner that executes scenarios using the handle() method
 pattern, where components yield Interactions or CheckResults and receive
@@ -74,11 +74,11 @@ class _ScenarioStepsBuilder[InputType, OutputType, TraceType: Trace]:  # pyright
 
 
 class ScenarioRunner:
-    """Execute scenarios by running sequences of ScenarioComponents.
+    """Execute scenarios by running sequences of scenario components.
 
     The runner processes components sequentially, maintaining a shared Trace
-    that accumulates interactions. Execution stops on the first check failure
-    or error.
+    that accumulates interactions. Checks within a step all run; execution stops
+    after the first step that fails or errors.
 
     Components are processed in order:
     1. **InteractionSpec components**: Generate interactions using their `generate()`
@@ -107,9 +107,9 @@ class ScenarioRunner:
 
         Components are executed in order:
         - InteractionSpec components update the shared trace
-        - Check components validate the current trace and stop execution on failure
+        - Check components validate the current trace and stop execution after a failed step
 
-        Execution stops on the first failing check; remaining components are not executed.
+        Execution stops after the first step with a failing check; remaining components are not executed.
 
         Parameters
         ----------

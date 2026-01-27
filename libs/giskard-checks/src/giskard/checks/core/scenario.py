@@ -19,7 +19,8 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
     use cases where you need direct control over scenario construction.
 
     A scenario executes components sequentially, maintaining a shared trace that
-    accumulates all interactions. Execution stops immediately if any check fails.
+    accumulates all interactions. Checks for a step run to completion, and the
+    scenario stops after the first step that fails.
 
     Components are processed in order:
     - **InteractionSpec** components: Generate interactions and add them to the trace
@@ -29,9 +30,9 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
     ----------
     name : str
         Scenario identifier.
-    sequence : Sequence[ScenarioComponent[InputType, OutputType]]
-        Sequential steps to execute. Each component can be either an InteractionSpec
-        (which updates the trace) or a Check (which validates the current trace).
+    sequence : Sequence[Interaction | BaseInteractionSpec | Check]
+        Sequential components to execute. Each component can be an Interaction or
+        InteractionSpec (which updates the trace) or a Check (which validates the trace).
     trace_type : type[TraceType] | None
         Optional custom trace type to use. If not provided, the trace type will be
         inferred from the sequence of components. Useful when using custom trace
@@ -84,7 +85,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
 
         Each component is executed in order:
         - InteractionSpec components update the shared trace
-        - Check components validate the current trace and stop execution on failure
+        - Check components validate the current trace and stop execution after a failed step
 
         Returns
         -------

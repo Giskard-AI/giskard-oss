@@ -148,10 +148,8 @@ class ScenarioResult[InputType, OutputType](BaseModel):
     ----------
     scenario_name:
         Name of the scenario that was executed.
-    check_results:
-        List of all check results from executed checks.
-    passed:
-        Whether all executed checks passed.
+    steps:
+        List of `TestCaseResult` objects, one per scenario step.
     duration_ms:
         Total execution time in milliseconds.
     final_trace:
@@ -187,17 +185,14 @@ class ScenarioResult[InputType, OutputType](BaseModel):
 
 
 class TestCaseResult(BaseModel):
-    """Immutable summary of a test case execution with full run history.
+    """Immutable summary of a test case execution.
 
     Attributes
     ----------
-    all_runs:
-        List of check results for each run. Each inner list contains the
-        CheckResults from one execution of the test case.
+    results:
+        List of check results from the execution.
     duration_ms:
-        Total execution time in milliseconds across all runs.
-    total_runs:
-        Number of runs actually executed (may be less than max_runs if stopped early).
+        Total execution time in milliseconds.
     """
 
     results: list[CheckResult] = Field(..., description="Check results for each run")

@@ -125,7 +125,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         """Add a check to the scenario sequence.
 
         Adds a check component to the scenario sequence. Checks validate the
-        current trace state and stop execution on failure.
+        current trace state and stop execution after a failed step.
 
         Parameters
         ----------
@@ -151,7 +151,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         """Add multiple checks to the scenario sequence.
 
         Adds one or more check components to the scenario sequence. Checks validate
-        the current trace state and stop execution on failure.
+        the current trace state and stop execution after a failed step.
 
         Parameters
         ----------
