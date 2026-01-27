@@ -1,6 +1,8 @@
 from typing import Any, Self
 
 from pydantic import BaseModel, Field, computed_field
+from rich.console import Console, ConsoleOptions, RenderResult
+from rich.rule import Rule
 
 from .protocols import InteractionGenerator
 
@@ -35,6 +37,12 @@ class Interaction[InputType, OutputType](BaseModel, frozen=True):
     inputs: InputType
     outputs: OutputType
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        yield "Inputs: " + repr(self.inputs)
+        yield "Outputs: " + repr(self.outputs)
 
 
 class Trace[InputType, OutputType](BaseModel, frozen=True):
@@ -147,3 +155,10 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
                 await generator.aclose()
 
     # TODO def steps() -> list[list[Interaction[InputType, OutputType]]]: # Index based
+
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        for idx, interaction in enumerate(self.interactions):
+            yield Rule(f"Interaction {idx + 1}", style="bold")
+            yield from interaction.__rich_console__(console, options)

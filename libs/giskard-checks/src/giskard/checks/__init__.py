@@ -1,5 +1,6 @@
 """Public package exports for giskard.checks."""
 
+import os
 from pathlib import Path
 
 from giskard.agents import add_prompts_path
@@ -39,6 +40,17 @@ from .scenarios.runner import ScenarioRunner
 from .settings import get_default_generator, set_default_generator
 from .testing import WithSpy
 from .testing.runner import TestCaseRunner
+
+# Install rich.pretty for better REPL output (including Pydantic models)
+# Can be disabled by setting GISKARD_CHECKS_DISABLE_RICH_PRETTY=1
+if os.getenv("GISKARD_CHECKS_DISABLE_RICH_PRETTY", "").lower() not in (
+    "1",
+    "true",
+    "yes",
+):
+    from rich.pretty import install
+
+    install()
 
 add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.checks")
 
