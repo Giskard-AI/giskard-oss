@@ -27,7 +27,7 @@ class TestLesserThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LesserThan(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -42,7 +42,7 @@ class TestLesserThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = LesserThan(
             expected_value=5,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -59,7 +59,7 @@ class TestLesserThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LesserThan(
             expected_value=5,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -74,7 +74,7 @@ class TestLesserThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
         check = LesserThan(
             expected_value=5.0,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -89,7 +89,7 @@ class TestLesserThan:
         )
         check = LesserThan(
             expected_value="banana",
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -104,7 +104,7 @@ class TestLesserThan:
         )
         check = LesserThan(
             expected_value="apple",
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -119,7 +119,7 @@ class TestLesserThan:
         )
         check = LesserThan(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs.missing",
+            key="trace.interactions[-1].outputs.missing",
         )
 
         result = await check.run(trace)
@@ -136,7 +136,7 @@ class TestLesserThan:
         )
         check = LesserThan(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs.value",
+            key="trace.interactions[-1].outputs.value",
         )
 
         result = await check.run(trace)
@@ -150,7 +150,7 @@ class TestLesserThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="5"))
         check = LesserThan(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -168,7 +168,7 @@ class TestLesserThan:
         )
         check = LesserThan(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -188,7 +188,7 @@ class TestGreaterThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = GreaterThan(
             expected_value=5,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -203,7 +203,7 @@ class TestGreaterThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = GreaterThan(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -220,7 +220,7 @@ class TestGreaterThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = GreaterThan(
             expected_value=5,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -235,7 +235,7 @@ class TestGreaterThan:
         )
         check = GreaterThan(
             expected_value="apple",
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -248,7 +248,7 @@ class TestGreaterThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="10"))
         check = GreaterThan(
             expected_value=5,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -268,7 +268,7 @@ class TestGreaterThan:
         )
         check = GreaterThan(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -288,7 +288,7 @@ class TestLesserThanEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LesserThanEquals(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -303,7 +303,7 @@ class TestLesserThanEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LesserThanEquals(
             expected_value=5,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -318,7 +318,7 @@ class TestLesserThanEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = LesserThanEquals(
             expected_value=5,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -337,7 +337,7 @@ class TestLesserThanEquals:
         )
         check = LesserThanEquals(
             expected_value="banana",
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -352,7 +352,7 @@ class TestLesserThanEquals:
         )
         check = LesserThanEquals(
             expected_value="apple",
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -365,7 +365,7 @@ class TestLesserThanEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="5"))
         check = LesserThanEquals(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -385,7 +385,7 @@ class TestLesserThanEquals:
         )
         check = LesserThanEquals(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -405,7 +405,7 @@ class TestGreaterEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = GreaterEquals(
             expected_value=5,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -420,7 +420,7 @@ class TestGreaterEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = GreaterEquals(
             expected_value=5,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -435,7 +435,7 @@ class TestGreaterEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = GreaterEquals(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -454,7 +454,7 @@ class TestGreaterEquals:
         )
         check = GreaterEquals(
             expected_value="apple",
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -469,7 +469,7 @@ class TestGreaterEquals:
         )
         check = GreaterEquals(
             expected_value="apple",
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -482,7 +482,7 @@ class TestGreaterEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="10"))
         check = GreaterEquals(
             expected_value=5,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -502,7 +502,7 @@ class TestGreaterEquals:
         )
         check = GreaterEquals(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -522,7 +522,7 @@ class TestComparisonEdgeCases:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = LesserThan(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -538,7 +538,7 @@ class TestComparisonEdgeCases:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = GreaterThan(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -555,7 +555,7 @@ class TestComparisonEdgeCases:
         )
         check = LesserThan(
             expected_value="abc",
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -591,7 +591,7 @@ class TestComparisonEdgeCases:
         )
         check = LesserThan(
             expected_value=ComparableValue(10),
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -614,7 +614,7 @@ class TestComparisonEdgeCases:
         )
         check = LesserThan(
             expected_value=10,  # int, not ComparableValue
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -632,7 +632,7 @@ class TestComparisonEdgeCases:
         )
         check = LesserThan(
             expected_value=[10, 10],  # Expected list
-            actual_value_key="trace.interactions[*].outputs",
+            key="trace.interactions[*].outputs",
         )
 
         result = await check.run(trace)
@@ -650,7 +650,7 @@ class TestComparisonEdgeCases:
         )
         check = LesserThan(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -668,7 +668,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = NotEquals(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -683,7 +683,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = NotEquals(
             expected_value=5,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -700,7 +700,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
         check = NotEquals(
             expected_value=5.0,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -715,7 +715,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value="world",
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -732,7 +732,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value="hello",
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -747,7 +747,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
         check = NotEquals(
             expected_value=False,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -762,7 +762,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
         check = NotEquals(
             expected_value=True,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -777,7 +777,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="5"))
         check = NotEquals(
             expected_value=5,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -794,7 +794,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value=True,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -811,7 +811,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs.missing",
+            key="trace.interactions[-1].outputs.missing",
         )
 
         result = await check.run(trace)
@@ -828,7 +828,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs.value",
+            key="trace.interactions[-1].outputs.value",
         )
 
         result = await check.run(trace)
@@ -842,7 +842,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = NotEquals(
             expected_value=10,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -857,7 +857,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = NotEquals(
             expected_value=None,
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -874,7 +874,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value=[3, 4],
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -891,7 +891,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value=[1, 2],
-            actual_value_key="trace.interactions[-1].outputs",
+            key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)

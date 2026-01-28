@@ -140,19 +140,19 @@ async def test_single_message(
         .check(
             Equals(
                 expected_value=1,
-                actual_value_key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_count']",
+                key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_count']",
             )
         )
         .check(
             Equals(
                 expected_value="test@test.com",
-                actual_value_key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[0]",
+                key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[0]",
             )
         )
         .check(
             Equals(
                 expected_value="Hello, I want to apply for a job.",
-                actual_value_key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[1]",
+                key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[1]",
             )
         )
         .run()

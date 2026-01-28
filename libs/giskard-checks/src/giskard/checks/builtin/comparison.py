@@ -34,7 +34,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     - Result formatting
     """
 
-    actual_value_key: str = Field(
+    key: str = Field(
         ..., description="The key to extract the actual value from the trace"
     )
     expected_value: ExpectedType | None = Field(
@@ -81,7 +81,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     @override
     async def run(self, trace: TraceType) -> CheckResult:
         """Execute the check against the provided trace."""
-        actual_value = resolve(trace, self.actual_value_key)
+        actual_value = resolve(trace, self.key)
         expected_value = provided_or_resolve(
             trace,
             key=provide_not_none(self.expected_value_key),
@@ -101,7 +101,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
 
         if isinstance(actual_value, NoMatch):
             return CheckResult.failure(
-                message=f"No value found for key '{self.actual_value_key}', expected a value {self._comparison_message} {repr(self.expected_value)}.",
+                message=f"No value found for key '{self.key}', expected a value {self._comparison_message} {repr(self.expected_value)}.",
                 details=details,
             )
 
@@ -148,7 +148,7 @@ class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyri
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    actual_value_key : str
+    key : str
         The key to extract the actual value from the trace
     """
 
@@ -191,7 +191,7 @@ class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyr
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    actual_value_key : str
+    key : str
         The key to extract the actual value from the trace
     """
 
@@ -234,7 +234,7 @@ class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    actual_value_key : str
+    key : str
         The key to extract the actual value from the trace
     """
 
@@ -277,7 +277,7 @@ class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # p
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    actual_value_key : str
+    key : str
         The key to extract the actual value from the trace
     """
 
@@ -320,7 +320,7 @@ class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright:
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    actual_value_key : str
+    key : str
         The key to extract the actual value from the trace
     """
 
@@ -363,7 +363,7 @@ class NotEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrig
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    actual_value_key : str
+    key : str
         The key to extract the actual value from the trace
     """
 
