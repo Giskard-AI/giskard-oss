@@ -1,4 +1,4 @@
-"""Scenario runner for executing sequences of ScenarioComponents.
+"""Scenario runner for executing sequences of scenario components.
 
 This module provides a runner that executes scenarios using the handle() method
 pattern, where components yield Interactions or CheckResults and receive
@@ -74,16 +74,17 @@ class _ScenarioStepsBuilder[InputType, OutputType, TraceType: Trace]:  # pyright
 
 
 class ScenarioRunner:
-    """Execute scenarios by running sequences of ScenarioComponents.
+    """Execute scenarios by running sequences of scenario components.
 
     The runner processes components sequentially, maintaining a shared Trace
     that accumulates interactions. Execution stops on the first check failure
     or error.
 
     Components are processed in order:
-    1. **InteractionSpec components**: Generate interactions using their `generate()`
-       method. Each yielded interaction is added to the trace, and the updated
-       trace is sent back to the generator via `asend()`.
+    1. **Interaction / InteractionSpec components**: Add interactions to the trace.
+       Specs generate interactions using their `generate()` method. Each yielded
+       interaction is added to the trace, and the updated trace is sent back to
+       the generator via `asend()`.
     2. **Check components**: Validate the current trace state using their `run()`
        method. If a check fails or errors, execution stops immediately.
 
@@ -106,7 +107,7 @@ class ScenarioRunner:
         """Execute a sequential scenario with shared Trace.
 
         Components are executed in order:
-        - InteractionSpec components update the shared trace
+        - Interaction / InteractionSpec components update the shared trace
         - Check components validate the current trace and stop execution on failure
 
         Execution stops on the first failing check; remaining components are not executed.
@@ -115,6 +116,8 @@ class ScenarioRunner:
         ----------
         scenario : Scenario
             The scenario to execute.
+        return_exception : bool
+            If True, return results even when exceptions occur instead of raising.
 
         Returns
         -------

@@ -9,12 +9,17 @@ from . import builtin
 from .builtin import (
     BaseLLMCheck,
     Conformity,
-    Equality,
-    ExtractionCheck,
+    Equals,
     FnCheck,
+    GreaterEquals,
+    GreaterThan,
     Groundedness,
+    LesserThan,
+    LesserThanEquals,
     LLMCheckResult,
     LLMJudge,
+    NotEquals,
+    SemanticSimilarity,
     StringMatching,
     from_fn,
 )
@@ -30,7 +35,6 @@ from .core import (
     TestCaseResult,
     Trace,
 )
-from .core.extraction import Extractor, JsonPathExtractor
 from .core.interaction import BaseInteractionSpec
 from .generators.user import UserSimulator
 from .interaction import InteractionSpec
@@ -69,18 +73,21 @@ __all__ = [
     "Trace",
     "Interaction",
     "BaseInteractionSpec",
-    "Extractor",
-    "JsonPathExtractor",
     # Builtin checks
     "BaseLLMCheck",
     "LLMCheckResult",
     "Conformity",
-    "Equality",
-    "ExtractionCheck",
+    "Equals",
+    "NotEquals",
+    "LesserThan",
+    "GreaterThan",
+    "LesserThanEquals",
+    "GreaterEquals",
     "FnCheck",
     "from_fn",
     "Groundedness",
     "LLMJudge",
+    "SemanticSimilarity",
     "StringMatching",
     # Interaction
     "InteractionSpec",

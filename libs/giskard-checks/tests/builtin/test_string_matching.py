@@ -1,6 +1,7 @@
 """Tests for the StringMatching check."""
 
 from giskard.checks import CheckStatus, Interaction, StringMatching, Trace
+from giskard.checks.core.extraction import NoMatch
 
 
 async def test_run_returns_success_with_direct_values() -> None:
@@ -153,8 +154,12 @@ async def test_missing_keyword_in_trace() -> None:
     result = await check.run(Trace())
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
-    assert "Unable to extract keyword" in result.message
-    assert result.details["keyword"] is None
+    assert (
+        "No value found for keyword key 'trace.last.inputs.nonexistent'."
+        in result.message
+    )
+    assert isinstance(result.details["keyword"], NoMatch)
+    assert result.details["keyword"].key == "trace.last.inputs.nonexistent"
 
 
 async def test_missing_text_in_trace() -> None:
@@ -166,8 +171,12 @@ async def test_missing_text_in_trace() -> None:
     result = await check.run(Trace())
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
-    assert "Unable to extract text" in result.message
-    assert result.details["text"] is None
+    assert (
+        "No value found for text key 'trace.last.outputs.nonexistent', expected string to contain 'test'."
+        in result.message
+    )
+    assert isinstance(result.details["text"], NoMatch)
+    assert result.details["text"].key == "trace.last.outputs.nonexistent"
 
 
 async def test_default_text_key() -> None:
@@ -175,7 +184,7 @@ async def test_default_text_key() -> None:
     check = StringMatching(keyword="response")
     interaction = Interaction(
         inputs={"query": "Test"},
-        outputs={"response": "This is a response"},
+        outputs="This is a response",
     )
     result = await check.run(Trace(interactions=[interaction]))
     # Default text_key extracts trace.last.outputs which is a dict
@@ -325,3 +334,72 @@ async def test_empty_keyword() -> None:
     result = await check.run(Trace())
     # Empty string should be found in any text
     assert result.status == CheckStatus.PASS
+
+
+async def test_unicode_e_acute_nfc_nfd_matching() -> None:
+    """Test that 'é' (U+00E9) matches 'é' (U+0065 U+0301) with NFC normalization."""
+    # U+00E9 is the composed form (NFC)
+    # U+0065 U+0301 is the decomposed form (NFD): 'e' + combining acute accent
+    text_nfc = "café"  # Uses U+00E9
+    keyword_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
+
+    # With NFC normalization, both should normalize to the same form
+    check = StringMatching(
+        text=text_nfc,
+        keyword=keyword_nfd,
+        normalization_form="NFC",
+        case_sensitive=False,
+    )
+    result = await check.run(Trace())
+    assert result.status == CheckStatus.PASS
+
+
+async def test_unicode_e_acute_nfd_nfc_matching() -> None:
+    """Test that 'é' (U+0065 U+0301) matches 'é' (U+00E9) with NFD normalization."""
+    # U+0065 U+0301 is the decomposed form (NFD)
+    # U+00E9 is the composed form (NFC)
+    text_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
+    keyword_nfc = "café"  # Uses U+00E9
+
+    # With NFD normalization, both should normalize to the same form
+    check = StringMatching(
+        text=text_nfd,
+        keyword=keyword_nfc,
+        normalization_form="NFD",
+        case_sensitive=False,
+    )
+    result = await check.run(Trace())
+    assert result.status == CheckStatus.PASS
+
+
+async def test_unicode_e_acute_nfkc_matching() -> None:
+    """Test that 'é' in different forms matches with NFKC normalization."""
+    # NFKC should also normalize both forms to the same representation
+    text_nfc = "café"  # Uses U+00E9
+    keyword_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
+
+    check = StringMatching(
+        text=text_nfc,
+        keyword=keyword_nfd,
+        normalization_form="NFKC",
+        case_sensitive=False,
+    )
+    result = await check.run(Trace())
+    assert result.status == CheckStatus.PASS
+
+
+async def test_unicode_e_acute_no_normalization_fails() -> None:
+    """Test that 'é' in different forms does NOT match without normalization."""
+    # Without normalization, different Unicode representations should not match
+    text_nfc = "café"  # Uses U+00E9
+    keyword_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
+
+    check = StringMatching(
+        text=text_nfc,
+        keyword=keyword_nfd,
+        normalization_form=None,
+        case_sensitive=False,
+    )
+    result = await check.run(Trace())
+    # Without normalization, they should not match
+    assert result.status == CheckStatus.FAIL

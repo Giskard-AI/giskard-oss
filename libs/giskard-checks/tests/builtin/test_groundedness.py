@@ -216,8 +216,8 @@ async def test_missing_answer_in_trace() -> None:
     result = await groundedness.run(Trace())
 
     assert result.status == CheckStatus.PASS
-    # When resolve returns None, str(None) becomes "None"
-    assert result.details["inputs"]["answer"] == "None"
+    # When resolve returns NoMatch, str(NoMatch) becomes "No match for key: ..."
+    assert result.details["inputs"]["answer"] == "No match for key: trace.last.outputs"
 
 
 async def test_missing_context_in_trace() -> None:
@@ -232,8 +232,11 @@ async def test_missing_context_in_trace() -> None:
     result = await groundedness.run(Trace(interactions=[interaction]))
 
     assert result.status == CheckStatus.PASS
-    # When resolve returns None with multiple=True, it returns []
-    assert result.details["inputs"]["context"] == "[]"
+    # When resolve returns NoMatch, str(NoMatch) becomes "No match for key: ..."
+    assert (
+        result.details["inputs"]["context"]
+        == "No match for key: trace.last.metadata.context"
+    )
 
 
 async def test_using_trace_last_property() -> None:
@@ -284,4 +287,5 @@ async def test_trace_last_with_empty_trace() -> None:
     result = await groundedness.run(trace)
 
     assert result.status == CheckStatus.PASS
-    assert result.details["inputs"]["answer"] == "None"
+    # When resolve returns NoMatch, str(NoMatch) becomes "No match for key: ..."
+    assert result.details["inputs"]["answer"] == "No match for key: trace.last.outputs"

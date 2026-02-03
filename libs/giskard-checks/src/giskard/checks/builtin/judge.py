@@ -31,8 +31,7 @@ class LLMJudge[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     - `trace.last.inputs`: Inputs from the most recent interaction
     - `trace.last.outputs`: Outputs from the most recent interaction
     - `trace.interactions[-1]`: Alternative way to access the most recent interaction
-    - `trace.messages`: If using message-based interactions, all messages (if property exists)
-    - `trace.transcript`: If using message-based interactions, full conversation transcript (if property exists)
+    - Custom Trace subclasses may expose additional properties (e.g., messages or transcripts)
 
     Note
     ----

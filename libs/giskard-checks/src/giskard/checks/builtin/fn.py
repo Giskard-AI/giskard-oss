@@ -96,7 +96,7 @@ def from_fn[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     ```python
     from giskard.checks import from_fn
 
-    chk = from_fn(lambda trace: trace.interactions[-1].outputs is not None, name="has_output")
+    chk = from_fn(lambda trace: trace.last.outputs is not None, name="has_output")
     ```
     """
     return FnCheck(

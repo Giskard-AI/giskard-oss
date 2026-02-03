@@ -9,6 +9,7 @@ import importlib.util
 
 from .discriminated import Discriminated, discriminated_base
 from .errors import Error
+from .utils import NOT_PROVIDED, NotProvided, provide_not_none
 
 LEGACY_GISKARD_PACKAGE_NAME = "giskard"
 
@@ -31,4 +32,8 @@ __all__ = [
     "discriminated_base",
     # Error handling
     "Error",
+    # Utilities
+    "NotProvided",
+    "NOT_PROVIDED",
+    "provide_not_none",
 ]

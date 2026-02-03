@@ -116,7 +116,7 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         dict[str, Any]
             Template variables available in the prompt. Default implementation
             provides the trace object under the 'trace' key, allowing templates
-            to access properties like `trace.interactions`, `trace.messages`, etc.
+            to access properties like `trace.interactions` and `trace.last`.
         """
         return {"trace": trace}
 
