@@ -1,8 +1,8 @@
 """Test case model and runner integration.
 
-`TestCase` binds a specific `InteractionSpec` (or compatible subclass) with a sequence
-of `Check`s and delegates execution to a `ScenarioRunner`. It offers a single `run()`
-method that returns a `TestCaseResult` summarizing the outcomes.
+`TestCase` binds a concrete `Trace` with a sequence of `Check`s and delegates
+execution to a `TestCaseRunner`. It offers a single `run()` method that returns a
+`TestCaseResult` summarizing the outcomes.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ class TestCase[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
 
     **Note**: For most use cases, the fluent API (`scenario().interact().check()`) is
     recommended as it's simpler and more readable. This class is useful for advanced
-    use cases where you need direct control over test case construction.
+    use cases where you need direct control over trace construction and check execution.
 
     Attributes
     ----------

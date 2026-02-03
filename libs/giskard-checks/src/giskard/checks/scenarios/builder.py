@@ -27,7 +27,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
     scenario = (
         scenario("my_scenario")
         .interact("Hello", "Hi")
-        .check(StringMatching(content="Hi", key="trace.last.outputs"))
+        .check(StringMatching(keyword="Hi", text_key="trace.last.outputs"))
         .interact("How are you?", "Good")
         .check(Equals(expected="Good", key="trace.last.outputs"))
         .build()
@@ -37,7 +37,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
     result = await (
         scenario("my_scenario")
         .interact("Hello", "Hi")
-        .check(StringMatching(content="Hi", key="trace.last.outputs"))
+        .check(StringMatching(keyword="Hi", text_key="trace.last.outputs"))
         .run()
     )
     ```
@@ -141,7 +141,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         --------
         ```python
         builder = scenario("my_test")
-        builder.check(StringMatching(content="Hi", key="trace.last.outputs"))
+        builder.check(StringMatching(keyword="Hi", text_key="trace.last.outputs"))
         ```
         """
         self.sequence.append(check)
