@@ -13,6 +13,7 @@ from .conformity import Conformity
 from .fn import FnCheck, from_fn
 from .groundedness import Groundedness
 from .judge import LLMJudge
+from .semantic_similarity import SemanticSimilarity
 from .string_matching import StringMatching
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "Groundedness",
     "Conformity",
     "LLMJudge",
+    "SemanticSimilarity",
     "BaseLLMCheck",
     "LLMCheckResult",
 ]

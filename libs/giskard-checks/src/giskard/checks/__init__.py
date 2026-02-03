@@ -19,6 +19,7 @@ from .builtin import (
     LLMCheckResult,
     LLMJudge,
     NotEquals,
+    SemanticSimilarity,
     StringMatching,
     from_fn,
 )
@@ -86,6 +87,7 @@ __all__ = [
     "from_fn",
     "Groundedness",
     "LLMJudge",
+    "SemanticSimilarity",
     "StringMatching",
     # Interaction
     "InteractionSpec",

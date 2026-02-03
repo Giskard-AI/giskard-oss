@@ -15,6 +15,7 @@ dependencies = [
     "logfire-api>=3.22.0,<5",
     "tenacity>=9.1.0,<10",
     "giskard-core>=0.1.5,<1",
+    "numpy>=2.4.1",
 ]
 
 [build-system]
