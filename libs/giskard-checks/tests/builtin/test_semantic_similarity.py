@@ -5,6 +5,7 @@ import pytest
 from giskard.agents.embeddings.base import BaseEmbeddingModel, EmbeddingParams
 from giskard.checks import Check, CheckStatus, Interaction, SemanticSimilarity, Trace
 from giskard.checks.builtin.semantic_similarity import cosine_similarity
+from giskard.checks.core.extraction import NoMatch
 
 
 class MockEmbeddingModel(BaseEmbeddingModel):
@@ -317,11 +318,13 @@ async def test_empty_trace() -> None:
     )
     result = await check.run(Trace())
 
-    # When trace is empty, resolve returns None which causes check to fail
+    # When trace is empty, resolve returns NoMatch which causes check to fail
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
-    assert "No actual answer found" in result.message
-    assert result.details["actual_answer"] is None
+    assert (
+        "No value found for actual answer key 'trace.last.outputs'." in result.message
+    )
+    assert isinstance(result.details["actual_answer"], NoMatch)
 
 
 async def test_serialization_roundtrip() -> None:
@@ -383,8 +386,11 @@ async def test_missing_reference_text_in_trace() -> None:
     # When reference is not found, check fails early
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
-    assert "No reference text found" in result.message
-    assert result.details["reference_text"] is None
+    assert (
+        "No value found for reference text key 'trace.last.metadata.reference_text'."
+        in result.message
+    )
+    assert isinstance(result.details["reference_text"], NoMatch)
     assert "reference_text_key" in result.details
 
 
@@ -412,8 +418,11 @@ async def test_missing_actual_answer_in_trace() -> None:
     # When answer field is not found, check fails early
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
-    assert "No actual answer found" in result.message
-    assert result.details["actual_answer"] is None
+    assert (
+        "No value found for actual answer key 'trace.last.outputs.nonexistent_field'."
+        in result.message
+    )
+    assert isinstance(result.details["actual_answer"], NoMatch)
     assert "actual_answer_key" in result.details
 
 
@@ -440,8 +449,11 @@ async def test_both_reference_and_answer_missing() -> None:
     # Check fails when reference text is missing (checked first)
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
-    assert "No reference text found" in result.message
-    assert result.details["reference_text"] is None
+    assert (
+        "No value found for reference text key 'trace.last.metadata.missing'."
+        in result.message
+    )
+    assert isinstance(result.details["reference_text"], NoMatch)
 
 
 async def test_empty_trace_with_no_direct_reference() -> None:
@@ -460,8 +472,11 @@ async def test_empty_trace_with_no_direct_reference() -> None:
     # Check fails when reference text is missing
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
-    assert "No reference text found" in result.message
-    assert result.details["reference_text"] is None
+    assert (
+        "No value found for reference text key 'trace.last.metadata.reference_text'."
+        in result.message
+    )
+    assert isinstance(result.details["reference_text"], NoMatch)
 
 
 async def test_missing_outputs_field_in_interaction() -> None:
@@ -487,8 +502,11 @@ async def test_missing_outputs_field_in_interaction() -> None:
     # When response field doesn't exist in outputs, check fails
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
-    assert "No actual answer found" in result.message
-    assert result.details["actual_answer"] is None
+    assert (
+        "No value found for actual answer key 'trace.last.outputs.response'."
+        in result.message
+    )
+    assert isinstance(result.details["actual_answer"], NoMatch)
 
 
 async def test_missing_metadata_in_interaction() -> None:
@@ -515,8 +533,11 @@ async def test_missing_metadata_in_interaction() -> None:
     # When metadata doesn't exist, check fails (reference not found)
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
-    assert "No reference text found" in result.message
-    assert result.details["reference_text"] is None
+    assert (
+        "No value found for reference text key 'trace.last.metadata.reference'."
+        in result.message
+    )
+    assert isinstance(result.details["reference_text"], NoMatch)
 
 
 async def test_invalid_jsonpath_key() -> None:
@@ -539,11 +560,14 @@ async def test_invalid_jsonpath_key() -> None:
     )
     result = await check.run(Trace(interactions=[interaction]))
 
-    # Invalid path resolves to None, causing check to fail
+    # Invalid path resolves to NoMatch, causing check to fail
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
-    assert "No reference text found" in result.message
-    assert result.details["reference_text"] is None
+    assert (
+        "No value found for reference text key 'trace.nonexistent.deeply.nested.field'."
+        in result.message
+    )
+    assert isinstance(result.details["reference_text"], NoMatch)
 
 
 async def test_similarity_at_exact_threshold() -> None:

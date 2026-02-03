@@ -1,6 +1,7 @@
 from typing import override
 
 from giskard.agents.workflow import TemplateReference
+from giskard.core import provide_not_none
 from pydantic import Field
 
 from ..core.check import Check
@@ -81,10 +82,18 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             Template variables with 'answer' and 'context' keys.
         """
         return {
-            "answer": str(provided_or_resolve(self.answer, trace, self.answer_key)),
+            "answer": str(
+                provided_or_resolve(
+                    trace,
+                    key=self.answer_key,
+                    value=provide_not_none(self.answer),
+                )
+            ),
             "context": str(
                 provided_or_resolve(
-                    self.context, trace, self.context_key, multiple=True
+                    trace,
+                    key=self.context_key,
+                    value=provide_not_none(self.context),
                 )
             ),
         }

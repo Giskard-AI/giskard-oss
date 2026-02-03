@@ -1,10 +1,11 @@
 from typing import override
 
 import numpy as np
+from giskard.core import provide_not_none
 from pydantic import Field
 
 from ..core.check import Check
-from ..core.extraction import provided_or_resolve, resolve
+from ..core.extraction import NoMatch, provided_or_resolve, resolve
 from ..core.mixin import WithEmbeddingMixin
 from ..core.result import CheckResult
 from ..core.trace import Trace
@@ -115,9 +116,19 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
             The result of the check evaluation.
         """
         reference_text = provided_or_resolve(
-            self.reference_text, trace, self.reference_text_key
+            trace,
+            key=provide_not_none(self.reference_text_key),
+            value=provide_not_none(self.reference_text),
         )
-        if not reference_text:
+        if isinstance(reference_text, NoMatch):
+            return CheckResult.failure(
+                message=f"No value found for reference text key '{self.reference_text_key}'.",
+                details={
+                    "reference_text_key": self.reference_text_key,
+                    "reference_text": reference_text,
+                },
+            )
+        if reference_text is None or reference_text == "":
             return CheckResult.failure(
                 message="No reference text found",
                 details={
@@ -126,7 +137,15 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                 },
             )
         actual_answer = resolve(trace, self.actual_answer_key)
-        if not actual_answer:
+        if isinstance(actual_answer, NoMatch):
+            return CheckResult.failure(
+                message=f"No value found for actual answer key '{self.actual_answer_key}'.",
+                details={
+                    "actual_answer": actual_answer,
+                    "actual_answer_key": self.actual_answer_key,
+                },
+            )
+        if actual_answer is None or actual_answer == "":
             return CheckResult.failure(
                 message="No actual answer found",
                 details={
