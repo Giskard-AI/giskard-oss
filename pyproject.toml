@@ -46,6 +46,11 @@ giskard-core = { workspace = true }
 giskard-agents = { workspace = true }
 giskard-checks = { workspace = true }
 
+[tool.pytest.ini_options]
+markers = [
+    "functional: tests that require external API calls (deselect with '-m \"not functional\"')",
+]
+
 [dependency-groups]
 dev = [
     "ipykernel==7.1.0",

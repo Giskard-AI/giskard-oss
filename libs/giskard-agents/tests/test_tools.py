@@ -80,6 +80,7 @@ async def test_tool_with_methods():
     assert await weather.get_weather(city="Tokyo") == "It's sunny in Tokyo."
 
 
+@pytest.mark.functional
 async def test_tool_run(generator):
     """Test that the tool runs correctly."""
 

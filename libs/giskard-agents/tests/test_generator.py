@@ -39,6 +39,7 @@ async def test_litellm_generator_completion_with_mock(
         assert response.finish_reason == "stop"
 
 
+@pytest.mark.functional
 async def test_generator_completion(generator: LiteLLMGenerator):
     response = await generator.complete(
         messages=[
@@ -57,6 +58,7 @@ async def test_generator_completion(generator: LiteLLMGenerator):
     assert response.finish_reason == "stop"
 
 
+@pytest.mark.functional
 async def test_generator_chat(generator: LiteLLMGenerator):
     test_message = "Hello, world!"
     pipeline = generator.chat(test_message)

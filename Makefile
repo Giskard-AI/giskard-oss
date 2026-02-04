@@ -1,16 +1,15 @@
 # Variables
 LIBS := giskard-core giskard-agents giskard-checks
-TEST_TARGETS := $(addprefix test-,$(LIBS))
+PACKAGE ?= # Optional package to test (e.g., giskard-core, giskard-agents, giskard-checks)
 
 # Default target
 help: ## Show this help message
 	@echo "Available targets:"
 	@grep -E '^[a-zA-Z0-9_%-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
 # Installation targets
 install: ## Install project dependencies
 	uv sync
-
-sync: install ## Alias for install
 
 install-tools: ## Install development tools
 	uv tool install ruff
@@ -23,13 +22,26 @@ pre-commit-install: ## Setup pre-commit hooks
 
 setup: install install-tools pre-commit-install ## Complete development setup (install deps + tools)
 
-test: $(TEST_TARGETS) ## Run all tests
+test: ## Run all tests (unit + functional), optional PACKAGE=<name>
+ifdef PACKAGE
+	uv run pytest libs/$(PACKAGE)
+else
+	uv run pytest libs/
+endif
 
-$(TEST_TARGETS): test-%: ## Run tests for a specific library (e.g., make test-giskard-core)
-	@echo "------------------------------------------------"
-	@echo "Running tests for $*"
-	@echo "------------------------------------------------"
-	uv run pytest libs/$*
+test-unit: ## Run unit tests only (excludes functional), optional PACKAGE=<name>
+ifdef PACKAGE
+	uv run pytest libs/$(PACKAGE) -m "not functional"
+else
+	$(foreach lib,$(LIBS),uv run pytest libs/$(lib) -m "not functional" &&) true
+endif
+
+test-functional: ## Run functional tests only (requires API keys), optional PACKAGE=<name>
+ifdef PACKAGE
+	uv run pytest libs/$(PACKAGE) -m "functional"
+else
+	$(foreach lib,$(LIBS),uv run pytest libs/$(lib) -m "functional" &&) true
+endif
 
 test-package-conflict: ## Test package conflict with giskard legacy package installed
 	@echo "Testing package conflict..."
@@ -67,7 +79,7 @@ typecheck: ## Run type checking with basedpyright
 	uv tool run basedpyright --level error .
 
 security: ## Check for security vulnerabilities
-	uv run pip-audit
+	uv run pip-audit --skip-editable
 
 generate-licenses: ## Generate licenses
 	uv tool run licensecheck --license MIT \
@@ -79,13 +91,7 @@ check-licenses: ## Check for licenses
 		--show-only-failing --zero \
 		--skip-dependencies giskard-agents giskard-checks giskard-core
 
-# Combined targets
-check: lint check-format check-compat typecheck security check-licenses ## Run all checks (lint, format, compatibility, typecheck)
-
-all: format check test ## Format, check, and test
-
-# CI simulation
-ci: check test ## Run the same checks as CI
+check: lint check-format check-compat typecheck security check-licenses ## Run all checks
 
 clean: ## Clean up build artifacts and caches
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
