@@ -1,6 +1,6 @@
 [project]
 name = "giskard-agents"
-version = "0.3.3"
+version = "1.0.0a1"
 description = " A lightweight library that orchestrates LLM completions and agents in parallel workflows "
 readme = "README.md"
 license = { text = "MIT" }
@@ -14,7 +14,7 @@ dependencies = [
     "jinja2>=3.1.6,<4",
     "logfire-api>=3.22.0,<5",
     "tenacity>=9.1.0,<10",
-    "giskard-core>=0.1.5,<1",
+    "giskard-core>=1.0.0a1",
     "numpy>=2.4.1",
 ]
 

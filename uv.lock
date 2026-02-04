@@ -661,7 +661,7 @@ wheels = [
 
 [[package]]
 name = "giskard"
-version = "3.0.0"
+version = "3.0.0a1"
 source = { virtual = "." }
 dependencies = [
     { name = "giskard-agents" },
@@ -698,7 +698,7 @@ dev = [
 
 [[package]]
 name = "giskard-agents"
-version = "0.3.3"
+version = "1.0.0a1"
 source = { editable = "libs/giskard-agents" }
 dependencies = [
     { name = "giskard-core" },
@@ -727,7 +727,7 @@ requires-dist = [
 
 [[package]]
 name = "giskard-checks"
-version = "0.1.0"
+version = "1.0.0a1"
 source = { editable = "libs/giskard-checks" }
 dependencies = [
     { name = "giskard-agents" },
@@ -752,7 +752,7 @@ requires-dist = [
 
 [[package]]
 name = "giskard-core"
-version = "0.1.7"
+version = "1.0.0a1"
 source = { editable = "libs/giskard-core" }
 dependencies = [
     { name = "pydantic" },
