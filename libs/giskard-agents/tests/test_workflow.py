@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from giskard import agents
 from giskard.agents.chat import Chat
 from giskard.agents.generators.litellm_generator import LiteLLMGenerator
@@ -7,6 +8,7 @@ from giskard.agents.templates.prompts_manager import PromptsManager
 from pydantic import BaseModel
 
 
+@pytest.mark.functional
 async def test_single_run(generator):
     workflow = agents.ChatWorkflow(generator=generator)
 
@@ -20,6 +22,7 @@ async def test_single_run(generator):
     assert "testbot" in chat.last.content.lower()
 
 
+@pytest.mark.functional
 async def test_run_many(generator):
     """Test that the workflow runs correctly."""
 
@@ -30,6 +33,7 @@ async def test_run_many(generator):
     assert len(chats) == 3
 
 
+@pytest.mark.functional
 async def test_run_batch(generator):
     """Test that the workflow runs correctly."""
 
@@ -50,6 +54,7 @@ async def test_run_batch(generator):
     assert len(chats) == 3
 
 
+@pytest.mark.functional
 async def test_stream_many(generator):
     workflow = agents.ChatWorkflow(generator=generator).chat("Hello!", role="user")
 
@@ -61,6 +66,7 @@ async def test_stream_many(generator):
     assert len(chats) == 3
 
 
+@pytest.mark.functional
 async def test_stream_batch(generator):
     workflow = agents.ChatWorkflow(generator=generator).chat("Hello!", role="user")
 
@@ -77,6 +83,7 @@ async def test_stream_batch(generator):
     assert len(chats) == 2
 
 
+@pytest.mark.functional
 async def test_workflow_with_mixed_templates(generator: LiteLLMGenerator):
     workflow = agents.ChatWorkflow(
         generator=generator,
@@ -123,6 +130,7 @@ async def test_workflow_with_mixed_templates(generator: LiteLLMGenerator):
     assert chat.messages[4].role == "assistant"
 
 
+@pytest.mark.functional
 async def test_output_format(generator):
     workflow = agents.ChatWorkflow(generator=generator)
 

@@ -49,6 +49,7 @@ async def test_litellm_embedding_model_embed_with_mock(
         assert np.isclose(embeddings[1], np.array([0.4, 0.5, 0.6])).all()
 
 
+@pytest.mark.functional
 async def test_embedding_model_real_embedding(
     embedding_model: LitellmEmbeddingModel,
 ) -> None:

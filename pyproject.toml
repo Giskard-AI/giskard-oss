@@ -2,7 +2,7 @@
 name = "giskard"
 readme = "README.md"
 license = { text = "Apache Software License 2.0" }
-version = "3.0.0"
+version = "3.0.0a1"
 description = "The testing framework dedicated to ML models, from tabular to LLMs"
 authors = [{ name = "Giskard AI", email = "hello@giskard.ai" }]
 
@@ -20,9 +20,9 @@ classifiers = [
 ]
 
 dependencies = [
-    "giskard-core",
-    "giskard-agents",
-    "giskard-checks"
+    "giskard-core>=1.0.0a1",
+    "giskard-agents>=1.0.0a1",
+    "giskard-checks>=1.0.0a1",
 ]
 requires-python = ">=3.12"
 
@@ -45,6 +45,11 @@ members = [
 giskard-core = { workspace = true }
 giskard-agents = { workspace = true }
 giskard-checks = { workspace = true }
+
+[tool.pytest.ini_options]
+markers = [
+    "functional: tests that require external API calls (deselect with '-m \"not functional\"')",
+]
 
 [dependency-groups]
 dev = [
