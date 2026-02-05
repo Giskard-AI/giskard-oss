@@ -33,6 +33,9 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "functional: marks tests that depend on external APIs (e.g., Gemini, OpenAI)",
+]
 
 [tool.ruff.lint.isort.sections]
 "my_packages" = ["giskard"]
