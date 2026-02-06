@@ -1,54 +1,44 @@
-from contextlib import AbstractAsyncContextManager, nullcontext
-from typing import Any, cast
+from contextlib import AsyncExitStack, asynccontextmanager
+from typing import Any
 
 import tenacity as t
+from giskard.core import RateLimiter
 from pydantic import BaseModel, Field, field_validator
 
 from ..chat import Message
-from ..rate_limiter import RateLimiter, get_rate_limiter
 from .base import GenerationParams, Response
 from .retry import RetryPolicy
 
 
-class WithRateLimiter(BaseModel):
+class WithRateLimiters(BaseModel):
     """Adds a rate limiter to the generator."""
 
-    rate_limiter: RateLimiter | None = Field(default=None, validate_default=True)
+    rate_limiters: list[RateLimiter] = Field(default_factory=list)
 
-    @field_validator("rate_limiter", mode="before")
-    def _validate_rate_limiter(cls, v: RateLimiter | str | None) -> RateLimiter | None:
-        # Supported singleton semantics are implemented at the container level:
-        # - If a string is provided, it must already exist in the registry.
-        # - If a dict is provided (e.g. from JSON deserialization), we reuse an
-        #   already-registered instance when possible, otherwise we let Pydantic
-        #   create a new RateLimiter from the dict.
-        if v is None or isinstance(v, RateLimiter):
-            return v
-
-        if isinstance(v, str):
-            return get_rate_limiter(v)
-
-        if isinstance(v, dict):
-            rate_limiter_id = v.get("rate_limiter_id")
-            if rate_limiter_id:
-                try:
-                    return get_rate_limiter(rate_limiter_id)
-                except ValueError:
-                    return v  # let Pydantic create & register a new instance
-            return v
-
+    @field_validator("rate_limiters")
+    @classmethod
+    def ensure_unique_ids(cls, v: list[RateLimiter]) -> list[RateLimiter]:
+        ids = [r.id for r in v]
+        if len(ids) != len(set(ids)):
+            raise ValueError(
+                "Duplicate RateLimiter IDs detected; this would cause a deadlock."
+            )
         return v
 
-    def _rate_limiter_context(
+    @asynccontextmanager
+    async def _throttle(
         self,
-    ) -> AbstractAsyncContextManager[RateLimiter | None, None]:
-        if self.rate_limiter is None:
-            return nullcontext(None)
+    ):
+        if not self.rate_limiters:
+            yield []
+            return
 
-        return cast(
-            AbstractAsyncContextManager[RateLimiter | None, None],
-            self.rate_limiter.throttle(),
-        )
+        waited_times: list[tuple[RateLimiter, float]] = []
+        async with AsyncExitStack() as stack:
+            for rate_limiter in self.rate_limiters:
+                waited_time = await stack.enter_async_context(rate_limiter.throttle())
+                waited_times.append((rate_limiter, waited_time))
+            yield waited_times
 
 
 class WithRetryPolicy(BaseModel):

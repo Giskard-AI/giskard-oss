@@ -7,11 +7,11 @@ from pydantic import Field
 
 from ..chat import Message
 from .base import BaseGenerator, GenerationParams, Response
-from .mixins import WithRateLimiter, WithRetryPolicy
+from .mixins import WithRateLimiters, WithRetryPolicy
 
 
 @BaseGenerator.register("litellm")
-class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
+class LiteLLMGenerator(WithRateLimiters, WithRetryPolicy, BaseGenerator):
     """A generator for creating chat completion pipelines."""
 
     model: str = Field(
@@ -34,7 +34,7 @@ class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
         if tools:
             params_["tools"] = [t.to_litellm_function() for t in tools]
 
-        async with self._rate_limiter_context():
+        async with self._throttle():
             response = cast(
                 ModelResponse,
                 await acompletion(
