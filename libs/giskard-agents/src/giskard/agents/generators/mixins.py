@@ -41,6 +41,11 @@ class WithRateLimiters(BaseModel):
                 waited_times.append((rate_limiter, waited_time))
             yield waited_times
 
+    def with_rate_limiters(self, *rate_limiters: RateLimiter) -> "WithRateLimiters":
+        return self.model_copy(
+            update={"rate_limiters": [*self.rate_limiters, *rate_limiters]}
+        )
+
 
 class WithRetryPolicy(BaseModel):
     """Adds a retry policy to the generator.
