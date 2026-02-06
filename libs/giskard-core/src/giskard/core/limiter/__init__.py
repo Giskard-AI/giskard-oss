@@ -22,6 +22,9 @@ def rpm(requests: int, id: str | None = None) -> MaxRequestsPerMinute:
 def max_concurrent(limit: int, id: str | None = None) -> MaxConcurrentRequests:
     """
     Creates a limiter that enforces a maximum number of concurrent requests.
+
+    If an ID is provided, multiple instances with the same ID will share
+    the same internal lock/state.
     """
     kwargs: dict[str, Any] = {"max_concurrent": limit}
     if id is not None:
