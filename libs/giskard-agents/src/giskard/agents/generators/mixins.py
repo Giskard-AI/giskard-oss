@@ -1,3 +1,4 @@
+from collections.abc import AsyncGenerator
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any
 
@@ -17,7 +18,7 @@ class WithRateLimiters(BaseModel):
 
     @field_validator("rate_limiters")
     @classmethod
-    def ensure_unique_ids(cls, v: list[RateLimiter]) -> list[RateLimiter]:
+    def _ensure_unique_ids(cls, v: list[RateLimiter]) -> list[RateLimiter]:
         ids = [r.id for r in v]
         if len(ids) != len(set(ids)):
             raise ValueError(
@@ -28,7 +29,7 @@ class WithRateLimiters(BaseModel):
     @asynccontextmanager
     async def _throttle(
         self,
-    ):
+    ) -> "AsyncGenerator[list[tuple[RateLimiter, float]], None]":
         if not self.rate_limiters:
             yield []
             return
