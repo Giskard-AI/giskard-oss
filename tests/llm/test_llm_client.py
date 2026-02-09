@@ -150,13 +150,11 @@ def test_litellm_client_custom_model_with_embeddings():
                 ]
             )
 
-        def embedding(
-            self, model: str, input: list, api_key: str, **kwargs
-        ) -> litellm.EmbeddingResponse:
+        def embedding(self, model: str, input: list, api_key: str, **kwargs) -> litellm.EmbeddingResponse:
             assert api_key == API_KEY, "Embedding params are not passed properly"
 
             embeddings_data = []
-            for idx, text in enumerate(input):
+            for idx, _ in enumerate(input):
                 embedding_vector = [float(idx + i) for i in range(10)]
                 embeddings_data.append({"embedding": embedding_vector, "index": idx})
 
