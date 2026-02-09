@@ -14,7 +14,6 @@ def test_sequence_classification_distilbert_base_uncased_tensorflow():
     model_name = "distilbert/distilbert-base-uncased-finetuned-sst-2-english"
     tokenizer_distilbert_base_uncased = AutoTokenizer.from_pretrained(model_name)
 
-    id2label = {0: "NEGATIVE", 1: "POSITIVE"}
     label2id = {"NEGATIVE": 0, "POSITIVE": 1}
 
     model_distilbert_base_uncased = TFAutoModelForSequenceClassification.from_pretrained(model_name)
