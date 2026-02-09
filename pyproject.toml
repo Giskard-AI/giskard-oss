@@ -23,25 +23,7 @@ giskard = [
 
 
 
-[tool.pdm.scripts]
-_.env = { GSK_DISABLE_ANALYTICS = "True", GISKARD_DEV_MODE = "True" }
-# add "-n auto" to the pytest command to parallelize the execution
-test.cmd = "pdm base-test tests/"
-# for some reason github runners don't work when calling 'pdm test -m "not slow"'
-base-test.cmd = "pytest -c pyproject.toml --cov=giskard --cov-report=xml --cov-append --disable-warnings --no-header -vv --durations=0"
-test-fast.cmd = "pdm base-test -n auto -m 'not slow' --use-subprocess tests"
-test-slow.cmd = "pdm base-test -m 'slow' --use-subprocess"
-lint = "ruff check giskard tests"
-doc = "sphinx-build docs docs/_build/html"
-#  -W --keep-going -n => temporary disable
-check-doc = "python ./docs/scrapper.py"
-watch-doc = "python -m sphinx_autobuild --watch giskard docs docs/_build/html"
-clean = "rm -rf coverage.xml coverage* .coverage*"
-notebook = "jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --notebook-dir ./docs/reference/notebooks --NotebookApp.token=''"
-check-deps = "deptry ."
-update-lock = "docker run --platform linux/amd64 --rm -it -w /work -v ${PWD}/pdm.lock:/work/pdm.lock -v ${PWD}/pyproject.toml:/work/pyproject.toml python:3.10-slim bash -c \"apt update && apt install curl -y && curl -sSL https://pdm.fming.dev/install-pdm.py | python3 - && /root/.local/bin/pdm lock -G :all -v\""
-
-[tool.pdm.dev-dependencies]
+[dependency-groups]
 dev = [
     "typing-extensions",
     "jupyter>=1.0.0",
