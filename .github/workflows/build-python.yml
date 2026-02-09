@@ -160,36 +160,36 @@ jobs:
       - name: Install pydantic v1
         if: ${{ matrix.pydantic_v1 }}
         run: |
-          uv run pip uninstall pydantic pydantic_core -y
-          uv run pip install "pydantic>=1,<2"
+          uv pip uninstall pydantic pydantic_core -y
+          uv pip install "pydantic>=1,<2"
 
       - name: Check Pydantic installed version
         run: |
-          uv run pip freeze | grep '^pydantic'
-          uv run pip freeze | grep -q '^pydantic==${{ matrix.pydantic_v1 && '1' || '2' }}\.'
+          uv pip list | grep -i pydantic
+          uv run python -c "import pydantic; assert pydantic.__version__.startswith('${{ matrix.pydantic_v1 && '1' || '2' }}.'), f'Wrong pydantic version: {pydantic.__version__}'"
 
       - name: Install langchain minimal version
         if: ${{ matrix.langchain_minimal }}
         run: |
-          uv run pip uninstall langchain -y
-          uv run pip install "langchain==0.0.275"
+          uv pip uninstall langchain -y
+          uv pip install "langchain==0.0.275"
 
       - name: Check langchain installed version
         if: ${{ matrix.langchain_minimal }}
         run: |
-          uv run pip freeze | grep '^langchain'
-          uv run pip freeze | grep -q '^langchain==0.0.275'
+          uv pip list | grep -i langchain
+          uv run python -c "import langchain; assert langchain.__version__ == '0.0.275'"
 
       - name: Install pandas v1
         if: ${{ matrix.pandas_v1 }}
         run: |
-          uv run pip uninstall pandas -y
-          uv run pip install "pandas<2"
+          uv pip uninstall pandas -y
+          uv pip install "pandas>=1.0,<2.0"
 
       - name: Check Pandas installed version
         run: |
-          uv run pip freeze | grep '^pandas'
-          uv run pip freeze | grep -q '^pandas==${{ matrix.pandas_v1 && '1' || '2' }}\.'
+          uv pip list | grep -i pandas
+          uv run python -c "import pandas; version = pandas.__version__; print(f'pandas version: {version}'); assert version.startswith('${{ matrix.pandas_v1 && '1' || '2' }}.'), f'Expected pandas v${{ matrix.pandas_v1 && '1' || '2' }}.x, got {version}'"
 
       - name: Lint code
         run: uv run ruff check giskard tests
