@@ -203,18 +203,39 @@ class MyCustomLLM(litellm.CustomLLM):
         )
 
         return litellm.ModelResponse(**response.json())
+    
+    # Custom embeddings
+    def embedding(
+        self,
+        model: str,
+        input: list,
+        api_key: Optional[str] = None,
+        **kwargs,
+    ) -> litellm.EmbeddingResponse:
+        api_key = api_key or os.environ.get("MY_SECRET_KEY")
+        if api_key is None:
+            raise litellm.AuthenticationError("`api_key` was not provided")
 
-os.eviron["MY_SECRET_KEY"] = "" # "my-secret-key"
+        response = requests.post(
+            "https://www.my-custom-llm.ai/embeddings",
+            json={"model": model, "input": input},
+            headers={"Authorization": api_key},
+        )
+
+        return litellm.EmbeddingResponse(**response.json())
+
+os.environ["MY_SECRET_KEY"] = "" # "my-secret-key"
 
 my_custom_llm = MyCustomLLM()
 
 litellm.custom_provider_map = [  # 👈 KEY STEP - REGISTER HANDLER
-    {"provider": "my-custom-llm-endpoint", "custom_handler": my_custom_llm}
+    {"provider": "my-custom-provider", "custom_handler": my_custom_llm}
 ]
 
 api_key = os.environ["MY_SECRET_KEY"]
 
-giskard.llm.set_llm_model("my-custom-llm-endpoint/my-custom-model", api_key=api_key)
+giskard.llm.set_llm_model("my-custom-provider/my-custom-model", api_key=api_key)
+giskard.llm.set_embedding_model("my-custom-provider/my-custom-model", api_key=api_key)
 ```
 
 If you run into any issues configuring the LLM client, don't hesitate to [ask us on Discord](https://discord.com/invite/ABvfpbu69R) or open a new issue on [our GitHub repo](https://github.com/Giskard-AI/giskard).
