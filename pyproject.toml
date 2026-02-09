@@ -149,7 +149,7 @@ dependencies = [
     "chardet",                  # text metadata
     "jinja2>=3",                # scan template
     "requests-toolbelt>=0.9.1",
-    "setuptools",               # used for pkg_resources
+    "setuptools<70",            # used for pkg_resources, <70 to ensure pkg_resources is available
     "typing_extensions",        # used in registry/decorators, for python <3.10
     "pyyaml",
     "packaging",                # used in settings

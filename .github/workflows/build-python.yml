@@ -194,10 +194,6 @@ jobs:
       - name: Lint code
         run: uv run ruff check giskard tests
 
-      - name: Ensure setuptools with pkg_resources is available for mlflow
-        run: |
-          uv pip install "setuptools<70"
-
       - name: Test code
         run: uv run pytest -c pyproject.toml --cov=giskard --cov-report=xml --cov-append --disable-warnings --no-header -vv --durations=0 -n auto -m 'not slow' --use-subprocess tests
         env:
