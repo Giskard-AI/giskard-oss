@@ -146,11 +146,6 @@ jobs:
           uv sync --all-groups --extra llm --extra talk --extra tensorflow
           uv pip list
 
-      - name: Ensure setuptools is installed
-        run: |
-          uv run python -m pip install setuptools
-          uv run python -c "import pkg_resources, setuptools; print('setuptools version:', setuptools.__version__)"
-
       - name: Check yet again new disk space
         run: |
           df -h
