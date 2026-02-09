@@ -294,11 +294,16 @@ jobs:
         run: uv build
       - name: Create new project, install wheel and import (UV)
         run: |
-          mkdir ./install-run
-          cd ./install-run
-          uv init install-run
-          sed -i 's/^\(requires-python *= *\).*$/\1">=3.10,<3.13"/' pyproject.toml
-          uv add "$(ls ../dist/*.whl)"
+          mkdir -p /tmp/install-run
+          cd /tmp/install-run
+          cat > pyproject.toml << 'EOF'
+          [project]
+          name = "install-run"
+          version = "0.1.0"
+          requires-python = ">=3.10,<3.13"
+          dependencies = []
+          EOF
+          uv add "$(ls ${{ github.workspace }}/dist/*.whl)"
           uv run python -c "import giskard"
   check-doc:
     name: "Build and check doc"
