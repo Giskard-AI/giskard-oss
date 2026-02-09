@@ -296,7 +296,7 @@ jobs:
         run: |
           mkdir ./install-run
           cd ./install-run
-          uv init .
+          uv init install-run
           sed -i 's/^\(requires-python *= *\).*$/\1">=3.10,<3.13"/' pyproject.toml
           uv add "$(ls ../dist/*.whl)"
           uv run python -c "import giskard"
