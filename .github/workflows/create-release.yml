@@ -43,18 +43,18 @@ jobs:
           ref: main
           token: ${{ secrets.RELEASE_PAT_TOKEN }} # Needed to trigger other actions
 
-      - name: Edit pyproject.toml
-        run: sed -i 's/^\(version *= *\).*$/\1"${{ env.VERSION_NUMBER }}"/' pyproject.toml
 
       - name: Remove dark theme logo from README
         run: sed -i 's/.*#gh-dark-mode-only.*//' README.md
 
-      - name: Setup PDM
-        uses: pdm-project/setup-pdm@v4
+      - name: Setup UV
+        uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
         with:
           python-version: "3.10"
-          version: head # Issue with PDM 2.20.1: https://github.com/pdm-project/pdm/issues/3271
-          cache: false
+      - name: Change version
+        run: |
+          set -euo pipefail
+          uv version "${INPUT_VERSION}"
 
       - name: "@slack Release process started"
         id: slack
@@ -87,7 +87,7 @@ jobs:
 
       # build .tar.gz sdist tarball
       - name: Build source distribution tarball
-        run: pdm build
+        run: uv build
 
       - name: Create Github Release
         id: github-release
@@ -101,7 +101,7 @@ jobs:
             dist/giskard-*.whl
 
       - name: Push to Pipy
-        run: pdm publish --no-build --username "${{ secrets.PIPY_USERNAME }}" --password "${{ secrets.PIPY_PASSWORD }}"
+        run: uv publish --username "${{ secrets.PIPY_USERNAME }}" --password "${{ secrets.PIPY_PASSWORD }}"
 
       - name: Set job success env var
         run: |

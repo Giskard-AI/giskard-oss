@@ -6,8 +6,8 @@ build:
     python: "3.10"
   jobs:
     post_create_environment:
-      - pip install pdm
-      - pdm export --without-hashes -G doc,llm -o requirements-sphinx.txt
+      - pip install uv
+      - uv export --no-hashes --group doc --extra llm -o requirements-sphinx.txt
 
 sphinx:
   configuration: docs/conf.py

@@ -4,16 +4,16 @@ After cloning the repository here are the useful commands to set up the local en
 
 ## Install dependencies
 
-We work with [PDM](https://pdm-project.org/en/latest/) as our package manager. You can find the installation instructions [here](https://pdm-project.org/en/latest/#installation).
+We work with [uv](https://docs.astral.sh/uv/) as our Python package and project manager. You can find the installation instructions [here](https://docs.astral.sh/uv/getting-started/installation/).
 
-After installing PDM, we can install the dependencies by running:
+After installing uv, we can install the dependencies by running:
 
 ```shell
-pdm install
+uv sync --all-extras --all-groups
 ```
 
 ## Pre-commit hooks installation
-Pre-commit hooks ensure that the basic code quality checks are performed before the code is committed. Pre-commit has already been installed as a dev dependency using `pdm`.
+Pre-commit hooks ensure that the basic code quality checks are performed before the code is committed. Pre-commit has already been installed as a dev dependency using `uv`.
 
 The current pre-commit hook configuration is defined in `.pre-commit-config.yaml`.
 

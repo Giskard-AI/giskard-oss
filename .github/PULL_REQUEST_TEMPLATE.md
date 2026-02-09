@@ -25,5 +25,5 @@
 - [ ] I've read the [`CONTRIBUTING.md`](https://github.com/Giskard-AI/ai-inspector/blob/master/CONTRIBUTING.md) guide.
 - [ ] I've written tests for all new methods and classes that I created.
 - [ ] I've written the docstring in Google format for all the methods and classes that I used.
-- [ ] I've updated the `pdm.lock` running `pdm update-lock` (only applicable when `pyproject.toml` has been
+- [ ] I've updated the `uv.lock` running `uv lock` (only applicable when `pyproject.toml` has been
   modified)
