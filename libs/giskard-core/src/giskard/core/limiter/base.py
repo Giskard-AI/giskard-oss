@@ -14,12 +14,6 @@ from pydantic import (
 from ..discriminated import Discriminated, discriminated_base
 
 
-def compute_waited_time(waited_time: float, threshold: float = 1e-3) -> float:
-    if waited_time < threshold:
-        return 0
-    return waited_time
-
-
 class ThrottleEvent(BaseModel, frozen=True):
     rate_limiter_id: str
     rule: "RateLimiterRule[Any]"
