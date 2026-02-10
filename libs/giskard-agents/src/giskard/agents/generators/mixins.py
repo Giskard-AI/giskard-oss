@@ -1,10 +1,9 @@
-from collections.abc import AsyncGenerator
-from contextlib import AsyncExitStack, asynccontextmanager
-from typing import Any
+from contextlib import asynccontextmanager
+from typing import Any, Self
 
 import tenacity as t
 from giskard.core import RateLimiter
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from ..chat import Message
 from .base import GenerationParams, Response
@@ -14,37 +13,22 @@ from .retry import RetryPolicy
 class WithRateLimiters(BaseModel):
     """Adds a rate limiter to the generator."""
 
-    rate_limiters: list[RateLimiter] = Field(default_factory=list)
+    rate_limiter: RateLimiter | None = Field(default=None)
 
-    @field_validator("rate_limiters")
-    @classmethod
-    def _ensure_unique_ids(cls, v: list[RateLimiter]) -> list[RateLimiter]:
-        ids = [r.id for r in v]
-        if len(ids) != len(set(ids)):
-            raise ValueError(
-                "Duplicate RateLimiter IDs detected; this would cause a deadlock."
-            )
-        return v
+    def with_rate_limiter(self, rate_limiter: str | RateLimiter | None) -> Self:
+        if isinstance(rate_limiter, str):
+            rate_limiter = RateLimiter.from_id(rate_limiter)
+
+        return self.model_copy(update={"rate_limiter": rate_limiter})
 
     @asynccontextmanager
-    async def _throttle(
-        self,
-    ) -> "AsyncGenerator[list[tuple[RateLimiter, float]], None]":
-        if not self.rate_limiters:
+    async def _throttle(self):
+        if self.rate_limiter is None:
             yield []
             return
 
-        waited_times: list[tuple[RateLimiter, float]] = []
-        async with AsyncExitStack() as stack:
-            for rate_limiter in self.rate_limiters:
-                waited_time = await stack.enter_async_context(rate_limiter.throttle())
-                waited_times.append((rate_limiter, waited_time))
-            yield waited_times
-
-    def with_rate_limiters(self, *rate_limiters: RateLimiter) -> "WithRateLimiters":
-        return self.model_copy(
-            update={"rate_limiters": [*self.rate_limiters, *rate_limiters]}
-        )
+        async with self.rate_limiter.throttle() as waited_time:
+            yield waited_time
 
 
 class WithRetryPolicy(BaseModel):

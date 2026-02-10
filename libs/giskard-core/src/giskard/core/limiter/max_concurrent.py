@@ -2,14 +2,14 @@ import asyncio
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import ClassVar, override
+from typing import override
 
-from pydantic import Field, PrivateAttr
+from pydantic import Field
 
-from ..limiter.base import RateLimiter, RateLimiterStateRegistry, compute_waited_time
+from ..limiter.base import RateLimiterRule, compute_waited_time
 
 
-class MaxConcurrentRequestsState:
+class _MaxConcurrentRequestsState:
     """Mutable state for the concurrency limiter."""
 
     semaphore: asyncio.Semaphore
@@ -18,32 +18,22 @@ class MaxConcurrentRequestsState:
         self.semaphore = asyncio.Semaphore(max_concurrent)
 
 
-@RateLimiter.register("max_concurrent")
-class MaxConcurrentRequests(RateLimiter):
+@RateLimiterRule.register("max_concurrent")
+class MaxConcurrentRequests(RateLimiterRule[_MaxConcurrentRequestsState]):
     """Enforce a maximum number of concurrent in-flight requests."""
 
     max_concurrent: int = Field(..., ge=1)
-    _state_registry: ClassVar[RateLimiterStateRegistry[MaxConcurrentRequestsState]] = (
-        RateLimiterStateRegistry[MaxConcurrentRequestsState]()
-    )
-    _state: MaxConcurrentRequestsState | None = PrivateAttr(default=None)
-
-    async def _get_or_create_state(self) -> MaxConcurrentRequestsState:
-        if self._state is not None:
-            return self._state
-
-        self._state = await self._state_registry.get_or_create_state(
-            (self.id, str(self.max_concurrent)),
-            lambda: MaxConcurrentRequestsState(self.max_concurrent),
-        )
-        return self._state
 
     @override
     @asynccontextmanager
-    async def throttle(self) -> AsyncGenerator[float, None]:
-        state = await self._get_or_create_state()
-
+    async def throttle(
+        self, state: _MaxConcurrentRequestsState
+    ) -> AsyncGenerator[float, None]:
         start_time = time.monotonic()
         async with state.semaphore:
             end_time = time.monotonic()
             yield compute_waited_time(end_time - start_time)
+
+    @override
+    def build_initial_state(self) -> _MaxConcurrentRequestsState:
+        return _MaxConcurrentRequestsState(self.max_concurrent)

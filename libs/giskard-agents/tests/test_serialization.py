@@ -11,10 +11,7 @@ from giskard.agents.templates import MessageTemplate
 from giskard.agents.tools import Tool
 from giskard.agents.workflow import ChatWorkflow, ErrorPolicy
 from giskard.core import (
-    MaxConcurrentRequests,
-    MaxRequestsPerMinute,
-    max_concurrent,
-    rpm,
+    RateLimiter,
 )
 from pydantic import Field
 
@@ -24,7 +21,7 @@ def test_generator_serialization():
     original = Generator(
         model="test-model",
         retry_policy=RetryPolicy(max_retries=3, base_delay=1.0),
-        rate_limiters=[max_concurrent(10), rpm(100)],
+        rate_limiter=RateLimiter.from_rpm(100, max_concurrent=10),
         params=GenerationParams(
             temperature=0.5,
             max_tokens=100,
@@ -43,11 +40,7 @@ def test_generator_serialization():
     assert deserialized.retry_policy.max_retries == 3
     assert deserialized.retry_policy.base_delay == 1.0
 
-    assert len(deserialized.rate_limiters) == 2
-    assert isinstance(deserialized.rate_limiters[0], MaxConcurrentRequests)
-    assert deserialized.rate_limiters[0].max_concurrent == 10
-    assert isinstance(deserialized.rate_limiters[1], MaxRequestsPerMinute)
-    assert deserialized.rate_limiters[1].max_requests_per_minute == 100
+    assert deserialized.rate_limiter == RateLimiter.from_rpm(100, max_concurrent=10)
 
     assert deserialized.params is not None
     assert deserialized.params.temperature == 0.5
@@ -95,7 +88,7 @@ def test_chat_workflow_serialization():
     generator = Generator(
         model="test-model",
         retry_policy=RetryPolicy(max_retries=3, base_delay=1.0),
-        rate_limiters=[max_concurrent(10), rpm(100)],
+        rate_limiter=RateLimiter.from_rpm(100, max_concurrent=10),
     )
 
     tool = Tool(name="test-tool", description="Test tool", fn=lambda: "test")
