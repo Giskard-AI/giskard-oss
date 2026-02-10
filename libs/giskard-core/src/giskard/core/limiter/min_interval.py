@@ -12,8 +12,12 @@ from ..limiter.base import RateLimiterRule, compute_waited_time
 class _MinIntervalState:
     """Mutable state for the interval limiter."""
 
-    lock: asyncio.Lock = asyncio.Lock()
-    next_request_time: float = time.monotonic()
+    lock: asyncio.Lock
+    next_request_time: float
+
+    def __init__(self):
+        self.lock = asyncio.Lock()
+        self.next_request_time = time.monotonic()
 
 
 @RateLimiterRule.register("min_interval")

@@ -40,7 +40,7 @@ def test_generator_serialization():
     assert deserialized.retry_policy.max_retries == 3
     assert deserialized.retry_policy.base_delay == 1.0
 
-    assert deserialized.rate_limiter == RateLimiter.from_rpm(100, max_concurrent=10)
+    assert deserialized.rate_limiter == original.rate_limiter
 
     assert deserialized.params is not None
     assert deserialized.params.temperature == 0.5
