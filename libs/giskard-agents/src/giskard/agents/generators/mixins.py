@@ -39,18 +39,16 @@ class WithRateLimiters(BaseModel):
     async def _throttle(self):
         throttled_events = NO_THROTTLE
 
-        rate_limiters = (
-            [self.rate_limiter]
-            if isinstance(self.rate_limiter, RateLimiter)
-            else self.rate_limiter
-        )
-
-        if not rate_limiters:
+        limiters = self.rate_limiter
+        if not limiters:
             yield throttled_events
             return
 
+        if isinstance(limiters, RateLimiter):
+            limiters = [limiters]
+
         async with AsyncExitStack() as stack:
-            for rate_limiter in rate_limiters:
+            for rate_limiter in limiters:
                 throttled_events += await stack.enter_async_context(
                     rate_limiter.throttle()
                 )
