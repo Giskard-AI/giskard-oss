@@ -3,7 +3,7 @@ import sys
 import time
 
 import pytest
-from giskard.core import RateLimiter
+from giskard.core import RateLimiter, ThrottleEvents
 
 JITTER_TIME = 0.02  # 20ms jitter
 
@@ -75,13 +75,11 @@ class TestMinInterval:
     async def test_throttle_rate(self):
         rate_limiter = RateLimiter.from_rpm(6_000)  # 10ms throttle rate
 
-        waited_times: list[float] = []
+        all_events: list[ThrottleEvents] = []
 
         async def throttle_task(rate_limiter: RateLimiter) -> None:
-            async with rate_limiter.throttle() as waited_time:
-                assert len(waited_time) == 1
-                assert waited_time[0][0].kind == "min_interval"
-                waited_times.append(waited_time[0][1])
+            async with rate_limiter.throttle() as events:
+                all_events.append(events)
 
         start_time = time.monotonic()
         async with asyncio.TaskGroup() as tg:
@@ -93,22 +91,20 @@ class TestMinInterval:
             elapsed_time < 0.49 + JITTER_TIME
         )  # Ensure reasonable time to run the tasks
 
-        assert len(waited_times) == 50
-        assert waited_times[0] == 0  # Ensure the first request is not throttled
-        for waited_time in waited_times[1:]:
-            assert waited_time > 0
-            assert (
-                waited_time <= 0.49 + JITTER_TIME
-            )  # Ensure the wait time is within the expected range
+        assert len(all_events) == 50
+        assert (
+            all_events[0].waited_time == 0
+        )  # Ensure the first request is not throttled
+        for event in all_events[1:]:
+            assert event.waited_time > 0
+            assert event.waited_time <= 0.49 + JITTER_TIME
 
     async def test_throttle_rate_reset_after_interval(self):
         rate_limiter = RateLimiter.from_rpm(60 * 25)  # 25 requests per second
 
         async def throttle_task(rate_limiter: RateLimiter):
-            async with rate_limiter.throttle() as waited_time:
-                assert len(waited_time) == 1
-                assert waited_time[0][0].kind == "min_interval"
-                assert waited_time[0][1] == 0  # Ensure the task is not throttled
+            async with rate_limiter.throttle() as events:
+                assert events.waited_time == 0  # Ensure the task is not throttled
 
         for _ in range(10):
             await throttle_task(rate_limiter)
@@ -118,25 +114,23 @@ class TestMinInterval:
 
     async def test_serialization_keeps_rate_limiter_instance(self):
         rate_limiter = RateLimiter.from_rpm(6_000)
-        waited_times: list[float] = []
+        all_events: list[ThrottleEvents] = []
 
         async def throttle_task(rate_limiter: RateLimiter) -> None:
             deserialized_rate_limiter = RateLimiter.model_validate_json(
                 rate_limiter.model_dump_json()
             )
-            async with deserialized_rate_limiter.throttle() as waited_time:
-                assert len(waited_time) == 1
-                assert waited_time[0][0].kind == "min_interval"
-                waited_times.append(waited_time[0][1])
+            async with deserialized_rate_limiter.throttle() as events:
+                all_events.append(events)
 
         async with asyncio.TaskGroup() as tg:
             for _ in range(10):
                 _ = tg.create_task(throttle_task(rate_limiter))
 
-        assert len(waited_times) == 10
-        assert waited_times[0] == 0  # Ensure the task is not throttled
-        for waited_time in waited_times[1:]:
-            assert waited_time > 0, waited_times  # Ensure the task is throttled
+        assert len(all_events) == 10
+        assert all_events[0].waited_time == 0  # Ensure the task is not throttled
+        for event in all_events[1:]:
+            assert event.waited_time > 0  # Ensure the task is throttled
 
 
 class TestMaxConcurrentRequests:
@@ -152,10 +146,8 @@ class TestMaxConcurrentRequests:
         barrier = asyncio.Barrier(10)
 
         async def throttle_task(rate_limiter: RateLimiter) -> None:
-            async with rate_limiter.throttle() as waited_time:
-                assert len(waited_time) == 1
-                assert waited_time[0][0].kind == "max_concurrent"
-                assert waited_time[0][1] == 0
+            async with rate_limiter.throttle() as events:
+                assert events.waited_time == 0
                 _ = await barrier.wait()
 
         rate_limiter = RateLimiter.max_concurrent(max_concurrent=10)
@@ -168,13 +160,11 @@ class TestMaxConcurrentRequests:
     async def test_block_when_max_concurrent_reached(self):
         rate_limiter = RateLimiter.max_concurrent(max_concurrent=5)
         barrier = asyncio.Barrier(10)
-        waited_times: list[float] = []
+        all_events: list[ThrottleEvents] = []
 
         async def throttle_task(rate_limiter: RateLimiter) -> None:
-            async with rate_limiter.throttle() as waited_time:
-                assert len(waited_time) == 1
-                assert waited_time[0][0].kind == "max_concurrent"
-                waited_times.append(waited_time[0][1])
+            async with rate_limiter.throttle() as events:
+                all_events.append(events)
                 _ = await barrier.wait()
 
         async with asyncio.TaskGroup() as tg:
@@ -183,20 +173,21 @@ class TestMaxConcurrentRequests:
 
             await asyncio.sleep(JITTER_TIME)
             assert barrier.n_waiting == 5  # Ensure only 5 tasks are running
-            assert len(waited_times) == 5
-            for waited_time in waited_times:
-                assert waited_time == 0  # Ensure the tasks are not throttled
-            waited_times.clear()
+            assert len(all_events) == 5
+            for event in all_events:
+                assert event.waited_time == 0  # Ensure the tasks are not throttled
+            all_events.clear()
 
             for _ in range(5):
                 _ = tg.create_task(barrier.wait())  # Unblock the tasks
 
             await asyncio.sleep(JITTER_TIME)
             assert barrier.n_waiting == 5  # Ensure the other 5 tasks are running
-            assert len(waited_times) == 5
-            for waited_time in waited_times:
+            assert len(all_events) == 5
+            for event in all_events:
                 assert (
-                    waited_time > JITTER_TIME and waited_time <= 2 * JITTER_TIME
+                    event.waited_time > JITTER_TIME
+                    and event.waited_time <= 2 * JITTER_TIME
                 )  # Ensure the tasks are throttled
 
             for _ in range(5):
@@ -204,17 +195,15 @@ class TestMaxConcurrentRequests:
 
     async def test_serialization_keeps_rate_limiter_instance(self):
         rate_limiter = RateLimiter.max_concurrent(max_concurrent=1)
-        waited_times: list[float] = []
+        all_events: list[ThrottleEvents] = []
         barrier = asyncio.Barrier(2)
 
         async def throttle_task(rate_limiter: RateLimiter) -> None:
             deserialized_rate_limiter = RateLimiter.model_validate_json(
                 rate_limiter.model_dump_json()
             )
-            async with deserialized_rate_limiter.throttle() as waited_time:
-                assert len(waited_time) == 1
-                assert waited_time[0][0].kind == "max_concurrent"
-                waited_times.append(waited_time[0][1])
+            async with deserialized_rate_limiter.throttle() as events:
+                all_events.append(events)
                 _ = await barrier.wait()
 
         async with asyncio.TaskGroup() as tg:
@@ -223,16 +212,19 @@ class TestMaxConcurrentRequests:
 
             await asyncio.sleep(JITTER_TIME)
             assert barrier.n_waiting == 1
-            assert len(waited_times) == 1
-            assert waited_times[0] == 0
-            waited_times.clear()
+            assert len(all_events) == 1
+            assert all_events[0].waited_time == 0
+            all_events.clear()
 
             _ = await barrier.wait()
 
             await asyncio.sleep(JITTER_TIME)
             assert barrier.n_waiting == 1
-            assert len(waited_times) == 1
-            assert waited_times[0] > JITTER_TIME and waited_times[0] <= 2 * JITTER_TIME
-            waited_times.clear()
+            assert len(all_events) == 1
+            assert (
+                all_events[0].waited_time > JITTER_TIME
+                and all_events[0].waited_time <= 2 * JITTER_TIME
+            )
+            all_events.clear()
 
             _ = await barrier.wait()

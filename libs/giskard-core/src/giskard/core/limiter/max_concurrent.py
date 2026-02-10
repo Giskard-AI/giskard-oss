@@ -1,12 +1,11 @@
 import asyncio
-import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import override
 
 from pydantic import Field
 
-from ..limiter.base import RateLimiterRule, compute_waited_time
+from ..limiter.base import RateLimiterRule
 
 
 class _MaxConcurrentRequestsState:
@@ -28,11 +27,9 @@ class MaxConcurrentRequests(RateLimiterRule[_MaxConcurrentRequestsState]):
     @asynccontextmanager
     async def throttle(
         self, state: _MaxConcurrentRequestsState
-    ) -> AsyncGenerator[float, None]:
-        start_time = time.monotonic()
+    ) -> AsyncGenerator[None]:
         async with state.semaphore:
-            end_time = time.monotonic()
-            yield compute_waited_time(end_time - start_time)
+            yield
 
     @override
     def build_initial_state(self) -> _MaxConcurrentRequestsState:

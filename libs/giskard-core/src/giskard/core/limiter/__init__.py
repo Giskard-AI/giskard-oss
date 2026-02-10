@@ -1,5 +1,6 @@
-from .base import RateLimiter
+from .base import RateLimiter, ThrottleEvents
 
 __all__ = [
     "RateLimiter",
+    "ThrottleEvents",
 ]

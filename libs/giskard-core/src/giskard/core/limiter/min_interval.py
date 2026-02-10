@@ -6,7 +6,7 @@ from typing import override
 
 from pydantic import Field
 
-from ..limiter.base import RateLimiterRule, compute_waited_time
+from ..limiter.base import RateLimiterRule
 
 
 class _MinIntervalState:
@@ -28,7 +28,7 @@ class MinInterval(RateLimiterRule[_MinIntervalState]):
 
     @override
     @asynccontextmanager
-    async def throttle(self, state: _MinIntervalState) -> AsyncGenerator[float, None]:
+    async def throttle(self, state: _MinIntervalState) -> AsyncGenerator[None]:
         async with state.lock:
             current_time = time.monotonic()
 
@@ -40,7 +40,7 @@ class MinInterval(RateLimiterRule[_MinIntervalState]):
         if wait_time > 0:
             await asyncio.sleep(wait_time)
 
-        yield compute_waited_time(wait_time)
+        yield
 
     @override
     def build_initial_state(self) -> _MinIntervalState:

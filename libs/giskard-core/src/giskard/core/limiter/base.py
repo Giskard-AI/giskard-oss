@@ -1,4 +1,5 @@
 import threading
+import time
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -17,6 +18,42 @@ def compute_waited_time(waited_time: float, threshold: float = 1e-3) -> float:
     if waited_time < threshold:
         return 0
     return waited_time
+
+
+class ThrottleEvent(BaseModel, frozen=True):
+    rate_limiter_id: str
+    rule: "RateLimiterRule[Any]"
+    waited_time: float
+
+
+class ThrottleEvents(BaseModel, frozen=True):
+    events: list[ThrottleEvent]
+
+    @property
+    def waited_time(self) -> float:
+        return sum(event.waited_time for event in self.events)
+
+    def monitor(
+        self, rate_limiter_id: str, rule: "RateLimiterRule[Any]", waited_time: float
+    ):
+        if waited_time < 1e-3:
+            return self
+
+        return self.model_copy(
+            update={
+                "events": self.events
+                + [
+                    ThrottleEvent(
+                        rate_limiter_id=rate_limiter_id,
+                        rule=rule,
+                        waited_time=waited_time,
+                    )
+                ]
+            }
+        )
+
+    def __add__(self, other: "ThrottleEvents") -> "ThrottleEvents":
+        return self.model_copy(update={"events": self.events + other.events})
 
 
 class _RateLimiterRegistry:
@@ -70,7 +107,7 @@ class RateLimiterRule[T](Discriminated):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     @asynccontextmanager
-    def throttle(self, state: T) -> AsyncGenerator[float, None]:
+    def throttle(self, state: T) -> AsyncGenerator[None]:
         raise NotImplementedError
 
     def build_initial_state(self) -> T:
@@ -144,17 +181,23 @@ class RateLimiter(BaseModel, frozen=True):
     @asynccontextmanager
     async def throttle(
         self,
-    ) -> AsyncGenerator[list[tuple[RateLimiterRule[Any], float]], None]:
+    ) -> AsyncGenerator[ThrottleEvents, None]:
+        throttled_times = NO_THROTTLE
         if not self.rules:
-            yield []
+            yield throttled_times
             return
 
-        waited_times: list[tuple[RateLimiterRule[Any], float]] = []
         async with AsyncExitStack() as stack:
             for rule in self.rules:
-                # state = rule.build_initial_state()
                 state = self._registry.get_rate_limiter_rules_state(self, rule)
-                waited_time = await stack.enter_async_context(rule.throttle(state))
-                waited_times.append((rule, waited_time))
+                start_time = time.monotonic()
+                await stack.enter_async_context(rule.throttle(state))
+                end_time = time.monotonic()
+                throttled_times = throttled_times.monitor(
+                    self.id, rule, end_time - start_time
+                )
 
-            yield waited_times
+            yield throttled_times
+
+
+NO_THROTTLE = ThrottleEvents(events=[])
