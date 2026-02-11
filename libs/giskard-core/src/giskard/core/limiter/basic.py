@@ -3,7 +3,7 @@ import time
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, nullcontext
-from typing import Any, ClassVar, override
+from typing import Any, override
 
 from pydantic import Field
 
@@ -27,8 +27,6 @@ class _BasicRateLimiterState:
 class BasicRateLimiter(BaseRateLimiter):
     min_interval: float = Field(..., ge=0)
     max_concurrent: int | None = Field(default=None, ge=1)
-
-    _states: ClassVar[dict[str, _BasicRateLimiterState]] = {}
 
     @override
     def model_post_init(self, context: Any, /) -> None:
