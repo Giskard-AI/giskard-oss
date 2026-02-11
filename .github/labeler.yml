@@ -12,8 +12,3 @@
   - changed-files:
       - any-glob-to-any-file:
           - "libs/giskard-checks/**"
-
-"Scope: CI":
-  - changed-files:
-      - any-glob-to-any-file:
-          - ".github/**"
