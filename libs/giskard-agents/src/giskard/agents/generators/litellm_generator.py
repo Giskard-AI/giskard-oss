@@ -7,11 +7,11 @@ from pydantic import Field
 
 from ..chat import Message
 from .base import BaseGenerator, GenerationParams, Response
-from .mixins import WithRateLimiters, WithRetryPolicy
+from .mixins import WithRateLimiter, WithRetryPolicy
 
 
 @BaseGenerator.register("litellm")
-class LiteLLMGenerator(WithRateLimiters, WithRetryPolicy, BaseGenerator):
+class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
     """A generator for creating chat completion pipelines."""
 
     model: str = Field(

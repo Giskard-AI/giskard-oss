@@ -10,8 +10,8 @@ import importlib.util
 from .discriminated import Discriminated, discriminated_base
 from .errors import Error
 from .limiter import (
+    BaseRateLimiter,
     RateLimiter,
-    ThrottleEvents,
 )
 from .utils import NOT_PROVIDED, NotProvided, provide_not_none
 
@@ -42,5 +42,5 @@ __all__ = [
     "provide_not_none",
     # Limiter
     "RateLimiter",
-    "ThrottleEvents",
+    "BaseRateLimiter",
 ]

@@ -1,12 +1,11 @@
 import threading
-import time
 import uuid
 from collections.abc import AsyncGenerator
-from contextlib import AsyncExitStack, asynccontextmanager
-from typing import Any, ClassVar
+from contextlib import asynccontextmanager
+from typing import Any, ClassVar, override
+from weakref import WeakSet
 
 from pydantic import (
-    BaseModel,
     ConfigDict,
     Field,
 )
@@ -14,184 +13,73 @@ from pydantic import (
 from ..discriminated import Discriminated, discriminated_base
 
 
-class ThrottleEvent(BaseModel, frozen=True):
-    rate_limiter_id: str
-    rule: "RateLimiterRule[Any]"
-    waited_time: float
+class RateLimiterRegistry:
+    """Share limiter state across instances despite serialization round-trips."""
 
-
-class ThrottleEvents(BaseModel, frozen=True):
-    events: list[ThrottleEvent]
-
-    @property
-    def waited_time(self) -> float:
-        return sum(event.waited_time for event in self.events)
-
-    def monitor(
-        self, rate_limiter_id: str, rule: "RateLimiterRule[Any]", waited_time: float
-    ):
-        if waited_time < 1e-3:
-            return self
-
-        return self.model_copy(
-            update={
-                "events": self.events
-                + [
-                    ThrottleEvent(
-                        rate_limiter_id=rate_limiter_id,
-                        rule=rule,
-                        waited_time=waited_time,
-                    )
-                ]
-            }
-        )
-
-    def __add__(self, other: "ThrottleEvents") -> "ThrottleEvents":
-        return self.model_copy(update={"events": self.events + other.events})
-
-
-class _RateLimiterRegistry:
     _lock: threading.Lock = threading.Lock()
-    _registered_ids: dict[str, tuple["RateLimiterRule[Any]", ...]] = {}
-    _rate_limiter_rules_states: dict[tuple[str, "RateLimiterRule[Any]"], Any] = {}
+    _instances: dict[str, WeakSet["BaseRateLimiter"]]
+    _states: dict[str, Any]
 
-    def register_rate_limiter(self, rate_limiter: "RateLimiter"):
-        registered_rules = self._registered_ids.get(rate_limiter.id, None)
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._instances = {}
+        self._states = {}
 
-        if registered_rules is not None:
-            if registered_rules != rate_limiter.rules:
-                raise ValueError(
-                    f"Rate limiter with id '{rate_limiter.id}' already registered with different rules"
-                )
-            return
-
+    def register_instance(self, rate_limiter: "BaseRateLimiter"):
         with self._lock:
-            registered_rules = self._registered_ids.get(rate_limiter.id, None)
-            if registered_rules is not None:
-                if registered_rules != rate_limiter.rules:
+            instances = self._instances.get(rate_limiter.id)
+            if instances is None:
+                instances = WeakSet()
+                self._instances[rate_limiter.id] = instances
+
+            if instances:
+                existing_instance = next(iter(instances))
+                if existing_instance != rate_limiter:
                     raise ValueError(
-                        f"Rate limiter with id '{rate_limiter.id}' already registered with different rules"
+                        f"Rate limiter with id '{rate_limiter.id}' already registered"
                     )
-                return
+            else:
+                # Initialize the state for the first instance
+                self._states[rate_limiter.id] = rate_limiter.create_initial_state()
 
-            self._registered_ids[rate_limiter.id] = rate_limiter.rules
-            for rule in rate_limiter.rules:
-                self._rate_limiter_rules_states[(rate_limiter.id, rule)] = (
-                    rule.build_initial_state()
-                )
+            instances.add(rate_limiter)
 
-    def get_rate_limiter(self, id: str) -> "RateLimiter":
-        rules = self._registered_ids.get(id, None)
+    def get_state(self, rate_limiter: "BaseRateLimiter") -> Any:
+        return self._states.get(rate_limiter.id, None)
 
-        if rules is None:
+    def get_instance(self, id: str) -> "BaseRateLimiter":
+        instances = self._instances.get(id)
+        if instances is None:
             raise ValueError(f"Rate limiter with id '{id}' not found")
 
-        return RateLimiter(id=id, rules=rules)
-
-    def get_rate_limiter_rules_state(
-        self, rate_limiter: "RateLimiter", rule: "RateLimiterRule[Any]"
-    ) -> Any:
-        return self._rate_limiter_rules_states[(rate_limiter.id, rule)]
+        return next(iter(instances))
 
 
 @discriminated_base
-class RateLimiterRule[T](Discriminated):
-    """A rule for a rate limiter."""
+class BaseRateLimiter(Discriminated):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    _registry: ClassVar[RateLimiterRegistry] = RateLimiterRegistry()
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    @asynccontextmanager
-    def throttle(self, state: T) -> AsyncGenerator[None]:
-        raise NotImplementedError
-
-    def build_initial_state(self) -> T:
-        raise NotImplementedError
-
-
-class RateLimiter(BaseModel, frozen=True):
-    """Abstract base for rate limiters using async context managers."""
-
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    rules: tuple[RateLimiterRule[Any], ...] = Field(default_factory=tuple)
-
-    _registry: ClassVar[_RateLimiterRegistry] = _RateLimiterRegistry()
-
-    @classmethod
-    def from_id(cls, id: str) -> "RateLimiter":
-        return cls._registry.get_rate_limiter(id)
-
-    @classmethod
-    def from_rules(
-        cls, *rules: RateLimiterRule[Any], id: str | None = None
-    ) -> "RateLimiter":
-        if id is None:
-            id = str(uuid.uuid4())
-
-        return RateLimiter(id=id, rules=rules)
-
-    @classmethod
-    def max_concurrent(
-        cls, max_concurrent: int, id: str | None = None
-    ) -> "RateLimiter":
-        from .max_concurrent import MaxConcurrentRequests
-
-        return cls.from_rules(
-            MaxConcurrentRequests(max_concurrent=max_concurrent), id=id
-        )
-
-    @classmethod
-    def min_interval(
-        cls,
-        min_interval: float,
-        max_concurrent: int | None = None,
-        id: str | None = None,
-    ) -> "RateLimiter":
-        from .min_interval import MinInterval
-
-        rules: list[RateLimiterRule[Any]] = []
-        if max_concurrent is not None:
-            from .max_concurrent import MaxConcurrentRequests
-
-            rules.append(MaxConcurrentRequests(max_concurrent=max_concurrent))
-
-        rules.append(MinInterval(min_interval=min_interval))
-
-        return cls.from_rules(*rules, id=id)
-
-    @classmethod
-    def from_rpm(
-        cls, rpm: int, max_concurrent: int | None = None, id: str | None = None
-    ) -> "RateLimiter":
-        if rpm <= 0:
-            raise ValueError("RPM must be greater than 0")
-
-        return cls.min_interval(
-            min_interval=60.0 / rpm, max_concurrent=max_concurrent, id=id
-        )
-
+    @override
     def model_post_init(self, context: Any, /) -> None:
-        self._registry.register_rate_limiter(self)
+        self._registry.register_instance(
+            self,
+        )
+        super().model_post_init(context)
 
     @asynccontextmanager
-    async def throttle(
-        self,
-    ) -> AsyncGenerator[ThrottleEvents, None]:
-        throttled_times = NO_THROTTLE
-        if not self.rules:
-            yield throttled_times
-            return
+    def throttle(self) -> AsyncGenerator[float]:
+        raise NotImplementedError
 
-        async with AsyncExitStack() as stack:
-            for rule in self.rules:
-                state = self._registry.get_rate_limiter_rules_state(self, rule)
-                start_time = time.monotonic()
-                await stack.enter_async_context(rule.throttle(state))
-                end_time = time.monotonic()
-                throttled_times = throttled_times.monitor(
-                    self.id, rule, end_time - start_time
-                )
+    def create_initial_state(self) -> Any:
+        return None
 
-            yield throttled_times
+    @property
+    def state(self) -> Any:
+        return self._registry.get_state(self)
 
-
-NO_THROTTLE = ThrottleEvents(events=[])
+    @classmethod
+    def from_id(cls, id: str) -> "BaseRateLimiter":
+        return cls._registry.get_instance(id)

@@ -1,9 +1,8 @@
-from contextlib import AsyncExitStack, asynccontextmanager
-from typing import Any, Self, overload
+from contextlib import asynccontextmanager
+from typing import Any, Self
 
 import tenacity as t
-from giskard.core import RateLimiter
-from giskard.core.limiter.base import NO_THROTTLE
+from giskard.core import BaseRateLimiter
 from pydantic import BaseModel, Field
 
 from ..chat import Message
@@ -11,49 +10,25 @@ from .base import GenerationParams, Response
 from .retry import RetryPolicy
 
 
-class WithRateLimiters(BaseModel):
+class WithRateLimiter(BaseModel):
     """Adds a rate limiter to the generator."""
 
-    rate_limiter: list[RateLimiter] | RateLimiter | None = Field(default=None)
+    rate_limiter: BaseRateLimiter | None = Field(default=None)
 
-    @overload
-    def with_rate_limiter(self, rate_limiter: None, /) -> Self: ...
+    def with_rate_limiter(self, rate_limiter: BaseRateLimiter | str | None) -> Self:
+        if isinstance(rate_limiter, str):
+            rate_limiter = BaseRateLimiter.from_id(rate_limiter)
 
-    @overload
-    def with_rate_limiter(self, *rate_limiters: str | RateLimiter) -> Self: ...
-
-    def with_rate_limiter(self, *rate_limiters: str | RateLimiter | None) -> Self:
-        limiters = [
-            RateLimiter.from_id(rate_limiter)
-            if isinstance(rate_limiter, str)
-            else rate_limiter
-            for rate_limiter in rate_limiters
-            if rate_limiter is not None
-        ]
-
-        return self.model_copy(
-            update={"rate_limiter": None if len(limiters) == 0 else limiters}
-        )
+        return self.model_copy(update={"rate_limiter": rate_limiter})
 
     @asynccontextmanager
     async def _throttle(self):
-        throttled_events = NO_THROTTLE
-
-        limiters = self.rate_limiter
-        if not limiters:
-            yield throttled_events
+        if self.rate_limiter is None:
+            yield 0.0
             return
 
-        if isinstance(limiters, RateLimiter):
-            limiters = [limiters]
-
-        async with AsyncExitStack() as stack:
-            for rate_limiter in limiters:
-                throttled_events += await stack.enter_async_context(
-                    rate_limiter.throttle()
-                )
-
-            yield throttled_events
+        async with self.rate_limiter.throttle() as waited:
+            yield waited
 
 
 class WithRetryPolicy(BaseModel):
