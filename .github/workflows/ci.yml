@@ -1,4 +1,4 @@
-name: CI
+name: Main CI
 
 on:
   push:
@@ -41,27 +41,3 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: make install
       - run: make test-unit PACKAGE=${{ matrix.package }}
-
-  test-functional:
-    needs: lint
-    runs-on: ubuntu-latest
-    environment: CI
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12", "3.13"]
-        package: [giskard-core, giskard-agents, giskard-checks]
-    name: test-functional / ${{ matrix.package }} / ${{ matrix.python-version }}
-    env:
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      TEST_MODEL: "gemini/gemini-2.0-flash"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          python-version: ${{ matrix.python-version }}
-      - run: make install
-      - run: make test-functional PACKAGE=${{ matrix.package }}
