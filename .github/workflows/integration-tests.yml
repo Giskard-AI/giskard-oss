@@ -48,13 +48,13 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       TEST_MODEL: "gemini/gemini-2.0-flash"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           # Use the SHA from the event to ensure we're using the correct commit
           # for the `labeled` event. For external contributors, we want to use
           # the SHA corresponding to the time the label was added.
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
