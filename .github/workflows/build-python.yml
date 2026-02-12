@@ -1,0 +1,381 @@
+# https://docs.github.com/en/actions/using-workflows/reusing-workflows#calling-a-reusable-workflow
+# https://docs.github.com/fr/actions/using-workflows/workflow-syntax-for-github-actions#exemple--inclusion-de-chemins-dacc%C3%A8s
+
+name: Full CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run-integration-tests:
+        description: "If integration test should be run"
+        required: true
+        type: boolean
+        default: false
+      use-cache:
+        description: "If cache should be used"
+        required: true
+        type: boolean
+        default: true
+      is-dispatch:
+        description: "Just to identify manual dispatch"
+        required: true
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      run-integration-tests:
+        description: "If integration test should be run"
+        required: true
+        type: boolean
+        default: false
+      use-cache:
+        description: "If cache should be used"
+        required: true
+        type: boolean
+        default: false
+# Concurrency : auto-cancel "old" jobs ie when pushing again
+# https://docs.github.com/fr/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.run-integration-tests }}-${{ inputs.is-dispatch }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+env:
+  GSK_DISABLE_ANALYTICS: true
+  GSK_DISABLE_SENTRY: true
+defaults:
+  run:
+    shell: bash
+jobs:
+  build-python:
+    name: "Python ${{ matrix.python-version }}${{ matrix.pandas_v1 && ' (Pandas V1)' || ''}}${{ matrix.pydantic_v1 && ' (Pydantic V1)' || ''}} ${{ matrix.langchain_minimal && ' (Minimal langchain)' || ''}} on ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # Do not stop when any job fails
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        os: [ubuntu-latest]
+        pydantic_v1: [false]
+        pandas_v1: [false]
+        langchain_minimal: [false]
+        # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
+        include:
+          # - python-version: "3.10" # Deactivating windows-2019, since it's trying to use python 3.7 to install PDM. Maybe try to reactivate later ?
+          #   os: windows-2019
+          #   pydantic_v1: false
+          #   pandas_v1: false
+          #   langchain_minimal: false
+          - python-version: "3.10"
+            os: windows-2022
+            pydantic_v1: false
+            pandas_v1: false
+            langchain_minimal: false
+          - python-version: "3.10"
+            os: macos-latest
+            pydantic_v1: false
+            pandas_v1: false
+            langchain_minimal: false
+          - python-version: "3.10"
+            os: ubuntu-latest
+            pydantic_v1: true
+            pandas_v1: false
+            langchain_minimal: false
+          - python-version: "3.10"
+            os: ubuntu-latest
+            pydantic_v1: false
+            pandas_v1: true
+            langchain_minimal: false
+          - python-version: "3.10"
+            os: ubuntu-latest
+            pydantic_v1: false
+            pandas_v1: false
+            langchain_minimal: true
+    continue-on-error: false # https://ncorti.com/blog/howto-github-actions-build-matrix
+    steps:
+      - name: Check disk space
+        run: |
+          df -h
+      - name: Free disk space
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo rm -rf /usr/local/lib/android
+          sudo apt update && sudo apt remove -y \
+          google-cloud-cli microsoft-edge-stable dotnet-sdk-* llvm-* google-chrome-stable temurin-*
+          sudo apt autoremove -y
+          sudo apt autoclean -y
+
+      - name: Check new disk space
+        run: |
+          df -h
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          version: head # Issue with PDM 2.20.1: https://github.com/pdm-project/pdm/issues/3271
+          cache: false
+
+      - name: Cache Giskard test resources
+        uses: actions/cache@v4
+        if: ${{ github.event_name == 'pull_request' || inputs.use-cache }}
+        with:
+          path: ~/.giskard
+          key: ${{ matrix.os }}-${{ matrix.python-version }}-python-test-resources-${{ hashFiles('tests/fixtures/**/*py')}}
+          restore-keys: ${{ matrix.os }}-${{ matrix.python-version }}-python-giskard-test-resources
+
+      - name: Check again new disk space
+        run: |
+          df -h
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
+
+      - name: Install dependencies (Windows)
+        if: ${{ matrix.os == 'windows-2022' }}
+        run: |
+          pdm config use_uv true
+          pdm install -G :all --without tensorflow
+          pdm list
+
+      - name: Install dependencies
+        if: ${{ matrix.os != 'windows-2022' }}
+        run: |
+          pdm config use_uv true
+          pdm install -G :all
+          pdm list
+
+      - name: Check yet again new disk space
+        run: |
+          df -h
+
+      - name: Re-install lightgbm from sources for MacOS
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          pdm run pip uninstall lightgbm -y
+          pdm run pip install --no-binary lightgbm lightgbm --config-settings=cmake.define.USE_OPENMP=OFF
+          brew install libomp
+
+      - name: Install pydantic v1
+        if: ${{ matrix.pydantic_v1 }}
+        run: |
+          pdm run pip uninstall pydantic pydantic_core -y
+          pdm run pip install "pydantic>=1,<2"
+
+      - name: Check Pydantic installed version
+        run: |
+          pdm run pip freeze | grep '^pydantic'
+          pdm run pip freeze | grep -q '^pydantic==${{ matrix.pydantic_v1 && '1' || '2' }}\.'
+
+      - name: Install langchain minimal version
+        if: ${{ matrix.langchain_minimal }}
+        run: |
+          pdm run pip uninstall langchain -y
+          pdm run pip install "langchain==0.0.275"
+
+      - name: Check langchain installed version
+        if: ${{ matrix.langchain_minimal }}
+        run: |
+          pdm run pip freeze | grep '^langchain'
+          pdm run pip freeze | grep -q '^langchain==0.0.275'
+
+      - name: Install pandas v1
+        if: ${{ matrix.pandas_v1 }}
+        run: |
+          pdm run pip uninstall pandas -y
+          pdm run pip install "pandas<2"
+
+      - name: Check Pandas installed version
+        run: |
+          pdm run pip freeze | grep '^pandas'
+          pdm run pip freeze | grep -q '^pandas==${{ matrix.pandas_v1 && '1' || '2' }}\.'
+
+      - name: Lint code
+        run: pdm run lint
+
+      - name: Test code
+        run: pdm test-fast
+        env:
+          PYTEST_XDIST_AUTO_NUM_WORKERS: 2
+
+      - name: SonarQube Scan
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10' && !matrix.langchain_minimal && !matrix.pandas_v1 && !matrix.pydantic_v1 && (github.event.ref == 'refs/heads/main' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Build
+        run: pdm build
+
+      - name: "Python client: archive built artifacts"
+        # Upload needs to be done only once by workflo run, so we need to select one only in the matrix
+        if: ${{ github.event_name == 'push' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10' && !matrix.langchain_minimal && !matrix.pandas_v1 && !matrix.pydantic_v1 }}
+        uses: actions/upload-artifact@v4
+        with:
+          path: dist/*whl
+
+      - name: Run integration tests for python
+        if: ${{ inputs.run-integration-tests }}
+        env:
+          PYTEST_XDIST_AUTO_NUM_WORKERS: 2
+        run: pdm test-slow tests/
+
+      - name: "Memory csv"
+        if: ${{ always() && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10' && !matrix.langchain_minimal && !matrix.pandas_v1 && !matrix.pydantic_v1 }}
+        uses: actions/upload-artifact@v4
+        with:
+          path: memory*.csv
+          name: memory-usage
+          retention-days: 7
+
+  retry-on-failure:
+    if: failure() && fromJSON(github.run_attempt) < 2
+    needs: [build-python]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run retry-workflow.yml --ref ${{ github.ref }} -F run_id=${{ github.run_id }}
+
+  install-poetry:
+    name: "Check if wheel can be installed with using Poetry"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: "3.10"
+          version: head # Issue with PDM 2.20.1: https://github.com/pdm-project/pdm/issues/3271
+          cache: false
+      - name: Build wheel
+        run: pdm build
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+      - name: Create new project, install wheel and import (Poetry)
+        run: |
+          poetry new ./install-run
+          cd ./install-run
+          sed -i -E 's|(python\s*=\s*)".*"|\1">=3.10,<3.13"|' pyproject.toml
+          rm -f poetry.lock
+          poetry add "$(ls ../dist/*.whl)"
+          poetry run python -c "import giskard"
+  install-pip:
+    name: "Check if wheel can be installed with pip"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: "3.10"
+          version: head # Issue with PDM 2.20.1: https://github.com/pdm-project/pdm/issues/3271
+          cache: false
+      - name: Build wheel
+        run: pdm build
+      - name: Create new project, install wheel and import (Pip)
+        run: |
+          python -m venv .venv-test-pip
+          source .venv-test-pip/bin/activate
+          python -m pip install "$(ls ./dist/*.whl)"
+          python -c "import giskard"
+  install-pdm:
+    name: "Check if wheel can be installed with PDM"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: "3.10"
+          version: head # Issue with PDM 2.20.1: https://github.com/pdm-project/pdm/issues/3271
+          cache: false
+      - name: Build wheel
+        run: pdm build
+      - name: Create new project, install wheel and import (PDM)
+        run: |
+          mkdir ./install-run
+          cd ./install-run
+          pdm init --python 3.10 -n
+          sed -i 's/^\(requires-python *= *\).*$/\1">=3.10,<3.12"/' pyproject.toml
+          pdm add "$(ls ../dist/*.whl)"
+          pdm run python -c "import giskard"
+  check-doc:
+    name: "Build and check doc"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check disk space
+        run: |
+          df -h
+
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo rm -rf /usr/local/lib/android
+
+          # Only remove Docker images if any exist
+          IMAGES=$(docker image ls -aq)
+          if [ -n "$IMAGES" ]; then
+            docker rmi $IMAGES
+          fi
+
+          sudo apt update && sudo apt remove -y \
+            google-cloud-cli \
+            microsoft-edge-stable \
+            dotnet-sdk-* \
+            llvm-* \
+            google-chrome-stable \
+            temurin-*
+          sudo apt autoremove -y
+          sudo apt autoclean -y
+
+      - name: Check new disk space
+        run: |
+          df -h
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: "3.10"
+          version: head # Issue with PDM 2.20.1: https://github.com/pdm-project/pdm/issues/3271
+          cache: false
+
+      - name: Set up Pandoc (needed for doc)
+        uses: r-lib/actions/setup-pandoc@v2
+        with:
+          pandoc-version: "3.1.7" # https://github.com/jgm/pandoc/releases
+      - name: Install uv
+        uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
+
+      - name: Install dependencies
+        run: |
+          pdm config use_uv true
+          pdm install -G :all
+
+      - name: Check new disk space
+        run: |
+          df -h
+
+      - name: Build doc
+        run: pdm  doc
+
+      - name: Check doc
+        run: pdm check-doc

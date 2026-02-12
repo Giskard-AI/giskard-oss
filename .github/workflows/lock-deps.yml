@@ -1,0 +1,86 @@
+# https://docs.github.com/en/actions/using-workflows/reusing-workflows#calling-a-reusable-workflow
+# https://docs.github.com/fr/actions/using-workflows/workflow-syntax-for-github-actions#exemple--inclusion-de-chemins-dacc%C3%A8s
+
+name: Lock dependencies
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+  workflow_dispatch:
+# Concurrency : auto-cancel "old" jobs ie when pushing again
+# https://docs.github.com/fr/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+defaults:
+  run:
+    shell: bash
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  lock-deps:
+    if: ${{ !github.event.pull_request || contains( github.event.pull_request.labels.*.name, 'Lockfile') }}
+    name: "Lock dependencies using PDM"
+    runs-on: ubuntu-latest
+    continue-on-error: false # https://ncorti.com/blog/howto-github-actions-build-matrix
+    steps:
+      - name: Check if organization member
+        id: is_organization_member
+        uses: JamesSingleton/is-organization-member@1.1.0
+        with:
+          organization: Giskard-AI
+          username: ${{ github.actor }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Interrupt job
+        if: ${{ steps.is_organization_member.outputs.result == 'false' }}
+        shell: bash
+        run: |
+          echo "Job failed due to user not being a member of Giskard-AI organization and the 'safe for build' label not being set on the PR"
+          exit 1
+
+      - name: Extract branch name
+        shell: bash
+        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+        id: extract_branch
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RELEASE_PAT_TOKEN }} # Needed to trigger other actions
+          ref: ${{ steps.extract_branch.outputs.branch }}
+
+      - name: Setup PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: "3.10"
+          version: head # Issue with PDM 2.20.1: https://github.com/pdm-project/pdm/issues/3271
+          cache: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
+
+      - name: Install dependencies
+        run: pdm config use_uv true && rm -rf pdm.lock && pdm lock -G :all
+
+      - name: Configure git
+        run: |
+          git config --global user.name 'BotLocker'
+          git config --global user.email 'bot.locker@users.noreply.github.com'
+
+      - name: Adding file
+        run: |
+          git add pdm.lock
+          git commit -m "Regenerating pdm.lock" --allow-empty
+
+      - name: Remove label
+        if: ${{ github.event.pull_request}}
+        run: |
+          gh pr edit --remove-label Lockfile
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Push to target branch
+        run: |
+          git push origin ${{ steps.extract_branch.outputs.branch }}
