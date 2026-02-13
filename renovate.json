@@ -25,13 +25,14 @@
             "enabled": false
         },
         {
-            "description": "Group workspace dependencies together",
-            "matchPackageNames": [
-                "giskard-core",
-                "giskard-agents",
-                "giskard-checks"
+            "groupName": "{{manager}} dependencies",
+            "groupSlug": "{{manager}}-deps",
+            "matchUpdateTypes": [
+               "*"
             ],
-            "groupName": "workspace dependencies"
-        }
+            "matchPackageNames": [
+               "*"
+            ]
+         }
     ]
 }
