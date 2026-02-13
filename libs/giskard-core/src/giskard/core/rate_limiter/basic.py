@@ -1,3 +1,5 @@
+"""Basic rate limiter implementation with RPM and concurrency limits."""
+
 import asyncio
 import time
 import uuid
@@ -11,6 +13,8 @@ from .base import BaseRateLimiter
 
 
 class _BasicRateLimiterState:
+    """Internal state for BasicRateLimiter: semaphore, lock, and next allowed request time."""
+
     semaphore: asyncio.Semaphore | None
     lock: asyncio.Lock
     next_request_time: float
@@ -25,6 +29,12 @@ class _BasicRateLimiterState:
 
 @BaseRateLimiter.register("basic_rate_limiter")
 class BasicRateLimiter(BaseRateLimiter):
+    """Rate limiter with minimum interval between requests and optional max concurrency.
+
+    Enforces a minimum time between the start of consecutive requests (e.g. RPM limit)
+    and optionally limits how many requests can run concurrently.
+    """
+
     min_interval: float = Field(..., ge=0)
     max_concurrent: int | None = Field(default=None, ge=1)
 
@@ -32,6 +42,7 @@ class BasicRateLimiter(BaseRateLimiter):
 
     @asynccontextmanager
     async def throttle(self) -> AsyncGenerator[float]:
+        """Wait for rate limit, then yield the time waited (or 0.0 if no wait)."""
         start_time = time.monotonic()
         async with self._state.semaphore or nullcontext():
             async with self._state.lock:
@@ -49,12 +60,26 @@ class BasicRateLimiter(BaseRateLimiter):
 
     @override
     def create_initial_state(self) -> _BasicRateLimiterState:
+        """Create state with semaphore (if max_concurrent) and lock."""
         return _BasicRateLimiterState(self.max_concurrent)
 
     @classmethod
     def from_rpm(
         cls, rpm: int, max_concurrent: int | None = None, id: str | None = None
     ) -> "BasicRateLimiter":
+        """Create a rate limiter from requests-per-minute (RPM).
+
+        Args:
+            rpm: Maximum requests per minute. Must be greater than 0.
+            max_concurrent: Maximum concurrent requests allowed, or None for no limit.
+            id: Optional unique identifier. Auto-generated if not provided.
+
+        Returns:
+            A BasicRateLimiter configured for the given RPM and concurrency.
+
+        Raises:
+            ValueError: If rpm is less than or equal to 0.
+        """
         if rpm <= 0:
             raise ValueError("RPM must be greater than 0")
 

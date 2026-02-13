@@ -1,3 +1,9 @@
+"""Rate limiter base classes for throttling async operations.
+
+This module provides the abstract base class and registry for rate limiters
+that control the frequency and concurrency of async operations (e.g. API calls).
+"""
+
 import operator
 import os
 import threading
@@ -22,7 +28,12 @@ GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS = os.environ.get(
 
 
 class RateLimiterRegistry:
-    """Share limiter state across instances despite serialization round-trips."""
+    """Share limiter state across instances despite serialization round-trips.
+
+    When a rate limiter is created (including after deserialization), instances
+    with the same id and model fields share the same internal state, so
+    throttling is consistent across serialization boundaries.
+    """
 
     _lock: threading.Lock
     _instances: dict[str, WeakSet["BaseRateLimiter[Any]"]]
@@ -31,7 +42,16 @@ class RateLimiterRegistry:
         self._lock = threading.Lock()
         self._instances = {}
 
-    def register_instance(self, rate_limiter: "BaseRateLimiter"):
+    def register_instance(self, rate_limiter: "BaseRateLimiter") -> None:
+        """Register a rate limiter instance and share state with compatible existing ones.
+
+        When a rate limiter is created (including after deserialization), we look for
+        an existing instance with the same id and model fields. If found, we reuse its
+        _state so throttling is shared across instances (e.g. before/after serialization).
+
+        Args:
+            rate_limiter: The rate limiter instance to register.
+        """
         with self._lock:
             instances = self._instances.get(rate_limiter.id)
             if instances is None:
@@ -63,6 +83,17 @@ class RateLimiterRegistry:
             instances.add(rate_limiter)
 
     def get_instance(self, id: str) -> "BaseRateLimiter[Any]":
+        """Retrieve a registered rate limiter by id.
+
+        Args:
+            id: The unique identifier of the rate limiter.
+
+        Returns:
+            The registered rate limiter instance.
+
+        Raises:
+            ValueError: If no rate limiter with the given id is registered.
+        """
         instances = self._instances.get(id)
         if instances is None:
             raise ValueError(f"Rate limiter with id '{id}' not found")
@@ -72,6 +103,12 @@ class RateLimiterRegistry:
 
 @discriminated_base
 class BaseRateLimiter(Discriminated):
+    """Abstract base class for rate limiters that throttle async operations.
+
+    Subclasses must implement throttle() and optionally override create_initial_state().
+    Instances with the same id and model fields share throttling state via the registry.
+    """
+
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
     _registry: ClassVar[RateLimiterRegistry] = RateLimiterRegistry()
 
@@ -88,16 +125,46 @@ class BaseRateLimiter(Discriminated):
 
     @asynccontextmanager
     def throttle(self) -> AsyncGenerator[float]:
+        """Async context manager that enforces rate limiting before yielding.
+
+        Yields:
+            The time waited (in seconds) before the operation was allowed to proceed,
+            or 0.0 if no wait was required.
+        """
         raise NotImplementedError
 
     def create_initial_state(self) -> Any:
+        """Create the initial internal state for this rate limiter.
+
+        Override in subclasses to provide custom state (e.g. semaphores, locks).
+        State is shared across instances with the same id and model fields.
+
+        Returns:
+            The initial state object, or None if no state is needed.
+        """
         return None
 
     @classmethod
     def from_id(cls, id: str) -> "BaseRateLimiter":
+        """Retrieve a previously registered rate limiter by id.
+
+        Args:
+            id: The unique identifier of the rate limiter.
+
+        Returns:
+            The registered rate limiter instance.
+
+        Raises:
+            ValueError: If no rate limiter with the given id is registered.
+        """
         return cls._registry.get_instance(id)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        """Compare rate limiters by model fields only, ignoring internal state.
+
+        This is needed for the registry: when registering, we find matching instances
+        by config; the new instance does not have _state set yet.
+        """
         if not isinstance(other, type(self)):
             return False
 
