@@ -49,7 +49,7 @@ class TestRateLimiterRegistry:
         self,
     ):
         with patch(
-            "giskard.core.limiter.base.GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS",
+            "giskard.core.rate_limiter.base.GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS",
             True,
         ):
             with warnings.catch_warnings(record=True) as record:

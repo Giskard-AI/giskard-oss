@@ -7,7 +7,7 @@ from typing import override
 
 from pydantic import Field, PrivateAttr
 
-from ..limiter.base import BaseRateLimiter
+from .base import BaseRateLimiter
 
 
 class _BasicRateLimiterState:

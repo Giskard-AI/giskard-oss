@@ -9,7 +9,7 @@ import importlib.util
 
 from .discriminated import Discriminated, discriminated_base
 from .errors import Error
-from .limiter import (
+from .rate_limiter import (
     BaseRateLimiter,
     RateLimiter,
 )
