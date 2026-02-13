@@ -1,5 +1,8 @@
+import operator
+import os
 import threading
 import uuid
+import warnings
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any, ClassVar, override
@@ -12,6 +15,10 @@ from pydantic import (
 )
 
 from ..discriminated import Discriminated, discriminated_base
+
+GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS = os.environ.get(
+    "GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS", ""
+).lower() in ("true", "1", "yes")
 
 
 class RateLimiterRegistry:
@@ -31,21 +38,26 @@ class RateLimiterRegistry:
                 instances = WeakSet["BaseRateLimiter"]()
                 self._instances[rate_limiter.id] = instances
 
-            if instances:
-                try:
-                    existing_instance = next(iter(instances))
-                    rate_limiter._state = (
-                        existing_instance._state
-                    )  # Set state to ensure equality check works
-                    if existing_instance != rate_limiter:
-                        raise ValueError(
-                            f"Rate limiter with id '{rate_limiter.id}' already registered"
-                        )
+            all_instances = list(instances)
+            matching_instances = [
+                instance for instance in all_instances if instance == rate_limiter
+            ]
 
-                    instances.add(rate_limiter)
-                    return
-                except StopIteration:
-                    pass  # last instance was deleted by gc
+            if matching_instances:
+                rate_limiter._state = matching_instances[0]._state
+                return
+
+            if not GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS and len(
+                all_instances
+            ) > len(matching_instances):
+                warnings.warn(
+                    (
+                        f"Rate limiter with id '{rate_limiter.id}' already registered,"
+                        f"this will make RateLimiter.from_id('{rate_limiter.id}') unreliable."
+                        "Set GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS=1 to disable this warning"
+                    ),
+                    RuntimeWarning,
+                )
 
             rate_limiter._state = rate_limiter.create_initial_state()
             instances.add(rate_limiter)
@@ -60,10 +72,11 @@ class RateLimiterRegistry:
 
 @discriminated_base
 class BaseRateLimiter(Discriminated):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
     _registry: ClassVar[RateLimiterRegistry] = RateLimiterRegistry()
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+
     _state: Any = PrivateAttr()
 
     @override
@@ -83,3 +96,17 @@ class BaseRateLimiter(Discriminated):
     @classmethod
     def from_id(cls, id: str) -> "BaseRateLimiter":
         return cls._registry.get_instance(id)
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return False
+
+        model_fields = type(self).model_fields
+        if not model_fields:
+            return True
+
+        getter = operator.itemgetter(*model_fields)
+        try:
+            return getter(self.__dict__) == getter(other.__dict__)
+        except KeyError:
+            return False

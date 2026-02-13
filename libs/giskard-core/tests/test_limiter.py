@@ -1,8 +1,10 @@
 import asyncio
 import time
+import warnings
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import override
+from unittest.mock import patch
 
 import pytest
 from giskard.core import BaseRateLimiter, RateLimiter
@@ -19,16 +21,16 @@ class CustomRateLimiter(BaseRateLimiter):
 
 
 class TestRateLimiterRegistry:
-    def test_cannot_create_rate_limiter_with_duplicate_id(self):
-        with pytest.raises(
-            ValueError,
+    def test_warns_when_creating_rate_limiter_with_duplicate_id(self):
+        with pytest.warns(
+            RuntimeWarning,
             match="Rate limiter with id 'test' already registered",
         ):
             _rate_limiter_a = RateLimiter.from_rpm(60, id="test")
             _rate_limiter_b = RateLimiter.from_rpm(120, id="test")
 
-        with pytest.raises(
-            ValueError,
+        with pytest.warns(
+            RuntimeWarning,
             match="Rate limiter with id 'test_2' already registered",
         ):
             _rate_limiter_a = RateLimiter.from_rpm(rpm=60, id="test_2")
@@ -36,12 +38,41 @@ class TestRateLimiterRegistry:
                 rpm=60, max_concurrent=1, id="test_2"
             )
 
-        with pytest.raises(
-            ValueError,
+        with pytest.warns(
+            RuntimeWarning,
             match="Rate limiter with id 'another_rate_limiter' already registered",
         ):
             _rate_limiter_a = RateLimiter.from_rpm(rpm=60, id="another_rate_limiter")
             _rate_limiter_b = CustomRateLimiter(id="another_rate_limiter")
+
+    def test_does_not_warn_when_disabled_and_creating_rate_limiter_with_duplicate_id(
+        self,
+    ):
+        with patch(
+            "giskard.core.limiter.base.GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS",
+            True,
+        ):
+            with warnings.catch_warnings(record=True) as record:
+                warnings.simplefilter("always")
+                _rate_limiter_a = RateLimiter.from_rpm(60, id="test")
+                _rate_limiter_b = RateLimiter.from_rpm(120, id="test")
+            assert not any("already registered" in str(w.message) for w in record)
+
+            with warnings.catch_warnings(record=True) as record:
+                warnings.simplefilter("always")
+                _rate_limiter_a = RateLimiter.from_rpm(rpm=60, id="test_2")
+                _rate_limiter_b = RateLimiter.from_rpm(
+                    rpm=60, max_concurrent=1, id="test_2"
+                )
+            assert not any("already registered" in str(w.message) for w in record)
+
+            with warnings.catch_warnings(record=True) as record:
+                warnings.simplefilter("always")
+                _rate_limiter_a = RateLimiter.from_rpm(
+                    rpm=60, id="another_rate_limiter"
+                )
+                _rate_limiter_b = CustomRateLimiter(id="another_rate_limiter")
+            assert not any("already registered" in str(w.message) for w in record)
 
     def test_same_rate_limiter_with_same_id_should_not_raise_error(
         self,
