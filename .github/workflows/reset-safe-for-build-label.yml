@@ -1,0 +1,22 @@
+name: Reset 'safe for build' label
+
+on:
+  pull_request_target:
+    types: [synchronize]
+
+jobs:
+  remove-safe-for-build-label:
+    if: contains(github.event.pull_request.labels.*.name, 'safe for build')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              name: 'safe for build'
+            });
