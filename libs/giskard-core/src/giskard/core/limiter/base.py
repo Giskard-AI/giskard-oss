@@ -16,7 +16,7 @@ from ..discriminated import Discriminated, discriminated_base
 class RateLimiterRegistry:
     """Share limiter state across instances despite serialization round-trips."""
 
-    _lock: threading.Lock = threading.Lock()
+    _lock: threading.Lock
     _instances: dict[str, WeakSet["BaseRateLimiter"]]
     _states: dict[str, Any]
 
@@ -29,7 +29,7 @@ class RateLimiterRegistry:
         with self._lock:
             instances = self._instances.get(rate_limiter.id)
             if instances is None:
-                instances = WeakSet()
+                instances = WeakSet["BaseRateLimiter"]()
                 self._instances[rate_limiter.id] = instances
 
             if instances:
