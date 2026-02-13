@@ -1,0 +1,62 @@
+name: Integration Tests
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  authorize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check authorization
+        env:
+          AUTHOR_ASSOC: ${{ github.event.pull_request.author_association }}
+          EVENT_ACTION: ${{ github.event.action }}
+          LABEL_NAME: ${{ github.event.label.name }}
+        run: |
+          # Internal contributors are always authorized
+          if [[ "$AUTHOR_ASSOC" =~ ^(MEMBER|COLLABORATOR|OWNER)$ ]]; then
+            echo "Internal contributor — authorized."
+            exit 0
+          fi
+
+          # External contributors: only when a maintainer adds the 'safe for build' label
+          if [[ "$EVENT_ACTION" == "labeled" && "$LABEL_NAME" == "safe for build" ]]; then
+            echo "External contributor — authorized via 'safe for build' label."
+            exit 0
+          fi
+
+          echo "::error::External contributors require a maintainer to add the 'safe for build' label."
+          exit 1
+
+  test-functional:
+    needs: authorize
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+        package: [giskard-core, giskard-agents, giskard-checks]
+    name: test-functional / ${{ matrix.package }} / ${{ matrix.python-version }}
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TEST_MODEL: "gemini/gemini-2.0-flash"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          # Use the SHA from the event to ensure we're using the correct commit
+          # for the `labeled` event. For external contributors, we want to use
+          # the SHA corresponding to the time the label was added.
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+      - run: make install
+      - run: make test-functional PACKAGE=${{ matrix.package }}
