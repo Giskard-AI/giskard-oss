@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, nullcontext
 from typing import override
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 from ..limiter.base import BaseRateLimiter
 
@@ -28,15 +28,17 @@ class BasicRateLimiter(BaseRateLimiter):
     min_interval: float = Field(..., ge=0)
     max_concurrent: int | None = Field(default=None, ge=1)
 
+    _state: _BasicRateLimiterState = PrivateAttr()
+
     @asynccontextmanager
     async def throttle(self) -> AsyncGenerator[float]:
         start_time = time.monotonic()
-        async with self.state.semaphore or nullcontext():
-            async with self.state.lock:
+        async with self._state.semaphore or nullcontext():
+            async with self._state.lock:
                 current_time = time.monotonic()
-                wait_time = self.state.next_request_time - current_time
-                self.state.next_request_time = (
-                    max(self.state.next_request_time, current_time) + self.min_interval
+                wait_time = self._state.next_request_time - current_time
+                self._state.next_request_time = (
+                    max(self._state.next_request_time, current_time) + self.min_interval
                 )
 
             if wait_time > 0:

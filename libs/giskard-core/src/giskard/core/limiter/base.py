@@ -8,6 +8,7 @@ from weakref import WeakSet
 from pydantic import (
     ConfigDict,
     Field,
+    PrivateAttr,
 )
 
 from ..discriminated import Discriminated, discriminated_base
@@ -17,13 +18,11 @@ class RateLimiterRegistry:
     """Share limiter state across instances despite serialization round-trips."""
 
     _lock: threading.Lock
-    _instances: dict[str, WeakSet["BaseRateLimiter"]]
-    _states: dict[str, Any]
+    _instances: dict[str, WeakSet["BaseRateLimiter[Any]"]]
 
     def __init__(self):
         self._lock = threading.Lock()
         self._instances = {}
-        self._states = {}
 
     def register_instance(self, rate_limiter: "BaseRateLimiter"):
         with self._lock:
@@ -33,21 +32,25 @@ class RateLimiterRegistry:
                 self._instances[rate_limiter.id] = instances
 
             if instances:
-                existing_instance = next(iter(instances))
-                if existing_instance != rate_limiter:
-                    raise ValueError(
-                        f"Rate limiter with id '{rate_limiter.id}' already registered"
-                    )
-            else:
-                # Initialize the state for the first instance
-                self._states[rate_limiter.id] = rate_limiter.create_initial_state()
+                try:
+                    existing_instance = next(iter(instances))
+                    rate_limiter._state = (
+                        existing_instance._state
+                    )  # Set state to ensure equality check works
+                    if existing_instance != rate_limiter:
+                        raise ValueError(
+                            f"Rate limiter with id '{rate_limiter.id}' already registered"
+                        )
 
+                    instances.add(rate_limiter)
+                    return
+                except StopIteration:
+                    pass  # last instance was deleted by gc
+
+            rate_limiter._state = rate_limiter.create_initial_state()
             instances.add(rate_limiter)
 
-    def get_state(self, rate_limiter: "BaseRateLimiter") -> Any:
-        return self._states.get(rate_limiter.id, None)
-
-    def get_instance(self, id: str) -> "BaseRateLimiter":
+    def get_instance(self, id: str) -> "BaseRateLimiter[Any]":
         instances = self._instances.get(id)
         if instances is None:
             raise ValueError(f"Rate limiter with id '{id}' not found")
@@ -61,6 +64,7 @@ class BaseRateLimiter(Discriminated):
     _registry: ClassVar[RateLimiterRegistry] = RateLimiterRegistry()
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+    _state: Any = PrivateAttr()
 
     @override
     def model_post_init(self, context: Any, /) -> None:
@@ -75,10 +79,6 @@ class BaseRateLimiter(Discriminated):
 
     def create_initial_state(self) -> Any:
         return None
-
-    @property
-    def state(self) -> Any:
-        return self._registry.get_state(self)
 
     @classmethod
     def from_id(cls, id: str) -> "BaseRateLimiter":

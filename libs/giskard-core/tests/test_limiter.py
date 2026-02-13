@@ -54,27 +54,29 @@ class TestRateLimiterRegistry:
 
     def test_rate_limiter_should_cleanup_state_when_last_instance_is_deleted(self):
         _rate_limiter_a = RateLimiter.from_rpm(60, max_concurrent=1, id="test")
-        assert _rate_limiter_a.state is not None
-        assert _rate_limiter_a.state.semaphore is not None
+        assert _rate_limiter_a._state is not None
+        assert _rate_limiter_a._state.semaphore is not None
+        old_state = _rate_limiter_a._state
         del _rate_limiter_a
 
         _rate_limiter_b = RateLimiter.from_rpm(
             120, id="test"
         )  # This should not raise an error since the state is cleaned up
-        assert _rate_limiter_b.state is not None
-        assert _rate_limiter_b.state.semaphore is None  # Since max_concurrent is None
+        assert _rate_limiter_b._state is not None
+        assert _rate_limiter_b._state.semaphore is None  # Since max_concurrent is None
+        assert _rate_limiter_b._state is not old_state
 
     def test_rate_limiter_should_share_state_between_instances(self):
         _rate_limiter_a = RateLimiter.from_rpm(60, max_concurrent=1, id="test")
         _rate_limiter_b = RateLimiter.from_rpm(60, max_concurrent=1, id="test")
-        assert _rate_limiter_a.state is _rate_limiter_b.state
+        assert _rate_limiter_a._state is _rate_limiter_b._state
 
     def test_rate_limiter_should_not_share_state_between_instances_with_different_ids(
         self,
     ):
         _rate_limiter_a = RateLimiter.from_rpm(60, max_concurrent=1, id="test")
         _rate_limiter_b = RateLimiter.from_rpm(60, max_concurrent=1, id="test_2")
-        assert _rate_limiter_a.state is not _rate_limiter_b.state
+        assert _rate_limiter_a._state is not _rate_limiter_b._state
 
 
 class TestBasicRateLimiter:
