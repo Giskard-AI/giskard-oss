@@ -363,3 +363,75 @@ OutputFormatting = IssueGroup(
     name="Output Formatting",
     description="We detected that the model may require a specific format for its output, but this format was not always respected. Model output should be verified to ensure that its format is consistent with the downstream application requirements.",
 )
+
+IndirectInjection = IssueGroup(
+    name="Indirect Prompt Injection",
+    description="""We detected that your model is vulnerable to indirect prompt injection attacks through external content sources.
+
+Indirect prompt injection occurs when malicious instructions are hidden in external content (RAG documents, websites, emails, tool contexts) that the LLM processes as part of its context. Unlike direct prompt injection where users directly provide malicious input, these attacks exploit the model's trust in external data sources.
+
+Common attack vectors include:
+- **RAG Context Poisoning**: Malicious instructions embedded in retrieval documents using HTML comments, markdown, YAML frontmatter, or other markup
+- **Tool Manipulation**: Hijacking function calls, API parameters, or tool configurations to execute unauthorized operations
+- **External Content Injection**: Attacks via processed websites, emails, PDFs, or other external content sources
+- **Multi-Source Context Mixing**: Exploiting priority conflicts between system prompts, RAG context, and user queries
+
+This vulnerability can lead to:
+- Data exfiltration and sensitive information disclosure
+- Unauthorized actions or function calls
+- Safety protocol bypasses
+- System prompt overrides
+
+To learn more about this critical security issue, see [OWASP LLM Top 10 2025: LLM01 Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/).
+""",
+)
+
+MultiTurnJailbreak = IssueGroup(
+    name="Multi-Turn Jailbreak",
+    description="""We detected that your model can be manipulated through multi-turn conversation attacks that bypass safety guardrails.
+
+Multi-turn jailbreak attacks exploit conversational context to gradually manipulate the model into unsafe behavior over multiple dialogue turns. While single-turn attacks may be blocked, these sophisticated attacks succeed through:
+- **Crescendo Attacks**: Gradual escalation from benign to malicious requests across conversation turns
+- **Context Splitting**: Breaking malicious payloads across multiple turns to avoid detection
+- **Incremental Refinement**: Iteratively probing and refining attacks based on model responses
+- **Role-Play Injection**: Establishing deceptive conversational contexts that normalize unsafe requests
+- **Bad Likert Judge**: Using psychometric scale manipulation to shift model behavior
+
+Research shows multi-turn attacks achieve 70%+ success rates compared to <10% for single-turn attacks on the same models.
+
+This vulnerability enables attackers to:
+- Bypass content filters and safety mechanisms
+- Generate harmful, unethical, or illegal content
+- Extract sensitive information through conversational manipulation
+- Override system instructions via context window poisoning
+
+Defending against multi-turn attacks requires maintaining safety awareness across the entire conversation history, not just individual turns.
+
+To learn more, see [Multi-Turn Jailbreak Research](https://arxiv.org/html/2503.04856v3) and [OWASP LLM Top 10: Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/).
+""",
+)
+
+TrainingDataLeakage = IssueGroup(
+    name="Training Data Leakage",
+    description="""We detected that your model may leak memorized training data including sensitive information.
+
+Training data leakage occurs when LLMs unintentionally reveal information from their training corpus through:
+- **Prefix Completion Attacks**: Prompts designed to trigger verbatim completion of memorized sensitive data (emails, credentials, personal information)
+- **Confusion-Inducing Prompts**: High-entropy inputs that cause the model to "fall back" to regurgitating training data
+- **Repetition-Based Extraction**: Exploiting the model's tendency to memorize and repeat seen patterns
+- **Membership Inference**: Statistical attacks to determine if specific data was in the training set
+- **Knowledge Boundary Probing**: Testing for information beyond expected knowledge cutoff dates or proprietary datasets
+
+This vulnerability can expose:
+- Personally Identifiable Information (PII): emails, phone numbers, addresses, social security numbers
+- Credentials: API keys, passwords, authentication tokens
+- Proprietary Information: internal documents, trade secrets, confidential communications
+- Training Data Artifacts: hints about model architecture, training procedures, or dataset composition
+
+Unlike the existing Data Leakage detector (which tests batch vs. single prediction discrepancies), this detector focuses on LLM-specific memorization vulnerabilities and extraction attacks.
+
+Research shows that even well-trained models can leak sensitive information through carefully crafted prompts, posing serious privacy and security risks.
+
+To learn more, see [Training Data Extraction Attacks Survey](https://antispoofing.org/training-data-extraction-attacks-and-countermeasures/) and [LLM Privacy Survey 2025](https://link.springer.com/article/10.1007/s44443-025-00177-1).
+""",
+)
