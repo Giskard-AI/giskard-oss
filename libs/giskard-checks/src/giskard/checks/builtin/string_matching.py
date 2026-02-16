@@ -364,7 +364,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
 
         check = RegexMatching(
             text="Price: $10.99",
-            pattern=r"\$\d+\.\d{2}"
+            pattern=r"\\$\\d+\\.\\d{2}"
         )
 
     Email validation::
