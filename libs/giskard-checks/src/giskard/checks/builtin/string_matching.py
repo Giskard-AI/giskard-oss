@@ -329,13 +329,13 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     """Check that validates if a regex pattern matches within text.
 
     This check performs regex pattern matching with explicit flag control.
-    Only the text is normalized (not the pattern), allowing users to write
-    patterns that match the normalized text.
+    The pattern is matched against the raw text without any normalization,
+    giving users full control through regex syntax and flags.
 
     The matching process:
     1. Extracts text and pattern (from provided values or trace)
     2. Compiles regex pattern with specified flags
-    3. Checks if pattern matches anywhere in the raw text using re.search()
+    3. Checks if pattern matches anywhere in the text using re.search()
 
     Attributes
     ----------

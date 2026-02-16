@@ -122,6 +122,7 @@ async def test_regex_invalid_pattern() -> None:
     )
     result = await check.run(Trace())
     assert result.status == CheckStatus.FAIL
+    assert result.message is not None
     assert "invalid regex pattern" in result.message.lower()
 
 
@@ -133,6 +134,7 @@ async def test_regex_unclosed_group() -> None:
     )
     result = await check.run(Trace())
     assert result.status == CheckStatus.FAIL
+    assert result.message is not None
     assert "invalid regex pattern" in result.message.lower()
 
 
@@ -298,11 +300,8 @@ async def test_empty_pattern_regex_mode() -> None:
 
 async def test_missing_pattern_validation() -> None:
     """Test that either pattern or pattern_key must be provided."""
-    try:
+    with pytest.raises(ValueError, match="pattern"):
         RegexMatching(text="Hello")
-        assert False, "Should have raised ValueError"
-    except ValueError as e:
-        assert "pattern" in str(e).lower()
 
 
 async def test_cannot_provide_both_pattern_and_pattern_key() -> None:
@@ -355,6 +354,7 @@ async def test_missing_pattern_in_trace() -> None:
     )
     result = await check.run(Trace())
     assert result.status == CheckStatus.FAIL
+    assert result.message is not None
     assert "no value found for pattern" in result.message.lower()
 
 
@@ -366,4 +366,5 @@ async def test_missing_text_in_trace() -> None:
     )
     result = await check.run(Trace())
     assert result.status == CheckStatus.FAIL
+    assert result.message is not None
     assert "no value found for text" in result.message.lower()
