@@ -130,7 +130,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
                 ),
             )
 
-        return str(text), str(target), details
+        return text, target, details
 
     @abstractmethod
     async def run(self, trace: TraceType) -> CheckResult:
@@ -364,7 +364,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
 
         check = RegexMatching(
             text="Price: $10.99",
-            pattern=r"\\$\\d+\\.\\d{2}"
+            pattern=r"\$\d+\.\d{2}"
         )
 
     Email validation::
