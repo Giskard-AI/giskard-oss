@@ -14,12 +14,13 @@ from .fn import FnCheck, from_fn
 from .groundedness import Groundedness
 from .judge import LLMJudge
 from .semantic_similarity import SemanticSimilarity
-from .string_matching import StringMatching
+from .string_matching import RegexMatching, StringMatching
 
 __all__ = [
     "from_fn",
     "FnCheck",
     "StringMatching",
+    "RegexMatching",
     "Equals",
     "NotEquals",
     "LesserThan",

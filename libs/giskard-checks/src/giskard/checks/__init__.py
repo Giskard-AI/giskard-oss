@@ -19,6 +19,7 @@ from .builtin import (
     LLMCheckResult,
     LLMJudge,
     NotEquals,
+    RegexMatching,
     SemanticSimilarity,
     StringMatching,
     from_fn,
@@ -89,6 +90,7 @@ __all__ = [
     "LLMJudge",
     "SemanticSimilarity",
     "StringMatching",
+    "RegexMatching",
     # Interaction
     "InteractionSpec",
     # Generators
