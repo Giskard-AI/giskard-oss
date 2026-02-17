@@ -40,7 +40,7 @@ concurrency:
   group: release-${{ github.event.inputs.package }}-${{ github.ref }}
   cancel-in-progress: false
 
-jobs:    
+jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
@@ -111,15 +111,18 @@ jobs:
         run: |
           uv build
 
-      - name: Commit and push to main
-        if: ${{ github.event.inputs.dry_run == false }}
+      - name: Commit version bump
         working-directory: libs/${{ env.PACKAGE }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "pyproject.toml"
           git commit -m "chore(${{ env.PACKAGE }}): bump version to ${{ steps.bump.outputs.new_version }}"
-          git push origin main --rebase
+
+      - name: Push to main
+        if: ${{ github.event.inputs.dry_run == false && github.ref_name == 'main' }}
+        run: |
+          git push origin main
 
       - name: Create tag
         if: ${{ github.event.inputs.dry_run == false }}
