@@ -1,0 +1,130 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Library to release'
+        required: true
+        type: choice
+        options:
+          - giskard-core
+          - giskard-agents
+          - giskard-checks
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+          - none
+        default: patch
+      release_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - alpha
+          - beta
+          - rc
+          - none
+        default: none
+
+concurrency:
+  group: release-${{ github.event.inputs.package }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+      id-token: write
+    env:
+      PACKAGE: ${{ github.event.inputs.package }}
+      BUMP_TYPE: ${{ github.event.inputs.bump_type }}
+      RELEASE_TYPE: ${{ github.event.inputs.release_type }}
+      TEST_MODEL: "gemini/gemini-2.0-flash"
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Setup development environment
+        run: make setup
+
+      - name: Run checks
+        run: make check
+
+      - name: Run tests
+        run: make test
+
+      - name: Bump version
+        id: bump
+        run: |
+          cd libs/${{ env.PACKAGE }}
+
+          CMD=("uv" "version")
+
+          if [ "${{ github.event.inputs.bump_type }}" != "none" ]; then
+            CMD+=("--bump ${{ github.event.inputs.bump_type }}")
+          fi
+
+          if [ "${{ github.event.inputs.release_type }}" != "none" ] && [ -n "${{ github.event.inputs.release_type }}" ]; then
+            CMD+=("--bump" "${{ github.event.inputs.release_type }}")
+          fi
+
+          if [ ${#CMD[@]} -gt 2 ]; then
+            "${CMD[@]}"
+          else
+            echo "No version bump"
+            exit 1
+          fi
+
+          NEW_VERSION=$(uv version --short)
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${{ env.PACKAGE }}/v$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build package
+        run: |
+          cd libs/${{ env.PACKAGE }}
+          uv build
+
+      - name: Commit and push to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "libs/${{ env.PACKAGE }}/pyproject.toml"
+          git commit -m "chore(${{ env.PACKAGE }}): bump version to ${{ steps.bump.outputs.new_version }}"
+          git push origin main --rebase
+
+      - name: Create tag
+        run: |
+          git tag "${{ steps.bump.outputs.tag }}"
+          git push origin "${{ steps.bump.outputs.tag }}"
+
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
+        with:
+          tag_name: ${{ steps.bump.outputs.tag }}
+          name: "${{ env.PACKAGE }} v${{ steps.bump.outputs.new_version }}"
+          generate_release_notes: true
+          files: |
+            libs/${{ env.PACKAGE }}/dist/*.tar.gz
+            libs/${{ env.PACKAGE }}/dist/*.whl
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: libs/${{ env.PACKAGE }}/dist/
