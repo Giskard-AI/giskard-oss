@@ -244,7 +244,7 @@ We welcome contributions from the AI community! Read this [guide](./CONTRIBUTING
 
 ❤️ If you find our work useful, please consider [sponsoring us](https://github.com/sponsors/Giskard-AI) on GitHub. With a monthly sponsoring, you can get a sponsor badge, display your company in this readme, and get your bug reports prioritized. We also offer one-time sponsoring if you want us to get involved in a consulting project, run a workshop, or give a talk at your company.
 
-<h2 id="sponsors">💚 Current sponsors</h1>
+<h2 id="sponsors">💚 Current sponsors</h2>
 
 We thank the following companies which are sponsoring our project with monthly donations:
 
