@@ -112,7 +112,7 @@ jobs:
       - name: Build package
         working-directory: libs/${{ env.PACKAGE }}
         run: |
-          uv build
+          uv build --out-dir dist
 
       - name: Commit version bump
         working-directory: libs/${{ env.PACKAGE }}
