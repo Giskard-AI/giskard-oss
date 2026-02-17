@@ -9,7 +9,7 @@
   [![GitHub release](https://img.shields.io/github/v/release/Giskard-AI/giskard)](https://github.com/Giskard-AI/giskard/releases)
   [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/Giskard-AI/giskard/blob/main/LICENSE)
   [![Downloads](https://static.pepy.tech/badge/giskard/month)](https://pepy.tech/project/giskard)
-  [![CI](https://github.com/Giskard-AI/giskard/actions/workflows/build-python.yml/badge.svg?branch=main)](https://github.com/Giskard-AI/giskard/actions/workflows/build-python.yml?query=branch%3Amain)
+  [![CI](https://github.com/Giskard-AI/giskard-oss/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Giskard-AI/giskard-oss/actions/workflows/ci.yml/badge.svg?branch=main)
   [![Giskard on Discord](https://img.shields.io/discord/939190303397666868?label=Discord)](https://gisk.ar/discord)
 
   <a rel="me" href="https://fosstodon.org/@Giskard"></a>
@@ -52,7 +52,7 @@ Issues detected include:
 - many more...
 
 <p align="center">
-  <img src="readme/scan_updates.gif" alt="Scan Example" width="800">
+  <img src="readme/scan_updated.gif" alt="Scan Example" width="800">
 </p>
 
 ## RAG Evaluation Toolkit (RAGET): Automatically generate evaluation datasets & evaluate RAG application answers ⤵️
