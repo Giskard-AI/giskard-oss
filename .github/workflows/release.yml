@@ -49,16 +49,16 @@ jobs:
       PACKAGE: ${{ github.event.inputs.package }}
       BUMP_TYPE: ${{ github.event.inputs.bump_type }}
       RELEASE_TYPE: ${{ github.event.inputs.release_type }}
-      TEST_MODEL: "gemini/gemini-2.0-flash"
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
-      - name: Check if organization member
-        id: is_organization_member
-        uses: JamesSingleton/is-organization-member@311430b0670cdec4036e721029b78018236a0b74 # 1.1.0
-        with:
-          organization: Giskard-AI
-          username: ${{ github.actor }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Authorize
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          if ! gh api "orgs/Giskard-AI/members/$ACTOR" --silent 2>/dev/null; then
+            echo "::error::Only Giskard-AI organization members can create releases."
+            exit 1
+          fi
 
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -68,7 +68,7 @@ jobs:
           token: ${{ secrets.RELEASE_PAT_TOKEN }} # Needed to trigger other actions
 
       - name: Install uv
-        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
         with:
           python-version: "3.12"
 
@@ -79,6 +79,9 @@ jobs:
         run: make check
 
       - name: Run tests
+        env:
+          TEST_MODEL: "gemini/gemini-2.0-flash"
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: make test
 
       - name: Bump version
@@ -87,12 +90,12 @@ jobs:
         run: |
           CMD=("uv" "version")
 
-          if [ "${{ github.event.inputs.bump_type }}" != "none" ]; then
-            CMD+=("--bump ${{ github.event.inputs.bump_type }}")
+          if [ "$BUMP_TYPE" != "none" ]; then
+            CMD+=("--bump" "$BUMP_TYPE")
           fi
 
-          if [ "${{ github.event.inputs.release_type }}" != "none" ] && [ -n "${{ github.event.inputs.release_type }}" ]; then
-            CMD+=("--bump" "${{ github.event.inputs.release_type }}")
+          if [ "$RELEASE_TYPE" != "none" ] && [ -n "$RELEASE_TYPE" ]; then
+            CMD+=("--bump" "$RELEASE_TYPE")
           fi
 
           if [ ${#CMD[@]} -gt 2 ]; then
@@ -104,7 +107,7 @@ jobs:
 
           NEW_VERSION=$(uv version --short)
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "tag=${{ env.PACKAGE }}/v$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$PACKAGE/v$NEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Build package
         working-directory: libs/${{ env.PACKAGE }}
@@ -113,11 +116,13 @@ jobs:
 
       - name: Commit version bump
         working-directory: libs/${{ env.PACKAGE }}
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "pyproject.toml"
-          git commit -m "chore(${{ env.PACKAGE }}): bump version to ${{ steps.bump.outputs.new_version }}"
+          git commit -m "chore($PACKAGE): bump version to $NEW_VERSION"
 
       - name: Push to main
         if: ${{ github.event.inputs.dry_run == false && github.ref_name == 'main' }}
@@ -126,9 +131,11 @@ jobs:
 
       - name: Create tag
         if: ${{ github.event.inputs.dry_run == false }}
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
         run: |
-          git tag "${{ steps.bump.outputs.tag }}"
-          git push origin "${{ steps.bump.outputs.tag }}"
+          git tag "$TAG"
+          git push origin "$TAG"
 
 
       - name: Create GitHub Release
@@ -143,6 +150,7 @@ jobs:
             libs/${{ env.PACKAGE }}/dist/*.whl
       
       - name: Push to Test PyPI (dry run)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
         working-directory: libs/${{ env.PACKAGE }}
         env:
           PIPY_USERNAME: ${{ secrets.PIPY_USERNAME }}
