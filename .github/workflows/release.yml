@@ -30,6 +30,11 @@ on:
           - rc
           - none
         default: none
+      dry_run:
+        description: 'If true, the release will not be published to PyPI'
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
   group: release-${{ github.event.inputs.package }}-${{ github.ref }}
@@ -40,23 +45,30 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: read
-      id-token: write
     env:
       PACKAGE: ${{ github.event.inputs.package }}
       BUMP_TYPE: ${{ github.event.inputs.bump_type }}
       RELEASE_TYPE: ${{ github.event.inputs.release_type }}
-      TEST_MODEL: "gemini/gemini-2.0-flash"
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
+      - name: Authorize
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          if ! gh api "orgs/Giskard-AI/members/$ACTOR" --silent 2>/dev/null; then
+            echo "::error::Only Giskard-AI organization members can create releases."
+            exit 1
+          fi
+
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-          ref: main
+          fetch-tags: true
+          token: ${{ secrets.RELEASE_PAT_TOKEN }} # Needed to trigger other actions
 
       - name: Install uv
-        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
         with:
           python-version: "3.12"
 
@@ -67,21 +79,23 @@ jobs:
         run: make check
 
       - name: Run tests
+        env:
+          TEST_MODEL: "gemini/gemini-2.0-flash"
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: make test
 
       - name: Bump version
         id: bump
+        working-directory: libs/${{ env.PACKAGE }}
         run: |
-          cd libs/${{ env.PACKAGE }}
-
           CMD=("uv" "version")
 
-          if [ "${{ github.event.inputs.bump_type }}" != "none" ]; then
-            CMD+=("--bump ${{ github.event.inputs.bump_type }}")
+          if [ "$BUMP_TYPE" != "none" ]; then
+            CMD+=("--bump" "$BUMP_TYPE")
           fi
 
-          if [ "${{ github.event.inputs.release_type }}" != "none" ] && [ -n "${{ github.event.inputs.release_type }}" ]; then
-            CMD+=("--bump" "${{ github.event.inputs.release_type }}")
+          if [ "$RELEASE_TYPE" != "none" ] && [ -n "$RELEASE_TYPE" ]; then
+            CMD+=("--bump" "$RELEASE_TYPE")
           fi
 
           if [ ${#CMD[@]} -gt 2 ]; then
@@ -93,28 +107,39 @@ jobs:
 
           NEW_VERSION=$(uv version --short)
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "tag=${{ env.PACKAGE }}/v$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$PACKAGE/v$NEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Build package
+        working-directory: libs/${{ env.PACKAGE }}
         run: |
-          cd libs/${{ env.PACKAGE }}
-          uv build
+          uv build --out-dir dist
 
-      - name: Commit and push to main
+      - name: Commit version bump
+        working-directory: libs/${{ env.PACKAGE }}
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "libs/${{ env.PACKAGE }}/pyproject.toml"
-          git commit -m "chore(${{ env.PACKAGE }}): bump version to ${{ steps.bump.outputs.new_version }}"
-          git push origin main --rebase
+          git add "pyproject.toml"
+          git commit -m "chore($PACKAGE): bump version to $NEW_VERSION"
+
+      - name: Push to main
+        if: ${{ github.event.inputs.dry_run == false && github.ref_name == 'main' }}
+        run: |
+          git push origin main
 
       - name: Create tag
+        if: ${{ github.event.inputs.dry_run == false }}
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
         run: |
-          git tag "${{ steps.bump.outputs.tag }}"
-          git push origin "${{ steps.bump.outputs.tag }}"
+          git tag "$TAG"
+          git push origin "$TAG"
 
 
       - name: Create GitHub Release
+        if: ${{ github.event.inputs.dry_run == false }}
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
         with:
           tag_name: ${{ steps.bump.outputs.tag }}
@@ -123,8 +148,11 @@ jobs:
           files: |
             libs/${{ env.PACKAGE }}/dist/*.tar.gz
             libs/${{ env.PACKAGE }}/dist/*.whl
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: libs/${{ env.PACKAGE }}/dist/
+            
+      - name: Push to PyPI
+        if: ${{ github.event.inputs.dry_run == false }}
+        working-directory: libs/${{ env.PACKAGE }}
+        env:
+          PIPY_USERNAME: ${{ secrets.PIPY_USERNAME }}
+          PIPY_PASSWORD: ${{ secrets.PIPY_PASSWORD }}
+        run: uv publish --username "$PIPY_USERNAME" --password "$PIPY_PASSWORD"
