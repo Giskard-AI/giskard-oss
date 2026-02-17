@@ -148,15 +148,7 @@ jobs:
           files: |
             libs/${{ env.PACKAGE }}/dist/*.tar.gz
             libs/${{ env.PACKAGE }}/dist/*.whl
-      
-      - name: Push to Test PyPI (dry run)
-        if: ${{ github.event.inputs.dry_run == 'true' }}
-        working-directory: libs/${{ env.PACKAGE }}
-        env:
-          PIPY_USERNAME: ${{ secrets.PIPY_USERNAME }}
-          PIPY_PASSWORD: ${{ secrets.PIPY_PASSWORD }}
-        run: uv publish --username "$PIPY_USERNAME" --password "$PIPY_PASSWORD" --publish-url https://test.pypi.org/legacy/
-      
+            
       - name: Push to PyPI
         if: ${{ github.event.inputs.dry_run == false }}
         working-directory: libs/${{ env.PACKAGE }}
