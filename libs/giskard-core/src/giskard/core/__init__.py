@@ -9,6 +9,7 @@ import importlib.util
 
 from .discriminated import Discriminated, discriminated_base
 from .errors import Error
+from .rate_limiter import BaseRateLimiter, RateLimiter
 from .utils import NOT_PROVIDED, NotProvided, provide_not_none
 
 LEGACY_GISKARD_PACKAGE_NAME = "giskard"
@@ -32,6 +33,9 @@ __all__ = [
     "discriminated_base",
     # Error handling
     "Error",
+    # Rate limiters
+    "BaseRateLimiter",
+    "RateLimiter",
     # Utilities
     "NotProvided",
     "NOT_PROVIDED",
