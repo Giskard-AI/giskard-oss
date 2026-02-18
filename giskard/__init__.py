@@ -26,11 +26,7 @@ def get_version() -> str:
     try:
         res = importlib_metadata.version(__name__)
         if res is None:
-            # importlib_metadata can return None https://github.com/python/importlib_metadata/issues/371
-            # fallback to pkg_resources even if it's deprecated
-            import pkg_resources
-
-            return pkg_resources.get_distribution(__name__).version
+            return importlib_metadata.distribution(__name__).version
         return res
     except importlib_metadata.PackageNotFoundError:  # pragma: no cover
         return "unknown"

@@ -135,15 +135,20 @@ jobs:
         run: |
           df -h
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
+
       - name: Install dependencies (Windows)
         if: ${{ matrix.os == 'windows-2022' }}
         run: |
+          pdm config use_uv true
           pdm install -G :all --without tensorflow
           pdm list
 
       - name: Install dependencies
         if: ${{ matrix.os != 'windows-2022' }}
         run: |
+          pdm config use_uv true
           pdm install -G :all
           pdm list
 
@@ -357,9 +362,13 @@ jobs:
         uses: r-lib/actions/setup-pandoc@v2
         with:
           pandoc-version: "3.1.7" # https://github.com/jgm/pandoc/releases
+      - name: Install uv
+        uses: astral-sh/setup-uv@61cb8a9741eeb8a550a1b8544337180c0fc8476b # v7.2.0
 
       - name: Install dependencies
-        run: pdm install -G :all
+        run: |
+          pdm config use_uv true
+          pdm install -G :all
 
       - name: Check new disk space
         run: |

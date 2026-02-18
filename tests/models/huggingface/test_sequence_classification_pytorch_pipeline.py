@@ -9,17 +9,16 @@ from giskard.models.huggingface import HuggingFaceModel
 
 @pytest.mark.memory_expensive
 def test_sequence_classification_distilbert_base_uncased_pytorch_pipeline():
+    model_name = "distilbert/distilbert-base-uncased-finetuned-sst-2-english"
     text = "This was a masterpiece. Not completely faithful to the books, but enthralling from beginning to end. Might be my favorite of the three."
 
-    my_classifier = pipeline(task="sentiment-analysis", model="stevhliu/my_awesome_model")
+    my_classifier = pipeline(task="sentiment-analysis", model=model_name)
 
-    # The labels do not seem to correctly configured for "stevhliu/my_awesome_model" so we're using here the default
-    # labels provided by pipeline
-    label2id = {"LABEL_0": 0, "LABEL_1": 1}
+    label2id = {"NEGATIVE": 0, "POSITIVE": 1}
 
     raw_data = {
         "text": text,
-        "label": "LABEL_1",
+        "label": "POSITIVE",
     }
     test_df = pd.DataFrame(raw_data, columns=["text", "label"], index=[0])
 
@@ -29,7 +28,7 @@ def test_sequence_classification_distilbert_base_uncased_pytorch_pipeline():
         return df["text"].tolist()
 
     my_model = HuggingFaceModel(
-        name="stevhliu/my_awesome_model",
+        name=model_name,
         model=my_classifier,
         feature_names=feature_names,
         model_type="classification",
@@ -42,11 +41,10 @@ def test_sequence_classification_distilbert_base_uncased_pytorch_pipeline():
     predictions = my_model.predict(my_test_dataset).prediction
     assert list(my_test_dataset.df["label"]) == list(predictions)
 
-    # Try with multiple samples
-    text2 = "Give me a label 0!"
+    text2 = "This movie was terrible and boring."
     raw_data = {
         "text": [text, text2, text],
-        "label": ["LABEL_1", "LABEL_0", "LABEL_1"],
+        "label": ["POSITIVE", "NEGATIVE", "POSITIVE"],
     }
     test_df = pd.DataFrame(raw_data, columns=["text", "label"])
     my_test_dataset = Dataset(test_df, name="test dataset", target="label")
