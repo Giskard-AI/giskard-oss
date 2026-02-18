@@ -1,11 +1,11 @@
-from contextlib import asynccontextmanager
-from typing import Any, Self
+from contextlib import AbstractAsyncContextManager, nullcontext
+from typing import Any, cast
 
 import tenacity as t
-from giskard.core import BaseRateLimiter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..chat import Message
+from ..rate_limiter import RateLimiter, get_rate_limiter
 from .base import GenerationParams, Response
 from .retry import RetryPolicy
 
@@ -13,22 +13,42 @@ from .retry import RetryPolicy
 class WithRateLimiter(BaseModel):
     """Adds a rate limiter to the generator."""
 
-    rate_limiter: BaseRateLimiter | None = Field(default=None)
+    rate_limiter: RateLimiter | None = Field(default=None, validate_default=True)
 
-    def with_rate_limiter(self, rate_limiter: BaseRateLimiter | str | None) -> Self:
-        if isinstance(rate_limiter, str):
-            rate_limiter = BaseRateLimiter.from_id(rate_limiter)
+    @field_validator("rate_limiter", mode="before")
+    def _validate_rate_limiter(cls, v: RateLimiter | str | None) -> RateLimiter | None:
+        # Supported singleton semantics are implemented at the container level:
+        # - If a string is provided, it must already exist in the registry.
+        # - If a dict is provided (e.g. from JSON deserialization), we reuse an
+        #   already-registered instance when possible, otherwise we let Pydantic
+        #   create a new RateLimiter from the dict.
+        if v is None or isinstance(v, RateLimiter):
+            return v
 
-        return self.model_copy(update={"rate_limiter": rate_limiter})
+        if isinstance(v, str):
+            return get_rate_limiter(v)
 
-    @asynccontextmanager
-    async def _throttle(self):
+        if isinstance(v, dict):
+            rate_limiter_id = v.get("rate_limiter_id")
+            if rate_limiter_id:
+                try:
+                    return get_rate_limiter(rate_limiter_id)
+                except ValueError:
+                    return v  # let Pydantic create & register a new instance
+            return v
+
+        return v
+
+    def _rate_limiter_context(
+        self,
+    ) -> AbstractAsyncContextManager[RateLimiter | None, None]:
         if self.rate_limiter is None:
-            yield 0.0
-            return
+            return nullcontext(None)
 
-        async with self.rate_limiter.throttle() as waited:
-            yield waited
+        return cast(
+            AbstractAsyncContextManager[RateLimiter | None, None],
+            self.rate_limiter.throttle(),
+        )
 
 
 class WithRetryPolicy(BaseModel):
