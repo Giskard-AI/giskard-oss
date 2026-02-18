@@ -43,48 +43,73 @@ class LLMTrace(Trace[str, str], frozen=True):
         )
 
 
-def test_predefined_persona_accepted():
-    """Test predefined persona is accepted."""
-    simulator = PersonaSimulator(persona="frustrated_customer")
-    assert simulator.persona == "frustrated_customer"
+def create_mock_response(
+    goal_reached: bool,
+    message: str | None,
+    client_description: str | None = None,
+) -> dict[str, Any]:
+    """Helper to create mock response dictionaries."""
+    return {
+        "client_description": client_description,
+        "goal_reached": goal_reached,
+        "message": message,
+    }
 
 
-def test_predefined_persona_with_context():
-    """Test predefined persona with additional context."""
-    simulator = PersonaSimulator(persona="frustrated_customer", context="delayed order")
-    assert simulator.persona == "frustrated_customer"
-    assert simulator.context == "delayed order"
+async def advance_turn(
+    gen, trace: LLMTrace, response_text: str
+) -> tuple[LLMTrace, str]:
+    """Helper to advance generator by one turn and return updated trace and next input."""
+    next_input = await gen.asend(trace)
+    updated_trace = await trace.with_interaction(
+        Interaction(inputs=next_input, outputs=response_text)
+    )
+    return updated_trace, next_input
 
 
-def test_custom_persona_description():
-    """Test custom persona description (not predefined)."""
-    custom = "A polite elderly user who needs step-by-step guidance"
-    simulator = PersonaSimulator(persona=custom)
-    assert simulator.persona == custom
-
-
-def test_custom_persona_with_context():
-    """Test custom persona with context."""
-    custom = "A busy executive"
-    context = "Looking for quick answers"
-    simulator = PersonaSimulator(persona=custom, context=context)
-    assert simulator.persona == custom
+@pytest.mark.parametrize(
+    "persona,context,description",
+    [
+        ("frustrated_customer", None, "predefined persona without context"),
+        ("frustrated_customer", "delayed order", "predefined persona with context"),
+        (
+            "A polite elderly user who needs step-by-step guidance",
+            None,
+            "custom persona without context",
+        ),
+        (
+            "A busy executive",
+            "Looking for quick answers",
+            "custom persona with context",
+        ),
+    ],
+)
+def test_persona_and_context_assignment(persona, context, description):
+    """Test persona and context field assignments."""
+    simulator = PersonaSimulator(persona=persona, context=context)
+    assert simulator.persona == persona
     assert simulator.context == context
+
+
+def test_empty_persona_rejected():
+    """Test that empty persona string is rejected."""
+    with pytest.raises(ValueError, match="at least 1 character"):
+        PersonaSimulator(persona="")
+
+
+def test_negative_max_steps_rejected():
+    """Test that negative max_steps is rejected."""
+    with pytest.raises(ValueError, match="greater than or equal to 0"):
+        PersonaSimulator(persona="test_user", max_steps=-1)
 
 
 async def test_persona_simulator_first_turn_generates_client_description():
     """Test that first turn generates and stores client description."""
+    client_desc = "Sarah Martinez, 35, working professional"
     generator = MockPersonaGenerator(
         responses=[
-            {
-                "client_description": "Sarah Martinez, 35, working professional",
-                "goal_reached": False,
-                "message": "Hi, I need help with my order",
-            },
-            {
-                "goal_reached": True,
-                "message": None,
-            },
+            create_mock_response(False, "Hi, I need help with my order", client_desc),
+            create_mock_response(True, None),
         ]
     )
 
@@ -98,45 +123,30 @@ async def test_persona_simulator_first_turn_generates_client_description():
     trace = LLMTrace()
     gen = simulator(trace)
 
-    # First turn - should generate client description
-    inputs = await anext(gen)
-    assert inputs == "Hi, I need help with my order"
-    assert simulator._client_description == "Sarah Martinez, 35, working professional"
-
-    # Verify template received None for client_description (first turn)
+    first_input = await anext(gen)
+    assert first_input == "Hi, I need help with my order"
+    assert simulator._client_description == client_desc
     first_call_content = str(generator.calls[0][-1].content)
     assert "frustrated" in first_call_content.lower()
 
-    # Second turn - should use stored client description
     trace = await trace.with_interaction(
-        Interaction(inputs=inputs, outputs="How can I help?")
+        Interaction(inputs=first_input, outputs="How can I help?")
     )
-
     with pytest.raises(StopAsyncIteration):
-        _ = await gen.asend(trace)
+        await gen.asend(trace)
 
-    # Verify template received the client description (second turn)
     second_call_content = str(generator.calls[1][-1].content)
     assert "Sarah Martinez" in second_call_content
 
 
 async def test_persona_simulator_maintains_client_description_across_turns():
     """Test that same client description is used for all turns."""
+    client_desc = "John Doe, 40, tech-savvy"
     generator = MockPersonaGenerator(
         responses=[
-            {
-                "client_description": "John Doe, 40, tech-savvy",
-                "goal_reached": False,
-                "message": "First message",
-            },
-            {
-                "goal_reached": False,
-                "message": "Second message",
-            },
-            {
-                "goal_reached": True,
-                "message": None,
-            },
+            create_mock_response(False, "First message", client_desc),
+            create_mock_response(False, "Second message"),
+            create_mock_response(True, None),
         ]
     )
 
@@ -145,43 +155,29 @@ async def test_persona_simulator_maintains_client_description_across_turns():
     trace = LLMTrace()
     gen = simulator(trace)
 
-    # Turn 1
-    inputs1 = await anext(gen)
-    assert inputs1 == "First message"
-    assert simulator._client_description == "John Doe, 40, tech-savvy"
+    input1 = await anext(gen)
+    assert input1 == "First message"
+    assert simulator._client_description == client_desc
 
-    # Turn 2
-    trace = await trace.with_interaction(
-        Interaction(inputs=inputs1, outputs="Response 1")
-    )
-    inputs2 = await gen.asend(trace)
-    assert inputs2 == "Second message"
-    assert simulator._client_description == "John Doe, 40, tech-savvy"  # Same
+    trace, input2 = await advance_turn(gen, trace, "Response 1")
+    assert input2 == "Second message"
+    assert simulator._client_description == client_desc
 
-    # Turn 3
     trace = await trace.with_interaction(
-        Interaction(inputs=inputs2, outputs="Response 2")
+        Interaction(inputs=input2, outputs="Response 2")
     )
     with pytest.raises(StopAsyncIteration):
-        _ = await gen.asend(trace)
+        await gen.asend(trace)
 
-    # Client description should remain the same
-    assert simulator._client_description == "John Doe, 40, tech-savvy"
+    assert simulator._client_description == client_desc
 
 
 async def test_persona_simulator_respects_max_steps():
     """Test that simulator respects max_steps limit."""
     generator = MockPersonaGenerator(
         responses=[
-            {
-                "client_description": "Test User",
-                "goal_reached": False,
-                "message": "Message 1",
-            },
-            {
-                "goal_reached": False,
-                "message": "Message 2",
-            },
+            create_mock_response(False, "Message 1", "Test User"),
+            create_mock_response(False, "Message 2"),
         ]
     )
 
@@ -192,15 +188,14 @@ async def test_persona_simulator_respects_max_steps():
     trace = LLMTrace()
     gen = simulator(trace)
 
-    # First turn
-    inputs = await anext(gen)
-    assert inputs == "Message 1"
+    first_input = await anext(gen)
+    assert first_input == "Message 1"
     assert len(generator.calls) == 1
 
-    # Second turn should not happen (max_steps=1)
-    trace = await trace.with_interaction(Interaction(inputs=inputs, outputs="Response"))
+    trace = await trace.with_interaction(
+        Interaction(inputs=first_input, outputs="Response")
+    )
     with pytest.raises(StopAsyncIteration):
-        _ = await gen.asend(trace)
+        await gen.asend(trace)
 
-    # Should still only have 1 call
     assert len(generator.calls) == 1
