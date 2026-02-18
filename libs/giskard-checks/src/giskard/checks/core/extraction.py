@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, override
+from typing import Annotated, Any, override
 
 from giskard.core import NOT_PROVIDED, NotProvided
 from jsonpath_ng import (
@@ -15,9 +15,31 @@ from jsonpath_ng import (
     WhereNot,
     parse,
 )
-from pydantic import BaseModel, Field
+from jsonpath_ng.exceptions import JsonPathLexerError, JsonPathParserError
+from pydantic import AfterValidator, BaseModel, Field
 
 from .trace import Trace
+
+
+class _JsonPathStrMarker:
+    """Marker placed in JsonPathStr metadata. Used by the enforcement test."""
+
+
+def _validate_jsonpath_syntax(v: str) -> str:
+    if not v.startswith("trace."):
+        raise ValueError(
+            f"Invalid JSONPath expression {v!r}: path must start with 'trace.'"
+        )
+    try:
+        parse(v)
+        return v
+    except (JsonPathLexerError, JsonPathParserError) as e:
+        raise ValueError(f"Invalid JSONPath expression {v!r}: {e}") from e
+
+
+JsonPathStr = Annotated[
+    str, AfterValidator(_validate_jsonpath_syntax), _JsonPathStrMarker()
+]
 
 
 class NoMatch(BaseModel):
