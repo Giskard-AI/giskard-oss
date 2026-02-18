@@ -60,12 +60,12 @@ class PersonaSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
     """
 
     persona: str = Field(
-        ..., description="Predefined persona name or custom description"
+        ..., description="Predefined persona name or custom description", min_length=1
     )
     context: str | None = Field(
         default=None, description="Optional context to customize persona behavior"
     )
-    max_steps: int = Field(default=3)
+    max_steps: int = Field(default=3, ge=0)
 
     # Client description generated on first turn and reused
     _client_description: str | None = PrivateAttr(default=None)
