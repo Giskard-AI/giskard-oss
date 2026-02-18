@@ -30,15 +30,13 @@
 ## Install Giskard 🐢
 Install the latest version of Giskard from PyPi using pip:
 ```sh
-pip install --pre giskard
+pip install "giskard[llm]" -U
 ```
-Python >= 3.12 is required.
+We officially support Python 3.9, 3.10 and 3.11.
+## Try in Colab 📙
+[Open Colab notebook](https://colab.research.google.com/github/giskard-ai/giskard/blob/main/docs/getting_started/quickstart/quickstart_llm.ipynb)
 
-## Repository structure
-This repo is a Python workspace with three packages:
-- `giskard-core`
-- `giskard-checks`
-- `giskard-agents`
+______________________________________________________________________
 
 Giskard is an open-source Python library that **automatically detects performance, bias & security issues in AI applications**. The library covers LLM-based applications such as RAG agents, all the way to traditional ML models for tabular data.
 
@@ -101,17 +99,21 @@ Let's build an agent that answers questions about climate change, based on the 2
 
 Before starting let's install the required libraries:
 ```sh
-make setup
-make test
-make ci
+pip install langchain langchain-community langchain-openai tiktoken "pypdf<=3.17.0"
 ```
 
-## Community
-We welcome contributions from the AI community. Read the [contributing guide](./CONTRIBUTING.md) to get started, and join the community on [Discord](https://gisk.ar/discord).
 
-🌟 [Leave us a star](https://github.com/Giskard-AI/giskard) to help the project get discovered and keep the momentum.
+```python
+from langchain import FAISS, PromptTemplate
+from langchain_openai import OpenAIEmbeddings, OpenAI
+from langchain.document_loaders import PyPDFLoader
+from langchain.chains import RetrievalQA
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-❤️ If you find our work useful, consider [sponsoring us](https://github.com/sponsors/Giskard-AI) on GitHub. We also offer one-time sponsoring for consulting, workshops, or talks.
+# Prepare vector store (FAISS) with IPPC report
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100, add_start_index=True)
+loader = PyPDFLoader("https://www.ipcc.ch/report/ar6/syr/downloads/report/IPCC_AR6_SYR_LongerReport.pdf")
+db = FAISS.from_documents(loader.load_and_split(text_splitter), OpenAIEmbeddings())
 
 # Prepare QA chain
 PROMPT_TEMPLATE = """You are the Climate Assistant, a helpful AI assistant made by Giskard.
