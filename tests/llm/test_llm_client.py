@@ -127,6 +127,74 @@ def test_litellm_client_custom_model():
     assert f"Mock response - {message}" == response.content
 
 
+@pytest.mark.skipif(not PYDANTIC_V2, reason="LiteLLM raise an error with pydantic < 2")
+def test_litellm_client_custom_model_with_embeddings():
+    import litellm
+
+    from giskard.llm import get_default_client, set_llm_model
+    from giskard.llm.client import ChatMessage
+    from giskard.llm.embeddings import get_default_embedding, set_embedding_model
+
+    class MockLLMWithEmbeddings(litellm.CustomLLM):
+        def completion(self, model: str, messages: list, api_key: str, **kwargs) -> litellm.ModelResponse:
+            assert api_key == API_KEY, "Completion params are not passed properly"
+
+            return litellm.ModelResponse(
+                choices=[
+                    litellm.Choices(
+                        model=model,
+                        message=litellm.Message(
+                            role="assistant", content=f"Mock response - {messages[-1].get('content')}"
+                        ),
+                    )
+                ]
+            )
+
+        def embedding(self, model: str, input: list, api_key: str, **kwargs) -> litellm.EmbeddingResponse:
+            assert api_key == API_KEY, "Embedding params are not passed properly"
+
+            embeddings_data = []
+            for idx, _ in enumerate(input):
+                embedding_vector = [float(idx + i) for i in range(10)]
+                embeddings_data.append({"embedding": embedding_vector, "index": idx})
+
+            return litellm.EmbeddingResponse(
+                model=model,
+                data=embeddings_data,
+                object="list",
+            )
+
+    litellm.custom_provider_map = litellm.custom_provider_map + [
+        {"provider": "mock-embed", "custom_handler": MockLLMWithEmbeddings()}
+    ]
+
+    set_llm_model("mock-embed/faux-bot", api_key=API_KEY)
+    set_embedding_model("mock-embed/faux-bot", api_key=API_KEY)
+
+    llm_client = get_default_client()
+    cfg = llm_client.get_config()
+    assert cfg == {
+        "client_type": "LiteLLMClient",
+        "model": "mock-embed/faux-bot",
+        "disable_structured_output": False,
+        "completion_params": {"api_key": API_KEY},
+    }
+
+    message = "Mock input"
+    response = llm_client.complete([ChatMessage(role="user", content=message)])
+    assert f"Mock response - {message}" == response.content
+
+    embedding = get_default_embedding()
+    assert embedding.model == "mock-embed/faux-bot"
+
+    test_texts = ["Hello", "World"]
+    embeddings = embedding.embed(test_texts)
+
+    assert embeddings.shape == (2, 10)
+    assert embeddings[0][0] == 0.0
+    assert embeddings[1][0] == 1.0
+
+
 @pytest.mark.skipif(not PYDANTIC_V2, reason="Mistral raise an error with pydantic < 2")
 def test_mistral_client():
     from mistralai.models import ChatCompletionChoice, ChatCompletionResponse, UsageInfo
