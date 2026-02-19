@@ -65,7 +65,7 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
 
     @override
     def get_prompt(self) -> TemplateReference:
-        return TemplateReference(template_name="giskard.checks::checks/groundedness.j2")
+        return TemplateReference(template_name="giskard.checks::judges/groundedness.j2")
 
     @override
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:

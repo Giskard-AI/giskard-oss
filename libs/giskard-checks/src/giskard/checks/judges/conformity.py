@@ -51,7 +51,7 @@ class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
     @override
     def get_prompt(self) -> TemplateReference:
         """Return the Jinja2 template name for conformity evaluation."""
-        return TemplateReference(template_name="giskard.checks::checks/conformity.j2")
+        return TemplateReference(template_name="giskard.checks::judges/conformity.j2")
 
     @override
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
