@@ -55,6 +55,25 @@ class TestValidateJsonpathSyntax:
         with pytest.raises(ValueError, match="path must start with 'trace\\.'"):
             _validate_jsonpath_syntax("")
 
+    def test_just_prefix_is_invalid(self):
+        """JSONPath 'trace.' alone should fail parsing as it's incomplete."""
+        with pytest.raises(ValueError, match="Invalid JSONPath expression"):
+            _validate_jsonpath_syntax("trace.")
+
+    def test_prefix_is_case_sensitive(self):
+        """Prefix must be lowercase 'trace.', not 'Trace.' or 'TRACE.'"""
+        with pytest.raises(ValueError, match="path must start with 'trace\\.'"):
+            _validate_jsonpath_syntax("Trace.last.outputs")
+
+    def test_whitespace_prefix_is_invalid(self):
+        """Leading whitespace should be rejected."""
+        with pytest.raises(ValueError, match="path must start with 'trace\\.'"):
+            _validate_jsonpath_syntax(" trace.last.outputs")
+
+    def test_valid_descendants_operator(self):
+        """JSONPath descendants operator (..) should be valid."""
+        assert _validate_jsonpath_syntax("trace..outputs") == "trace..outputs"
+
 
 class TestJsonPathStrAnnotatedType:
     """Tests for JsonPathStr as a Pydantic Annotated field type."""
@@ -87,9 +106,11 @@ class TestJsonPathStrAnnotatedType:
         m = Model(key=None)
         assert m.key is None
 
-    def test_optional_jsonpath_str_validates_when_str(self):
+    def test_optional_jsonpath_str_validates_when_provided(self):
+        """Optional fields should still validate when a string value is provided."""
+
         class Model(BaseModel):
-            key: JsonPathStr | None = None
+            key: JsonPathStr | None
 
         with pytest.raises(ValidationError, match="Invalid JSONPath expression"):
             Model(key="trace.last.outputs[")
