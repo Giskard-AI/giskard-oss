@@ -5,19 +5,14 @@ from pathlib import Path
 
 from giskard.agents import add_prompts_path
 
-from . import builtin
+from . import builtin, judges
 from .builtin import (
-    BaseLLMCheck,
-    Conformity,
     Equals,
     FnCheck,
     GreaterEquals,
     GreaterThan,
-    Groundedness,
     LesserThan,
     LesserThanEquals,
-    LLMCheckResult,
-    LLMJudge,
     NotEquals,
     SemanticSimilarity,
     StringMatching,
@@ -38,6 +33,13 @@ from .core import (
 from .core.interaction import BaseInteractionSpec
 from .generators.user import UserSimulator
 from .interaction import InteractionSpec
+from .judges import (
+    BaseLLMCheck,
+    Conformity,
+    Groundedness,
+    LLMCheckResult,
+    LLMJudge,
+)
 from .scenarios.builder import ScenarioBuilder, scenario
 from .scenarios.runner import ScenarioRunner
 from .settings import get_default_generator, set_default_generator
@@ -61,6 +63,7 @@ add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.checks")
 __all__ = [
     # Modules
     "builtin",
+    "judges",
     # Core classes
     "Check",
     "CheckResult",
