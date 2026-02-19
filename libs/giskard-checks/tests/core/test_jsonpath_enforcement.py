@@ -12,14 +12,24 @@ JSONPATH_FIELD = re.compile(r"^(key|.+_key)$")
 
 
 def _all_check_subclasses(cls):
-    """Recursively yield all concrete subclasses of cls."""
+    """Recursively yield all concrete and abstract subclasses of cls.
+
+    This ensures all Check subclasses follow the JsonPathStr convention,
+    even if they're abstract base classes.
+    """
     for sub in cls.__subclasses__():
         yield sub
         yield from _all_check_subclasses(sub)
 
 
 def _annotation_has_marker(annotation) -> bool:
-    """Recursively check if an annotation contains _JsonPathStrMarker."""
+    """Recursively check if an annotation contains _JsonPathStrMarker.
+
+    This handles complex type annotations like:
+    - Annotated[str, AfterValidator(...), _JsonPathStrMarker()]
+    - JsonPathStr | None
+    - JsonPathStr | NotProvided
+    """
     if get_origin(annotation) is Annotated:
         return any(isinstance(m, _JsonPathStrMarker) for m in get_args(annotation)[1:])
     origin = get_origin(annotation)
@@ -43,6 +53,14 @@ def _has_jsonpath_marker(field_info) -> bool:
 
 
 def test_all_jsonpath_fields_use_jsonpath_str():
+    """Enforce that all JSONPath fields use the JsonPathStr type.
+
+    This architectural constraint ensures:
+    1. JSONPath syntax is validated at model creation time
+    2. All JSONPath expressions start with 'trace.' prefix
+    3. API consistency across all Check subclasses
+    4. Better error messages for users when they provide invalid paths
+    """
     violations = []
     for cls in _all_check_subclasses(Check):
         if not hasattr(cls, "model_fields"):
