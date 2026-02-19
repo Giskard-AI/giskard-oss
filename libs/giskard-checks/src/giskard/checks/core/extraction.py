@@ -25,8 +25,11 @@ class _JsonPathStrMarker:
     """Marker placed in JsonPathStr metadata. Used by the enforcement test."""
 
 
+_REQUIRED_JSONPATH_PREFIX = "trace."
+
+
 def _validate_jsonpath_syntax(v: str) -> str:
-    if not v.startswith("trace."):
+    if not v.startswith(_REQUIRED_JSONPATH_PREFIX):
         raise ValueError(
             f"Invalid JSONPath expression {v!r}: path must start with 'trace.'"
         )
