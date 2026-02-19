@@ -164,6 +164,7 @@ async def test_generator_with_params_overwrite(mock_response):
     generator = LiteLLMGenerator(model="test-model").with_params(
         temperature=0.5,  # This should be preserved.
         max_tokens=100,  # This should be overwritten.
+        timeout=30,  # This should be overwritten.
     )
 
     with patch(
@@ -173,7 +174,7 @@ async def test_generator_with_params_overwrite(mock_response):
         # ACT: Call complete() with overriding parameters.
         await generator.complete(
             messages=[Message(role="user", content="Test message")],
-            params=GenerationParams(max_tokens=200),
+            params=GenerationParams(max_tokens=200, timeout=60),
         )
 
         # ASSERT: Verify that parameters were merged correctly.
@@ -184,5 +185,8 @@ async def test_generator_with_params_overwrite(mock_response):
         )  # Preserved from the generator's params.
         assert (
             call_kwargs["max_tokens"] == 200
+        )  # Overwritten by the complete() call's params.
+        assert (
+            call_kwargs["timeout"] == 60
         )  # Overwritten by the complete() call's params.
         assert call_kwargs["model"] == "test-model"
