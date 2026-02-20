@@ -21,8 +21,8 @@ from pydantic import AfterValidator, BaseModel, Field
 from .trace import Trace
 
 
-class _JsonPathStrMarker:
-    """Marker placed in JsonPathStr metadata. Used by the enforcement test."""
+class _JSONPathStrMarker:
+    """Marker placed in JSONPathStr metadata. Used by the enforcement test."""
 
 
 _REQUIRED_JSONPATH_PREFIX = "trace."
@@ -40,8 +40,8 @@ def _validate_jsonpath_syntax(v: str) -> str:
         raise ValueError(f"Invalid JSONPath expression {v!r}: {e}") from e
 
 
-JsonPathStr = Annotated[
-    str, AfterValidator(_validate_jsonpath_syntax), _JsonPathStrMarker()
+JSONPathStr = Annotated[
+    str, AfterValidator(_validate_jsonpath_syntax), _JSONPathStrMarker()
 ]
 
 

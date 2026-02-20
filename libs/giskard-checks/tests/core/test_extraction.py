@@ -1,7 +1,7 @@
 """Unit tests for JSONPath validation in extraction.py."""
 
 import pytest
-from giskard.checks.core.extraction import JsonPathStr, _validate_jsonpath_syntax
+from giskard.checks.core.extraction import JSONPathStr, _validate_jsonpath_syntax
 from pydantic import BaseModel, ValidationError
 
 
@@ -75,33 +75,33 @@ class TestValidateJsonpathSyntax:
         assert _validate_jsonpath_syntax("trace..outputs") == "trace..outputs"
 
 
-class TestJsonPathStrAnnotatedType:
-    """Tests for JsonPathStr as a Pydantic Annotated field type."""
+class TestJSONPathStrAnnotatedType:
+    """Tests for JSONPathStr as a Pydantic Annotated field type."""
 
     def test_valid_path_accepted(self):
         class Model(BaseModel):
-            key: JsonPathStr
+            key: JSONPathStr
 
         m = Model(key="trace.last.outputs")
         assert m.key == "trace.last.outputs"
 
     def test_invalid_syntax_raises_validation_error(self):
         class Model(BaseModel):
-            key: JsonPathStr
+            key: JSONPathStr
 
         with pytest.raises(ValidationError, match="Invalid JSONPath expression"):
             Model(key="trace.last.outputs[")
 
     def test_missing_trace_prefix_raises_validation_error(self):
         class Model(BaseModel):
-            key: JsonPathStr
+            key: JSONPathStr
 
         with pytest.raises(ValidationError, match="path must start with 'trace\\.'"):
             Model(key="last.outputs")
 
     def test_optional_jsonpath_str_accepts_none(self):
         class Model(BaseModel):
-            key: JsonPathStr | None = None
+            key: JSONPathStr | None = None
 
         m = Model(key=None)
         assert m.key is None
@@ -110,7 +110,7 @@ class TestJsonPathStrAnnotatedType:
         """Optional fields should still validate when a string value is provided."""
 
         class Model(BaseModel):
-            key: JsonPathStr | None
+            key: JSONPathStr | None
 
         with pytest.raises(ValidationError, match="Invalid JSONPath expression"):
             Model(key="trace.last.outputs[")
