@@ -133,8 +133,10 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     async def with_interaction(
         self,
-        interaction: Interaction[InputType, OutputType]
-        | InteractionGenerator[Interaction[InputType, OutputType], Self],
+        interaction: (
+            Interaction[InputType, OutputType]
+            | InteractionGenerator[Interaction[InputType, OutputType], Self]
+        ),
     ) -> Self:
         if isinstance(interaction, Interaction):
             return self.model_copy(

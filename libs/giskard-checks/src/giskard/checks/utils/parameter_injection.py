@@ -125,17 +125,21 @@ class CallableInjectionMapping(BaseModel, frozen=True):
                 )
 
             injection = ParameterInjection(
-                position=idx
-                if parameter.kind
-                in (
-                    inspect.Parameter.POSITIONAL_ONLY,
-                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                )
-                else None,
+                position=(
+                    idx
+                    if parameter.kind
+                    in (
+                        inspect.Parameter.POSITIONAL_ONLY,
+                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    )
+                    else None
+                ),
                 name=param_name,
-                class_info=param_annotation
-                if param_annotation is not inspect.Parameter.empty
-                else matching_req.class_info,
+                class_info=(
+                    param_annotation
+                    if param_annotation is not inspect.Parameter.empty
+                    else matching_req.class_info
+                ),
             )
 
             if injection.position is not None:
