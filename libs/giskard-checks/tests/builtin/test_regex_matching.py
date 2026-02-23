@@ -95,22 +95,19 @@ async def test_regex_case_sensitive() -> None:
     check = RegexMatching(
         text="Hello WORLD",
         pattern=r"world",
-        ignore_case=False,
     )
     result = await check.run(Trace())
     assert result.status == CheckStatus.FAIL
 
 
 async def test_regex_case_insensitive() -> None:
-    """Test case-insensitive regex matching."""
+    """Test case-insensitive regex matching using inline modifier."""
     check = RegexMatching(
         text="Hello WORLD",
-        pattern=r"world",
-        ignore_case=True,
+        pattern=r"(?i)world",
     )
     result = await check.run(Trace())
     assert result.status == CheckStatus.PASS
-    assert result.details["ignore_case"] is True
 
 
 # Invalid regex patterns
@@ -203,43 +200,37 @@ async def test_regex_extract_both_from_trace() -> None:
 
 # Multiline and dotall flags
 async def test_regex_multiline_flag() -> None:
-    """Test regex with multiline flag."""
+    """Test regex with multiline inline modifier."""
     check = RegexMatching(
         text="Line 1\nLine 2\nLine 3",
-        pattern=r"^Line 2$",
-        multiline=True,
+        pattern=r"(?m)^Line 2$",
     )
     result = await check.run(Trace())
-    # With MULTILINE, ^ and $ match line boundaries
+    # With (?m), ^ and $ match line boundaries
     assert result.status == CheckStatus.PASS
-    assert result.details["multiline"] is True
 
 
 async def test_regex_dotall_flag() -> None:
-    """Test regex with dotall flag."""
+    """Test regex with dotall inline modifier."""
     check = RegexMatching(
         text="Line 1\nLine 2",
-        pattern=r"Line 1.Line 2",
-        dotall=True,
+        pattern=r"(?s)Line 1.Line 2",
     )
     result = await check.run(Trace())
-    # With DOTALL, . matches newlines
+    # With (?s), . matches newlines
     assert result.status == CheckStatus.PASS
-    assert result.details["dotall"] is True
 
 
 async def test_regex_ascii_flag() -> None:
-    """Test regex with ASCII flag."""
+    """Test regex with ASCII inline modifier."""
     check = RegexMatching(
         text="café",
-        pattern=r"\w+",
-        ascii_only=True,
+        pattern=r"(?a)\w+",
     )
     result = await check.run(Trace())
-    # With ASCII flag, \w only matches [a-zA-Z0-9_]
+    # With (?a), \w only matches [a-zA-Z0-9_]
     # So it won't match the é
     assert result.status == CheckStatus.PASS  # Still matches "caf"
-    assert result.details["ascii_only"] is True
 
 
 # Special regex features
@@ -268,10 +259,9 @@ async def test_regex_inline_flags() -> None:
     check = RegexMatching(
         text="Hello WORLD",
         pattern=r"(?i)world",
-        ignore_case=False,
     )
     result = await check.run(Trace())
-    # Inline flag should work regardless of ignore_case parameter
+    # Inline flag should work
     assert result.status == CheckStatus.PASS
 
 

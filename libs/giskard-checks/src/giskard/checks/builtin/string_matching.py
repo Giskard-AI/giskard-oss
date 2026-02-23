@@ -2,7 +2,7 @@
 
 This module provides checks for text matching:
 - StringMatching: Literal substring matching with normalization
-- RegexMatching: Regular expression pattern matching with flags
+- RegexMatching: Regular expression pattern matching
 """
 
 from __future__ import annotations
@@ -326,15 +326,15 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
 class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     TextBasedCheck[InputType, OutputType, TraceType]
 ):
-    """Check that validates if a regex pattern matches within text.
+    r"""Check that validates if a regex pattern matches within text.
 
-    This check performs regex pattern matching with explicit flag control.
+    This check performs regex pattern matching using standard Python re module.
     The pattern is matched against the raw text without any normalization,
-    giving users full control through regex syntax and flags.
+    giving users full control through regex syntax.
 
     The matching process:
     1. Extracts text and pattern (from provided values or trace)
-    2. Compiles regex pattern with specified flags
+    2. Compiles regex pattern
     3. Checks if pattern matches anywhere in the text using re.search()
 
     Attributes
@@ -349,14 +349,6 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         The regex pattern to search for. Either this or pattern_key must be provided.
     pattern_key : str | None
         JSONPath expression to extract pattern from trace.
-    ignore_case : bool
-        If True, applies re.IGNORECASE flag (case-insensitive matching). Defaults to False.
-    multiline : bool
-        If True, applies re.MULTILINE flag (^ and $ match line boundaries). Defaults to False.
-    dotall : bool
-        If True, applies re.DOTALL flag (. matches newlines). Defaults to False.
-    ascii_only : bool
-        If True, applies re.ASCII flag (\\w, \\b, etc. match ASCII only). Defaults to False.
 
     Examples
     --------
@@ -364,30 +356,28 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
 
         check = RegexMatching(
             text="Price: $10.99",
-            pattern=r"\\$\\d+\\.\\d{2}"
+            pattern=r"\$\d+\.\d{2}"
         )
 
     Email validation::
 
         check = RegexMatching(
             text="Contact: user@example.com",
-            pattern=r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+            pattern=r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
         )
 
-    Case-insensitive matching::
+    Case-insensitive matching (using inline modifier)::
 
         check = RegexMatching(
             text="The ANSWER is 42",
-            pattern=r"answer.*\\d+",
-            ignore_case=True
+            pattern=r"(?i)answer.*\d+"
         )
 
-    Multiline matching with anchors::
+    Multiline matching with anchors (using inline modifier)::
 
         check = RegexMatching(
             text="Line 1\\nLine 2\\nLine 3",
-            pattern=r"^Line 2$",
-            multiline=True
+            pattern=r"(?m)^Line 2$"
         )
 
     Extract from trace::
@@ -401,7 +391,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
 
         check = RegexMatching(
             text="Call me at 555-123-4567",
-            pattern=r"\\d{3}-\\d{3}-\\d{4}"
+            pattern=r"\d{3}-\d{3}-\d{4}"
         )
     """
 
@@ -412,22 +402,6 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     pattern_key: str | None = Field(
         default=None,
         description="JSONPath expression to extract the pattern from the trace.",
-    )
-    ignore_case: bool = Field(
-        default=False,
-        description="If True, pattern matching is case-insensitive (re.IGNORECASE).",
-    )
-    multiline: bool = Field(
-        default=False,
-        description="If True, ^ and $ match line boundaries (re.MULTILINE).",
-    )
-    dotall: bool = Field(
-        default=False,
-        description="If True, . matches newlines (re.DOTALL).",
-    )
-    ascii_only: bool = Field(
-        default=False,
-        description="If True, \\w, \\b, etc. match ASCII only (re.ASCII).",
     )
 
     @model_validator(mode="after")
@@ -464,7 +438,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         -------
         CheckResult
             Success if pattern matches text, failure if it doesn't or if regex is invalid.
-            Includes details about the text, pattern, and regex flags.
+            Includes details about the text and pattern.
         """
         # Extract and validate using base class
         result = self._extract_and_validate(
@@ -479,26 +453,9 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         # Extract successful values
         text, pattern, details = result[0], result[1], result[2]
 
-        # Add regex-specific details
-        details["ignore_case"] = self.ignore_case
-        details["multiline"] = self.multiline
-        details["dotall"] = self.dotall
-        details["ascii_only"] = self.ascii_only
-
-        # Build regex flags
-        flags = 0
-        if self.ignore_case:
-            flags |= re.IGNORECASE
-        if self.multiline:
-            flags |= re.MULTILINE
-        if self.dotall:
-            flags |= re.DOTALL
-        if self.ascii_only:
-            flags |= re.ASCII
-
         # Try to compile and match
         try:
-            if re.search(pattern, text, flags):
+            if re.search(pattern, text):
                 return CheckResult.success(
                     message=f"Text matches the regex pattern '{pattern}'.",
                     details=details,
