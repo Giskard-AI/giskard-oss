@@ -1,7 +1,7 @@
 from collections.abc import AsyncGenerator
 from typing import override
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field
 
 from ..core.input_generator import InputGenerator
 from ..core.mixin import WithGeneratorMixin
@@ -9,12 +9,8 @@ from ..core.trace import Trace
 
 
 class PersonaSimulatorOutput(BaseModel):
-    """Output from PersonaSimulator including client description for consistency."""
+    """Output from PersonaSimulator."""
 
-    client_description: str | None = Field(
-        default=None,
-        description="Detailed description of the specific client being simulated. Generated on first turn, None on subsequent turns.",
-    )
     goal_reached: bool = Field(
         ...,
         description="Whether the goal has been reached.",
@@ -29,12 +25,15 @@ class PersonaSimulatorOutput(BaseModel):
 class PersonaSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     InputGenerator[str, TraceType], WithGeneratorMixin
 ):
-    """User simulation with custom personas.
+    """User simulation with predefined or custom personas.
+
+    Accepts either a predefined persona name (e.g., "frustrated_customer") or a custom
+    persona description. No client description is generated; the persona is used directly.
 
     Parameters
     ----------
     persona : str
-        Persona description (e.g., "A polite elderly user who needs step-by-step guidance")
+        Predefined persona name or custom persona description
     context : str | None
         Optional context to customize the persona's behavior
     max_steps : int
@@ -48,14 +47,13 @@ class PersonaSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
     ... )
     """
 
-    persona: str = Field(..., description="Persona description", min_length=1)
+    persona: str = Field(
+        ..., description="Predefined persona name or custom description", min_length=1
+    )
     context: str | None = Field(
         default=None, description="Optional context to customize persona behavior"
     )
     max_steps: int = Field(default=3, ge=0)
-
-    # Client description generated on first turn and reused
-    _client_description: str | None = PrivateAttr(default=None)
 
     @override
     async def __call__(self, trace: TraceType) -> AsyncGenerator[str, TraceType]:
@@ -65,20 +63,13 @@ class PersonaSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
 
         step = 0
         while step < self.max_steps:
-            # First turn: no client description yet
-            # Subsequent turns: pass existing client description
             chat = await persona_generator_workflow_.with_inputs(
                 persona=self.persona,
                 context=self.context,
-                client_description=self._client_description,
                 history=trace,
             ).run()
 
             output = chat.output
-
-            # Store client description from first turn
-            if output.client_description and not self._client_description:
-                self._client_description = output.client_description
 
             if output.goal_reached or not output.message:
                 return

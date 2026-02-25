@@ -46,11 +46,9 @@ class LLMTrace(Trace[str, str], frozen=True):
 def create_mock_response(
     goal_reached: bool,
     message: str | None,
-    client_description: str | None = None,
 ) -> dict[str, Any]:
     """Helper to create mock response dictionaries."""
     return {
-        "client_description": client_description,
         "goal_reached": goal_reached,
         "message": message,
     }
@@ -103,12 +101,11 @@ def test_negative_max_steps_rejected():
         PersonaSimulator(persona="test_user", max_steps=-1)
 
 
-async def test_persona_simulator_first_turn_generates_client_description():
-    """Test that first turn generates and stores client description."""
-    client_desc = "Sarah Martinez, 35, working professional"
+async def test_persona_simulator_first_turn_generates_message():
+    """Test that first turn generates a message from persona."""
     generator = MockPersonaGenerator(
         responses=[
-            create_mock_response(False, "Hi, I need help with my order", client_desc),
+            create_mock_response(False, "Hi, I need help with my order"),
             create_mock_response(True, None),
         ]
     )
@@ -125,7 +122,6 @@ async def test_persona_simulator_first_turn_generates_client_description():
 
     first_input = await anext(gen)
     assert first_input == "Hi, I need help with my order"
-    assert simulator._client_description == client_desc
     first_call_content = str(generator.calls[0][-1].content)
     assert "frustrated" in first_call_content.lower()
 
@@ -135,33 +131,29 @@ async def test_persona_simulator_first_turn_generates_client_description():
     with pytest.raises(StopAsyncIteration):
         await gen.asend(trace)
 
-    second_call_content = str(generator.calls[1][-1].content)
-    assert "Sarah Martinez" in second_call_content
 
-
-async def test_persona_simulator_maintains_client_description_across_turns():
-    """Test that same client description is used for all turns."""
-    client_desc = "John Doe, 40, tech-savvy"
+async def test_persona_simulator_multi_turn_flow():
+    """Test multi-turn flow with persona."""
     generator = MockPersonaGenerator(
         responses=[
-            create_mock_response(False, "First message", client_desc),
+            create_mock_response(False, "First message"),
             create_mock_response(False, "Second message"),
             create_mock_response(True, None),
         ]
     )
 
-    simulator = PersonaSimulator(generator=generator, persona="power_user", max_steps=3)
+    simulator = PersonaSimulator(
+        generator=generator, persona="helpful_user", max_steps=3
+    )
 
     trace = LLMTrace()
     gen = simulator(trace)
 
     input1 = await anext(gen)
     assert input1 == "First message"
-    assert simulator._client_description == client_desc
 
     trace, input2 = await advance_turn(gen, trace, "Response 1")
     assert input2 == "Second message"
-    assert simulator._client_description == client_desc
 
     trace = await trace.with_interaction(
         Interaction(inputs=input2, outputs="Response 2")
@@ -169,14 +161,12 @@ async def test_persona_simulator_maintains_client_description_across_turns():
     with pytest.raises(StopAsyncIteration):
         await gen.asend(trace)
 
-    assert simulator._client_description == client_desc
-
 
 async def test_persona_simulator_respects_max_steps():
     """Test that simulator respects max_steps limit."""
     generator = MockPersonaGenerator(
         responses=[
-            create_mock_response(False, "Message 1", "Test User"),
+            create_mock_response(False, "Message 1"),
             create_mock_response(False, "Message 2"),
         ]
     )
