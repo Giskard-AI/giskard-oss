@@ -1,4 +1,4 @@
-"""String matching check implementations.
+"""Text matching check implementations.
 
 This module provides checks for text matching:
 - StringMatching: Literal substring matching with normalization
