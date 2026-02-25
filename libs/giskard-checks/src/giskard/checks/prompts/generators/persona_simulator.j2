@@ -1,27 +1,8 @@
-{# Predefined persona descriptions #}
-{% set predefined_personas = {
-    "helpful_user": "You are a cooperative user with clear communication who provides necessary information.",
-    "confused_user": "You are a confused user who gives unclear requests and needs frequent clarifications.",
-    "novice_user": "You are a novice user with limited technical knowledge who needs guidance.",
-    "frustrated_customer": "You are a frustrated customer who is emotional and has an escalating tone when things don't work.",
-    "impatient_user": "You are an impatient user who sends short messages and wants quick answers.",
-    "verbose_user": "You are a verbose user who provides overly detailed, rambling responses with too much context.",
-    "non_native_speaker": "You are a non-native speaker with grammar issues, typos, and limited vocabulary.",
-    "detail_oriented_user": "You are a detail-oriented user who asks clarifying questions and wants specific, precise information.",
-} %}
-
-{# Resolve persona: use predefined if exists, otherwise treat as custom description #}
-{% if persona in predefined_personas %}
-    {% set persona_description = predefined_personas[persona] %}
-{% else %}
-    {% set persona_description = persona %}
-{% endif %}
-
 {# Combine persona description with context if provided #}
 {% if context %}
-    {% set full_instructions = persona_description ~ "\n\nContext: " ~ context %}
+    {% set full_instructions = persona ~ "\n\nContext: " ~ context %}
 {% else %}
-    {% set full_instructions = persona_description %}
+    {% set full_instructions = persona %}
 {% endif %}
 
 You are simulating a specific user/client in a test case scenario. You will maintain this client's characteristics consistently throughout the entire conversation.

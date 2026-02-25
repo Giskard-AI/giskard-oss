@@ -70,8 +70,8 @@ async def advance_turn(
 @pytest.mark.parametrize(
     "persona,context,description",
     [
-        ("frustrated_customer", None, "predefined persona without context"),
-        ("frustrated_customer", "delayed order", "predefined persona with context"),
+        ("frustrated_customer", None, "persona without context"),
+        ("frustrated_customer", "delayed order", "persona with context"),
         (
             "A polite elderly user who needs step-by-step guidance",
             None,

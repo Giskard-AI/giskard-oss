@@ -29,39 +29,26 @@ class PersonaSimulatorOutput(BaseModel):
 class PersonaSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     InputGenerator[str, TraceType], WithGeneratorMixin
 ):
-    """User simulation with predefined or custom personas.
-
-    Accepts either:
-    - Predefined persona name (e.g., "frustrated_customer")
-    - Custom persona description (e.g., "A polite elderly user")
+    """User simulation with custom personas.
 
     Parameters
     ----------
     persona : str
-        Either a predefined persona name or a custom persona description
+        Persona description (e.g., "A polite elderly user who needs step-by-step guidance")
     context : str | None
-        Optional additional context to customize the persona's behavior
+        Optional context to customize the persona's behavior
     max_steps : int
         Maximum number of conversation turns (default: 3)
 
     Examples
     --------
-    >>> # Predefined persona
-    >>> simulator = PersonaSimulator(
-    ...     persona="frustrated_customer",
-    ...     context="Complain about a delayed order"
-    ... )
-
-    >>> # Custom persona
     >>> simulator = PersonaSimulator(
     ...     persona="A polite elderly user who needs step-by-step guidance",
     ...     context="Ask about using the mobile app"
     ... )
     """
 
-    persona: str = Field(
-        ..., description="Predefined persona name or custom description", min_length=1
-    )
+    persona: str = Field(..., description="Persona description", min_length=1)
     context: str | None = Field(
         default=None, description="Optional context to customize persona behavior"
     )
