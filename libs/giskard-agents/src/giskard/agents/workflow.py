@@ -361,7 +361,9 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         ChatWorkflow
             A new workflow with the parsed messages.
         """
-        parsed = [Message.model_validate(m) for m in messages]
+        parsed: list[Message | MessageTemplate | TemplateReference] = [
+            Message.model_validate(m) for m in messages
+        ]
         return cls(generator=generator, messages=parsed, **kwargs)
 
     def on_error(self, error_policy: ErrorPolicy) -> Self:

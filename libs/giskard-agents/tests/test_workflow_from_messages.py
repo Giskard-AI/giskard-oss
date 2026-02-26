@@ -46,12 +46,17 @@ async def test_from_messages_preserves_roles_and_content():
         ],
     )
 
-    assert wf.messages[0].role == "system"
-    assert wf.messages[0].content == "System prompt."
-    assert wf.messages[1].role == "user"
-    assert wf.messages[1].content == "User says hello."
-    assert wf.messages[2].role == "assistant"
-    assert wf.messages[2].content == "Assistant responds."
+    msg0, msg1, msg2 = wf.messages
+    assert isinstance(msg0, Message)
+    assert isinstance(msg1, Message)
+    assert isinstance(msg2, Message)
+
+    assert msg0.role == "system"
+    assert msg0.content == "System prompt."
+    assert msg1.role == "user"
+    assert msg1.content == "User says hello."
+    assert msg2.role == "assistant"
+    assert msg2.content == "Assistant responds."
 
 
 async def test_from_messages_with_tool_calls():
