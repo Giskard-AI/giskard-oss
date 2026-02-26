@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Self
+from typing import Any, Self
 
 from pydantic import BaseModel, Field
 
@@ -52,6 +52,10 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
     trace_type: type[TraceType] | None = Field(
         default=None,
         description="Optional custom trace type. If not provided, will be inferred from components.",
+    )
+    annotations: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Scenario-level annotations.",
     )
 
     def interact(
@@ -381,6 +385,15 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         self.sequence.extend(components)
         return self
 
+    def with_annotations(self, annotations: dict[str, Any]) -> Self:
+        """Set scenario-level annotations for the builder.
+
+        Annotations provide shared, read-only context available on the Trace
+        as `trace.annotations` during scenario execution.
+        """
+        self.annotations = annotations
+        return self
+
     def build(self) -> Scenario[InputType, OutputType, TraceType]:
         """Build the scenario from the accumulated sequence.
 
@@ -393,6 +406,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
             name=self.name,
             sequence=self.sequence,
             trace_type=self.trace_type,
+            annotations=self.annotations,
         )
 
     async def run(
@@ -430,6 +444,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
 def scenario[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     name: str | None = None,
     trace_type: type[TraceType] | None = None,
+    annotations: dict[str, Any] | None = None,
 ) -> ScenarioBuilder[InputType, OutputType, TraceType]:
     """Create a new scenario builder.
 
@@ -462,4 +477,5 @@ def scenario[InputType, OutputType, TraceType: Trace](  # pyright: ignore[report
     return ScenarioBuilder(
         name=name or "Unnamed Scenario",
         trace_type=trace_type,
+        annotations=annotations or {},
     )

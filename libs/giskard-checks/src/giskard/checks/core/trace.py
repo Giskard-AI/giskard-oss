@@ -86,6 +86,10 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     """
 
     interactions: list[Interaction[InputType, OutputType]] = Field(default_factory=list)
+    annotations: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Shared Scenario/Trace-level annotations.",
+    )
 
     @computed_field
     @property

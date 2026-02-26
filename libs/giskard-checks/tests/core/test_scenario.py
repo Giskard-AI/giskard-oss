@@ -12,7 +12,9 @@ from giskard.checks import (
     Check,
     CheckResult,
     Interaction,
+    Scenario,
     Trace,
+    from_fn,
     scenario,
 )
 
@@ -613,6 +615,39 @@ class TestScenarioEdgeCases:
             interaction.inputs for interaction in result.final_trace.interactions
         ]
         assert interaction_inputs == ["0", "1", "2"]
+
+    async def test_scenario_annotations_propagated_to_trace(self):
+        """Test that scenario annotations are visible on the final trace."""
+        s = Scenario(
+            name="annotations_scenario",
+            annotations={"my_key": "my_value"},
+            sequence=[],
+        )
+
+        result = await s.run()
+
+        assert result.passed
+        assert result.final_trace.annotations == {"my_key": "my_value"}
+
+    async def test_scenario_builder_with_annotations_and_equals_check(self):
+        """Builder annotations should be available via trace.annotations in checks."""
+        result = await (
+            scenario("annotations_builder")
+            .with_annotations({"my_key": "my_value"})
+            .interact("Hello", "my_value")
+            .check(
+                from_fn(
+                    lambda trace: (
+                        trace.last is not None
+                        and trace.annotations["my_key"] == trace.last.outputs
+                    ),
+                    name="output_matches_annotation",
+                )
+            )
+            .run()
+        )
+
+        assert result.passed
 
     async def test_scenario_with_multiple_consecutive_checks(self):
         """Test scenario with multiple consecutive checks."""
