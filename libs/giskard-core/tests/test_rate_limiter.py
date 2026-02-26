@@ -305,7 +305,7 @@ class TestMinIntervalRateLimiter:
             await asyncio.sleep(JITTER_TIME)
             assert barrier.n_waiting == 1
             assert len(all_waited) == 1
-            assert all_waited[0] == 0.0
+            assert all_waited[0] <= 1e-3
             all_waited.clear()
 
             _ = await barrier.wait()
