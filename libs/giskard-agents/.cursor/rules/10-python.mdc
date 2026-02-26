@@ -38,8 +38,8 @@ alwaysApply: false
 ## Async Patterns
 
 - All workflow execution is async. Never use blocking calls inside async code.
-- Use `asyncio.gather` for parallel execution (see `pipeline.py`)
-- Generator backends must implement `async def complete(...)` and `async def stream(...)`
+- Use `asyncio.gather` for parallel execution (see `run_many` / `run_batch` in `workflow.py`)
+- Generator backends must implement `async def _complete(...)`
 
 ## Error Handling
 

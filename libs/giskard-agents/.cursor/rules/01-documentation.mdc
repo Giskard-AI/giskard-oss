@@ -17,13 +17,14 @@ Every public class, method, and function **must** have a docstring that includes
 
 ```python
 # Good
-async def run(self, **kwargs) -> Chat:
+async def run(self, max_steps: int | None = None) -> Chat:
     """Execute the workflow and return the resulting chat.
 
     Parameters
     ----------
-    kwargs
-        Input variables for template rendering.
+    max_steps : int, optional
+        The number of steps to run. If not provided, the workflow
+        will run until the chat is complete.
 
     Returns
     -------

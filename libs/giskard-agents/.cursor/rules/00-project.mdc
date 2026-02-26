@@ -12,7 +12,7 @@ alwaysApply: false
 
 - **Generator** — wraps a model (via LiteLLM) and exposes `.chat()` / `.template()` to build workflows.
 - **ChatWorkflow** — the builder that assembles messages, tools, inputs, and output schemas, then runs completions.
-- **Chat / Message** — immutable result objects returned after a workflow run.
+- **Chat / Message** — result objects returned after a workflow run.
 - **Tool** — a decorated Python function the LLM can call. Defined with `@agents.tool`.
 - **RunContext** — shared key-value store passed to tools during a run.
 - **ErrorPolicy** — controls how errors propagate (`RAISE`, `RETURN`, `SKIP`).
@@ -22,7 +22,7 @@ alwaysApply: false
 ```
 src/giskard/agents/
 ├── generators/          # LLM backends (base ABC + LiteLLM impl)
-│   ├── base.py          # BaseGenerator, GenerationParams, StreamChunk
+│   ├── base.py          # BaseGenerator, GenerationParams, Response
 │   ├── litellm_generator.py
 │   ├── mixins.py        # Shared generator capabilities
 │   └── retry.py         # Retry / back-off logic
@@ -35,7 +35,7 @@ src/giskard/agents/
 ├── workflow.py          # ChatWorkflow — the main orchestration engine
 ├── chat.py              # Chat & Message models
 ├── context.py           # RunContext
-├── pipeline.py          # Low-level parallel execution
+├── pipeline.py          # Backwards-compatibility alias (Pipeline = ChatWorkflow)
 ├── config.py            # Global configuration
 └── rate_limiter.py      # Token / request rate limiting
 ```
