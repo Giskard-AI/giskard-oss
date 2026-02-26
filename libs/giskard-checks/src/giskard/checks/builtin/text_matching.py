@@ -352,35 +352,36 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
 
     Examples
     --------
-    Basic regex matching for prices::
+    Basic regex matching for prices:
 
         check = RegexMatching(
             text="Price: $10.99",
             pattern=r"\$\d+\.\d{2}"
         )
 
-    Email validation::
+    Email validation:
 
         check = RegexMatching(
             text="Contact: user@example.com",
             pattern=r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
         )
 
-    Case-insensitive matching (using inline modifier)::
+    Case-insensitive matching (using inline modifier):
 
         check = RegexMatching(
             text="The ANSWER is 42",
             pattern=r"(?i)answer.*\d+"
         )
 
-    Multiline matching with anchors (using inline modifier)::
+
+    Multiline matching with anchors (using inline modifier):
 
         check = RegexMatching(
             text="Line 1\nLine 2\nLine 3",
             pattern=r"(?m)^Line 2$"
         )
 
-    Extract from trace::
+    Extract from trace:
 
         check = RegexMatching(
             text_key="trace.last.outputs.response",
