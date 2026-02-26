@@ -80,7 +80,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
     )
     annotations: dict[str, Any] = Field(
         default_factory=dict,
-        description="Scenario-level annotations shared across the trace.",
+        description="Scenario-level annotations that will be injected in the trace.",
     )
 
     async def run(
