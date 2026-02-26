@@ -1,5 +1,6 @@
 import asyncio
 import time
+import uuid
 import warnings
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -12,6 +13,11 @@ from giskard.core import BaseRateLimiter, MinIntervalRateLimiter
 JITTER_TIME = 0.02  # 20ms jitter
 
 
+def _uid() -> str:
+    """Generate a unique id per call to isolate tests from the singleton registry."""
+    return str(uuid.uuid4())
+
+
 @BaseRateLimiter.register("custom_rate_limiter")
 class CustomRateLimiter(BaseRateLimiter):
     @override
@@ -22,30 +28,31 @@ class CustomRateLimiter(BaseRateLimiter):
 
 class TestRateLimiterRegistry:
     def test_warns_when_creating_rate_limiter_with_duplicate_id(self):
+        rl_id = _uid()
         with pytest.warns(
             RuntimeWarning,
-            match="Rate limiter with id 'test' already registered",
+            match=f"Rate limiter with id '{rl_id}' already registered",
         ):
-            _rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id="test")
-            _rate_limiter_b = MinIntervalRateLimiter.from_rpm(120, id="test")
+            _rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
+            _rate_limiter_b = MinIntervalRateLimiter.from_rpm(120, id=rl_id)
 
+        rl_id = _uid()
         with pytest.warns(
             RuntimeWarning,
-            match="Rate limiter with id 'test_2' already registered",
+            match=f"Rate limiter with id '{rl_id}' already registered",
         ):
-            _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id="test_2")
+            _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id=rl_id)
             _rate_limiter_b = MinIntervalRateLimiter.from_rpm(
-                rpm=60, max_concurrent=1, id="test_2"
+                rpm=60, max_concurrent=1, id=rl_id
             )
 
+        rl_id = _uid()
         with pytest.warns(
             RuntimeWarning,
-            match="Rate limiter with id 'another_rate_limiter' already registered",
+            match=f"Rate limiter with id '{rl_id}' already registered",
         ):
-            _rate_limiter_a = MinIntervalRateLimiter.from_rpm(
-                rpm=60, id="another_rate_limiter"
-            )
-            _rate_limiter_b = CustomRateLimiter(id="another_rate_limiter")
+            _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id=rl_id)
+            _rate_limiter_b = CustomRateLimiter(id=rl_id)
 
     def test_does_not_warn_when_disabled_and_creating_rate_limiter_with_duplicate_id(
         self,
@@ -56,57 +63,60 @@ class TestRateLimiterRegistry:
         ):
             with warnings.catch_warnings(record=True) as record:
                 warnings.simplefilter("always")
-                _rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id="test")
-                _rate_limiter_b = MinIntervalRateLimiter.from_rpm(120, id="test")
+                rl_id = _uid()
+                _rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
+                _rate_limiter_b = MinIntervalRateLimiter.from_rpm(120, id=rl_id)
             assert not any("already registered" in str(w.message) for w in record)
 
             with warnings.catch_warnings(record=True) as record:
                 warnings.simplefilter("always")
-                _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id="test_2")
+                rl_id = _uid()
+                _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id=rl_id)
                 _rate_limiter_b = MinIntervalRateLimiter.from_rpm(
-                    rpm=60, max_concurrent=1, id="test_2"
+                    rpm=60, max_concurrent=1, id=rl_id
                 )
             assert not any("already registered" in str(w.message) for w in record)
 
             with warnings.catch_warnings(record=True) as record:
                 warnings.simplefilter("always")
-                _rate_limiter_a = MinIntervalRateLimiter.from_rpm(
-                    rpm=60, id="another_rate_limiter"
-                )
-                _rate_limiter_b = CustomRateLimiter(id="another_rate_limiter")
+                rl_id = _uid()
+                _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id=rl_id)
+                _rate_limiter_b = CustomRateLimiter(id=rl_id)
             assert not any("already registered" in str(w.message) for w in record)
 
     def test_same_rate_limiter_with_same_id_should_not_raise_error(
         self,
     ):
-        _custom_rate_limiter_a = CustomRateLimiter(id="custom_rate_limiter")
-        _custom_rate_limiter_b = CustomRateLimiter(id="custom_rate_limiter")
+        rl_id = _uid()
+        _custom_rate_limiter_a = CustomRateLimiter(id=rl_id)
+        _custom_rate_limiter_b = CustomRateLimiter(id=rl_id)
 
-        _rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id="test")
-        _rate_limiter_b = MinIntervalRateLimiter.from_rpm(60, id="test")
+        rl_id = _uid()
+        _rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
+        _rate_limiter_b = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
 
     def test_rate_limiter_should_cleanup_state_when_last_instance_is_deleted(self):
+        rl_id = _uid()
         _rate_limiter_a = MinIntervalRateLimiter.from_rpm(
-            60, max_concurrent=1, id="test"
+            60, max_concurrent=1, id=rl_id
         )
         assert _rate_limiter_a._state is not None
         assert _rate_limiter_a._state.semaphore is not None
         old_state = _rate_limiter_a._state
         del _rate_limiter_a
 
-        _rate_limiter_b = MinIntervalRateLimiter.from_rpm(
-            120, id="test"
-        )  # This should not raise an error since the state is cleaned up
+        _rate_limiter_b = MinIntervalRateLimiter.from_rpm(120, id=rl_id)
         assert _rate_limiter_b._state is not None
         assert _rate_limiter_b._state.semaphore is None  # Since max_concurrent is None
         assert _rate_limiter_b._state is not old_state
 
     def test_rate_limiter_should_share_state_between_instances(self):
+        rl_id = _uid()
         _rate_limiter_a = MinIntervalRateLimiter.from_rpm(
-            60, max_concurrent=1, id="test"
+            60, max_concurrent=1, id=rl_id
         )
         _rate_limiter_b = MinIntervalRateLimiter.from_rpm(
-            60, max_concurrent=1, id="test"
+            60, max_concurrent=1, id=rl_id
         )
         assert _rate_limiter_a._state is _rate_limiter_b._state
 
@@ -114,10 +124,10 @@ class TestRateLimiterRegistry:
         self,
     ):
         _rate_limiter_a = MinIntervalRateLimiter.from_rpm(
-            60, max_concurrent=1, id="test"
+            60, max_concurrent=1, id=_uid()
         )
         _rate_limiter_b = MinIntervalRateLimiter.from_rpm(
-            60, max_concurrent=1, id="test_2"
+            60, max_concurrent=1, id=_uid()
         )
         assert _rate_limiter_a._state is not _rate_limiter_b._state
 

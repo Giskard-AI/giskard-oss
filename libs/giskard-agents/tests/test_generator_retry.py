@@ -7,7 +7,7 @@ from giskard.agents.generators import RetryPolicy, WithRetryPolicy
 from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
 
 
-class RetriableError(BaseException):
+class RetriableError(Exception):
     """A retriable error."""
 
 
@@ -31,15 +31,6 @@ class MockGenerator(WithRetryPolicy, BaseGenerator):
         """Record sleep times for testing."""
         if retry_state.next_action and retry_state.next_action.sleep:
             self._sleep_times.append(retry_state.next_action.sleep)
-
-
-@pytest.fixture
-def mock_response(self):
-    """Create a mock response."""
-    return Response(
-        message=Message(role="assistant", content="Test response"),
-        finish_reason="stop",
-    )
 
 
 def test_with_retries_helper_method():

@@ -13,7 +13,13 @@ from .retries import WithRetryPolicy
 
 @BaseGenerator.register("litellm")
 class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
-    """A generator for creating chat completion pipelines."""
+    """A generator for creating chat completion pipelines.
+
+    The MRO places rate limiting inside the retry loop: each retry attempt
+    individually acquires the rate limiter. This prevents retry storms from
+    bypassing rate limits, at the cost of consuming one rate-limit slot per
+    attempt (including failed ones).
+    """
 
     model: str = Field(
         description="The model identifier to use (e.g. 'gemini/gemini-2.0-flash')"

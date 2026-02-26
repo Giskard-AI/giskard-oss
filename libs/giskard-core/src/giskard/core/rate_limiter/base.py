@@ -9,6 +9,7 @@ import os
 import threading
 import uuid
 import warnings
+from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any, ClassVar, Self, override
@@ -100,15 +101,16 @@ class RateLimiterRegistry:
         ValueError
             If no rate limiter with the given id is registered.
         """
-        instances = self._instances.get(id)
-        if not instances:
-            raise ValueError(f"Rate limiter with id '{id}' not found")
+        with self._lock:
+            instances = self._instances.get(id)
+            if not instances:
+                raise ValueError(f"Rate limiter with id '{id}' not found")
 
-        return next(iter(instances))
+            return next(iter(instances))
 
 
 @discriminated_base
-class BaseRateLimiter(Discriminated):
+class BaseRateLimiter(Discriminated, ABC):
     """Abstract base class for rate limiters that throttle async operations.
 
     Subclasses must implement throttle() and optionally override initialize_state().
@@ -126,7 +128,8 @@ class BaseRateLimiter(Discriminated):
         super().model_post_init(context)
 
     @asynccontextmanager
-    def throttle(self) -> AsyncGenerator[float]:
+    @abstractmethod
+    async def throttle(self) -> AsyncGenerator[float]:
         """Async context manager that enforces rate limiting before yielding.
 
         Yields
@@ -146,7 +149,6 @@ class BaseRateLimiter(Discriminated):
             An existing matching instance to share state from. If None, fresh
             state should be created.
         """
-        return None
 
     @classmethod
     def from_id(cls, id: str) -> "BaseRateLimiter":
