@@ -25,10 +25,10 @@ class Interaction[InputType, OutputType](BaseModel, frozen=True):
     Examples
     --------
     >>> Interaction(
-        inputs="What is the capital of France?",
-        outputs="The capital of France is Paris.",
-        metadata={"model": "gpt-4", "tokens": 15}
-    )
+    ...    inputs="What is the capital of France?",
+    ...    outputs="The capital of France is Paris.",
+    ...    metadata={"model": "gpt-4", "tokens": 15}
+    ... )
     Interaction(inputs='What is the capital of France?', outputs='The capital of Franc...)
     """
 

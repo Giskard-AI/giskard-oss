@@ -37,25 +37,26 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
     --------
     **Recommended**: Use the fluent API:
 
-    >>> from giskard.checks import scenario, Equals
-    >>> result = await (
-        scenario("multi_step_test")
-        .interact("Hello", lambda inputs: "Hi")
-        .check(Equals(expected="Hi", key="trace.last.outputs"))
-        .run()
-    )
+        from giskard.checks import scenario, Equals
+        result = await (
+            scenario("multi_step_test")
+            .interact("Hello", lambda inputs: "Hi")
+            .check(Equals(expected="Hi", key="trace.last.outputs"))
+            .run()
+        )
 
     **Advanced**: Direct instantiation:
 
-    >>> from giskard.checks import Scenario, Interaction, Equals
-    >>> scenario = Scenario(
-        name="multi_step_test",
-        sequence=[
-            Interaction(inputs="Hello", outputs="Hi"),
-            Equals(expected="Hi", key="trace.last.outputs"),
-        ],
-    )
-    >>> result = await scenario.run()
+        from giskard.checks import Scenario, Interaction, Equals
+
+        scenario = Scenario(
+            name="multi_step_test",
+            sequence=[
+                Interaction(inputs="Hello", outputs="Hi"),
+                Equals(expected="Hi", key="trace.last.outputs"),
+            ],
+        )
+        result = await scenario.run()
     """
 
     name: str = Field(..., description="Scenario name")

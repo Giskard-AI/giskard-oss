@@ -31,13 +31,15 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     Examples
     --------
-    >>> Trace(interactions=[
+    >>> trace = Trace[str, str](interactions=[
     ...    Interaction(inputs="Hello", outputs="Hi there!"),
     ...    Interaction(inputs="How are you?", outputs="I'm doing well, thanks!"),
     ... ])
 
     Access the most recent interaction in a trace:
     >>> last_interaction = trace.last
+    >>> last_interaction
+    Interaction[str, str](inputs='How are you?', ...)
 
     Use in JSONPath expressions:
     >>> from giskard.checks import Groundedness
@@ -45,6 +47,8 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     Access all outputs:
     >>> all_outputs = [interaction.outputs for interaction in trace.interactions]
+    >>> all_outputs
+    ['Hi there!', "I'm doing well, thanks!"]
     """
 
     interactions: list[Interaction[InputType, OutputType]] = Field(default_factory=list)
