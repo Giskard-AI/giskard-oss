@@ -36,9 +36,90 @@ class GenerationParams(BaseModel):
 
 @discriminated_base
 class BaseGenerator(Discriminated, ABC):
-    """Base class for all generators."""
+    """Base class for all generators.
+
+    Generators act as **protocol adapters**: they own all translation between
+    the internal ``Message`` format and whatever wire format the LLM provider
+    expects.  The three translation methods—``serialize_tools``,
+    ``serialize_messages``, and ``deserialize_response``—are the extension
+    points that provider-specific subclasses override.  Workflow, tool, and
+    chat code must never call provider APIs directly; they work exclusively
+    with ``Message`` objects and delegate wire translation to the generator.
+    """
 
     params: GenerationParams = Field(default_factory=GenerationParams)
+
+    # -- Protocol adapter methods ------------------------------------------
+
+    def serialize_tools(self, tools: list[Tool]) -> list[dict[str, Any]]:
+        """Convert internal ``Tool`` objects to the provider's wire format.
+
+        Override in subclasses to produce a different tool schema layout
+        (e.g. Anthropic's tool format).
+
+        Parameters
+        ----------
+        tools : list[Tool]
+            Tools to serialize.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            Tool definitions in the provider's expected format.
+        """
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": t.parameters_schema,
+                },
+            }
+            for t in tools
+        ]
+
+    def serialize_messages(self, messages: list[Message]) -> list[dict[str, Any]]:
+        """Convert internal ``Message`` objects to the provider's wire format.
+
+        Override in subclasses to reshape messages for providers that use a
+        different message layout (e.g. Anthropic batches tool results into a
+        single ``role="user"`` message with ``tool_result`` content blocks).
+
+        Parameters
+        ----------
+        messages : list[Message]
+            Messages to serialize.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            Messages in the provider's expected format.
+        """
+        return [
+            m.model_dump(include={"role", "content", "tool_calls", "tool_call_id"})
+            for m in messages
+        ]
+
+    def deserialize_response(self, raw: Any) -> Message:
+        """Convert a provider's raw response into an internal ``Message``.
+
+        Override in subclasses to handle provider-specific response shapes.
+
+        Parameters
+        ----------
+        raw : Any
+            The raw response object from the provider.
+
+        Returns
+        -------
+        Message
+            An internal Message instance.
+        """
+        data = raw if isinstance(raw, dict) else raw.model_dump()
+        return Message.model_validate(data)
+
+    # -- Completion --------------------------------------------------------
 
     @abstractmethod
     async def _complete(

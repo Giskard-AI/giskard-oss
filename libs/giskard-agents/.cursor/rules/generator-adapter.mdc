@@ -1,0 +1,25 @@
+---
+description: Generator as protocol adapter — architectural rules for provider translation in giskard-agents.
+alwaysApply: true
+---
+
+# Generator as Protocol Adapter
+
+## Core Principles
+
+1. **Message is the canonical internal format.** `role="tool"`, `tool_call_id`, `tool_calls` are the project's standard fields. Never reshape `Message` to accommodate a specific provider.
+
+2. **Tool.run() returns `str`.** The tool serializes its own output. The workflow wraps the string into a `Message`. The workflow never calls `json.dumps` on tool results.
+
+3. **The generator owns all provider translation.** Each generator subclass is responsible for converting between internal `Message` objects and whatever wire format the provider expects.
+
+## Rules
+
+- **Do not call provider APIs (litellm, anthropic, openai, etc.) from workflow, tool, or chat code.** Provider calls belong exclusively in generator subclasses.
+- **Do not import provider libraries outside of generator modules.** The `generators/` package is the only place that should depend on provider SDKs.
+- **Use generator translation methods for serialization:**
+  - `serialize_tools(tools)` — converts `Tool` objects to the provider's tool schema format.
+  - `serialize_messages(messages)` — converts `Message` objects to the provider's wire format.
+  - `deserialize_response(raw)` — converts a provider's raw response into an internal `Message`.
+- **Do not call `Message.to_litellm()`, `Message.from_litellm()`, or `Tool.to_litellm_function()` in new code.** These exist for backward compatibility. Use the generator methods instead.
+- **Adding a new provider?** Subclass `BaseGenerator` and override `serialize_tools`, `serialize_messages`, and `deserialize_response`. Do not modify `Message`, `Tool`, or workflow code.

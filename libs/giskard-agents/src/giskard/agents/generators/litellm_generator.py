@@ -1,7 +1,6 @@
 from typing import cast
 
 from litellm import Choices, ModelResponse, acompletion
-from litellm import Message as LiteLLMMessage
 from litellm import _should_retry as litellm_should_retry
 from pydantic import Field
 
@@ -12,7 +11,7 @@ from .mixins import WithRateLimiter, WithRetryPolicy
 
 @BaseGenerator.register("litellm")
 class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
-    """A generator for creating chat completion pipelines."""
+    """A generator for creating chat completion pipelines via LiteLLM."""
 
     model: str = Field(
         description="The model identifier to use (e.g. 'gemini/gemini-2.0-flash')"
@@ -29,16 +28,15 @@ class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
         if params is not None:
             params_.update(params.model_dump(exclude={"tools"}, exclude_unset=True))
 
-        # Now special handling of the tools
         tools = self.params.tools + (params.tools if params is not None else [])
         if tools:
-            params_["tools"] = [t.to_litellm_function() for t in tools]
+            params_["tools"] = self.serialize_tools(tools)
 
         async with self._rate_limiter_context():
             response = cast(
                 ModelResponse,
                 await acompletion(
-                    messages=[m.to_litellm() for m in messages],
+                    messages=self.serialize_messages(messages),
                     model=self.model,
                     **params_,
                 ),
@@ -46,6 +44,6 @@ class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
 
         choice = cast(Choices, response.choices[0])
         return Response(
-            message=Message.from_litellm(cast(LiteLLMMessage, choice.message)),
+            message=self.deserialize_response(choice.message),
             finish_reason=choice.finish_reason,  # pyright: ignore[reportArgumentType]
         )
