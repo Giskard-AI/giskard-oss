@@ -139,6 +139,7 @@ class BaseRateLimiter(Discriminated, ABC):
             or 0.0 if no wait was required.
         """
         raise NotImplementedError
+        yield 0.0  # unreachable; makes this an async generator for @asynccontextmanager typing
 
     def initialize_state(self, existing: Self | None = None) -> None:
         """Initialize internal state, optionally sharing from an existing matching instance.
