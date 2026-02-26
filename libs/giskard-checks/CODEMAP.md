@@ -21,7 +21,7 @@ modules, core abstractions, and expected workflows.
 │  ├─ __init__.py              # Public re-exports: all core classes, builtin checks, and settings helpers
 │  ├─ builtin/                 # Built-in Check implementations (fn, equality, LLM, etc.)
 │  ├─ core/                    # Core abstractions: Check, Scenario, Trace, results, extraction
-│  ├─ interaction/             # `InteractionSpec` implementation
+│  ├─ interaction/             # `Interaction` implementation
 │  ├─ scenarios/               # Runner, TestCase model, and helper utilities
 │  ├─ settings.py              # Global generator configuration for LLM checks
 │  └─ trace/                   # Reserved for future trace utilities (currently empty)
@@ -34,22 +34,22 @@ modules, core abstractions, and expected workflows.
 ## Core concepts & files
 
 ### Trace & Interactions (`core/trace.py`)
-- `Interaction`: immutable payload with `inputs`, `outputs`, `metadata`.
+- `InteractionRecord`: immutable payload with `inputs`, `outputs`, `metadata`.
 - `Trace`: ordered list of interactions; passed to every `Check`.
 
 ### Scenario components (`core/scenario.py`, `core/interaction.py`, `core/check.py`)
 - `ScenarioComponent`: discriminated base for anything that can be executed in a scenario
-  (either an `InteractionSpec` or a `Check`).
+  (either an `Interaction`/`InteractionRecord` or a `Check`).
 - `Scenario`: ordered sequence of components with a shared `Trace`. Components execute
   sequentially, stopping at the first failing check. Supports custom trace types.
-- `BaseInteractionSpec`: base class for specs that emit `Interaction` objects via
+- `BaseInteraction`: base class for specs that emit `InteractionRecord` objects via
   the `generate()` async generator method. Each yielded interaction receives the updated
   trace via `generator.asend()`.
-- `InteractionSpec` (`interaction/__init__.py`): default implementation accepting
+- `Interaction` (`interaction/interaction.py`): default implementation accepting
   static values, callables, or generators for both inputs and outputs. Supports
   multi-turn interactions through generators.
 - `Check`: base class for executable validations; subclasses return `CheckResult`.
-- Registration via `@Check.register("kind")` and `@BaseInteractionSpec.register("kind")`
+- Registration via `@Check.register("kind")` and `@BaseInteraction.register("kind")`
   enables polymorphic serialization.
 
 ### Results (`core/result.py`)
@@ -66,7 +66,7 @@ modules, core abstractions, and expected workflows.
 ### Scenario runner (`scenarios/runner.py`)
 - `ScenarioRunner`: orchestrates sequences of `ScenarioComponent`s using async
   generators and shared traces. Processes components sequentially:
-  - `InteractionSpec` components: call `generate()` to yield interactions, send
+  - `Interaction` components: call `generate()` to yield interactions, send
     updated trace back via `asend()`
   - `Check` components: call `run()` to validate trace, stop on failure/error
 - Adds duration metrics, converts exceptions into `CheckResult.error`, and stops
@@ -81,7 +81,7 @@ modules, core abstractions, and expected workflows.
 
 ### Utilities (`scenarios/utils.py`)
 - `with_params`, `execute_code`, `generate`: adapt sync/async callables or generators
-  into forms consumable by `InteractionSpec`.
+  into forms consumable by `Interaction`.
 - Provide ergonomic wrappers when binding user callables into specs.
 
 ### Built-in checks (`builtin/`)
@@ -103,7 +103,7 @@ modules, core abstractions, and expected workflows.
 
 ## Typical workflows
 
-1. **Describe interactions** using `InteractionSpec` (static payloads, callables, or
+1. **Describe interactions** using `Interaction` (static payloads, callables, or
    generators that can themselves depend on the current `Trace`).
 2. **Author checks** by subclassing `Check` or using `from_fn`. Access the
    current output via `trace.interactions[-1]`.
@@ -137,8 +137,8 @@ from giskard.checks import (
     Check, CheckResult, CheckStatus, Metric,
     Scenario, ScenarioResult,
     TestCase, TestCaseResult,
-    Trace, Interaction,
-    BaseInteractionSpec, InteractionSpec,
+    Trace, InteractionRecord,
+    BaseInteraction, Interaction,
     Extractor, JsonPathExtractor,
     # Builtin checks
     BaseLLMCheck, LLMCheckResult,

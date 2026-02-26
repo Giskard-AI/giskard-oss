@@ -7,8 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.rule import Rule
 
+from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
-from .trace import Trace
 
 STATUS_MAPPING = {
     "pass": {

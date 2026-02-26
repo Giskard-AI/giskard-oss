@@ -5,14 +5,13 @@ from collections.abc import Sequence
 from pydantic import BaseModel, Field
 
 from .check import Check
-from .interaction import BaseInteractionSpec
+from .interaction import BaseInteraction, InteractionRecord, Trace
 from .result import ScenarioResult
-from .trace import Interaction, Trace
 
 
 class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):  # pyright: ignore[reportMissingTypeArgument]
-    """A scenario composed of an ordered sequence of components (Interactions,
-    InteractionSpecs, and Checks) with shared trace.
+    """A scenario composed of an ordered sequence of components (InteractionRecords,
+    Interactions, and Checks) with shared trace.
 
     **Note**: For most use cases, the fluent API (`scenario().interact().check()`) is
     recommended as it's simpler and more readable. This class is useful for advanced
@@ -22,16 +21,16 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
     accumulates all interactions. Execution stops immediately if any check fails.
 
     Components are processed in order:
-    - **Interaction / InteractionSpec** components: Add interactions to the trace
+    - **InteractionRecord / Interaction** components: Add interactions to the trace
     - **Check** components: Validate the current trace state
 
     Attributes
     ----------
     name : str
         Scenario identifier.
-    sequence : Sequence[Interaction | BaseInteractionSpec | Check]
-        Sequential steps to execute. Each component can be an Interaction, an
-        InteractionSpec (which updates the trace), or a Check (which validates
+    sequence : Sequence[InteractionRecord | BaseInteraction | Check]
+        Sequential steps to execute. Each component can be an InteractionRecord, an
+        Interaction (which updates the trace), or a Check (which validates
         the current trace).
     trace_type : type[TraceType] | None
         Optional custom trace type to use. If not provided, the trace type will be
@@ -54,12 +53,12 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
 
     **Advanced**: Direct instantiation:
     ```python
-    from giskard.checks import Scenario, InteractionSpec, Equals
+    from giskard.checks import Scenario, Interaction, Equals
 
     scenario = Scenario(
         name="multi_step_test",
         sequence=[
-            InteractionSpec(inputs="Hello", outputs="Hi"),
+            Interaction(inputs="Hello", outputs="Hi"),
             Equals(expected="Hi", key="trace.last.outputs"),
         ],
     )
@@ -69,8 +68,8 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
 
     name: str = Field(..., description="Scenario name")
     sequence: Sequence[
-        Interaction[InputType, OutputType]
-        | BaseInteractionSpec[InputType, OutputType, TraceType]
+        InteractionRecord[InputType, OutputType]
+        | BaseInteraction[InputType, OutputType, TraceType]
         | Check[InputType, OutputType, TraceType]
     ] = Field(..., description="Sequential components to execute")
     trace_type: type[TraceType] | None = Field(
@@ -84,7 +83,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
         """Execute the scenario components sequentially with shared trace.
 
         Each component is executed in order:
-        - Interaction / InteractionSpec components update the shared trace
+        - InteractionRecord / Interaction components update the shared trace
         - Check components validate the current trace and stop execution on failure
 
         Returns

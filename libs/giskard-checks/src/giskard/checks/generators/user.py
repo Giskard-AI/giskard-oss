@@ -2,9 +2,9 @@ from collections.abc import AsyncGenerator
 
 from pydantic import BaseModel, Field
 
+from ..core import Trace
 from ..core.input_generator import InputGenerator
 from ..core.mixin import WithGeneratorMixin
-from ..core.trace import Trace
 
 
 class UserSimulatorOutput(BaseModel):

@@ -1,48 +1,11 @@
-from typing import Any, Self
+from typing import Self
 
 from pydantic import BaseModel, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.rule import Rule
 
-from .protocols import InteractionGenerator
-
-
-class Interaction[InputType, OutputType](BaseModel, frozen=True):
-    """A single interaction between inputs and outputs.
-
-    An interaction represents one exchange in a conversation or workflow,
-    capturing the inputs provided, the outputs produced, and optional metadata.
-
-    Attributes
-    ----------
-    inputs : InputType
-        The input values for this interaction (e.g., user message, API request).
-    outputs : OutputType
-        The output values produced in response (e.g., assistant reply, API response).
-    metadata : dict[str, Any]
-        Optional metadata associated with this interaction. Can include timing
-        information, tool calls, intermediate states, or any other relevant data.
-
-    Examples
-    --------
-    ```python
-    interaction = Interaction(
-        inputs="What is the capital of France?",
-        outputs="The capital of France is Paris.",
-        metadata={"model": "gpt-4", "tokens": 15}
-    )
-    ```
-    """
-
-    inputs: InputType
-    outputs: OutputType
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-    def __rich_console__(
-        self, console: Console, options: ConsoleOptions
-    ) -> RenderResult:
-        yield "Inputs: " + repr(self.inputs)
-        yield "Outputs: " + repr(self.outputs)
+from ..protocols import InteractionGenerator
+from .interaction_record import InteractionRecord
 
 
 class Trace[InputType, OutputType](BaseModel, frozen=True):
@@ -58,10 +21,10 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     Attributes
     ----------
-    interactions : list[Interaction[InputType, OutputType]]
+    interactions : list[InteractionRecord[InputType, OutputType]]
         Ordered list of all interactions that have occurred. The most recent
         interaction is at `interactions[-1]`.
-    last : Interaction[InputType, OutputType] | None
+    last : InteractionRecord[InputType, OutputType] | None
         Computed field that returns the last interaction in the trace, or None if empty.
         Equivalent to `interactions[-1]` if interactions exist, None otherwise.
         Available in Python code, Jinja2 prompt templates, and JSONPath expressions.
@@ -70,8 +33,8 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     --------
     ```python
     trace = Trace(interactions=[
-        Interaction(inputs="Hello", outputs="Hi there!"),
-        Interaction(inputs="How are you?", outputs="I'm doing well, thanks!"),
+        InteractionRecord(inputs="Hello", outputs="Hi there!"),
+        InteractionRecord(inputs="How are you?", outputs="I'm doing well, thanks!"),
     ])
 
     # Access the most recent interaction (preferred in prompt templates and JSONPath)
@@ -85,11 +48,13 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     ```
     """
 
-    interactions: list[Interaction[InputType, OutputType]] = Field(default_factory=list)
+    interactions: list[InteractionRecord[InputType, OutputType]] = Field(
+        default_factory=list
+    )
 
     @computed_field
     @property
-    def last(self) -> Interaction[InputType, OutputType] | None:
+    def last(self) -> InteractionRecord[InputType, OutputType] | None:
         """The last interaction in the trace, or None if the trace is empty.
 
         This computed field is equivalent to `interactions[-1]` when interactions exist.
@@ -114,15 +79,15 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     @classmethod
     async def from_interactions(
         cls,
-        *interactions: Interaction[InputType, OutputType]
-        | InteractionGenerator[Interaction[InputType, OutputType], Self],
+        *interactions: InteractionRecord[InputType, OutputType]
+        | InteractionGenerator[InteractionRecord[InputType, OutputType], Self],
     ) -> Self:
         return await cls().with_interactions(*interactions)
 
     async def with_interactions(
         self,
-        *interactions: Interaction[InputType, OutputType]
-        | InteractionGenerator[Interaction[InputType, OutputType], Self],
+        *interactions: InteractionRecord[InputType, OutputType]
+        | InteractionGenerator[InteractionRecord[InputType, OutputType], Self],
     ) -> Self:
         trace = self
 
@@ -134,11 +99,11 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     async def with_interaction(
         self,
         interaction: (
-            Interaction[InputType, OutputType]
-            | InteractionGenerator[Interaction[InputType, OutputType], Self]
+            InteractionRecord[InputType, OutputType]
+            | InteractionGenerator[InteractionRecord[InputType, OutputType], Self]
         ),
     ) -> Self:
-        if isinstance(interaction, Interaction):
+        if isinstance(interaction, InteractionRecord):
             return self.model_copy(
                 update={"interactions": self.interactions + [interaction]}
             )

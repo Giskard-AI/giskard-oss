@@ -2,16 +2,17 @@ from collections.abc import AsyncGenerator
 
 from giskard.core import Discriminated, discriminated_base
 
-from .trace import Interaction, Trace
+from .interaction_record import InteractionRecord
+from .trace import Trace
 
 
 @discriminated_base
-class BaseInteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class BaseInteraction[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     Discriminated
 ):
     """Base class for interaction specifications that generate interactions.
 
-    An interaction spec produces one or more `Interaction` objects by yielding
+    An interaction spec produces one or more `InteractionRecord` objects by yielding
     them through an async generator. Each yielded interaction receives the updated
     trace (including the newly yielded interaction) via `generator.asend()`.
 
@@ -19,7 +20,7 @@ class BaseInteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: 
     on the accumulated trace history.
 
     Subclasses must implement `generate()` to produce interactions. They should
-    be registered using `@BaseInteractionSpec.register("kind")` for polymorphic
+    be registered using `@BaseInteraction.register("kind")` for polymorphic
     serialization.
 
     Attributes
@@ -32,11 +33,11 @@ class BaseInteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: 
 
     def generate(
         self, trace: TraceType
-    ) -> AsyncGenerator[Interaction[InputType, OutputType], TraceType]:
+    ) -> AsyncGenerator[InteractionRecord[InputType, OutputType], TraceType]:
         """Generate interactions from the current trace state.
 
         This method is called by the scenario runner to produce interactions.
-        It yields `Interaction` objects and receives updated traces (including
+        It yields `InteractionRecord` objects and receives updated traces (including
         the newly yielded interaction) via the async generator protocol.
 
         Parameters
@@ -46,8 +47,8 @@ class BaseInteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: 
 
         Yields
         ------
-        Interaction[InputType, OutputType]
-            An interaction to add to the trace.
+        InteractionRecord[InputType, OutputType]
+            An interaction record to add to the trace.
 
         Receives
         --------
@@ -58,15 +59,13 @@ class BaseInteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: 
         Examples
         --------
         ```python
-        async def generate(self, trace: TraceType) -> AsyncGenerator[Interaction, TraceType]:
-            # Generate first interaction
-            interaction = Interaction(inputs="hello", outputs="hi")
-            updated_trace = yield interaction
+        async def generate(self, trace: TraceType) -> AsyncGenerator[InteractionRecord, TraceType]:
+            record = InteractionRecord(inputs="hello", outputs="hi")
+            updated_trace = yield record
 
-            # Generate second interaction based on updated trace
             next_input = f"Previous had {len(updated_trace.interactions)} interactions"
-            interaction = Interaction(inputs=next_input, outputs="response")
-            yield interaction
+            record = InteractionRecord(inputs=next_input, outputs="response")
+            yield record
         ```
         """
         raise NotImplementedError

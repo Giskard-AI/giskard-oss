@@ -4,9 +4,9 @@ from giskard.agents.workflow import TemplateReference
 from giskard.core import provide_not_none
 from pydantic import Field
 
+from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
-from ..core.trace import Trace
 from .base import BaseLLMCheck
 
 

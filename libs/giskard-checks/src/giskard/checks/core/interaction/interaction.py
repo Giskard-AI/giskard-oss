@@ -3,15 +3,16 @@ from typing import Any, cast, override
 
 from pydantic import Field, PrivateAttr, model_validator
 
-from ..core.input_generator import InputGenerator
-from ..core.interaction import BaseInteractionSpec
-from ..core.trace import Interaction, Trace
-from ..core.types import GeneratorType, ProviderType
-from ..utils.parameter_injection import ParameterInjectionRequirement
-from ..utils.value_provider import (
+from ...utils.parameter_injection import ParameterInjectionRequirement
+from ...utils.value_provider import (
     ValueGeneratorProvider,
     ValueProvider,
 )
+from ..input_generator import InputGenerator
+from ..types import GeneratorType, ProviderType
+from .base import BaseInteraction
+from .interaction_record import InteractionRecord
+from .trace import Trace
 
 INJECTABLE_TRACE = ParameterInjectionRequirement(
     class_info=Trace,
@@ -24,38 +25,34 @@ INJECTABLE_INPUT = ParameterInjectionRequirement(
 )
 
 
-@BaseInteractionSpec.register("interaction_spec")
-class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    BaseInteractionSpec[InputType, OutputType, TraceType]
+@BaseInteraction.register("interaction")
+class Interaction[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    BaseInteraction[InputType, OutputType, TraceType]
 ):
-    """Flexible interaction specification supporting static values, callables, and generators.
+    """Represents a single exchange with a system (step in a workflow, turn in a chat, etc.)
 
-    **Note**: For most use cases, the fluent API (`scenario().interact()`) is recommended
-    as it automatically creates `InteractionSpec` objects and is simpler to use. This class
-    is useful for advanced use cases where you need direct control over interaction specification.
+    Each interaction consists of:
+    - **Inputs**: The input values provided to the system
+    - **Outputs**: The output values produced by the system
+    - **Metadata**: Optional metadata associated with the interaction
 
-    This is the default implementation of `BaseInteractionSpec` that provides
-    a convenient way to specify interactions with varying levels of dynamism:
-
-    - **Static values**: Direct input/output values
-    - **Callables**: Functions that compute inputs/outputs (sync or async)
-    - **Generators**: Functions that yield multiple inputs over time
+    The Interaction class support both static and dynamic inputs and outputs.
+    Dynamic values will be evaluated at runtime to create an immutable
+    `InteractionRecord` object which contains the observed concrete values.
 
     The `inputs` field can be:
-    - A static value of type `InputType`
-    - A callable with no arguments that returns `InputType` (or awaitable/generator)
-    - A callable that takes the current `Trace` and returns `InputType` (or awaitable/generator)
-    - A generator/async generator that yields `InputType` values
+    - A static value
+    - A callable with no arguments
+    - A callable that takes the current `Trace`
+    - A generator/async generator
 
     The `outputs` field can be:
-    - A static value of type `OutputType`
-    - A callable that takes `InputType` and returns `OutputType` (or awaitable)
-    - A callable that takes `(InputType, Trace)` and returns `OutputType` (or awaitable)
-    - A callable that returns an `Interaction` object directly
+    - A static value
+    - A callable that takes `InputType` arguments
+    - A callable that takes `(InputType, Trace)` arguments
+    - A callable that returns an `InteractionRecord` object directly
 
-    When using generators for inputs, the spec will yield multiple interactions,
-    one for each input value produced by the generator. Each interaction receives
-    the updated trace (including previous interactions) via the generator protocol.
+    Awaitable callables will be awaited before being used.
 
     Attributes
     ----------
@@ -63,19 +60,19 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
         Input specification. Can be a static value, callable, or generator.
         Callables can take no arguments or the current `Trace` as an argument.
         Generators yield multiple inputs and receive updated traces via `asend()`.
-    outputs : OutputType | Callable[..., OutputType | Awaitable[OutputType | Interaction]]
+    outputs : OutputType | Callable[..., OutputType | Awaitable[OutputType | InteractionRecord]]
         Output specification. Can be a static value or callable.
         Callables receive the current `InputType` and optionally the current `Trace`.
-        Can return an `Interaction` object directly to override default metadata.
+        Can return an `InteractionRecord` object directly to override default metadata.
     metadata : dict[str, Any]
         Default metadata to attach to interactions. Can be overridden if `outputs`
-        returns an `Interaction` object directly.
+        returns an `InteractionRecord` object directly.
 
     Examples
     --------
     Static inputs and outputs:
     ```python
-    InteractionSpec(
+    Interaction(
         inputs="Hello",
         outputs="Hi there!",
         metadata={"source": "test"}
@@ -84,7 +81,7 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
 
     Callable-based outputs:
     ```python
-    InteractionSpec(
+    Interaction(
         inputs="What is 2+2?",
         outputs=lambda inputs: f"Answer: {eval(inputs)}"
     )
@@ -92,7 +89,7 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
 
     Trace-dependent inputs:
     ```python
-    InteractionSpec(
+    Interaction(
         inputs=lambda trace: f"Message #{len(trace.interactions) + 1}",
         outputs=lambda inputs, trace: f"Received: {inputs}"
     )
@@ -104,7 +101,7 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
         for i in range(3):
             yield f"Message {i+1}"
 
-    InteractionSpec(
+    Interaction(
         inputs=input_gen,
         outputs=lambda inputs: f"Echo: {inputs}"
     )
@@ -134,7 +131,7 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
     @model_validator(mode="after")
     def _validate_injection_mappings(
         self,
-    ) -> "InteractionSpec[InputType, OutputType, TraceType]":
+    ) -> "Interaction[InputType, OutputType, TraceType]":
         try:
             self._input_value_generator_provider = ValueGeneratorProvider.from_mapping(
                 self.inputs, INJECTABLE_TRACE
@@ -156,7 +153,7 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
     @override
     async def generate(
         self, trace: TraceType
-    ) -> AsyncGenerator[Interaction[InputType, OutputType], TraceType]:
+    ) -> AsyncGenerator[InteractionRecord[InputType, OutputType], TraceType]:
         generator = await self._input_value_generator_provider(trace)
 
         try:
@@ -167,9 +164,11 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
                 outputs = await self._output_value_provider(inputs, trace)
                 # Yield the interaction back to the caller and wait for an updated trace
                 # that captures the evaluation of this iteration.
-                trace = yield self._get_interaction(
+                trace = yield self._get_interaction_record(
                     inputs,
-                    cast(OutputType | Interaction[InputType, OutputType], outputs),
+                    cast(
+                        OutputType | InteractionRecord[InputType, OutputType], outputs
+                    ),
                 )
                 # Feed the updated trace to the input generator to produce the next inputs.
                 inputs = await generator.asend(trace)
@@ -178,16 +177,15 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
         finally:
             await generator.aclose()
 
-    def _get_interaction(
+    def _get_interaction_record(
         self,
         inputs: InputType,
-        outputs: OutputType | Interaction[InputType, OutputType],
-    ) -> Interaction[InputType, OutputType]:
+        outputs: OutputType | InteractionRecord[InputType, OutputType],
+    ) -> InteractionRecord[InputType, OutputType]:
         return (
             outputs
-            if isinstance(outputs, Interaction)
-            else Interaction(inputs=inputs, outputs=outputs, metadata=self.metadata)
+            if isinstance(outputs, InteractionRecord)
+            else InteractionRecord(
+                inputs=inputs, outputs=outputs, metadata=self.metadata
+            )
         )
-
-
-__all__ = ["InteractionSpec"]

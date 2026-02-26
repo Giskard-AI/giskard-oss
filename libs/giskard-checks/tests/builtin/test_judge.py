@@ -4,7 +4,7 @@ from typing import cast
 import pytest
 from giskard.agents.chat import Message
 from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
-from giskard.checks import Check, CheckStatus, Interaction, LLMJudge, Trace
+from giskard.checks import Check, CheckStatus, InteractionRecord, LLMJudge, Trace
 from pydantic import Field, ValidationError
 
 
@@ -85,7 +85,9 @@ async def test_run_handle_template_reference() -> None:
     result = await judge.run(
         Trace(
             interactions=[
-                Interaction(inputs={"response": "Hello"}, outputs={"response": "Hello"})
+                InteractionRecord(
+                    inputs={"response": "Hello"}, outputs={"response": "Hello"}
+                )
             ]
         )
     )
@@ -105,7 +107,9 @@ async def test_run_handle_template_reference() -> None:
     result = await roundtrip_judge.run(
         Trace(
             interactions=[
-                Interaction(inputs={"response": "Hello"}, outputs={"response": "Hello"})
+                InteractionRecord(
+                    inputs={"response": "Hello"}, outputs={"response": "Hello"}
+                )
             ]
         )
     )

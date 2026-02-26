@@ -19,10 +19,12 @@ from .builtin import (
     from_fn,
 )
 from .core import (
+    BaseInteraction,
     Check,
     CheckResult,
     CheckStatus,
     Interaction,
+    InteractionRecord,
     Metric,
     Scenario,
     ScenarioResult,
@@ -30,9 +32,7 @@ from .core import (
     TestCaseResult,
     Trace,
 )
-from .core.interaction import BaseInteractionSpec
 from .generators.user import UserSimulator
-from .interaction import InteractionSpec
 from .judges import (
     BaseLLMCheck,
     Conformity,
@@ -74,8 +74,8 @@ __all__ = [
     "TestCase",
     "TestCaseResult",
     "Trace",
-    "Interaction",
-    "BaseInteractionSpec",
+    "InteractionRecord",
+    "BaseInteraction",
     # Builtin checks
     "BaseLLMCheck",
     "LLMCheckResult",
@@ -93,7 +93,7 @@ __all__ = [
     "SemanticSimilarity",
     "StringMatching",
     # Interaction
-    "InteractionSpec",
+    "Interaction",
     # Generators
     "UserSimulator",
     # Testing

@@ -1,6 +1,6 @@
 """Tests for the StringMatching check."""
 
-from giskard.checks import CheckStatus, Interaction, StringMatching, Trace
+from giskard.checks import CheckStatus, InteractionRecord, StringMatching, Trace
 from giskard.checks.core.extraction import NoMatch
 
 
@@ -49,7 +49,7 @@ async def test_text_and_keyword_from_trace() -> None:
         text_key="trace.last.outputs.response",
         keyword_key="trace.last.inputs.expected",
     )
-    interaction = Interaction(
+    interaction = InteractionRecord(
         inputs={"expected": "Paris"},
         outputs={"response": "The capital of France is Paris."},
     )
@@ -66,7 +66,7 @@ async def test_text_from_trace_keyword_direct() -> None:
         keyword="Python",
         case_sensitive=False,
     )
-    interaction = Interaction(
+    interaction = InteractionRecord(
         inputs={"query": "What is Python?"},
         outputs={"answer": "Python is a programming language."},
     )
@@ -82,7 +82,7 @@ async def test_keyword_from_trace_text_direct() -> None:
         text="The Eiffel Tower is in Paris.",
         keyword_key="trace.last.inputs.city",
     )
-    interaction = Interaction(
+    interaction = InteractionRecord(
         inputs={"city": "Paris"},
         outputs={"response": "Confirmed"},
     )
@@ -182,7 +182,7 @@ async def test_missing_text_in_trace() -> None:
 async def test_default_text_key() -> None:
     """Test that default text_key (trace.last.outputs) works correctly."""
     check = StringMatching(keyword="response")
-    interaction = Interaction(
+    interaction = InteractionRecord(
         inputs={"query": "Test"},
         outputs="This is a response",
     )
@@ -205,11 +205,11 @@ async def test_trace_last_property() -> None:
         text_key="trace.last.outputs.message",
         keyword="Alice",
     )
-    interaction1 = Interaction(
+    interaction1 = InteractionRecord(
         inputs={"name": "Bob"},
         outputs={"message": "Hello Bob"},
     )
-    interaction2 = Interaction(
+    interaction2 = InteractionRecord(
         inputs={"name": "Alice"},
         outputs={"message": "Hello Alice"},
     )
@@ -226,11 +226,11 @@ async def test_multiple_interactions_uses_last() -> None:
         text_key="trace.last.outputs.response",
         keyword="Second",
     )
-    interaction1 = Interaction(
+    interaction1 = InteractionRecord(
         inputs={"query": "First"},
         outputs={"response": "First response"},
     )
-    interaction2 = Interaction(
+    interaction2 = InteractionRecord(
         inputs={"query": "Second"},
         outputs={"response": "Second response"},
     )

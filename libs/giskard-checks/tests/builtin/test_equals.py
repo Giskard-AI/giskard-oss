@@ -6,7 +6,7 @@ Tests cover different types (str, number, bool) and various comparison scenarios
 - Same value, different type (should fail)
 """
 
-from giskard.checks import CheckStatus, Equals, Interaction, Trace
+from giskard.checks import CheckStatus, Equals, InteractionRecord, Trace
 from giskard.checks.core.extraction import NoMatch
 
 
@@ -16,7 +16,7 @@ class TestEqualsString:
     async def test_string_same_value_same_type(self):
         """Test that same string value and type passes."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs="hello")
+            InteractionRecord(inputs="test", outputs="hello")
         )
         check = Equals(
             expected_value="hello",
@@ -33,7 +33,7 @@ class TestEqualsString:
     async def test_string_different_value_same_type(self):
         """Test that different string values fail."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs="hello")
+            InteractionRecord(inputs="test", outputs="hello")
         )
         check = Equals(
             expected_value="world",
@@ -51,7 +51,9 @@ class TestEqualsString:
 
     async def test_string_same_value_different_type_string_vs_number(self):
         """Test that string '123' vs number 123 fails (type mismatch)."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs="123"))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs="123")
+        )
         check = Equals(
             expected_value=123,
             key="trace.interactions[-1].outputs",
@@ -67,7 +69,7 @@ class TestEqualsString:
     async def test_string_same_value_different_type_string_vs_bool(self):
         """Test that string 'True' vs bool True fails (type mismatch)."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs="True")
+            InteractionRecord(inputs="test", outputs="True")
         )
         check = Equals(
             expected_value=True,
@@ -87,7 +89,9 @@ class TestEqualsNumber:
 
     async def test_number_same_value_same_type_int(self):
         """Test that same integer value and type passes."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=42))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs=42)
+        )
         check = Equals(
             expected_value=42,
             key="trace.interactions[-1].outputs",
@@ -102,7 +106,9 @@ class TestEqualsNumber:
 
     async def test_number_same_value_same_type_float(self):
         """Test that same float value and type passes."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs=3.14)
+        )
         check = Equals(
             expected_value=3.14,
             key="trace.interactions[-1].outputs",
@@ -117,7 +123,9 @@ class TestEqualsNumber:
 
     async def test_number_different_value_same_type_int(self):
         """Test that different integer values fail."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=42))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs=42)
+        )
         check = Equals(
             expected_value=100,
             key="trace.interactions[-1].outputs",
@@ -132,7 +140,9 @@ class TestEqualsNumber:
 
     async def test_number_different_value_same_type_float(self):
         """Test that different float values fail."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs=3.14)
+        )
         check = Equals(
             expected_value=2.71,
             key="trace.interactions[-1].outputs",
@@ -147,7 +157,9 @@ class TestEqualsNumber:
 
     async def test_number_same_value_different_type_int_vs_float(self):
         """Test that int 1 vs float 1.0 fails (type mismatch)."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=1))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs=1)
+        )
         check = Equals(
             expected_value=1.0,
             key="trace.interactions[-1].outputs",
@@ -162,7 +174,9 @@ class TestEqualsNumber:
 
     async def test_number_same_value_different_type_string_vs_int(self):
         """Test that string '1' vs int 1 fails (type mismatch)."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs="1"))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs="1")
+        )
         check = Equals(
             expected_value=1,
             key="trace.interactions[-1].outputs",
@@ -177,7 +191,9 @@ class TestEqualsNumber:
 
     async def test_number_same_value_different_type_string_vs_float(self):
         """Test that string '1.0' vs float 1.0 fails (type mismatch)."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs="1.0"))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs="1.0")
+        )
         check = Equals(
             expected_value=1.0,
             key="trace.interactions[-1].outputs",
@@ -196,7 +212,9 @@ class TestEqualsBool:
 
     async def test_bool_same_value_same_type_true(self):
         """Test that same boolean True value and type passes."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs=True)
+        )
         check = Equals(
             expected_value=True,
             key="trace.interactions[-1].outputs",
@@ -211,7 +229,9 @@ class TestEqualsBool:
 
     async def test_bool_same_value_same_type_false(self):
         """Test that same boolean False value and type passes."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=False))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs=False)
+        )
         check = Equals(
             expected_value=False,
             key="trace.interactions[-1].outputs",
@@ -226,7 +246,9 @@ class TestEqualsBool:
 
     async def test_bool_different_value_same_type(self):
         """Test that different boolean values fail."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs=True)
+        )
         check = Equals(
             expected_value=False,
             key="trace.interactions[-1].outputs",
@@ -242,7 +264,7 @@ class TestEqualsBool:
     async def test_bool_same_value_different_type_string_true_vs_bool_true(self):
         """Test that string 'True' vs bool True fails (type mismatch)."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs="True")
+            InteractionRecord(inputs="test", outputs="True")
         )
         check = Equals(
             expected_value=True,
@@ -259,7 +281,7 @@ class TestEqualsBool:
     async def test_bool_same_value_different_type_string_false_vs_bool_false(self):
         """Test that string 'False' vs bool False fails (type mismatch)."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs="False")
+            InteractionRecord(inputs="test", outputs="False")
         )
         check = Equals(
             expected_value=False,
@@ -279,7 +301,9 @@ class TestEqualsBool:
         Note: In Python, 1 == True is True due to bool being a subclass of int,
         but this test documents the actual behavior.
         """
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=1))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs=1)
+        )
         check = Equals(
             expected_value=True,
             key="trace.interactions[-1].outputs",
@@ -298,7 +322,9 @@ class TestEqualsBool:
         Note: In Python, 0 == False is True due to bool being a subclass of int,
         but this test documents the actual behavior.
         """
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=0))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs=0)
+        )
         check = Equals(
             expected_value=False,
             key="trace.interactions[-1].outputs",
@@ -314,7 +340,7 @@ class TestEqualsBool:
     async def test_string_true_vs_number_one(self):
         """Test that string 'True' vs number 1 fails (type mismatch)."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs="True")
+            InteractionRecord(inputs="test", outputs="True")
         )
         check = Equals(
             expected_value=1,
@@ -330,7 +356,9 @@ class TestEqualsBool:
 
     async def test_string_one_vs_bool_true(self):
         """Test that string '1' vs bool True fails (type mismatch)."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs="1"))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs="1")
+        )
         check = Equals(
             expected_value=True,
             key="trace.interactions[-1].outputs",
@@ -350,7 +378,7 @@ class TestEqualsEdgeCases:
     async def test_nested_outputs_string(self):
         """Test equality check with nested outputs (dict structure)."""
         trace = await Trace.from_interactions(
-            Interaction(
+            InteractionRecord(
                 inputs="test",
                 outputs={"result": "success", "code": 200},
             )
@@ -370,7 +398,7 @@ class TestEqualsEdgeCases:
     async def test_nested_outputs_number(self):
         """Test equality check with nested outputs containing number."""
         trace = await Trace.from_interactions(
-            Interaction(
+            InteractionRecord(
                 inputs="test",
                 outputs={"result": "success", "code": 200},
             )
@@ -390,7 +418,7 @@ class TestEqualsEdgeCases:
     async def test_nested_outputs_bool(self):
         """Test equality check with nested outputs containing bool."""
         trace = await Trace.from_interactions(
-            Interaction(
+            InteractionRecord(
                 inputs="test",
                 outputs={"result": "success", "valid": True},
             )
@@ -410,7 +438,7 @@ class TestEqualsEdgeCases:
     async def test_missing_key(self):
         """Test equality check when the key is missing from trace."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs={"other": "value"})
+            InteractionRecord(inputs="test", outputs={"other": "value"})
         )
         check = Equals(
             expected_value="expected",
@@ -432,7 +460,9 @@ class TestEqualsEdgeCases:
 
     async def test_none_value(self):
         """Test equality check with None values."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs=None)
+        )
         check = Equals(
             expected_value=None,
             key="trace.interactions[-1].outputs",
@@ -448,7 +478,7 @@ class TestEqualsEdgeCases:
     async def test_nomatch_with_trace_last(self):
         """Test equality check when using trace.last syntax and key is missing."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs={"other": "value"})
+            InteractionRecord(inputs="test", outputs={"other": "value"})
         )
         check = Equals(
             expected_value="expected",
@@ -466,7 +496,7 @@ class TestEqualsEdgeCases:
     async def test_nomatch_with_deeply_nested_path(self):
         """Test equality check with deeply nested path that doesn't exist."""
         trace = await Trace.from_interactions(
-            Interaction(
+            InteractionRecord(
                 inputs="test",
                 outputs={"level1": {"level2": {"level3": "value"}}},
             )
@@ -548,8 +578,8 @@ class TestEqualsListExpressions:
     async def test_wildcard_expression_with_list_expected_multiple_items(self):
         """Test that wildcard expression [*] returns a list and matches expected list."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test1", outputs="message 1"),
-            Interaction(inputs="test2", outputs="Message 2"),
+            InteractionRecord(inputs="test1", outputs="message 1"),
+            InteractionRecord(inputs="test2", outputs="Message 2"),
         )
         check = Equals(
             expected_value=["message 1", "Message 2"],
@@ -567,7 +597,7 @@ class TestEqualsListExpressions:
     async def test_wildcard_expression_with_list_expected_single_item(self):
         """Test that wildcard expression [*] returns a list even with single item."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test1", outputs="message 1"),
+            InteractionRecord(inputs="test1", outputs="message 1"),
         )
         check = Equals(
             expected_value=["message 1"],
@@ -585,7 +615,7 @@ class TestEqualsListExpressions:
     async def test_wildcard_expression_with_single_value_expected_fails(self):
         """Test that wildcard expression [*] fails when expected is a single value."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test1", outputs="message 1"),
+            InteractionRecord(inputs="test1", outputs="message 1"),
         )
         check = Equals(
             expected_value="message 1",
@@ -608,8 +638,8 @@ class TestEqualsListExpressions:
     async def test_single_index_expression_with_single_value_expected(self):
         """Test that single index expression [-1] returns a single value."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test1", outputs="message 1"),
-            Interaction(inputs="test2", outputs="Message 2"),
+            InteractionRecord(inputs="test1", outputs="message 1"),
+            InteractionRecord(inputs="test2", outputs="Message 2"),
         )
         check = Equals(
             expected_value="Message 2",
@@ -627,8 +657,8 @@ class TestEqualsListExpressions:
     async def test_single_index_expression_with_list_expected_fails(self):
         """Test that single index expression [-1] fails when expected is a list."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test1", outputs="message 1"),
-            Interaction(inputs="test2", outputs="Message 2"),
+            InteractionRecord(inputs="test1", outputs="message 1"),
+            InteractionRecord(inputs="test2", outputs="Message 2"),
         )
         check = Equals(
             expected_value=["Message 2"],
@@ -652,8 +682,8 @@ class TestEqualsListExpressions:
     async def test_single_index_expression_with_different_value_fails(self):
         """Test that single index expression [-1] fails when value doesn't match."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test1", outputs="message 1"),
-            Interaction(inputs="test2", outputs="Message 2"),
+            InteractionRecord(inputs="test1", outputs="message 1"),
+            InteractionRecord(inputs="test2", outputs="Message 2"),
         )
         check = Equals(
             expected_value="Wrong message",
@@ -675,8 +705,8 @@ class TestEqualsListExpressions:
     async def test_wildcard_expression_with_different_list_fails(self):
         """Test that wildcard expression [*] fails when list doesn't match."""
         trace = await Trace.from_interactions(
-            Interaction(inputs="test1", outputs="message 1"),
-            Interaction(inputs="test2", outputs="Message 2"),
+            InteractionRecord(inputs="test1", outputs="message 1"),
+            InteractionRecord(inputs="test2", outputs="Message 2"),
         )
         check = Equals(
             expected_value=["wrong", "list"],
@@ -717,7 +747,7 @@ class TestEqualsUnicodeNormalization:
         text_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
 
         trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs=text_nfc)
+            InteractionRecord(inputs="test", outputs=text_nfc)
         )
         check = Equals(
             expected_value=text_nfd,
@@ -737,7 +767,9 @@ class TestEqualsUnicodeNormalization:
         # Both use U+00E9 (NFC form)
         text = "café"  # Uses U+00E9
 
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=text))
+        trace = await Trace.from_interactions(
+            InteractionRecord(inputs="test", outputs=text)
+        )
         check = Equals(
             expected_value=text,
             key="trace.interactions[-1].outputs",
@@ -763,7 +795,7 @@ class TestEqualsUnicodeNormalization:
         text_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
 
         trace = await Trace.from_interactions(
-            Interaction(
+            InteractionRecord(
                 inputs="test",
                 outputs={"messages": [{"content": text_nfc}]},
             )
@@ -787,7 +819,7 @@ class TestEqualsUnicodeNormalization:
         text = "café"  # Uses U+00E9
 
         trace = await Trace.from_interactions(
-            Interaction(
+            InteractionRecord(
                 inputs="test",
                 outputs={"messages": [{"content": text}]},
             )
@@ -819,7 +851,7 @@ class TestEqualsUnicodeNormalization:
         text_nfd = "caf\u0065\u0301"  # Uses U+0065 U+0301
 
         trace = await Trace.from_interactions(
-            Interaction(
+            InteractionRecord(
                 inputs="test",
                 outputs={"messages": [{"content": text_nfc}]},
             )
@@ -847,7 +879,7 @@ class TestEqualsUnicodeNormalization:
         text = "café"  # Uses U+00E9
 
         trace = await Trace.from_interactions(
-            Interaction(
+            InteractionRecord(
                 inputs="test",
                 outputs={"messages": [{"content": text}]},
             )

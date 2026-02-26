@@ -3,10 +3,10 @@ from __future__ import annotations
 import time
 import traceback
 
+from ..core import Trace
 from ..core.check import Check
 from ..core.result import CheckResult, TestCaseResult
 from ..core.testcase import TestCase
-from ..core.trace import Trace
 
 
 async def _run_check[

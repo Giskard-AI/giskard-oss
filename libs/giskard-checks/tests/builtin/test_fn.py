@@ -3,7 +3,7 @@ from giskard.checks import (
     CheckResult,
     CheckStatus,
     FnCheck,
-    Interaction,
+    InteractionRecord,
     Trace,
     from_fn,
 )
@@ -123,7 +123,7 @@ async def test_function_receives_trace() -> None:
     check = FnCheck(fn=fn)
     test_trace = Trace(
         interactions=[
-            Interaction(inputs={"query": "test"}, outputs={"response": "answer"})
+            InteractionRecord(inputs={"query": "test"}, outputs={"response": "answer"})
         ]
     )
     result = await check.run(test_trace)
@@ -252,14 +252,14 @@ async def test_complex_trace_usage() -> None:
 
     # Test with trace that has outputs
     trace_with_outputs = Trace[dict[str, str], dict[str, str] | None](
-        interactions=[Interaction(inputs={"q": "test"}, outputs={"a": "answer"})]
+        interactions=[InteractionRecord(inputs={"q": "test"}, outputs={"a": "answer"})]
     )
     result = await check.run(trace_with_outputs)
     assert result.passed
 
     # Test with trace that has no outputs
     trace_no_outputs = Trace[dict[str, str], dict[str, str] | None](
-        interactions=[Interaction(inputs={"q": "test"}, outputs=None)]
+        interactions=[InteractionRecord(inputs={"q": "test"}, outputs=None)]
     )
     result = await check.run(trace_no_outputs)
     assert result.failed

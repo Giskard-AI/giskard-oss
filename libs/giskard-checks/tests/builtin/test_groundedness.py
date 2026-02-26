@@ -3,7 +3,7 @@ from typing import cast, override
 
 from giskard.agents.chat import Message
 from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
-from giskard.checks import CheckStatus, Groundedness, Interaction, Trace
+from giskard.checks import CheckStatus, Groundedness, InteractionRecord, Trace
 from pydantic import Field
 
 
@@ -59,7 +59,7 @@ async def test_run_returns_failure() -> None:
 async def test_answer_and_context_from_trace() -> None:
     generator = MockGenerator(passed=True, reason=None)
     groundedness = Groundedness(generator=generator)
-    interaction = Interaction(
+    interaction = InteractionRecord(
         inputs={"query": "Where is the Eiffel Tower?"},
         outputs={"response": "The Eiffel Tower is in Paris."},
         metadata={"context": ["Paris is the capital of France."]},
@@ -126,7 +126,7 @@ async def test_custom_keys() -> None:
         answer_key="trace.interactions[0].outputs.response",
         context_key="trace.interactions[0].metadata.documents",
     )
-    interaction = Interaction(
+    interaction = InteractionRecord(
         inputs={"query": "What is AI?"},
         outputs={"response": "AI is artificial intelligence."},
         metadata={"documents": ["Document about AI", "Another document"]},
@@ -147,7 +147,7 @@ async def test_answer_priority_over_trace() -> None:
         generator=generator,
         answer="Direct answer takes priority",
     )
-    interaction = Interaction(
+    interaction = InteractionRecord(
         inputs={"query": "Test"},
         outputs={"response": "Trace answer"},
     )
@@ -164,7 +164,7 @@ async def test_context_priority_over_trace() -> None:
         generator=generator,
         context=["Direct context"],
     )
-    interaction = Interaction(
+    interaction = InteractionRecord(
         inputs={"query": "Test"},
         outputs={"response": "Answer"},
         metadata={"context": ["Trace context"]},
@@ -183,7 +183,7 @@ async def test_empty_string_context_is_preserved() -> None:
         answer="Some answer",
         context="",
     )
-    interaction = Interaction(
+    interaction = InteractionRecord(
         inputs={"query": "Test"},
         outputs={"response": "Answer"},
         metadata={"context": ["Trace context"]},
@@ -224,7 +224,7 @@ async def test_missing_context_in_trace() -> None:
     """Test behavior when context is not found in trace."""
     generator = MockGenerator(passed=True, reason=None)
     groundedness = Groundedness(generator=generator)
-    interaction = Interaction(
+    interaction = InteractionRecord(
         inputs={"query": "Test"},
         outputs={"response": "Answer"},
         # No context in metadata
@@ -242,12 +242,12 @@ async def test_missing_context_in_trace() -> None:
 async def test_using_trace_last_property() -> None:
     """Test that demonstrates using trace.last instead of trace.interactions[-1]."""
     generator = MockGenerator(passed=True, reason=None)
-    interaction1 = Interaction(
+    interaction1 = InteractionRecord(
         inputs={"query": "First question"},
         outputs={"response": "First answer"},
         metadata={"context": ["Context 1"]},
     )
-    interaction2 = Interaction(
+    interaction2 = InteractionRecord(
         inputs={"query": "Second question"},
         outputs={"response": "Second answer"},
         metadata={"context": ["Context 2"]},
