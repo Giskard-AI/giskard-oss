@@ -4,7 +4,7 @@ from typing import override
 import pytest
 from giskard.agents.chat import Message
 from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
-from giskard.checks import InteractionRecord, Trace, UserSimulator
+from giskard.checks import Interaction, Trace, UserSimulator
 from pydantic import Field
 
 
@@ -68,7 +68,7 @@ async def test_user_simulator_returns_messages_until_goal_reached():
     )
 
     trace = await trace.with_interaction(
-        InteractionRecord(inputs=inputs, outputs="I'm good, thank you!")
+        Interaction(inputs=inputs, outputs="I'm good, thank you!")
     )
     with pytest.raises(StopAsyncIteration):
         _ = await gen.asend(trace)
@@ -101,7 +101,7 @@ async def test_user_simulator_returns_messages_until_max_steps():
     )
 
     trace = await trace.with_interaction(
-        InteractionRecord(inputs=inputs, outputs="I'm good and you?")
+        Interaction(inputs=inputs, outputs="I'm good and you?")
     )
     with pytest.raises(StopAsyncIteration):
         _ = await gen.asend(trace)
@@ -128,7 +128,7 @@ async def test_user_simulatorm_multiple_steps():
     )
 
     trace = await trace.with_interaction(
-        InteractionRecord(inputs=inputs, outputs="I'm good and you?")
+        Interaction(inputs=inputs, outputs="I'm good and you?")
     )
     inputs = await gen.asend(trace)
     assert inputs == "I'm good too"
@@ -142,7 +142,7 @@ async def test_user_simulatorm_multiple_steps():
     )
 
     trace = await trace.with_interaction(
-        InteractionRecord(inputs=inputs, outputs="How do I get to the city center?")
+        Interaction(inputs=inputs, outputs="How do I get to the city center?")
     )
     with pytest.raises(StopAsyncIteration):
         inputs = await gen.asend(trace)

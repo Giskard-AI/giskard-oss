@@ -1,6 +1,6 @@
-from .base import BaseInteraction
+from .base import InteractionSpec
+from .interact import Interact
 from .interaction import Interaction
-from .interaction_record import InteractionRecord
 from .trace import Trace
 
-__all__ = ["BaseInteraction", "Interaction", "InteractionRecord", "Trace"]
+__all__ = ["InteractionSpec", "Interact", "Interaction", "Trace"]

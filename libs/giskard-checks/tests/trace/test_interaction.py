@@ -2,9 +2,9 @@ from collections.abc import AsyncGenerator, Generator
 
 import pytest
 from giskard.checks import (
-    BaseInteraction,
+    Interact,
     Interaction,
-    InteractionRecord,
+    InteractionSpec,
     Trace,
     UserSimulator,
 )
@@ -12,31 +12,27 @@ from giskard.checks import (
 
 class TestInteraction:
     async def test_interaction_with_static_inputs_and_outputs(self):
-        interaction = Interaction(inputs=1, outputs=2)
+        interaction = Interact(inputs=1, outputs=2)
 
         generator = interaction.generate(Trace(interactions=[]))
 
         record = await anext(generator)
-        assert record == InteractionRecord(inputs=1, outputs=2, metadata={})
+        assert record == Interaction(inputs=1, outputs=2, metadata={})
         with pytest.raises(StopAsyncIteration):
             await generator.asend(
-                Trace(
-                    interactions=[InteractionRecord(inputs=1, outputs=2, metadata={})]
-                )
+                Trace(interactions=[Interaction(inputs=1, outputs=2, metadata={})])
             )
 
     async def test_interaction_with_dynamic_inputs_and_outputs(self):
-        interaction = Interaction(inputs=lambda: 1, outputs=lambda inputs: inputs + 1)
+        interaction = Interact(inputs=lambda: 1, outputs=lambda inputs: inputs + 1)
 
         generator = interaction.generate(Trace(interactions=[]))
 
         record = await anext(generator)
-        assert record == InteractionRecord(inputs=1, outputs=2, metadata={})
+        assert record == Interaction(inputs=1, outputs=2, metadata={})
         with pytest.raises(StopAsyncIteration):
             await generator.asend(
-                Trace(
-                    interactions=[InteractionRecord(inputs=1, outputs=2, metadata={})]
-                )
+                Trace(interactions=[Interaction(inputs=1, outputs=2, metadata={})])
             )
 
     async def test_interaction_with_inputs_generator(self):
@@ -47,7 +43,7 @@ class TestInteraction:
             trace = yield trace.interactions[-1].outputs + 1
             trace = yield trace.interactions[-1].outputs + 1
 
-        interaction = Interaction(
+        interaction = Interact(
             inputs=inputs_generator, outputs=lambda inputs: inputs + 1
         )
 
@@ -55,15 +51,15 @@ class TestInteraction:
         generator = interaction.generate(trace)
 
         record = await anext(generator)
-        assert record == InteractionRecord(inputs=1, outputs=2, metadata={})
+        assert record == Interaction(inputs=1, outputs=2, metadata={})
         record = await generator.asend(
             Trace(interactions=[*trace.interactions, record])
         )
-        assert record == InteractionRecord(inputs=3, outputs=4, metadata={})
+        assert record == Interaction(inputs=3, outputs=4, metadata={})
         record = await generator.asend(
             Trace(interactions=[*trace.interactions, record])
         )
-        assert record == InteractionRecord(inputs=5, outputs=6, metadata={})
+        assert record == Interaction(inputs=5, outputs=6, metadata={})
         with pytest.raises(StopAsyncIteration):
             await generator.asend(Trace(interactions=[*trace.interactions, record]))
 
@@ -77,7 +73,7 @@ class TestInteraction:
             trace = yield trace.outputs() + 1
             trace = yield trace.outputs() + 1
 
-        interaction = Interaction(
+        interaction = Interact(
             inputs=inputs_generator, outputs=lambda inputs: inputs + 1
         )
 
@@ -85,11 +81,11 @@ class TestInteraction:
         generator = interaction.generate(trace)
 
         record = await anext(generator)
-        assert record == InteractionRecord(inputs=1, outputs=2, metadata={})
+        assert record == Interaction(inputs=1, outputs=2, metadata={})
         record = await generator.asend(await trace.with_interaction(record))
-        assert record == InteractionRecord(inputs=3, outputs=4, metadata={})
+        assert record == Interaction(inputs=3, outputs=4, metadata={})
         record = await generator.asend(await trace.with_interaction(record))
-        assert record == InteractionRecord(inputs=5, outputs=6, metadata={})
+        assert record == Interaction(inputs=5, outputs=6, metadata={})
         with pytest.raises(StopAsyncIteration):
             await generator.asend(await trace.with_interaction(record))
 
@@ -97,7 +93,7 @@ class TestInteraction:
 
     async def test_inputs_static_value(self):
         """Test inputs as static value."""
-        interaction = Interaction(inputs="hello", outputs="hi")
+        interaction = Interact(inputs="hello", outputs="hi")
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.inputs == "hello"
@@ -109,7 +105,7 @@ class TestInteraction:
         def get_input() -> str:
             return "hello"
 
-        interaction = Interaction(inputs=get_input, outputs="hi")
+        interaction = Interact(inputs=get_input, outputs="hi")
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.inputs == "hello"
@@ -120,7 +116,7 @@ class TestInteraction:
         def get_input():
             return "hello"
 
-        interaction = Interaction(inputs=get_input, outputs="hi")
+        interaction = Interact(inputs=get_input, outputs="hi")
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.inputs == "hello"
@@ -132,7 +128,7 @@ class TestInteraction:
             count = len(trace.interactions)
             return f"message_{count}"
 
-        interaction = Interaction(inputs=get_input, outputs="hi")
+        interaction = Interact(inputs=get_input, outputs="hi")
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -146,7 +142,7 @@ class TestInteraction:
             return f"message_{count}"
 
         # Untyped parameters are now allowed and match any requirement
-        interaction = Interaction(inputs=get_input, outputs="hi")
+        interaction = Interact(inputs=get_input, outputs="hi")
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -159,7 +155,7 @@ class TestInteraction:
             count = len(trace.interactions)
             return f"message_{count}_{provided}"
 
-        interaction = Interaction(inputs=get_input, outputs="hi")
+        interaction = Interact(inputs=get_input, outputs="hi")
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -173,7 +169,7 @@ class TestInteraction:
             return f"message_{count}_{provided}"
 
         # Untyped parameters are now allowed and match any requirement
-        interaction = Interaction(inputs=get_input, outputs="hi")
+        interaction = Interact(inputs=get_input, outputs="hi")
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -185,7 +181,7 @@ class TestInteraction:
         async def get_input() -> str:
             return "hello"
 
-        interaction = Interaction(inputs=get_input, outputs="hi")
+        interaction = Interact(inputs=get_input, outputs="hi")
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.inputs == "hello"
@@ -197,7 +193,7 @@ class TestInteraction:
             count = len(trace.interactions)
             return f"message_{count}"
 
-        interaction = Interaction(inputs=get_input, outputs="hi")
+        interaction = Interact(inputs=get_input, outputs="hi")
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -213,7 +209,7 @@ class TestInteraction:
             yield 2
             yield 3
 
-        interaction = Interaction(
+        interaction = Interact(
             inputs=inputs_generator, outputs=lambda inputs: inputs * 2
         )
         trace = Trace(interactions=[])
@@ -246,7 +242,7 @@ class TestInteraction:
             yield 2
             yield 3
 
-        interaction = Interaction(
+        interaction = Interact(
             inputs=inputs_generator, outputs=lambda inputs: inputs * 2
         )
         trace = Trace(interactions=[])
@@ -282,7 +278,7 @@ class TestInteraction:
             trace = yield count + 2
             trace = yield count + 3
 
-        interaction = Interaction(
+        interaction = Interact(
             inputs=inputs_generator, outputs=lambda inputs: inputs * 2
         )
         trace = Trace(interactions=[])
@@ -318,7 +314,7 @@ class TestInteraction:
             trace = yield count + 2
             trace = yield count + 3
 
-        interaction = Interaction(
+        interaction = Interact(
             inputs=inputs_generator, outputs=lambda inputs: inputs * 2
         )
         trace = Trace(interactions=[])
@@ -350,7 +346,7 @@ class TestInteraction:
             yield 1
             yield 2
 
-        interaction = Interaction(
+        interaction = Interact(
             inputs=inputs_generator, outputs=lambda inputs: inputs * 2
         )
         trace = Trace(interactions=[])
@@ -376,7 +372,7 @@ class TestInteraction:
             yield 1
             yield 2
 
-        interaction = Interaction(
+        interaction = Interact(
             inputs=inputs_generator, outputs=lambda inputs: inputs * 2
         )
         trace = Trace(interactions=[])
@@ -403,7 +399,7 @@ class TestInteraction:
             trace = yield count + 1
             trace = yield count + 2
 
-        interaction = Interaction(
+        interaction = Interact(
             inputs=inputs_generator, outputs=lambda inputs: inputs * 2
         )
         trace = Trace(interactions=[])
@@ -431,7 +427,7 @@ class TestInteraction:
             trace = yield count + 1
             trace = yield count + 2
 
-        interaction = Interaction(
+        interaction = Interact(
             inputs=inputs_generator, outputs=lambda inputs: inputs * 2
         )
         trace = Trace(interactions=[])
@@ -455,7 +451,7 @@ class TestInteraction:
 
     async def test_outputs_static_value(self):
         """Test outputs as static value."""
-        interaction = Interaction(inputs="hello", outputs="hi")
+        interaction = Interact(inputs="hello", outputs="hi")
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.outputs == "hi"
@@ -466,7 +462,7 @@ class TestInteraction:
         def get_output() -> str:
             return "hi"
 
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.outputs == "hi"
@@ -477,7 +473,7 @@ class TestInteraction:
         def get_output():
             return "hi"
 
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.outputs == "hi"
@@ -488,7 +484,7 @@ class TestInteraction:
         def get_output(inputs: str) -> str:
             return f"echo: {inputs}"
 
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.outputs == "echo: hello"
@@ -499,7 +495,7 @@ class TestInteraction:
         def get_output(inputs):
             return f"echo: {inputs}"
 
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.outputs == "echo: hello"
@@ -511,7 +507,7 @@ class TestInteraction:
             count = len(trace.interactions)
             return f"echo_{count}: {inputs}"
 
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -524,7 +520,7 @@ class TestInteraction:
             count = len(trace.interactions)
             return f"echo_{count}: {inputs}"
 
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -537,7 +533,7 @@ class TestInteraction:
             count = len(trace.interactions)
             return f"echo_{count * multiplier}: {inputs}"
 
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -550,7 +546,7 @@ class TestInteraction:
             count = len(trace.interactions)
             return f"echo_{count * multiplier}: {inputs}"
 
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -562,7 +558,7 @@ class TestInteraction:
         async def get_output(inputs: str) -> str:
             return f"echo: {inputs}"
 
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.outputs == "echo: hello"
@@ -574,7 +570,7 @@ class TestInteraction:
             count = len(trace.interactions)
             return f"echo_{count}: {inputs}"
 
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -590,7 +586,7 @@ class TestInteraction:
 
         # TypeError is raised directly (not wrapped because code only catches ValueError)
         with pytest.raises(TypeError, match="Parameter 'unmapped'.*no matching"):
-            Interaction(inputs=get_input, outputs="hi")
+            Interact(inputs=get_input, outputs="hi")
 
     async def test_outputs_fn_with_unmapped_required_param_passes_validation_but_fails_runtime(
         self,
@@ -607,7 +603,7 @@ class TestInteraction:
             return f"echo_{unmapped}: {inputs}"
 
         # Validation passes because INJECTABLE_INPUT (Any) matches unmapped: str
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         generator = interaction.generate(Trace(interactions=[]))
         # Fails at runtime with IndexError because unmapped parameter (position 2)
         # cannot be resolved from args (only inputs and trace are provided)
@@ -621,7 +617,7 @@ class TestInteraction:
             return "hello"
 
         # *args are skipped in parameter injection, so this should work
-        interaction = Interaction(inputs=get_input, outputs="hi")
+        interaction = Interact(inputs=get_input, outputs="hi")
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.inputs == "hello"
@@ -633,7 +629,7 @@ class TestInteraction:
             return "hi"
 
         # *args are skipped in parameter injection, so this should work
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.outputs == "hi"
@@ -645,7 +641,7 @@ class TestInteraction:
             return "hello"
 
         # **kwargs are skipped in parameter injection, so this should work
-        interaction = Interaction(inputs=get_input, outputs="hi")
+        interaction = Interact(inputs=get_input, outputs="hi")
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.inputs == "hello"
@@ -657,7 +653,7 @@ class TestInteraction:
             return "hi"
 
         # **kwargs are skipped in parameter injection, so this should work
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.outputs == "hi"
@@ -671,7 +667,7 @@ class TestInteraction:
             count = len(trace.interactions)
             return f"[{count}] {inputs}"
 
-        interaction = Interaction(inputs="hello", outputs=get_output)
+        interaction = Interact(inputs="hello", outputs=get_output)
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -685,7 +681,7 @@ class TestInteraction:
             count = len(trace.interactions)
             return f"message_{count}"
 
-        interaction = Interaction(inputs=get_input, outputs="hi")
+        interaction = Interact(inputs=get_input, outputs="hi")
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -703,7 +699,7 @@ class TestInteraction:
             count = len(trace.interactions)
             return f"[{count * multiplier}] {inputs}"
 
-        interaction = Interaction(inputs=get_input, outputs=get_output)
+        interaction = Interact(inputs=get_input, outputs=get_output)
         trace = Trace(interactions=[])
         generator = interaction.generate(trace)
         record = await anext(generator)
@@ -717,7 +713,7 @@ class TestInteraction:
         user_simulator = UserSimulator(
             instructions="Ask about the weather", max_steps=2
         )
-        interaction = Interaction(
+        interaction = Interact(
             inputs=user_simulator, outputs="This is a static response"
         )
 
@@ -725,10 +721,10 @@ class TestInteraction:
         json_str = interaction.model_dump_json()
 
         # Deserialize from JSON
-        restored_spec = BaseInteraction.model_validate_json(json_str)
+        restored_spec = InteractionSpec.model_validate_json(json_str)
 
         # Verify it's an Interaction
-        assert isinstance(restored_spec, Interaction)
+        assert isinstance(restored_spec, Interact)
 
         # Verify the UserSimulator was restored correctly
         assert isinstance(restored_spec.inputs, UserSimulator)

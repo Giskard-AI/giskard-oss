@@ -5,7 +5,7 @@ from rich.console import Console, ConsoleOptions, RenderResult
 from rich.rule import Rule
 
 from ..protocols import InteractionGenerator
-from .interaction_record import InteractionRecord
+from .interaction import Interaction
 
 
 class Trace[InputType, OutputType](BaseModel, frozen=True):
@@ -21,36 +21,33 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     Attributes
     ----------
-    interactions : list[InteractionRecord[InputType, OutputType]]
+    interactions : list[Interaction[InputType, OutputType]]
         Ordered list of all interactions that have occurred. The most recent
         interaction is at `interactions[-1]`.
-    last : InteractionRecord[InputType, OutputType] | None
+    last : Interaction[InputType, OutputType] | None
         Computed field that returns the last interaction in the trace, or None if empty.
         Equivalent to `interactions[-1]` if interactions exist, None otherwise.
         Available in Python code, Jinja2 prompt templates, and JSONPath expressions.
 
     Examples
     --------
-    ```python
-    trace = Trace(interactions=[
-        InteractionRecord(inputs="Hello", outputs="Hi there!"),
-        InteractionRecord(inputs="How are you?", outputs="I'm doing well, thanks!"),
-    ])
+    >>> Trace(interactions=[
+    ...    Interaction(inputs="Hello", outputs="Hi there!"),
+    ...    Interaction(inputs="How are you?", outputs="I'm doing well, thanks!"),
+    ... ])
 
-    # Access the most recent interaction (preferred in prompt templates and JSONPath)
-    last_interaction = trace.last
+    Access the most recent interaction in a trace:
+    >>> last_interaction = trace.last
 
-    # Use in JSONPath expressions
-    check = Groundedness(answer_key="trace.last.outputs")
+    Use in JSONPath expressions:
+    >>> from giskard.checks import Groundedness
+    >>> check = Groundedness(answer_key="trace.last.outputs")
 
-    # Access all outputs
-    all_outputs = [interaction.outputs for interaction in trace.interactions]
-    ```
+    Access all outputs:
+    >>> all_outputs = [interaction.outputs for interaction in trace.interactions]
     """
 
-    interactions: list[InteractionRecord[InputType, OutputType]] = Field(
-        default_factory=list
-    )
+    interactions: list[Interaction[InputType, OutputType]] = Field(default_factory=list)
 
     annotations: dict[str, Any] = Field(
         default_factory=dict,
@@ -59,7 +56,7 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     @computed_field
     @property
-    def last(self) -> InteractionRecord[InputType, OutputType] | None:
+    def last(self) -> Interaction[InputType, OutputType] | None:
         """The last interaction in the trace, or None if the trace is empty.
 
         This computed field is equivalent to `interactions[-1]` when interactions exist.
@@ -84,15 +81,15 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     @classmethod
     async def from_interactions(
         cls,
-        *interactions: InteractionRecord[InputType, OutputType]
-        | InteractionGenerator[InteractionRecord[InputType, OutputType], Self],
+        *interactions: Interaction[InputType, OutputType]
+        | InteractionGenerator[Interaction[InputType, OutputType], Self],
     ) -> Self:
         return await cls().with_interactions(*interactions)
 
     async def with_interactions(
         self,
-        *interactions: InteractionRecord[InputType, OutputType]
-        | InteractionGenerator[InteractionRecord[InputType, OutputType], Self],
+        *interactions: Interaction[InputType, OutputType]
+        | InteractionGenerator[Interaction[InputType, OutputType], Self],
     ) -> Self:
         trace = self
 
@@ -104,11 +101,11 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     async def with_interaction(
         self,
         interaction: (
-            InteractionRecord[InputType, OutputType]
-            | InteractionGenerator[InteractionRecord[InputType, OutputType], Self]
+            Interaction[InputType, OutputType]
+            | InteractionGenerator[Interaction[InputType, OutputType], Self]
         ),
     ) -> Self:
-        if isinstance(interaction, InteractionRecord):
+        if isinstance(interaction, Interaction):
             return self.model_copy(
                 update={"interactions": self.interactions + [interaction]}
             )

@@ -8,10 +8,11 @@ from typing import override
 
 import pytest
 from giskard.checks import (
-    BaseInteraction,
     Check,
     CheckResult,
-    InteractionRecord,
+    Interact,
+    Interaction,
+    InteractionSpec,
     Scenario,
     Trace,
     from_fn,
@@ -36,17 +37,17 @@ class MockCheck(Check[str, str, Trace[str, str]]):
         return self.result
 
 
-@BaseInteraction.register("mock_interaction")
-class MockInteraction(BaseInteraction[str, str, Trace[str, str]]):
+@InteractionSpec.register("mock_interaction")
+class MockInteractionSpec(InteractionSpec[str, str, Trace[str, str]]):
     """Mock interaction spec component for testing scenarios."""
 
-    interactions: list[InteractionRecord[str, str]]
+    interactions: list[Interaction[str, str]]
     trace_received: Trace[str, str] | None = None
 
     @override
     async def generate(
         self, trace: Trace[str, str]
-    ) -> AsyncGenerator[InteractionRecord[str, str], Trace[str, str]]:
+    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
         """Generate interactions."""
         self.trace_received = trace
         for interaction in self.interactions:
@@ -80,16 +81,16 @@ class NamedFailingComponent(Check[str, str, Trace[str, str]]):
         raise ValueError(self.error_message)
 
 
-@BaseInteraction.register("generator_error_component")
-class GeneratorErrorComponent(BaseInteraction[str, str, Trace[str, str]]):
+@InteractionSpec.register("generator_error_component")
+class GeneratorErrorComponent(InteractionSpec[str, str, Trace[str, str]]):
     """Component whose generator raises an error after first yield."""
 
     @override
     async def generate(
         self, trace: Trace[str, str]
-    ) -> AsyncGenerator[InteractionRecord[str, str], Trace[str, str]]:
+    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
         """Yield an interaction then raise an error on next iteration."""
-        yield InteractionRecord(inputs="test", outputs="result", metadata={})
+        yield Interaction(inputs="test", outputs="result", metadata={})
         raise RuntimeError("Generator error")
 
 
@@ -140,10 +141,10 @@ class TestScenarioNormalCases:
     async def test_scenario_with_interaction_only(self):
         """Test scenario with only interaction specs (no checks)."""
         interactions = [
-            InteractionRecord(inputs="input1", outputs="output1", metadata={"step": 1}),
-            InteractionRecord(inputs="input2", outputs="output2", metadata={"step": 2}),
+            Interaction(inputs="input1", outputs="output1", metadata={"step": 1}),
+            Interaction(inputs="input2", outputs="output2", metadata={"step": 2}),
         ]
-        mock_interaction = MockInteraction(interactions=interactions)
+        mock_interaction = MockInteractionSpec(interactions=interactions)
         result = await (
             scenario("interactions_only").add_interaction(mock_interaction).run()
         )
@@ -160,10 +161,10 @@ class TestScenarioNormalCases:
 
     async def test_scenario_with_interactions_and_checks(self):
         """Test scenario with interaction specs and checks mixed."""
-        interaction1 = InteractionRecord(inputs="input1", outputs="output1")
-        interaction2 = InteractionRecord(inputs="input2", outputs="output2")
-        mock_interaction1 = MockInteraction(interactions=[interaction1])
-        mock_interaction2 = MockInteraction(interactions=[interaction2])
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+        mock_interaction1 = MockInteractionSpec(interactions=[interaction1])
+        mock_interaction2 = MockInteractionSpec(interactions=[interaction2])
 
         check1 = MockCheck(result=CheckResult.success(message="Check 1"))
         check2 = MockCheck(result=CheckResult.success(message="Check 2"))
@@ -237,10 +238,10 @@ class TestScenarioNormalCases:
 
     async def test_scenario_skips_subsequent_steps_on_failure(self):
         """Test that scenario skips subsequent steps when a step fails."""
-        interaction1 = InteractionRecord(inputs="input1", outputs="output1")
-        interaction2 = InteractionRecord(inputs="input2", outputs="output2")
-        mock_interaction1 = MockInteraction(interactions=[interaction1])
-        mock_interaction2 = MockInteraction(interactions=[interaction2])
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+        mock_interaction1 = MockInteractionSpec(interactions=[interaction1])
+        mock_interaction2 = MockInteractionSpec(interactions=[interaction2])
 
         check1 = MockCheck(result=CheckResult.failure(message="Check 1 failed"))
         check2 = MockCheck(result=CheckResult.success(message="Check 2 passed"))
@@ -273,10 +274,10 @@ class TestScenarioNormalCases:
 
     async def test_scenario_skips_subsequent_steps_on_error(self):
         """Test that scenario skips subsequent steps when a step errors."""
-        interaction1 = InteractionRecord(inputs="input1", outputs="output1")
-        interaction2 = InteractionRecord(inputs="input2", outputs="output2")
-        mock_interaction1 = MockInteraction(interactions=[interaction1])
-        mock_interaction2 = MockInteraction(interactions=[interaction2])
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+        mock_interaction1 = MockInteractionSpec(interactions=[interaction1])
+        mock_interaction2 = MockInteractionSpec(interactions=[interaction2])
 
         check1 = MockCheck(result=CheckResult.error(message="Check 1 errored"))
         check2 = MockCheck(result=CheckResult.success(message="Check 2 passed"))
@@ -309,15 +310,15 @@ class TestScenarioNormalCases:
 
     async def test_trace_accumulation_across_components(self):
         """Test that trace accumulates interactions across components."""
-        interaction1 = InteractionRecord(inputs="1", outputs="2")
-        interaction2 = InteractionRecord(inputs="3", outputs="4")
-        interaction3 = InteractionRecord(inputs="5", outputs="6")
+        interaction1 = Interaction(inputs="1", outputs="2")
+        interaction2 = Interaction(inputs="3", outputs="4")
+        interaction3 = Interaction(inputs="5", outputs="6")
 
-        mock_interaction1 = MockInteraction(interactions=[interaction1])
+        mock_interaction1 = MockInteractionSpec(interactions=[interaction1])
         check1 = MockCheck(result=CheckResult.success())
-        mock_interaction2 = MockInteraction(interactions=[interaction2])
+        mock_interaction2 = MockInteractionSpec(interactions=[interaction2])
         check2 = MockCheck(result=CheckResult.success())
-        mock_interaction3 = MockInteraction(interactions=[interaction3])
+        mock_interaction3 = MockInteractionSpec(interactions=[interaction3])
 
         result = await (
             scenario("trace_accumulation")
@@ -342,11 +343,11 @@ class TestScenarioNormalCases:
 
     async def test_check_receives_updated_trace(self):
         """Test that checks receive the trace with all previous interactions."""
-        interaction1 = InteractionRecord(inputs="a", outputs="b")
-        interaction2 = InteractionRecord(inputs="c", outputs="d")
+        interaction1 = Interaction(inputs="a", outputs="b")
+        interaction2 = Interaction(inputs="c", outputs="d")
 
-        mock_interaction1 = MockInteraction(interactions=[interaction1])
-        mock_interaction2 = MockInteraction(interactions=[interaction2])
+        mock_interaction1 = MockInteractionSpec(interactions=[interaction1])
+        mock_interaction2 = MockInteractionSpec(interactions=[interaction2])
         check = MockCheck(result=CheckResult.success())
 
         result = await (
@@ -430,10 +431,10 @@ class TestScenarioEdgeCases:
     async def test_scenario_with_only_interactions(self):
         """Test scenario with only interactions, no checks."""
         interactions = [
-            InteractionRecord(inputs=str(i), outputs=str(i * 2), metadata={"index": i})
+            Interaction(inputs=str(i), outputs=str(i * 2), metadata={"index": i})
             for i in range(5)
         ]
-        mock_interaction = MockInteraction(interactions=interactions)
+        mock_interaction = MockInteractionSpec(interactions=interactions)
         result = await (
             scenario("only_interactions").add_interaction(mock_interaction).run()
         )
@@ -460,9 +461,9 @@ class TestScenarioEdgeCases:
 
     async def test_scenario_with_multiple_consecutive_interactions(self):
         """Test scenario with multiple consecutive interaction specs."""
-        mock_interactions: list[BaseInteraction[str, str, Trace[str, str]]] = [
-            MockInteraction(
-                interactions=[InteractionRecord(inputs=str(i), outputs=str(i * 2))]
+        mock_interactions: list[InteractionSpec[str, str, Trace[str, str]]] = [
+            MockInteractionSpec(
+                interactions=[Interaction(inputs=str(i), outputs=str(i * 2))]
             )
             for i in range(3)
         ]
@@ -484,8 +485,8 @@ class TestScenarioEdgeCases:
     async def test_scenario_with_multiple_consecutive_direct_interactions(self):
         """Test scenario with multiple consecutive direct Interaction objects."""
         mock_interactions = [
-            MockInteraction(
-                interactions=[InteractionRecord(inputs=str(i), outputs=str(i * 2))]
+            MockInteractionSpec(
+                interactions=[Interaction(inputs=str(i), outputs=str(i * 2))]
             )
             for i in range(3)
         ]
@@ -554,10 +555,8 @@ class TestScenarioEdgeCases:
         for i in range(10):
             if i % 2 == 0:
                 builder.add_interaction(
-                    MockInteraction(
-                        interactions=[
-                            InteractionRecord(inputs=str(i), outputs=str(i * 2))
-                        ]
+                    MockInteractionSpec(
+                        interactions=[Interaction(inputs=str(i), outputs=str(i * 2))]
                     )
                 )
             else:
@@ -737,11 +736,11 @@ class TestScenarioErrorHandling:
 
     async def test_error_with_interactions_preserves_trace(self):
         """Test that errors preserve trace state up to that point."""
-        interaction1 = InteractionRecord(inputs="a", outputs="b")
-        interaction2 = InteractionRecord(inputs="c", outputs="d")
+        interaction1 = Interaction(inputs="a", outputs="b")
+        interaction2 = Interaction(inputs="c", outputs="d")
 
-        mock_interaction1 = MockInteraction(interactions=[interaction1])
-        mock_interaction2 = MockInteraction(interactions=[interaction2])
+        mock_interaction1 = MockInteractionSpec(interactions=[interaction1])
+        mock_interaction2 = MockInteractionSpec(interactions=[interaction2])
         failing_component = FailingComponent(error_message="Error after interactions")
 
         builder = (
@@ -775,26 +774,10 @@ class TestScenarioErrorHandling:
         # Duration should be reasonable (less than 1 second for a simple check)
         assert result.duration_ms < 1000
 
-    async def test_append_with_interaction_record(self):
-        """Test that append() method works with InteractionRecord objects."""
-        interaction = InteractionRecord(
-            inputs="Hello", outputs="Hi", metadata={"test": True}
-        )
-        check = MockCheck(result=CheckResult.success())
-
-        result = await (
-            scenario("add_interaction_test").append(interaction).append(check).run()
-        )
-
-        assert result.passed
-        assert len(result.final_trace.interactions) == 1
-        assert result.final_trace.interactions[0] == interaction
-        assert result.final_trace.interactions[0].metadata == {"test": True}
-
-    async def test_append_with_base_interaction(self):
+    async def test_append_with_interaction_spec(self):
         """Test that append() method works with BaseInteraction objects."""
-        interaction = InteractionRecord(inputs="Hello", outputs="Hi")
-        mock_interaction = MockInteraction(interactions=[interaction])
+        interaction = Interaction(inputs="Hello", outputs="Hi")
+        mock_interaction = MockInteractionSpec(interactions=[interaction])
         check = MockCheck(result=CheckResult.success())
 
         result = await (
@@ -821,22 +804,24 @@ class TestScenarioErrorHandling:
 
     async def test_extend_with_mixed_components(self):
         """Test that extend() method works with mixed component types."""
-        interaction1 = InteractionRecord(inputs="Hello", outputs="Hi")
-        interaction2 = InteractionRecord(inputs="How are you?", outputs="Good")
-        mock_interaction = MockInteraction(interactions=[interaction2])
+        interact_spec_1 = Interact(inputs="Hello", outputs="Hi")
+        interaction_1 = Interaction(inputs="Hello", outputs="Hi")
+
+        interaction_2 = Interaction(inputs="Hello", outputs="Hi")
+        mock_interaction_2 = MockInteractionSpec(interactions=[interaction_2])
         check1 = MockCheck(result=CheckResult.success(message="Check 1"))
         check2 = MockCheck(result=CheckResult.success(message="Check 2"))
 
         result = await (
             scenario("adds_mixed_test")
-            .extend(interaction1, mock_interaction, check1, check2)
+            .extend(interact_spec_1, mock_interaction_2, check1, check2)
             .run()
         )
 
         assert result.passed
         assert len(result.final_trace.interactions) == 2
-        assert result.final_trace.interactions[0] == interaction1
-        assert result.final_trace.interactions[1] == interaction2
+        assert result.final_trace.interactions[0] == interaction_1
+        assert result.final_trace.interactions[1] == interaction_2
         assert (
             len(result.steps) == 1
         )  # All consecutive interactions grouped, then checks
@@ -855,11 +840,9 @@ class TestScenarioErrorHandling:
         assert len(result.steps) == 1
         assert len(result.steps[0].results) == 3
 
-    async def test_extend_with_multiple_interaction_records(self):
-        """Test that extend() method works with multiple InteractionRecord objects."""
-        interactions = [
-            InteractionRecord(inputs=str(i), outputs=str(i * 2)) for i in range(3)
-        ]
+    async def test_extend_with_multiple_interactions(self):
+        """Test that extend() method works with multiple Interaction objects."""
+        interactions = [Interact(inputs=str(i), outputs=str(i * 2)) for i in range(3)]
 
         result = await (
             scenario("adds_multiple_interactions_test").extend(*interactions).run()
@@ -867,7 +850,9 @@ class TestScenarioErrorHandling:
 
         assert result.passed
         assert len(result.final_trace.interactions) == 3
-        assert result.final_trace.interactions == interactions
+        assert result.final_trace.interactions == [
+            Interaction(inputs=str(i), outputs=str(i * 2)) for i in range(3)
+        ]
 
     async def test_extend_with_empty_args(self):
         """Test that extend() method works with no arguments."""
@@ -883,17 +868,17 @@ class TestScenarioErrorHandling:
 
     async def test_append_and_extend_chaining(self):
         """Test that append() and extend() can be chained together."""
-        interaction1 = InteractionRecord(inputs="Hello", outputs="Hi")
-        interaction2 = InteractionRecord(inputs="How are you?", outputs="Good")
+        interact_1 = Interact(inputs="Hello", outputs="Hi")
+        interact_2 = Interact(inputs="How are you?", outputs="Good")
         check1 = MockCheck(result=CheckResult.success(message="Check 1"))
         check2 = MockCheck(result=CheckResult.success(message="Check 2"))
         check3 = MockCheck(result=CheckResult.success(message="Check 3"))
 
         result = await (
             scenario("add_adds_chain_test")
-            .append(interaction1)
+            .append(interact_1)
             .extend(check1, check2)
-            .append(interaction2)
+            .append(interact_2)
             .extend(check3)
             .run()
         )

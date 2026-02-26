@@ -8,8 +8,8 @@ import pytest
 from giskard import agents
 from giskard.checks import (
     Equals,
+    Interact,
     Interaction,
-    InteractionRecord,
     LLMJudge,
     Trace,
     WithSpy,
@@ -87,13 +87,13 @@ def adapter(
     mock_agent: agents.ChatWorkflow[agents.Message],
 ) -> Callable[
     [agents.Message, ConversationTraces],
-    Awaitable[InteractionRecord[agents.Message, agents.Message]],
+    Awaitable[Interaction[agents.Message, agents.Message]],
 ]:
     convs: dict[str, list[agents.Message]] = defaultdict(list)
 
     async def adapter(
         message: agents.Message, trace: ConversationTraces
-    ) -> InteractionRecord[agents.Message, agents.Message]:
+    ) -> Interaction[agents.Message, agents.Message]:
         conversation_id = trace.conversation_id or str(uuid.uuid4())
 
         convs[conversation_id].append(message)
@@ -102,7 +102,7 @@ def adapter(
         )
         chat = await agent.chat(message=message).run()
         convs[conversation_id].append(chat.last)
-        return InteractionRecord(
+        return Interaction(
             inputs=message,
             outputs=chat.last,
             metadata={"conversation_id": conversation_id},
@@ -122,7 +122,7 @@ async def test_single_message(
         scenario("test_single_message", trace_type=ConversationTraces)
         .add_interaction(
             WithSpy(
-                interaction_generator=Interaction(
+                interaction_generator=Interact(
                     inputs=agents.Message(
                         role="user",
                         content="Hello, I want to apply for a job. My email is test@test.com and my message is 'Hello, I want to apply for a job.'",
@@ -191,7 +191,7 @@ async def test_user_simulator(
     generator: agents.Generator,
     adapter: Callable[
         [agents.Message, ConversationTraces],
-        Awaitable[InteractionRecord[agents.Message, agents.Message]],
+        Awaitable[Interaction[agents.Message, agents.Message]],
     ],
 ):
     async def user_simulator(
@@ -216,7 +216,7 @@ async def test_user_simulator(
     result = await (
         scenario("test_single_message", trace_type=ConversationTraces)
         .add_interaction(
-            Interaction(
+            Interact(
                 inputs=partial(
                     user_simulator,
                     "You want to apply for an internship position, reply to the question to apply for the position.",
@@ -231,7 +231,7 @@ async def test_user_simulator(
             )
         )
         .add_interaction(
-            Interaction(
+            Interact(
                 inputs=partial(
                     user_simulator,
                     "You want to be in contact with the CTO, be persistent and ask for a meeting. Do not stop until you have a meeting.",

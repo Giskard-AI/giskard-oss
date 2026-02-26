@@ -10,7 +10,7 @@ from giskard.checks import (
     CheckStatus,
     GreaterEquals,
     GreaterThan,
-    InteractionRecord,
+    Interaction,
     LesserThan,
     LesserThanEquals,
     NotEquals,
@@ -24,9 +24,7 @@ class TestLesserThan:
 
     async def test_number_lesser_than_success(self):
         """Test that 5 < 10 passes."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=5)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LesserThan(
             expected_value=10,
             key="trace.interactions[-1].outputs",
@@ -41,9 +39,7 @@ class TestLesserThan:
 
     async def test_number_lesser_than_failure(self):
         """Test that 10 < 5 fails."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=10)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = LesserThan(
             expected_value=5,
             key="trace.interactions[-1].outputs",
@@ -60,9 +56,7 @@ class TestLesserThan:
 
     async def test_number_lesser_than_equal_fails(self):
         """Test that 5 < 5 fails (equal values)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=5)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LesserThan(
             expected_value=5,
             key="trace.interactions[-1].outputs",
@@ -77,9 +71,7 @@ class TestLesserThan:
 
     async def test_float_lesser_than_success(self):
         """Test that 3.14 < 5.0 passes."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=3.14)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
         check = LesserThan(
             expected_value=5.0,
             key="trace.interactions[-1].outputs",
@@ -93,7 +85,7 @@ class TestLesserThan:
     async def test_string_lesser_than_success(self):
         """Test that 'apple' < 'banana' passes."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="apple")
+            Interaction(inputs="test", outputs="apple")
         )
         check = LesserThan(
             expected_value="banana",
@@ -108,7 +100,7 @@ class TestLesserThan:
     async def test_string_lesser_than_failure(self):
         """Test that 'banana' < 'apple' fails."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="banana")
+            Interaction(inputs="test", outputs="banana")
         )
         check = LesserThan(
             expected_value="apple",
@@ -123,7 +115,7 @@ class TestLesserThan:
     async def test_missing_key(self):
         """Test LesserThan check when the key is missing from trace."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs={"other": "value"})
+            Interaction(inputs="test", outputs={"other": "value"})
         )
         check = LesserThan(
             expected_value=10,
@@ -140,7 +132,7 @@ class TestLesserThan:
     async def test_nested_outputs(self):
         """Test LesserThan check with nested outputs."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs={"value": 5})
+            Interaction(inputs="test", outputs={"value": 5})
         )
         check = LesserThan(
             expected_value=10,
@@ -155,9 +147,7 @@ class TestLesserThan:
 
     async def test_typeerror_incompatible_types(self):
         """Test LesserThan with incompatible types (string vs int)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="5")
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs="5"))
         check = LesserThan(
             expected_value=10,
             key="trace.interactions[-1].outputs",
@@ -174,7 +164,7 @@ class TestLesserThan:
     async def test_typeerror_missing_method(self):
         """Test LesserThan with object that doesn't implement __lt__."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=object())
+            Interaction(inputs="test", outputs=object())
         )
         check = LesserThan(
             expected_value=10,
@@ -195,9 +185,7 @@ class TestGreaterThan:
 
     async def test_number_greater_than_success(self):
         """Test that 10 > 5 passes."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=10)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = GreaterThan(
             expected_value=5,
             key="trace.interactions[-1].outputs",
@@ -212,9 +200,7 @@ class TestGreaterThan:
 
     async def test_number_greater_than_failure(self):
         """Test that 5 > 10 fails."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=5)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = GreaterThan(
             expected_value=10,
             key="trace.interactions[-1].outputs",
@@ -231,9 +217,7 @@ class TestGreaterThan:
 
     async def test_number_greater_than_equal_fails(self):
         """Test that 5 > 5 fails (equal values)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=5)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = GreaterThan(
             expected_value=5,
             key="trace.interactions[-1].outputs",
@@ -247,7 +231,7 @@ class TestGreaterThan:
     async def test_string_greater_than_success(self):
         """Test that 'banana' > 'apple' passes."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="banana")
+            Interaction(inputs="test", outputs="banana")
         )
         check = GreaterThan(
             expected_value="apple",
@@ -261,9 +245,7 @@ class TestGreaterThan:
 
     async def test_typeerror_incompatible_types(self):
         """Test GreaterThan with incompatible types (string vs int)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="10")
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs="10"))
         check = GreaterThan(
             expected_value=5,
             key="trace.interactions[-1].outputs",
@@ -282,7 +264,7 @@ class TestGreaterThan:
     async def test_typeerror_missing_method(self):
         """Test GreaterThan with object that doesn't implement __gt__."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=object())
+            Interaction(inputs="test", outputs=object())
         )
         check = GreaterThan(
             expected_value=10,
@@ -303,9 +285,7 @@ class TestLesserThanEquals:
 
     async def test_number_lesser_than_equals_success_less(self):
         """Test that 5 <= 10 passes (less than case)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=5)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LesserThanEquals(
             expected_value=10,
             key="trace.interactions[-1].outputs",
@@ -320,9 +300,7 @@ class TestLesserThanEquals:
 
     async def test_number_lesser_than_equals_success_equal(self):
         """Test that 5 <= 5 passes (equal case)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=5)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LesserThanEquals(
             expected_value=5,
             key="trace.interactions[-1].outputs",
@@ -337,9 +315,7 @@ class TestLesserThanEquals:
 
     async def test_number_lesser_than_equals_failure(self):
         """Test that 10 <= 5 fails."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=10)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = LesserThanEquals(
             expected_value=5,
             key="trace.interactions[-1].outputs",
@@ -357,7 +333,7 @@ class TestLesserThanEquals:
     async def test_string_lesser_than_equals_success(self):
         """Test that 'apple' <= 'banana' passes."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="apple")
+            Interaction(inputs="test", outputs="apple")
         )
         check = LesserThanEquals(
             expected_value="banana",
@@ -372,7 +348,7 @@ class TestLesserThanEquals:
     async def test_string_lesser_than_equals_equal(self):
         """Test that 'apple' <= 'apple' passes."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="apple")
+            Interaction(inputs="test", outputs="apple")
         )
         check = LesserThanEquals(
             expected_value="apple",
@@ -386,9 +362,7 @@ class TestLesserThanEquals:
 
     async def test_typeerror_incompatible_types(self):
         """Test LesserThanEquals with incompatible types (string vs int)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="5")
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs="5"))
         check = LesserThanEquals(
             expected_value=10,
             key="trace.interactions[-1].outputs",
@@ -407,7 +381,7 @@ class TestLesserThanEquals:
     async def test_typeerror_missing_method(self):
         """Test LesserThanEquals with object that doesn't implement __le__."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=object())
+            Interaction(inputs="test", outputs=object())
         )
         check = LesserThanEquals(
             expected_value=10,
@@ -428,9 +402,7 @@ class TestGreaterEquals:
 
     async def test_number_greater_equals_success_greater(self):
         """Test that 10 >= 5 passes (greater than case)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=10)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = GreaterEquals(
             expected_value=5,
             key="trace.interactions[-1].outputs",
@@ -445,9 +417,7 @@ class TestGreaterEquals:
 
     async def test_number_greater_equals_success_equal(self):
         """Test that 5 >= 5 passes (equal case)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=5)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = GreaterEquals(
             expected_value=5,
             key="trace.interactions[-1].outputs",
@@ -462,9 +432,7 @@ class TestGreaterEquals:
 
     async def test_number_greater_equals_failure(self):
         """Test that 5 >= 10 fails."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=5)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = GreaterEquals(
             expected_value=10,
             key="trace.interactions[-1].outputs",
@@ -482,7 +450,7 @@ class TestGreaterEquals:
     async def test_string_greater_equals_success(self):
         """Test that 'banana' >= 'apple' passes."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="banana")
+            Interaction(inputs="test", outputs="banana")
         )
         check = GreaterEquals(
             expected_value="apple",
@@ -497,7 +465,7 @@ class TestGreaterEquals:
     async def test_string_greater_equals_equal(self):
         """Test that 'apple' >= 'apple' passes."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="apple")
+            Interaction(inputs="test", outputs="apple")
         )
         check = GreaterEquals(
             expected_value="apple",
@@ -511,9 +479,7 @@ class TestGreaterEquals:
 
     async def test_typeerror_incompatible_types(self):
         """Test GreaterEquals with incompatible types (string vs int)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="10")
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs="10"))
         check = GreaterEquals(
             expected_value=5,
             key="trace.interactions[-1].outputs",
@@ -532,7 +498,7 @@ class TestGreaterEquals:
     async def test_typeerror_missing_method(self):
         """Test GreaterEquals with object that doesn't implement __ge__."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=object())
+            Interaction(inputs="test", outputs=object())
         )
         check = GreaterEquals(
             expected_value=10,
@@ -553,9 +519,7 @@ class TestComparisonEdgeCases:
 
     async def test_none_value_lesser_than(self):
         """Test LesserThan with None values."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=None)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = LesserThan(
             expected_value=10,
             key="trace.interactions[-1].outputs",
@@ -571,9 +535,7 @@ class TestComparisonEdgeCases:
 
     async def test_none_value_greater_than(self):
         """Test GreaterThan with None values."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=None)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = GreaterThan(
             expected_value=10,
             key="trace.interactions[-1].outputs",
@@ -589,7 +551,7 @@ class TestComparisonEdgeCases:
     async def test_list_vs_string_incompatible(self):
         """Test comparison with list vs string (incompatible types)."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=[1, 2, 3])
+            Interaction(inputs="test", outputs=[1, 2, 3])
         )
         check = LesserThan(
             expected_value="abc",
@@ -625,7 +587,7 @@ class TestComparisonEdgeCases:
                 return self.value >= other.value
 
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=ComparableValue(5))
+            Interaction(inputs="test", outputs=ComparableValue(5))
         )
         check = LesserThan(
             expected_value=ComparableValue(10),
@@ -648,7 +610,7 @@ class TestComparisonEdgeCases:
                 return self.value < other.value
 
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=ComparableValue(5))
+            Interaction(inputs="test", outputs=ComparableValue(5))
         )
         check = LesserThan(
             expected_value=10,  # int, not ComparableValue
@@ -665,8 +627,8 @@ class TestComparisonEdgeCases:
     async def test_wildcard_expression_with_list(self):
         """Test LesserThan with wildcard expression returning a list."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test1", outputs=5),
-            InteractionRecord(inputs="test2", outputs=3),
+            Interaction(inputs="test1", outputs=5),
+            Interaction(inputs="test2", outputs=3),
         )
         check = LesserThan(
             expected_value=[10, 10],  # Expected list
@@ -683,8 +645,8 @@ class TestComparisonEdgeCases:
     async def test_single_index_expression(self):
         """Test LesserThan with single index expression."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test1", outputs=5),
-            InteractionRecord(inputs="test2", outputs=15),
+            Interaction(inputs="test1", outputs=5),
+            Interaction(inputs="test2", outputs=15),
         )
         check = LesserThan(
             expected_value=10,
@@ -703,9 +665,7 @@ class TestNotEquals:
 
     async def test_number_not_equals_success(self):
         """Test that 5 != 10 passes."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=5)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = NotEquals(
             expected_value=10,
             key="trace.interactions[-1].outputs",
@@ -720,9 +680,7 @@ class TestNotEquals:
 
     async def test_number_not_equals_failure(self):
         """Test that 5 != 5 fails (equal values)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=5)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = NotEquals(
             expected_value=5,
             key="trace.interactions[-1].outputs",
@@ -739,9 +697,7 @@ class TestNotEquals:
 
     async def test_float_not_equals_success(self):
         """Test that 3.14 != 5.0 passes."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=3.14)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
         check = NotEquals(
             expected_value=5.0,
             key="trace.interactions[-1].outputs",
@@ -755,7 +711,7 @@ class TestNotEquals:
     async def test_string_not_equals_success(self):
         """Test that 'hello' != 'world' passes."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="hello")
+            Interaction(inputs="test", outputs="hello")
         )
         check = NotEquals(
             expected_value="world",
@@ -772,7 +728,7 @@ class TestNotEquals:
     async def test_string_not_equals_failure(self):
         """Test that 'hello' != 'hello' fails (equal values)."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="hello")
+            Interaction(inputs="test", outputs="hello")
         )
         check = NotEquals(
             expected_value="hello",
@@ -788,9 +744,7 @@ class TestNotEquals:
 
     async def test_bool_not_equals_success(self):
         """Test that True != False passes."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=True)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
         check = NotEquals(
             expected_value=False,
             key="trace.interactions[-1].outputs",
@@ -805,9 +759,7 @@ class TestNotEquals:
 
     async def test_bool_not_equals_failure(self):
         """Test that True != True fails (equal values)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=True)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
         check = NotEquals(
             expected_value=True,
             key="trace.interactions[-1].outputs",
@@ -822,9 +774,7 @@ class TestNotEquals:
 
     async def test_different_types_string_vs_int_success(self):
         """Test that '5' != 5 passes (different types)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="5")
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs="5"))
         check = NotEquals(
             expected_value=5,
             key="trace.interactions[-1].outputs",
@@ -840,7 +790,7 @@ class TestNotEquals:
     async def test_different_types_string_vs_bool_success(self):
         """Test that 'True' != True passes (different types)."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs="True")
+            Interaction(inputs="test", outputs="True")
         )
         check = NotEquals(
             expected_value=True,
@@ -857,7 +807,7 @@ class TestNotEquals:
     async def test_missing_key(self):
         """Test NotEquals check when the key is missing from trace."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs={"other": "value"})
+            Interaction(inputs="test", outputs={"other": "value"})
         )
         check = NotEquals(
             expected_value=10,
@@ -874,7 +824,7 @@ class TestNotEquals:
     async def test_nested_outputs(self):
         """Test NotEquals check with nested outputs."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs={"value": 5})
+            Interaction(inputs="test", outputs={"value": 5})
         )
         check = NotEquals(
             expected_value=10,
@@ -889,9 +839,7 @@ class TestNotEquals:
 
     async def test_none_value_not_equals_success(self):
         """Test that None != 10 passes."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=None)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = NotEquals(
             expected_value=10,
             key="trace.interactions[-1].outputs",
@@ -906,9 +854,7 @@ class TestNotEquals:
 
     async def test_none_value_not_equals_failure(self):
         """Test that None != None fails (equal values)."""
-        trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=None)
-        )
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = NotEquals(
             expected_value=None,
             key="trace.interactions[-1].outputs",
@@ -924,7 +870,7 @@ class TestNotEquals:
     async def test_list_not_equals_success(self):
         """Test that [1, 2] != [3, 4] passes."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=[1, 2])
+            Interaction(inputs="test", outputs=[1, 2])
         )
         check = NotEquals(
             expected_value=[3, 4],
@@ -941,7 +887,7 @@ class TestNotEquals:
     async def test_list_not_equals_failure(self):
         """Test that [1, 2] != [1, 2] fails (equal values)."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test", outputs=[1, 2])
+            Interaction(inputs="test", outputs=[1, 2])
         )
         check = NotEquals(
             expected_value=[1, 2],

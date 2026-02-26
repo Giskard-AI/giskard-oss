@@ -12,7 +12,7 @@ from typing import Any, cast
 
 from ..core import Trace
 from ..core.check import Check
-from ..core.interaction import InteractionRecord
+from ..core.interaction import Interaction
 from ..core.protocols import InteractionGenerator
 from ..core.result import CheckResult, ScenarioResult, TestCaseResult
 from ..core.scenario import Scenario
@@ -21,8 +21,8 @@ from ..core.testcase import TestCase
 
 class _ScenarioStep[InputType, OutputType, TraceType: Trace]:  # pyright: ignore[reportMissingTypeArgument]
     interactions: list[
-        InteractionRecord[InputType, OutputType]
-        | InteractionGenerator[InteractionRecord[InputType, OutputType], TraceType]
+        Interaction[InputType, OutputType]
+        | InteractionGenerator[Interaction[InputType, OutputType], TraceType]
     ]
     checks: list[Check[InputType, OutputType, TraceType]]
 
@@ -36,8 +36,8 @@ class _ScenarioStepsBuilder[InputType, OutputType, TraceType: Trace]:  # pyright
 
     def __init__(
         self,
-        *sequence: InteractionRecord[InputType, OutputType]
-        | InteractionGenerator[InteractionRecord[InputType, OutputType], TraceType]
+        *sequence: Interaction[InputType, OutputType]
+        | InteractionGenerator[Interaction[InputType, OutputType], TraceType]
         | Check[InputType, OutputType, TraceType],
     ):
         self.steps = []
@@ -60,8 +60,8 @@ class _ScenarioStepsBuilder[InputType, OutputType, TraceType: Trace]:  # pyright
     def add_interaction(
         self,
         interaction: (
-            InteractionRecord[InputType, OutputType]
-            | InteractionGenerator[InteractionRecord[InputType, OutputType], TraceType]
+            Interaction[InputType, OutputType]
+            | InteractionGenerator[Interaction[InputType, OutputType], TraceType]
         ),
     ):
         if len(self.current_step.checks) > 0:
@@ -84,7 +84,7 @@ class ScenarioRunner:
     or error.
 
     Components are processed in order:
-    1. **InteractionRecord / Interaction components**: Add interactions to the trace.
+    1. **Interaction / Interaction components**: Add interactions to the trace.
        Specs generate interactions using their `generate()` method. Each yielded
        interaction is added to the trace, and the updated trace is sent back to
        the generator via `asend()`.
@@ -110,7 +110,7 @@ class ScenarioRunner:
         """Execute a sequential scenario with shared Trace.
 
         Components are executed in order:
-        - InteractionRecord / Interaction components update the shared trace
+        - Interaction / Interaction components update the shared trace
         - Check components validate the current trace and stop execution on failure
 
         Execution stops on the first failing check; remaining components are not executed.

@@ -1,7 +1,7 @@
 """Tests for RegexMatching check."""
 
 import pytest
-from giskard.checks import CheckStatus, InteractionRecord, RegexMatching, Trace
+from giskard.checks import CheckStatus, Interaction, RegexMatching, Trace
 
 
 # Basic regex patterns
@@ -175,7 +175,7 @@ async def test_regex_with_trace_extraction() -> None:
         text_key="trace.last.outputs.response",
         pattern_key="trace.last.inputs.expected_pattern",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={"expected_pattern": r"\d{3}-\d{3}-\d{4}"},
         outputs={"response": "Call me at 555-123-4567"},
     )
@@ -190,7 +190,7 @@ async def test_regex_extract_both_from_trace() -> None:
         text_key="trace.last.outputs.answer",
         pattern_key="trace.last.inputs.pattern",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={"pattern": r"^[A-Z]"},
         outputs={"answer": "Hello there"},
     )

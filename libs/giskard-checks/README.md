@@ -5,7 +5,7 @@ Lightweight primitives to define and run checks against model interactions.
 
 This library provides:
 
-- Core types for describing interactions (`InteractionRecord`, `Interaction`, `Trace`)
+- Core types for describing interactions (`Interact`, `Interaction`, `Trace`)
 - A fluent scenario builder and runner (`scenario`, `Scenario`, `ScenarioResult`)
 - Built-in checks including string matching, comparisons, and LLM-based evaluation
 - JSONPath-based extraction utilities for referencing trace data
@@ -110,9 +110,9 @@ Concepts
 --------
 
 - **Fluent API**: The recommended way to create tests using `scenario().interact().check()`. This API builds a scenario and handles interaction generation.
-- **Interaction**: A specification for generating interactions dynamically (static values, callables, or generators).
-- **Trace**: Immutable history of all `InteractionRecord` objects produced while executing a scenario. Use `trace.last` in JSONPath expressions (e.g., `trace.last.outputs`).
-- **InteractionRecord**: A recorded exchange with `inputs`, `outputs`, and optional `metadata`.
+- **Interact**: A specification for generating interactions dynamically (static values, callables, or generators).
+- **Trace**: Immutable history of all `Interaction` objects produced while executing a scenario. Use `trace.last` in JSONPath expressions (e.g., `trace.last.outputs`).
+- **Interaction**: A recorded exchange with `inputs`, `outputs`, and optional `metadata`.
 - **Check**: Inspects the `Trace` and returns a `CheckResult`.
 - **Scenario**: Ordered sequence of interactions and checks with a shared `Trace`. Execution stops at the first failing check and later steps are skipped.
 
@@ -126,7 +126,7 @@ API Overview
 **Core types**
 - `giskard.checks.Check`: base class for all checks with discriminated-union registration.
 - `giskard.checks.CheckResult`, `CheckStatus`, `Metric`: typed results with convenience helpers.
-- `giskard.checks.InteractionRecord` / `Trace`: immutable interaction payloads plus accumulated history.
+- `giskard.checks.Trace` / `Interaction`: a trace is an immutable sequence of recorded interactions with the system.
 - `giskard.checks.Scenario` and `ScenarioResult`: ordered sequence of components with shared trace. Execution stops at first failure and later steps are skipped.
 - `giskard.checks.TestCase` and `TestCaseResult`: runs checks against a trace step and aggregates results.
 
@@ -135,7 +135,7 @@ API Overview
 - `giskard.checks.Interaction`: batteries-included spec that supports static values, callables, or generators for both inputs and outputs. Supports multi-turn interactions via generators.
 
 **Scenarios and runners**
-- `giskard.checks.Scenario`: ordered sequence of components (InteractionRecords, Interactions, and Checks) with shared trace. Components execute sequentially, stopping at first failure.
+- `giskard.checks.Scenario`: ordered sequence of components (Interactions, Interactions, and Checks) with shared trace. Components execute sequentially, stopping at first failure.
 - `giskard.checks.ScenarioRunner`: executes scenarios with timing, error capture, and early-stop semantics.
 - `giskard.checks.TestCaseRunner`: executes test cases with timing and error handling.
 
@@ -172,7 +172,7 @@ Serialization
 The library uses Pydantic's discriminated unions for polymorphic serialization.
 
 ```python
-from giskard.checks import Check, CheckResult, InteractionRecord, TestCase, Trace
+from giskard.checks import Check, CheckResult, Interaction, TestCase, Trace
 
 
 @Check.register("my_custom_check")
@@ -181,7 +181,7 @@ class MyCustomCheck(Check):
         return CheckResult.success("Check passed")
 
 
-trace = Trace(interactions=[InteractionRecord(inputs="test", outputs="result")])
+trace = Trace(interactions=[Interaction(inputs="test", outputs="result")])
 check = MyCustomCheck(name="test")
 testcase = TestCase(trace=trace, checks=[check], name="example")
 
@@ -220,7 +220,7 @@ class AdvancedSecurityCheck(Check):
 ### Step 2: Define a custom interaction specification
 
 ```python
-from giskard.checks import BaseInteraction, InteractionRecord, Trace
+from giskard.checks import BaseInteraction, Interaction, Trace
 
 
 @BaseInteraction.register("chat_conversation")
@@ -230,7 +230,7 @@ class ChatInteraction(BaseInteraction):
 
     async def generate(self, trace: Trace):
         summary = f"Conversation with {len(self.messages)} messages"
-        record = InteractionRecord(
+        record = Interaction(
             inputs=self.messages,
             outputs={"summary": summary},
             metadata={"session_id": self.session_id},
@@ -458,7 +458,7 @@ Advanced Usage
 For advanced use cases where you need direct control over interactions or trace construction, you can use `Interaction` with `Scenario` or build a `Trace` for `TestCase` directly:
 
 ```python
-from giskard.checks import InteractionRecord, Interaction, Scenario, TestCase, Trace
+from giskard.checks import Interaction, Interaction, Scenario, TestCase, Trace
 
 # Create an Interaction manually
 interaction = Interaction(
@@ -475,7 +475,7 @@ scenario_result = await scenario.run()
 
 # Or build a Trace manually for a TestCase
 trace = Trace(interactions=[
-    InteractionRecord(inputs="some text", outputs=process("some text")),
+    Interaction(inputs="some text", outputs=process("some text")),
 ])
 tc = TestCase(trace=trace, checks=[check1, check2], name="advanced_example")
 test_case_result = await tc.run()

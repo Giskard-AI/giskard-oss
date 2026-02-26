@@ -34,15 +34,15 @@ modules, core abstractions, and expected workflows.
 ## Core concepts & files
 
 ### Trace & Interactions (`core/trace.py`)
-- `InteractionRecord`: immutable payload with `inputs`, `outputs`, `metadata`.
+- `Interaction`: immutable payload with `inputs`, `outputs`, `metadata`.
 - `Trace`: ordered list of interactions; passed to every `Check`.
 
 ### Scenario components (`core/scenario.py`, `core/interaction.py`, `core/check.py`)
 - `ScenarioComponent`: discriminated base for anything that can be executed in a scenario
-  (either an `Interaction`/`InteractionRecord` or a `Check`).
+  (either an `Interaction`/`Interaction` or a `Check`).
 - `Scenario`: ordered sequence of components with a shared `Trace`. Components execute
   sequentially, stopping at the first failing check. Supports custom trace types.
-- `BaseInteraction`: base class for specs that emit `InteractionRecord` objects via
+- `BaseInteraction`: base class for specs that emit `Interaction` objects via
   the `generate()` async generator method. Each yielded interaction receives the updated
   trace via `generator.asend()`.
 - `Interaction` (`interaction/interaction.py`): default implementation accepting
@@ -137,7 +137,7 @@ from giskard.checks import (
     Check, CheckResult, CheckStatus, Metric,
     Scenario, ScenarioResult,
     TestCase, TestCaseResult,
-    Trace, InteractionRecord,
+    Trace, Interaction,
     BaseInteraction, Interaction,
     Extractor, JsonPathExtractor,
     # Builtin checks

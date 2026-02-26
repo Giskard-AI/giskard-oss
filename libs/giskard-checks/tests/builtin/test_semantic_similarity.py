@@ -6,7 +6,7 @@ from giskard.agents.embeddings.base import BaseEmbeddingModel, EmbeddingParams
 from giskard.checks import (
     Check,
     CheckStatus,
-    InteractionRecord,
+    Interaction,
     SemanticSimilarity,
     Trace,
 )
@@ -96,7 +96,7 @@ async def test_run_returns_success() -> None:
         reference_text="Paris is home to the Eiffel Tower.",
         actual_answer_key="trace.last.outputs.response",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={"query": "Where is the Eiffel Tower?"},
         outputs={"response": "The Eiffel Tower is in Paris."},
     )
@@ -123,7 +123,7 @@ async def test_run_returns_failure() -> None:
         reference_text="Tokyo is the capital of Japan.",
         actual_answer_key="trace.last.outputs.response",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={"query": "Where is the Eiffel Tower?"},
         outputs={"response": "The Eiffel Tower is in Paris."},
     )
@@ -148,7 +148,7 @@ async def test_reference_text_from_trace() -> None:
         threshold=0.90,
         actual_answer_key="trace.last.outputs.response",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={"query": "What is AI?"},
         outputs={"response": "AI is artificial intelligence."},
         metadata={"reference_text": "Artificial intelligence is AI."},
@@ -174,7 +174,7 @@ async def test_direct_reference_text_priority() -> None:
         reference_text="Direct reference",
         actual_answer_key="trace.last.outputs.response",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={"query": "Test"},
         outputs={"response": "Test answer"},
         metadata={"reference_text": "Trace reference"},
@@ -199,7 +199,7 @@ async def test_custom_actual_answer_key() -> None:
         reference_text="Reference",
         actual_answer_key="trace.last.outputs.custom_field",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={"query": "Test"},
         outputs={"custom_field": "Custom answer", "response": "Other answer"},
     )
@@ -223,7 +223,7 @@ async def test_custom_reference_text_key() -> None:
         reference_text_key="trace.last.metadata.custom_ref",
         actual_answer_key="trace.last.outputs.response",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={"query": "Test"},
         outputs={"response": "Answer"},
         metadata={"custom_ref": "Custom reference"},
@@ -255,7 +255,7 @@ async def test_threshold_variations() -> None:
         reference_text="Text B",
         actual_answer_key="trace.last.outputs.response",
     )
-    interaction = InteractionRecord(inputs={}, outputs={"response": "Text A"})
+    interaction = Interaction(inputs={}, outputs={"response": "Text A"})
     result = await check_low.run(Trace(interactions=[interaction]))
     assert result.status == CheckStatus.PASS
 
@@ -282,11 +282,11 @@ async def test_using_trace_last() -> None:
             "Reference": [0.85, 0.15, 0.0],
         }
     )
-    interaction1 = InteractionRecord(
+    interaction1 = Interaction(
         inputs={"query": "First"},
         outputs={"response": "First answer"},
     )
-    interaction2 = InteractionRecord(
+    interaction2 = Interaction(
         inputs={"query": "Second"},
         outputs={"response": "Second answer"},
     )
@@ -352,7 +352,7 @@ async def test_serialization_roundtrip() -> None:
     roundtrip_check = serialization_roundtrip(check)
     roundtrip_check.embedding_model = embedding_model
 
-    interaction = InteractionRecord(inputs={}, outputs={"response": "Answer"})
+    interaction = Interaction(inputs={}, outputs={"response": "Answer"})
     result = await roundtrip_check.run(Trace(interactions=[interaction]))
 
     assert result.status == CheckStatus.PASS
@@ -382,7 +382,7 @@ async def test_missing_reference_text_in_trace() -> None:
         threshold=0.85,
         actual_answer_key="trace.last.outputs.response",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={},
         outputs={"response": "Answer"},
         # No reference_text in metadata
@@ -414,7 +414,7 @@ async def test_missing_actual_answer_in_trace() -> None:
         reference_text="Reference",
         actual_answer_key="trace.last.outputs.nonexistent_field",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={},
         outputs={"response": "Some answer"},
         # actual_answer_key points to nonexistent field
@@ -445,7 +445,7 @@ async def test_both_reference_and_answer_missing() -> None:
         actual_answer_key="trace.last.outputs.missing",
         reference_text_key="trace.last.metadata.missing",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={},
         outputs={"response": "Answer"},
         metadata={"other": "data"},
@@ -499,7 +499,7 @@ async def test_missing_outputs_field_in_interaction() -> None:
         reference_text="Reference",
         actual_answer_key="trace.last.outputs.response",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={"query": "test"},
         outputs={},  # Empty outputs, no response field
     )
@@ -529,7 +529,7 @@ async def test_missing_metadata_in_interaction() -> None:
         actual_answer_key="trace.last.outputs.response",
         reference_text_key="trace.last.metadata.reference",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={},
         outputs={"response": "Answer"},
         # No metadata field
@@ -560,7 +560,7 @@ async def test_invalid_jsonpath_key() -> None:
         actual_answer_key="trace.last.outputs.response",
         reference_text_key="trace.nonexistent.deeply.nested.field",
     )
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={},
         outputs={"response": "Answer"},
     )
@@ -591,7 +591,7 @@ async def test_similarity_at_exact_threshold() -> None:
         reference_text="Text B",
         actual_answer_key="trace.last.outputs.response",
     )
-    interaction = InteractionRecord(inputs={}, outputs={"response": "Text A"})
+    interaction = Interaction(inputs={}, outputs={"response": "Text A"})
     result = await check.run(Trace(interactions=[interaction]))
 
     # Should pass when similarity >= threshold

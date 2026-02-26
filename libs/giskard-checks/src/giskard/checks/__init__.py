@@ -20,12 +20,12 @@ from .builtin import (
     from_fn,
 )
 from .core import (
-    BaseInteraction,
     Check,
     CheckResult,
     CheckStatus,
+    Interact,
     Interaction,
-    InteractionRecord,
+    InteractionSpec,
     Metric,
     Scenario,
     ScenarioResult,
@@ -75,8 +75,9 @@ __all__ = [
     "TestCase",
     "TestCaseResult",
     "Trace",
-    "InteractionRecord",
-    "BaseInteraction",
+    "Interact",
+    "Interaction",
+    "InteractionSpec",
     # Builtin checks
     "BaseLLMCheck",
     "LLMCheckResult",
@@ -95,7 +96,7 @@ __all__ = [
     "StringMatching",
     "RegexMatching",
     # Interaction
-    "Interaction",
+    "Interact",
     # Generators
     "UserSimulator",
     # Testing

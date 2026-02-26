@@ -11,8 +11,8 @@ from giskard.checks import (
     Check,
     CheckResult,
     Equals,
+    Interact,
     Interaction,
-    InteractionRecord,
     TestCase,
     Trace,
 )
@@ -26,7 +26,7 @@ class TestTestCaseNormalCases:
     async def test_testcase_with_single_passing_check(self):
         """Test test case with a single check that passes."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="test_input", outputs="test_output")
+            Interaction(inputs="test_input", outputs="test_output")
         )
         check = Equals(
             expected_value="test_output",
@@ -50,9 +50,7 @@ class TestTestCaseNormalCases:
     async def test_testcase_with_multiple_passing_checks(self):
         """Test test case with multiple checks that all pass."""
         trace = await Trace.from_interactions(
-            InteractionRecord(
-                inputs={"value": 42}, outputs={"result": 42, "status": "ok"}
-            )
+            Interaction(inputs={"value": 42}, outputs={"result": 42, "status": "ok"})
         )
         checks = [
             Equals(
@@ -79,7 +77,7 @@ class TestTestCaseNormalCases:
     async def test_testcase_with_failing_check(self):
         """Test test case with a failing check."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="input", outputs="output")
+            Interaction(inputs="input", outputs="output")
         )
         check = Equals(expected_value="expected", key="trace.interactions[-1].outputs")
         test_case = TestCase(
@@ -99,7 +97,7 @@ class TestTestCaseNormalCases:
     async def test_testcase_with_multiple_checks_one_fails(self):
         """Test test case with multiple checks where one fails - all checks should run."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="input", outputs="output")
+            Interaction(inputs="input", outputs="output")
         )
         checks = [
             Equals(
@@ -132,7 +130,7 @@ class TestTestCaseNormalCases:
     async def test_testcase_with_multiple_failures_all_run(self):
         """Test that all checks run even when multiple checks fail."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="input", outputs="output")
+            Interaction(inputs="input", outputs="output")
         )
         checks = [
             Equals(
@@ -170,7 +168,7 @@ class TestTestCaseNormalCases:
     async def test_testcase_without_name(self):
         """Test test case without a name."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="input", outputs="output")
+            Interaction(inputs="input", outputs="output")
         )
         check = Equals(expected_value="output", key="trace.interactions[-1].outputs")
         test_case = TestCase(
@@ -191,7 +189,7 @@ class TestTestCaseResult:
     async def test_testcase_result_properties(self):
         """Test TestCaseResult convenience properties."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="input", outputs="output")
+            Interaction(inputs="input", outputs="output")
         )
         check = Equals(expected_value="output", key="trace.interactions[-1].outputs")
         test_case = TestCase(
@@ -211,7 +209,7 @@ class TestTestCaseResult:
     async def test_testcase_result_format_failures(self):
         """Test format_failures() method."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="input", outputs="output")
+            Interaction(inputs="input", outputs="output")
         )
         checks = [
             Equals(
@@ -246,7 +244,7 @@ class TestTestCaseResult:
                 raise ValueError("Test error")
 
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="input", outputs="output")
+            Interaction(inputs="input", outputs="output")
         )
         check = ErroringCheckFormat()
         test_case = TestCase(
@@ -269,7 +267,7 @@ class TestTestCaseResult:
     async def test_testcase_result_format_failures_no_failures(self):
         """Test format_failures() when all checks pass."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="input", outputs="output")
+            Interaction(inputs="input", outputs="output")
         )
         check = Equals(expected_value="output", key="trace.interactions[-1].outputs")
         test_case = TestCase(
@@ -286,7 +284,7 @@ class TestTestCaseResult:
     async def test_testcase_result_assert_passed_success(self):
         """Test assert_passed() when test case passes."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="input", outputs="output")
+            Interaction(inputs="input", outputs="output")
         )
         check = Equals(expected_value="output", key="trace.interactions[-1].outputs")
         test_case = TestCase(
@@ -303,7 +301,7 @@ class TestTestCaseResult:
     async def test_testcase_result_assert_passed_failure(self):
         """Test assert_passed() raises AssertionError when test case fails."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="input", outputs="output")
+            Interaction(inputs="input", outputs="output")
         )
         check = Equals(expected_value="wrong", key="trace.interactions[-1].outputs")
         test_case = TestCase(
@@ -328,7 +326,7 @@ class TestTestCaseAssertPassed:
     async def test_testcase_assert_passed_success(self):
         """Test assert_passed() when test case passes."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="input", outputs="output")
+            Interaction(inputs="input", outputs="output")
         )
         check = Equals(expected_value="output", key="trace.interactions[-1].outputs")
         test_case = TestCase(
@@ -343,7 +341,7 @@ class TestTestCaseAssertPassed:
     async def test_testcase_assert_passed_failure(self):
         """Test assert_passed() raises AssertionError when test case fails."""
         trace = await Trace.from_interactions(
-            InteractionRecord(inputs="input", outputs="output")
+            Interaction(inputs="input", outputs="output")
         )
         check = Equals(expected_value="wrong", key="trace.interactions[-1].outputs")
         test_case = TestCase(
@@ -365,7 +363,7 @@ class TestTestCaseEdgeCases:
     async def test_testcase_with_complex_interaction(self):
         """Test test case with complex interaction data."""
         trace = await Trace.from_interactions(
-            InteractionRecord(
+            Interaction(
                 inputs={"user": "Alice", "message": "Hello"},
                 outputs={"assistant": "Bob", "response": "Hi Alice!"},
                 metadata={"timestamp": "2024-01-01"},
@@ -393,7 +391,7 @@ class TestTestCaseEdgeCases:
             return f"Processed: {inputs}"
 
         trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs=output_func)
+            Interact(inputs="test", outputs=output_func)
         )
         check = Equals(
             expected_value="Processed: test",
@@ -411,9 +409,7 @@ class TestTestCaseEdgeCases:
 
     async def test_testcase_no_checks(self):
         """Test test case with no checks."""
-        trace = Trace(
-            interactions=[InteractionRecord(inputs="input", outputs="output")]
-        )
+        trace = Trace(interactions=[Interaction(inputs="input", outputs="output")])
 
         test_case = TestCase(
             name="no_checks",

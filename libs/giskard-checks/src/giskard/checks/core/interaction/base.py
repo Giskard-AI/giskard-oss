@@ -2,17 +2,17 @@ from collections.abc import AsyncGenerator
 
 from giskard.core import Discriminated, discriminated_base
 
-from .interaction_record import InteractionRecord
+from .interaction import Interaction
 from .trace import Trace
 
 
 @discriminated_base
-class BaseInteraction[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     Discriminated
 ):
     """Base class for interaction specifications that generate interactions.
 
-    An interaction spec produces one or more `InteractionRecord` objects by yielding
+    An interaction spec produces one or more `Interaction` objects by yielding
     them through an async generator. Each yielded interaction receives the updated
     trace (including the newly yielded interaction) via `generator.asend()`.
 
@@ -33,11 +33,11 @@ class BaseInteraction[InputType, OutputType, TraceType: Trace](  # pyright: igno
 
     def generate(
         self, trace: TraceType
-    ) -> AsyncGenerator[InteractionRecord[InputType, OutputType], TraceType]:
+    ) -> AsyncGenerator[Interaction[InputType, OutputType], TraceType]:
         """Generate interactions from the current trace state.
 
         This method is called by the scenario runner to produce interactions.
-        It yields `InteractionRecord` objects and receives updated traces (including
+        It yields `Interaction` objects and receives updated traces (including
         the newly yielded interaction) via the async generator protocol.
 
         Parameters
@@ -47,7 +47,7 @@ class BaseInteraction[InputType, OutputType, TraceType: Trace](  # pyright: igno
 
         Yields
         ------
-        InteractionRecord[InputType, OutputType]
+        Interaction[InputType, OutputType]
             An interaction record to add to the trace.
 
         Receives
@@ -59,12 +59,12 @@ class BaseInteraction[InputType, OutputType, TraceType: Trace](  # pyright: igno
         Examples
         --------
         ```python
-        async def generate(self, trace: TraceType) -> AsyncGenerator[InteractionRecord, TraceType]:
-            record = InteractionRecord(inputs="hello", outputs="hi")
+        async def generate(self, trace: TraceType) -> AsyncGenerator[Interaction, TraceType]:
+            record = Interaction(inputs="hello", outputs="hi")
             updated_trace = yield record
 
             next_input = f"Previous had {len(updated_trace.interactions)} interactions"
-            record = InteractionRecord(inputs=next_input, outputs="response")
+            record = Interaction(inputs=next_input, outputs="response")
             yield record
         ```
         """

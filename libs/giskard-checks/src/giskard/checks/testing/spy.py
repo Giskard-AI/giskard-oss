@@ -3,20 +3,20 @@ from typing import override
 from unittest.mock import MagicMock, patch
 
 from ..core import Trace
-from ..core.interaction import BaseInteraction, InteractionRecord
+from ..core.interaction import Interaction, InteractionSpec
 
 
-@BaseInteraction.register("with_spy")
+@InteractionSpec.register("with_spy")
 class WithSpy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    BaseInteraction[InputType, OutputType, TraceType]
+    InteractionSpec[InputType, OutputType, TraceType]
 ):
-    interaction_generator: BaseInteraction[InputType, OutputType, TraceType]
+    interaction_generator: InteractionSpec[InputType, OutputType, TraceType]
     target: str
 
     @override
     async def generate(
         self, trace: TraceType
-    ) -> AsyncGenerator[InteractionRecord[InputType, OutputType], TraceType]:
+    ) -> AsyncGenerator[Interaction[InputType, OutputType], TraceType]:
         spy = MagicMock()
         with patch(self.target, spy):
             generator = self.interaction_generator.generate(trace)
@@ -33,9 +33,9 @@ class WithSpy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repor
                 await generator.aclose()
 
     def _patch_interaction(
-        self, interaction: InteractionRecord[InputType, OutputType], spy: MagicMock
-    ) -> InteractionRecord[InputType, OutputType]:
-        interaction = InteractionRecord(
+        self, interaction: Interaction[InputType, OutputType], spy: MagicMock
+    ) -> Interaction[InputType, OutputType]:
+        interaction = Interaction(
             inputs=interaction.inputs,
             outputs=interaction.outputs,
             metadata=interaction.metadata

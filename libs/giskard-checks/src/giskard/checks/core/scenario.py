@@ -6,33 +6,28 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from .check import Check
-from .interaction import BaseInteraction, InteractionRecord, Trace
+from .interaction import InteractionSpec, Trace
 from .result import ScenarioResult
 
 
 class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):  # pyright: ignore[reportMissingTypeArgument]
-    """A scenario composed of an ordered sequence of components (InteractionRecords,
-    Interactions, and Checks) with shared trace.
-
-    **Note**: For most use cases, the fluent API (`scenario().interact().check()`) is
-    recommended as it's simpler and more readable. This class is useful for advanced
-    use cases where you need direct control over scenario construction.
+    """A scenario composed of an ordered sequence of components InteractionSpecs
+    or Checks with a shared trace.
 
     A scenario executes components sequentially, maintaining a shared trace that
     accumulates all interactions. Execution stops immediately if any check fails.
 
     Components are processed in order:
-    - **InteractionRecord / Interaction** components: Add interactions to the trace
+    - **InteractionSpec / Interact** components: Add interactions to the trace
     - **Check** components: Validate the current trace state
 
     Attributes
     ----------
     name : str
         Scenario identifier.
-    sequence : Sequence[InteractionRecord | BaseInteraction | Check]
-        Sequential steps to execute. Each component can be an InteractionRecord, an
-        Interaction (which updates the trace), or a Check (which validates
-        the current trace).
+    sequence : Sequence[InteractionSpec | Check]
+        Sequential steps to execute. Each component can be an InteractionSpec or
+        a Check (which validates the current trace).
     trace_type : type[TraceType] | None
         Optional custom trace type to use. If not provided, the trace type will be
         inferred from the sequence of components. Useful when using custom trace
@@ -41,36 +36,31 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
     Examples
     --------
     **Recommended**: Use the fluent API:
-    ```python
-    from giskard.checks import scenario, Equals
 
-    result = await (
+    >>> from giskard.checks import scenario, Equals
+    >>> result = await (
         scenario("multi_step_test")
         .interact("Hello", lambda inputs: "Hi")
         .check(Equals(expected="Hi", key="trace.last.outputs"))
         .run()
     )
-    ```
 
     **Advanced**: Direct instantiation:
-    ```python
-    from giskard.checks import Scenario, Interaction, Equals
 
-    scenario = Scenario(
+    >>> from giskard.checks import Scenario, Interaction, Equals
+    >>> scenario = Scenario(
         name="multi_step_test",
         sequence=[
             Interaction(inputs="Hello", outputs="Hi"),
             Equals(expected="Hi", key="trace.last.outputs"),
         ],
     )
-    result = await scenario.run()
-    ```
+    >>> result = await scenario.run()
     """
 
     name: str = Field(..., description="Scenario name")
     sequence: Sequence[
-        InteractionRecord[InputType, OutputType]
-        | BaseInteraction[InputType, OutputType, TraceType]
+        InteractionSpec[InputType, OutputType, TraceType]
         | Check[InputType, OutputType, TraceType]
     ] = Field(..., description="Sequential components to execute")
     trace_type: type[TraceType] | None = Field(

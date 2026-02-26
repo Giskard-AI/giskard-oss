@@ -2,7 +2,7 @@ import json
 
 from giskard.agents.chat import Message
 from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
-from giskard.checks import CheckStatus, Conformity, InteractionRecord, Trace
+from giskard.checks import CheckStatus, Conformity, Interaction, Trace
 from pydantic import Field
 
 
@@ -55,9 +55,7 @@ async def test_rule_templating() -> None:
     result = await conformity.run(
         Trace(
             interactions=[
-                InteractionRecord(
-                    inputs={"query": "Hello"}, outputs={"response": "Hello"}
-                )
+                Interaction(inputs={"query": "Hello"}, outputs={"response": "Hello"})
             ]
         )
     )
@@ -75,7 +73,7 @@ async def test_rule_templating() -> None:
 async def test_interaction_json_in_inputs() -> None:
     generator = MockGenerator(passed=True, reason=None)
     conformity = Conformity(generator=generator, rule="Test rule")
-    interaction = InteractionRecord(
+    interaction = Interaction(
         inputs={"query": "What is AI?"}, outputs={"response": "AI is..."}
     )
     result = await conformity.run(Trace(interactions=[interaction]))
