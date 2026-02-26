@@ -1,0 +1,57 @@
+---
+description: Python conventions for giskard-agents (async, Pydantic v2, typing, error handling).
+globs: "libs/giskard-agents/**/*.py"
+alwaysApply: false
+---
+# Python Conventions
+
+## Project Setup
+
+- Python >= 3.11, src-layout with `src/giskard/agents/`
+- Build: Hatch. Deps managed in `pyproject.toml`.
+- Linting: Ruff (`select = ["I", "F401"]`)
+- Testing: pytest with `asyncio_mode = "auto"`
+
+## Imports and Naming
+
+- Absolute imports within the `giskard.agents` package
+- **Never use `from __future__ import annotations`** — it breaks Pydantic v2 model resolution and runtime type evaluation
+- PEP 8: `snake_case` functions/variables, `PascalCase` classes, `UPPER_CASE` constants
+
+## Type Hints
+
+- Type hints on all public function parameters and return types
+- Avoid `Any`; prefer precise types or generics (`TypeVar`)
+- Use modern syntax available since Python 3.11+:
+  - `X | None` not `Optional[X]`
+  - `list[str]` not `List[str]`
+  - `dict[str, int]` not `Dict[str, int]`
+  - `tuple[int, ...]` not `Tuple[int, ...]`
+  - Do not import from `typing` what is available as a builtin (`list`, `dict`, `tuple`, `set`, `type`)
+
+## Pydantic v2
+
+- Use `BaseModel` for structured data that needs serialization
+- Prefer immutable models; avoid mutating after creation
+- Validate external inputs at boundaries
+
+## Async Patterns
+
+- All workflow execution is async. Never use blocking calls inside async code.
+- Use `asyncio.gather` for parallel execution (see `pipeline.py`)
+- Generator backends must implement `async def complete(...)` and `async def stream(...)`
+
+## Error Handling
+
+- Use `ErrorPolicy` to control workflow-level error propagation
+- Tools catch exceptions by default and return error strings to the LLM
+- Use `catch=None` on `@tool` to let exceptions bubble up
+- Raise exceptions only for truly exceptional states (invalid config, missing deps)
+- Use `WorkflowError` / `Error` for structured, serializable errors
+
+## Testing
+
+- Co-locate tests under `tests/` mirroring package structure
+- Parametrize tests with descriptive IDs
+- Test success, failure, and edge-case paths
+- Mark external-API tests with `@pytest.mark.functional`

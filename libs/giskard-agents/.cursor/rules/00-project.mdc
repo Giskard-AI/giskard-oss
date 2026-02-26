@@ -1,0 +1,54 @@
+---
+description: High-level overview of giskard-agents. Read this before starting any task.
+alwaysApply: false
+---
+# Giskard Agents — Project Overview
+
+## What is this?
+
+`giskard-agents` is a lightweight, async-first library for orchestrating LLM completions and agent workflows. It is open-source (MIT) and designed to be approachable for new contributors.
+
+## Core Concepts
+
+- **Generator** — wraps a model (via LiteLLM) and exposes `.chat()` / `.template()` to build workflows.
+- **ChatWorkflow** — the builder that assembles messages, tools, inputs, and output schemas, then runs completions.
+- **Chat / Message** — immutable result objects returned after a workflow run.
+- **Tool** — a decorated Python function the LLM can call. Defined with `@agents.tool`.
+- **RunContext** — shared key-value store passed to tools during a run.
+- **ErrorPolicy** — controls how errors propagate (`RAISE`, `RETURN`, `SKIP`).
+
+## Architecture
+
+```
+src/giskard/agents/
+├── generators/          # LLM backends (base ABC + LiteLLM impl)
+│   ├── base.py          # BaseGenerator, GenerationParams, StreamChunk
+│   ├── litellm_generator.py
+│   ├── mixins.py        # Shared generator capabilities
+│   └── retry.py         # Retry / back-off logic
+├── tools/               # Tool system
+│   ├── tool.py          # Tool, ToolCall, @tool decorator
+│   └── _docstring_parser.py
+├── templates/           # Jinja2 prompt templating
+├── embeddings/          # Embedding model abstraction
+├── errors/              # WorkflowError, serializable Error
+├── workflow.py          # ChatWorkflow — the main orchestration engine
+├── chat.py              # Chat & Message models
+├── context.py           # RunContext
+├── pipeline.py          # Low-level parallel execution
+├── config.py            # Global configuration
+└── rate_limiter.py      # Token / request rate limiting
+```
+
+## Key Files
+
+- `pyproject.toml` — build config, dependencies, tooling
+- `Makefile` — development workflow commands (`make help`)
+- `README.md` — end-user docs with progressive examples
+
+## Constraints
+
+- Python >= 3.11 required
+- Everything is async (`asyncio`)
+- Pydantic v2 for all models
+- LiteLLM as the default LLM provider
