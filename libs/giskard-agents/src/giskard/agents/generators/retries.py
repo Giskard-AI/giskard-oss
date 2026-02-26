@@ -8,7 +8,7 @@ from .base import GenerationParams, Response
 
 
 class RetryPolicy(BaseModel):
-    """Adds a retry policy to the generator.
+    """Configuration for retry behavior.
 
     Attributes
     ----------

@@ -74,7 +74,7 @@ class RateLimiterRegistry:
                 warnings.warn(
                     (
                         f"Rate limiter with id '{rate_limiter.id}' already registered, "
-                        f"this will make RateLimiter.from_id('{rate_limiter.id}') unreliable. "
+                        f"this will make BaseRateLimiter.from_id('{rate_limiter.id}') unreliable. "
                         "Set GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS=1 to disable this warning"
                     ),
                     RuntimeWarning,

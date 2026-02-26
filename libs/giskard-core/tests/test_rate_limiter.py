@@ -123,7 +123,7 @@ class TestRateLimiterRegistry:
 
 
 class TestMinIntervalRateLimiter:
-    """Tests for BasicRateLimiter with min_interval (from_rpm), max_concurrent, and combined behavior."""
+    """Tests for MinIntervalRateLimiter with min_interval (from_rpm), max_concurrent, and combined behavior."""
 
     @pytest.mark.parametrize("rpm", [0, -1])
     def test_rpm_must_be_positive(self, rpm: int):

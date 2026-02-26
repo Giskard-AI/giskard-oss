@@ -22,7 +22,7 @@ class MockGenerator(WithRetryPolicy, BaseGenerator):
     def _should_retry(self, err: Exception) -> bool:
         return isinstance(err, RetriableError)
 
-    async def _complete_once(
+    async def _attempt_complete(
         self, messages: list[Message], params: GenerationParams | None = None
     ) -> Response:
         return await self._complete_mock(messages, params)
