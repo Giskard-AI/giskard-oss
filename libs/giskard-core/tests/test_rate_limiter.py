@@ -7,7 +7,7 @@ from typing import override
 from unittest.mock import patch
 
 import pytest
-from giskard.core import BaseRateLimiter, RateLimiter
+from giskard.core import BaseRateLimiter, MinIntervalRateLimiter
 
 JITTER_TIME = 0.02  # 20ms jitter
 
@@ -26,15 +26,15 @@ class TestRateLimiterRegistry:
             RuntimeWarning,
             match="Rate limiter with id 'test' already registered",
         ):
-            _rate_limiter_a = RateLimiter.from_rpm(60, id="test")
-            _rate_limiter_b = RateLimiter.from_rpm(120, id="test")
+            _rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id="test")
+            _rate_limiter_b = MinIntervalRateLimiter.from_rpm(120, id="test")
 
         with pytest.warns(
             RuntimeWarning,
             match="Rate limiter with id 'test_2' already registered",
         ):
-            _rate_limiter_a = RateLimiter.from_rpm(rpm=60, id="test_2")
-            _rate_limiter_b = RateLimiter.from_rpm(
+            _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id="test_2")
+            _rate_limiter_b = MinIntervalRateLimiter.from_rpm(
                 rpm=60, max_concurrent=1, id="test_2"
             )
 
@@ -42,7 +42,9 @@ class TestRateLimiterRegistry:
             RuntimeWarning,
             match="Rate limiter with id 'another_rate_limiter' already registered",
         ):
-            _rate_limiter_a = RateLimiter.from_rpm(rpm=60, id="another_rate_limiter")
+            _rate_limiter_a = MinIntervalRateLimiter.from_rpm(
+                rpm=60, id="another_rate_limiter"
+            )
             _rate_limiter_b = CustomRateLimiter(id="another_rate_limiter")
 
     def test_does_not_warn_when_disabled_and_creating_rate_limiter_with_duplicate_id(
@@ -54,21 +56,21 @@ class TestRateLimiterRegistry:
         ):
             with warnings.catch_warnings(record=True) as record:
                 warnings.simplefilter("always")
-                _rate_limiter_a = RateLimiter.from_rpm(60, id="test")
-                _rate_limiter_b = RateLimiter.from_rpm(120, id="test")
+                _rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id="test")
+                _rate_limiter_b = MinIntervalRateLimiter.from_rpm(120, id="test")
             assert not any("already registered" in str(w.message) for w in record)
 
             with warnings.catch_warnings(record=True) as record:
                 warnings.simplefilter("always")
-                _rate_limiter_a = RateLimiter.from_rpm(rpm=60, id="test_2")
-                _rate_limiter_b = RateLimiter.from_rpm(
+                _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id="test_2")
+                _rate_limiter_b = MinIntervalRateLimiter.from_rpm(
                     rpm=60, max_concurrent=1, id="test_2"
                 )
             assert not any("already registered" in str(w.message) for w in record)
 
             with warnings.catch_warnings(record=True) as record:
                 warnings.simplefilter("always")
-                _rate_limiter_a = RateLimiter.from_rpm(
+                _rate_limiter_a = MinIntervalRateLimiter.from_rpm(
                     rpm=60, id="another_rate_limiter"
                 )
                 _rate_limiter_b = CustomRateLimiter(id="another_rate_limiter")
@@ -80,17 +82,19 @@ class TestRateLimiterRegistry:
         _custom_rate_limiter_a = CustomRateLimiter(id="custom_rate_limiter")
         _custom_rate_limiter_b = CustomRateLimiter(id="custom_rate_limiter")
 
-        _rate_limiter_a = RateLimiter.from_rpm(60, id="test")
-        _rate_limiter_b = RateLimiter.from_rpm(60, id="test")
+        _rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id="test")
+        _rate_limiter_b = MinIntervalRateLimiter.from_rpm(60, id="test")
 
     def test_rate_limiter_should_cleanup_state_when_last_instance_is_deleted(self):
-        _rate_limiter_a = RateLimiter.from_rpm(60, max_concurrent=1, id="test")
+        _rate_limiter_a = MinIntervalRateLimiter.from_rpm(
+            60, max_concurrent=1, id="test"
+        )
         assert _rate_limiter_a._state is not None
         assert _rate_limiter_a._state.semaphore is not None
         old_state = _rate_limiter_a._state
         del _rate_limiter_a
 
-        _rate_limiter_b = RateLimiter.from_rpm(
+        _rate_limiter_b = MinIntervalRateLimiter.from_rpm(
             120, id="test"
         )  # This should not raise an error since the state is cleaned up
         assert _rate_limiter_b._state is not None
@@ -98,46 +102,54 @@ class TestRateLimiterRegistry:
         assert _rate_limiter_b._state is not old_state
 
     def test_rate_limiter_should_share_state_between_instances(self):
-        _rate_limiter_a = RateLimiter.from_rpm(60, max_concurrent=1, id="test")
-        _rate_limiter_b = RateLimiter.from_rpm(60, max_concurrent=1, id="test")
+        _rate_limiter_a = MinIntervalRateLimiter.from_rpm(
+            60, max_concurrent=1, id="test"
+        )
+        _rate_limiter_b = MinIntervalRateLimiter.from_rpm(
+            60, max_concurrent=1, id="test"
+        )
         assert _rate_limiter_a._state is _rate_limiter_b._state
 
     def test_rate_limiter_should_not_share_state_between_instances_with_different_ids(
         self,
     ):
-        _rate_limiter_a = RateLimiter.from_rpm(60, max_concurrent=1, id="test")
-        _rate_limiter_b = RateLimiter.from_rpm(60, max_concurrent=1, id="test_2")
+        _rate_limiter_a = MinIntervalRateLimiter.from_rpm(
+            60, max_concurrent=1, id="test"
+        )
+        _rate_limiter_b = MinIntervalRateLimiter.from_rpm(
+            60, max_concurrent=1, id="test_2"
+        )
         assert _rate_limiter_a._state is not _rate_limiter_b._state
 
 
-class TestBasicRateLimiter:
+class TestMinIntervalRateLimiter:
     """Tests for BasicRateLimiter with min_interval (from_rpm), max_concurrent, and combined behavior."""
 
     @pytest.mark.parametrize("rpm", [0, -1])
     def test_rpm_must_be_positive(self, rpm: int):
         with pytest.raises(ValueError, match="RPM must be greater than 0"):
-            _ = RateLimiter.from_rpm(rpm)
+            _ = MinIntervalRateLimiter.from_rpm(rpm)
 
     @pytest.mark.parametrize("max_concurrent", [0, -1])
     def test_max_concurrent_cannot_be_less_than_1(self, max_concurrent: int):
         with pytest.raises(ValueError, match="greater than or equal to 1"):
-            _ = RateLimiter.from_rpm(60, max_concurrent=max_concurrent)
+            _ = MinIntervalRateLimiter.from_rpm(60, max_concurrent=max_concurrent)
 
     @pytest.mark.timeout(1)
     async def test_min_interval_allows_parallel_requests(self):
         job_started_signal = asyncio.Event()
         signal = asyncio.Event()
 
-        async def wait_for_signal(rate_limiter: RateLimiter) -> None:
+        async def wait_for_signal(rate_limiter: MinIntervalRateLimiter) -> None:
             async with rate_limiter.throttle():
                 job_started_signal.set()
                 _ = await signal.wait()
 
-        async def signal_task(rate_limiter: RateLimiter) -> None:
+        async def signal_task(rate_limiter: MinIntervalRateLimiter) -> None:
             async with rate_limiter.throttle():
                 signal.set()
 
-        rate_limiter = RateLimiter.from_rpm(10_000)
+        rate_limiter = MinIntervalRateLimiter.from_rpm(10_000)
 
         async with asyncio.TaskGroup() as tg:
             _ = tg.create_task(wait_for_signal(rate_limiter))
@@ -145,11 +157,11 @@ class TestBasicRateLimiter:
             _ = tg.create_task(signal_task(rate_limiter))
 
     async def test_min_interval_throttles_rapid_requests(self):
-        rate_limiter = RateLimiter.from_rpm(6_000)  # 10ms min interval
+        rate_limiter = MinIntervalRateLimiter.from_rpm(6_000)  # 10ms min interval
 
         all_waited: list[float] = []
 
-        async def throttle_task(rate_limiter: RateLimiter) -> None:
+        async def throttle_task(rate_limiter: MinIntervalRateLimiter) -> None:
             async with rate_limiter.throttle() as waited:
                 all_waited.append(waited)
 
@@ -168,9 +180,11 @@ class TestBasicRateLimiter:
             assert waited <= 0.49 + JITTER_TIME
 
     async def test_min_interval_reset_after_interval(self):
-        rate_limiter = RateLimiter.from_rpm(60 * 25)  # 25 requests per second
+        rate_limiter = MinIntervalRateLimiter.from_rpm(
+            60 * 25
+        )  # 25 requests per second
 
-        async def throttle_task(rate_limiter: RateLimiter):
+        async def throttle_task(rate_limiter: MinIntervalRateLimiter):
             async with rate_limiter.throttle() as waited:
                 assert waited == 0.0
 
@@ -182,12 +196,12 @@ class TestBasicRateLimiter:
     async def test_max_concurrent_allows_parallel_requests(self):
         barrier = asyncio.Barrier(10)
 
-        async def throttle_task(rate_limiter: RateLimiter) -> None:
+        async def throttle_task(rate_limiter: MinIntervalRateLimiter) -> None:
             async with rate_limiter.throttle() as waited:
                 assert waited < 0.1  # May have small min_interval delay
                 _ = await barrier.wait()
 
-        rate_limiter = RateLimiter.from_rpm(10_000, max_concurrent=10)
+        rate_limiter = MinIntervalRateLimiter.from_rpm(10_000, max_concurrent=10)
 
         async with asyncio.TaskGroup() as tg:
             for _ in range(10):
@@ -195,11 +209,11 @@ class TestBasicRateLimiter:
 
     @pytest.mark.timeout(1)
     async def test_max_concurrent_blocks_when_limit_reached(self):
-        rate_limiter = RateLimiter.from_rpm(10_000, max_concurrent=5)
+        rate_limiter = MinIntervalRateLimiter.from_rpm(10_000, max_concurrent=5)
         barrier = asyncio.Barrier(10)
         all_waited: list[float] = []
 
-        async def throttle_task(rate_limiter: RateLimiter) -> None:
+        async def throttle_task(rate_limiter: MinIntervalRateLimiter) -> None:
             async with rate_limiter.throttle() as waited:
                 all_waited.append(waited)
                 _ = await barrier.wait()
@@ -229,10 +243,12 @@ class TestBasicRateLimiter:
 
     async def test_combined_min_interval_and_max_concurrent(self):
         """Both limits apply: max 2 concurrent, min 20ms between starts."""
-        rate_limiter = RateLimiter.from_rpm(50, max_concurrent=2)  # 20ms interval
+        rate_limiter = MinIntervalRateLimiter.from_rpm(
+            50, max_concurrent=2
+        )  # 20ms interval
         all_waited: list[float] = []
 
-        async def throttle_task(rate_limiter: RateLimiter) -> None:
+        async def throttle_task(rate_limiter: MinIntervalRateLimiter) -> None:
             async with rate_limiter.throttle() as waited:
                 all_waited.append(waited)
 
@@ -250,11 +266,11 @@ class TestBasicRateLimiter:
         assert elapsed >= 0.03  # Min 2*20ms spacing for 4 tasks (2 bursts of 2)
 
     async def test_serialization_keeps_min_interval_behavior(self):
-        rate_limiter = RateLimiter.from_rpm(6_000)
+        rate_limiter = MinIntervalRateLimiter.from_rpm(6_000)
         all_waited: list[float] = []
 
-        async def throttle_task(rate_limiter: RateLimiter) -> None:
-            deserialized = RateLimiter.model_validate_json(
+        async def throttle_task(rate_limiter: MinIntervalRateLimiter) -> None:
+            deserialized = MinIntervalRateLimiter.model_validate_json(
                 rate_limiter.model_dump_json()
             )
             async with deserialized.throttle() as waited:
@@ -270,12 +286,12 @@ class TestBasicRateLimiter:
             assert waited > 0
 
     async def test_serialization_keeps_max_concurrent_behavior(self):
-        rate_limiter = RateLimiter.from_rpm(10_000, max_concurrent=1)
+        rate_limiter = MinIntervalRateLimiter.from_rpm(10_000, max_concurrent=1)
         all_waited: list[float] = []
         barrier = asyncio.Barrier(2)
 
-        async def throttle_task(rate_limiter: RateLimiter) -> None:
-            deserialized = RateLimiter.model_validate_json(
+        async def throttle_task(rate_limiter: MinIntervalRateLimiter) -> None:
+            deserialized = MinIntervalRateLimiter.model_validate_json(
                 rate_limiter.model_dump_json()
             )
             async with deserialized.throttle() as waited:

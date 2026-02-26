@@ -3,9 +3,8 @@ from unittest.mock import AsyncMock
 import pytest
 import tenacity as t
 from giskard.agents.chat import Message
+from giskard.agents.generators import RetryPolicy, WithRetryPolicy
 from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
-from giskard.agents.generators.mixins import WithRetryPolicy
-from giskard.agents.generators.retry import RetryPolicy
 
 
 class RetriableError(BaseException):
@@ -46,34 +45,34 @@ def mock_response(self):
 def test_with_retries_helper_method():
     # Generator with no default policy
     generator = MockGenerator()
-    new_generator = generator.with_retries(max_retries=3)
+    new_generator = generator.with_retries(max_attempts=3)
     assert new_generator.retry_policy is not None
-    assert new_generator.retry_policy.max_retries == 3
+    assert new_generator.retry_policy.max_attempts == 3
     assert new_generator.retry_policy.base_delay == 1.0  # default
 
     # Generator with existing policy
-    generator = MockGenerator(retry_policy=RetryPolicy(max_retries=2, base_delay=0.5))
-    new_generator = generator.with_retries(max_retries=5)
+    generator = MockGenerator(retry_policy=RetryPolicy(max_attempts=2, base_delay=0.5))
+    new_generator = generator.with_retries(max_attempts=5)
     assert new_generator.retry_policy is not None
-    assert new_generator.retry_policy.max_retries == 5
+    assert new_generator.retry_policy.max_attempts == 5
     assert new_generator.retry_policy.base_delay == 0.5
 
     new_generator = generator.with_retries(4, base_delay=10)
     assert new_generator.retry_policy is not None
-    assert new_generator.retry_policy.max_retries == 4
+    assert new_generator.retry_policy.max_attempts == 4
     assert new_generator.retry_policy.base_delay == 10
 
     # Test max_delay parameter
     new_generator = generator.with_retries(3, max_delay=5.0)
     assert new_generator.retry_policy is not None
-    assert new_generator.retry_policy.max_retries == 3
+    assert new_generator.retry_policy.max_attempts == 3
     assert new_generator.retry_policy.base_delay == 0.5  # preserved
     assert new_generator.retry_policy.max_delay == 5.0
 
 
 async def test_raises_exception_after_retries_exhausted():
     generator = MockGenerator(
-        retry_policy=RetryPolicy(max_retries=3, base_delay=1e-3),
+        retry_policy=RetryPolicy(max_attempts=3, base_delay=1e-3),
     )
     generator._complete_mock.side_effect = RetriableError("Test error")
 
@@ -88,7 +87,7 @@ async def test_raises_exception_after_retries_exhausted():
 
 async def test_raises_exception_if_not_retriable():
     generator = MockGenerator(
-        retry_policy=RetryPolicy(max_retries=3, base_delay=1e-3),
+        retry_policy=RetryPolicy(max_attempts=3, base_delay=1e-3),
     )
     generator._complete_mock.side_effect = ValueError("Test error")
 
@@ -102,7 +101,7 @@ async def test_raises_exception_if_not_retriable():
 
 async def test_retries_with_result():
     generator = MockGenerator(
-        retry_policy=RetryPolicy(max_retries=3, base_delay=1e-3),
+        retry_policy=RetryPolicy(max_attempts=3, base_delay=1e-3),
     )
     generator._complete_mock.side_effect = [
         RetriableError("Test error"),
@@ -125,7 +124,7 @@ async def test_retries_with_result():
 
 async def test_retries_works_with_batch_complete():
     generator = MockGenerator(
-        retry_policy=RetryPolicy(max_retries=3, base_delay=1e-3),
+        retry_policy=RetryPolicy(max_attempts=3, base_delay=1e-3),
     )
     generator._complete_mock.side_effect = [
         RetriableError("Test error"),
@@ -153,7 +152,7 @@ async def test_retries_works_with_batch_complete():
 async def test_retries_with_max_delay():
     """Test that max_delay caps the exponential backoff."""
     generator = MockGenerator(
-        retry_policy=RetryPolicy(max_retries=5, base_delay=1.0, max_delay=3.0),
+        retry_policy=RetryPolicy(max_attempts=5, base_delay=1.0, max_delay=3.0),
     )
     generator._complete_mock.side_effect = [
         RetriableError("Test error"),
@@ -180,7 +179,7 @@ async def test_retries_with_max_delay():
 async def test_retries_exponential_backoff():
     """Test that exponential backoff increases sleep times correctly."""
     generator = MockGenerator(
-        retry_policy=RetryPolicy(max_retries=4, base_delay=1.0),
+        retry_policy=RetryPolicy(max_attempts=4, base_delay=1.0),
     )
     generator._complete_mock.side_effect = [
         RetriableError("Test error"),
@@ -208,7 +207,7 @@ async def test_retries_exponential_backoff():
 async def test_retries_exponential_backoff_with_max_delay():
     """Test exponential backoff with max_delay capping."""
     generator = MockGenerator(
-        retry_policy=RetryPolicy(max_retries=6, base_delay=1.0, max_delay=5.0),
+        retry_policy=RetryPolicy(max_attempts=6, base_delay=1.0, max_delay=5.0),
     )
     generator._complete_mock.side_effect = [
         RetriableError("Test error"),

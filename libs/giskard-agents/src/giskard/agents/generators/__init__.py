@@ -1,6 +1,7 @@
 from .base import BaseGenerator, GenerationParams, Response
 from .litellm_generator import LiteLLMGenerator
-from .mixins import WithRateLimiter
+from .rate_limiting import WithRateLimiter
+from .retries import RetryPolicy, WithRetryPolicy
 
 # Default generator uses LiteLLM
 Generator = LiteLLMGenerator
@@ -12,4 +13,6 @@ __all__ = [
     "BaseGenerator",
     "LiteLLMGenerator",
     "WithRateLimiter",
+    "WithRetryPolicy",
+    "RetryPolicy",
 ]

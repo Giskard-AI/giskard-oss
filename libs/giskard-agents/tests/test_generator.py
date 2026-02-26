@@ -7,7 +7,7 @@ from giskard.agents.generators.base import GenerationParams, Response
 from giskard.agents.generators.litellm_generator import LiteLLMGenerator
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow
-from giskard.core import RateLimiter
+from giskard.core import MinIntervalRateLimiter
 from litellm import ModelResponse
 
 
@@ -83,7 +83,8 @@ async def test_generator_chat(generator: LiteLLMGenerator):
 
 async def test_litellm_generator_gets_rate_limiter(mock_response):
     generator = LiteLLMGenerator(
-        model="test-model", rate_limiter=RateLimiter.from_rpm(60, max_concurrent=1)
+        model="test-model",
+        rate_limiter=MinIntervalRateLimiter.from_rpm(60, max_concurrent=1),
     )
     with patch(
         "giskard.agents.generators.litellm_generator.acompletion",
@@ -139,7 +140,7 @@ def test_generator_with_params():
 
 def test_generator_with_params_and_rate_limiter():
     """Test that with_params works correctly with a rate limiter."""
-    rate_limiter = RateLimiter.from_rpm(100, max_concurrent=5)
+    rate_limiter = MinIntervalRateLimiter.from_rpm(100, max_concurrent=5)
     generator = LiteLLMGenerator(model="test-model", rate_limiter=rate_limiter)
 
     # Verify initial state

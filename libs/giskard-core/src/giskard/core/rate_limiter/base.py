@@ -11,13 +11,12 @@ import uuid
 import warnings
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, ClassVar, override
+from typing import Any, ClassVar, Self, override
 from weakref import WeakSet
 
 from pydantic import (
     ConfigDict,
     Field,
-    PrivateAttr,
 )
 
 from ..discriminated import Discriminated, discriminated_base
@@ -43,14 +42,15 @@ class RateLimiterRegistry:
         self._instances = {}
 
     def register_instance(self, rate_limiter: "BaseRateLimiter") -> None:
-        """Register a rate limiter instance and share state with compatible existing ones.
+        """Register a rate limiter instance, initializing its state.
 
-        When a rate limiter is created (including after deserialization), we look for
-        an existing instance with the same id and model fields. If found, we reuse its
-        _state so throttling is shared across instances (e.g. before/after serialization).
+        Finds an existing instance with the same id and model fields to share
+        state with, or lets the limiter create fresh state.
 
-        Args:
-            rate_limiter: The rate limiter instance to register.
+        Parameters
+        ----------
+        rate_limiter : BaseRateLimiter
+            The rate limiter instance to register.
         """
         with self._lock:
             instances = self._instances.get(rate_limiter.id)
@@ -63,39 +63,45 @@ class RateLimiterRegistry:
                 instance for instance in all_instances if instance == rate_limiter
             ]
 
-            if matching_instances:
-                rate_limiter._state = matching_instances[0]._state
-                return
+            match = matching_instances[0] if matching_instances else None
+            rate_limiter.initialize_state(match)
 
-            if not GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS and len(
-                all_instances
-            ) > len(matching_instances):
+            if (
+                not GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS
+                and not match
+                and all_instances
+            ):
                 warnings.warn(
                     (
-                        f"Rate limiter with id '{rate_limiter.id}' already registered,"
-                        f"this will make RateLimiter.from_id('{rate_limiter.id}') unreliable."
+                        f"Rate limiter with id '{rate_limiter.id}' already registered, "
+                        f"this will make RateLimiter.from_id('{rate_limiter.id}') unreliable. "
                         "Set GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS=1 to disable this warning"
                     ),
                     RuntimeWarning,
                 )
 
-            rate_limiter._state = rate_limiter.create_initial_state()
             instances.add(rate_limiter)
 
     def get_instance(self, id: str) -> "BaseRateLimiter[Any]":
         """Retrieve a registered rate limiter by id.
 
-        Args:
-            id: The unique identifier of the rate limiter.
+        Parameters
+        ----------
+        id : str
+            The unique identifier of the rate limiter.
 
-        Returns:
+        Returns
+        -------
+        BaseRateLimiter
             The registered rate limiter instance.
 
-        Raises:
-            ValueError: If no rate limiter with the given id is registered.
+        Raises
+        ------
+        ValueError
+            If no rate limiter with the given id is registered.
         """
         instances = self._instances.get(id)
-        if instances is None:
+        if not instances:
             raise ValueError(f"Rate limiter with id '{id}' not found")
 
         return next(iter(instances))
@@ -105,7 +111,7 @@ class RateLimiterRegistry:
 class BaseRateLimiter(Discriminated):
     """Abstract base class for rate limiters that throttle async operations.
 
-    Subclasses must implement throttle() and optionally override create_initial_state().
+    Subclasses must implement throttle() and optionally override initialize_state().
     Instances with the same id and model fields share throttling state via the registry.
     """
 
@@ -114,33 +120,31 @@ class BaseRateLimiter(Discriminated):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
-    _state: Any = PrivateAttr()
-
     @override
     def model_post_init(self, context: Any, /) -> None:
-        self._registry.register_instance(
-            self,
-        )
+        self._registry.register_instance(self)
         super().model_post_init(context)
 
     @asynccontextmanager
     def throttle(self) -> AsyncGenerator[float]:
         """Async context manager that enforces rate limiting before yielding.
 
-        Yields:
+        Yields
+        ------
+        float
             The time waited (in seconds) before the operation was allowed to proceed,
             or 0.0 if no wait was required.
         """
         raise NotImplementedError
 
-    def create_initial_state(self) -> Any:
-        """Create the initial internal state for this rate limiter.
+    def initialize_state(self, existing: Self | None = None) -> None:
+        """Initialize internal state, optionally sharing from an existing matching instance.
 
-        Override in subclasses to provide custom state (e.g. semaphores, locks).
-        State is shared across instances with the same id and model fields.
-
-        Returns:
-            The initial state object, or None if no state is needed.
+        Parameters
+        ----------
+        existing : Self or None, optional
+            An existing matching instance to share state from. If None, fresh
+            state should be created.
         """
         return None
 
@@ -148,17 +152,24 @@ class BaseRateLimiter(Discriminated):
     def from_id(cls, id: str) -> "BaseRateLimiter":
         """Retrieve a previously registered rate limiter by id.
 
-        Args:
-            id: The unique identifier of the rate limiter.
+        Parameters
+        ----------
+        id : str
+            The unique identifier of the rate limiter.
 
-        Returns:
+        Returns
+        -------
+        BaseRateLimiter
             The registered rate limiter instance.
 
-        Raises:
-            ValueError: If no rate limiter with the given id is registered.
+        Raises
+        ------
+        ValueError
+            If no rate limiter with the given id is registered.
         """
         return cls._registry.get_instance(id)
 
+    @override
     def __eq__(self, other: object) -> bool:
         """Compare rate limiters by model fields only, ignoring internal state.
 

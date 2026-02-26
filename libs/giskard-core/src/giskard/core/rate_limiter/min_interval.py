@@ -5,14 +5,14 @@ import time
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, nullcontext
-from typing import override
+from typing import Self, override
 
 from pydantic import Field, PrivateAttr
 
 from .base import BaseRateLimiter
 
 
-class _BasicRateLimiterState:
+class _MinIntervalRateLimiterState:
     """Internal state for BasicRateLimiter: semaphore, lock, and next allowed request time."""
 
     semaphore: asyncio.Semaphore | None
@@ -27,8 +27,8 @@ class _BasicRateLimiterState:
         self.next_request_time = time.monotonic()
 
 
-@BaseRateLimiter.register("basic_rate_limiter")
-class BasicRateLimiter(BaseRateLimiter):
+@BaseRateLimiter.register("min_interval_rate_limiter")
+class MinIntervalRateLimiter(BaseRateLimiter):
     """Rate limiter with minimum interval between requests and optional max concurrency.
 
     Enforces a minimum time between the start of consecutive requests (e.g. RPM limit)
@@ -38,11 +38,11 @@ class BasicRateLimiter(BaseRateLimiter):
     min_interval: float = Field(..., ge=0)
     max_concurrent: int | None = Field(default=None, ge=1)
 
-    _state: _BasicRateLimiterState = PrivateAttr()
+    _state: _MinIntervalRateLimiterState = PrivateAttr()
 
     @asynccontextmanager
     async def throttle(self) -> AsyncGenerator[float]:
-        """Wait for rate limit, then yield the time waited (or 0.0 if no wait)."""
+        """Wait for rate limit, then yields the time waited in seconds."""
         start_time = time.monotonic()
         async with self._state.semaphore or nullcontext():
             async with self._state.lock:
@@ -56,29 +56,40 @@ class BasicRateLimiter(BaseRateLimiter):
                 await asyncio.sleep(wait_time)
 
             elapsed_time = time.monotonic() - start_time
-            yield 0.0 if elapsed_time <= 1e-3 else elapsed_time
+            yield elapsed_time
 
     @override
-    def create_initial_state(self) -> _BasicRateLimiterState:
-        """Create state with semaphore (if max_concurrent) and lock."""
-        return _BasicRateLimiterState(self.max_concurrent)
+    def initialize_state(self, existing: Self | None = None) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Initialize state, sharing from an existing instance or creating fresh."""
+        if existing is None:
+            self._state = _MinIntervalRateLimiterState(self.max_concurrent)
+        else:
+            self._state = existing._state
 
     @classmethod
     def from_rpm(
         cls, rpm: int, max_concurrent: int | None = None, id: str | None = None
-    ) -> "BasicRateLimiter":
+    ) -> "MinIntervalRateLimiter":
         """Create a rate limiter from requests-per-minute (RPM).
 
-        Args:
-            rpm: Maximum requests per minute. Must be greater than 0.
-            max_concurrent: Maximum concurrent requests allowed, or None for no limit.
-            id: Optional unique identifier. Auto-generated if not provided.
+        Parameters
+        ----------
+        rpm : int
+            Maximum requests per minute. Must be greater than 0.
+        max_concurrent : int or None, optional
+            Maximum concurrent requests allowed, or None for no limit.
+        id : str or None, optional
+            Unique identifier. Auto-generated if not provided.
 
-        Returns:
-            A BasicRateLimiter configured for the given RPM and concurrency.
+        Returns
+        -------
+        MinIntervalRateLimiter
+            Configured for the given RPM and concurrency.
 
-        Raises:
-            ValueError: If rpm is less than or equal to 0.
+        Raises
+        ------
+        ValueError
+            If rpm is less than or equal to 0.
         """
         if rpm <= 0:
             raise ValueError("RPM must be greater than 0")

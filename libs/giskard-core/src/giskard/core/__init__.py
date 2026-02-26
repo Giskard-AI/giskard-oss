@@ -11,7 +11,7 @@ from .discriminated import Discriminated, discriminated_base
 from .errors import Error
 from .rate_limiter import (
     BaseRateLimiter,
-    RateLimiter,
+    MinIntervalRateLimiter,
 )
 from .utils import NOT_PROVIDED, NotProvided, provide_not_none
 
@@ -41,6 +41,6 @@ __all__ = [
     "NOT_PROVIDED",
     "provide_not_none",
     # Limiter
-    "RateLimiter",
+    "MinIntervalRateLimiter",
     "BaseRateLimiter",
 ]
