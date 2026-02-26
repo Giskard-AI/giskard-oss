@@ -16,12 +16,13 @@ from .comparison import (
 # Import other builtin checks (staying in builtin)
 from .fn import FnCheck, from_fn
 from .semantic_similarity import SemanticSimilarity
-from .string_matching import StringMatching
+from .text_matching import RegexMatching, StringMatching
 
 __all__ = [
     "from_fn",
     "FnCheck",
     "StringMatching",
+    "RegexMatching",
     "Equals",
     "NotEquals",
     "LesserThan",

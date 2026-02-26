@@ -1,4 +1,4 @@
-from typing import Self
+from typing import Any, Self
 
 from pydantic import BaseModel, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -50,6 +50,11 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     interactions: list[InteractionRecord[InputType, OutputType]] = Field(
         default_factory=list
+    )
+
+    annotations: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Shared Scenario/Trace-level annotations.",
     )
 
     @computed_field
