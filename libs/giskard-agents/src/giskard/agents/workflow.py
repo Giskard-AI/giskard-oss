@@ -337,6 +337,33 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         """Set the context for the workflow."""
         return self.model_copy(update={"context": context})
 
+    @classmethod
+    def from_messages(
+        cls,
+        generator: "BaseGenerator",
+        messages: list[dict[str, Any]],
+        **kwargs: Any,
+    ) -> "ChatWorkflow[Any]":
+        """Create a workflow from pre-assembled message dicts.
+
+        Parameters
+        ----------
+        generator : BaseGenerator
+            The generator instance.
+        messages : list[dict[str, Any]]
+            Pre-built message dicts (each validated into a ``Message``).
+        **kwargs : Any
+            Additional keyword arguments forwarded to the ``ChatWorkflow``
+            constructor (e.g. ``tools``, ``context``, ``output_model``).
+
+        Returns
+        -------
+        ChatWorkflow
+            A new workflow with the parsed messages.
+        """
+        parsed = [Message.model_validate(m) for m in messages]
+        return cls(generator=generator, messages=parsed, **kwargs)
+
     def on_error(self, error_policy: ErrorPolicy) -> Self:
         """Set the error handling behavior for the workflow."""
         return self.model_copy(update={"error_policy": error_policy})
