@@ -88,7 +88,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
         """Execute the scenario components sequentially with shared trace.
 
         Each component is executed in order:
-        - InteractionRecord / Interaction components update the shared trace
+        - Interaction components update the shared trace
         - Check components validate the current trace and stop execution on failure
 
         Returns
