@@ -39,7 +39,7 @@ class Tool(BaseModel):
 
     run_context_param: str | None = Field(default=None)
     _params_model: type[BaseModel] | None = PrivateAttr(default=None)
-    _return_adapter: TypeAdapter | None = PrivateAttr(default=None)
+    _return_adapter: TypeAdapter[Any] | None = PrivateAttr(default=None)
 
     @classmethod
     def from_callable(
@@ -159,6 +159,9 @@ class Tool(BaseModel):
         """
 
         # Coerce inputs through the params model (dict -> BaseModel, etc.)
+        # We use getattr() instead of model_dump() to preserve coerced types
+        # (e.g. a dict becomes a Person instance) and only include fields the
+        # caller explicitly provided, letting Python defaults handle the rest.
         if self._params_model is not None:
             validated = self._params_model.model_validate(arguments)
             arguments = {
