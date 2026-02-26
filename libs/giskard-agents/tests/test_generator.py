@@ -5,9 +5,9 @@ import pytest
 from giskard.agents.chat import Chat, Message
 from giskard.agents.generators.base import GenerationParams, Response
 from giskard.agents.generators.litellm_generator import LiteLLMGenerator
-from giskard.agents.rate_limiter import RateLimiter, _rate_limiters
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow
+from giskard.core import MinIntervalRateLimiter
 from litellm import ModelResponse
 
 
@@ -82,8 +82,10 @@ async def test_generator_chat(generator: LiteLLMGenerator):
 
 
 async def test_litellm_generator_gets_rate_limiter(mock_response):
-    rate_limiter = RateLimiter.from_rpm(rpm=60, max_concurrent=1)
-    generator = LiteLLMGenerator(model="test-model", rate_limiter=rate_limiter)
+    generator = LiteLLMGenerator(
+        model="test-model",
+        rate_limiter=MinIntervalRateLimiter.from_rpm(60, max_concurrent=1),
+    )
     with patch(
         "giskard.agents.generators.litellm_generator.acompletion",
         return_value=mock_response,
@@ -101,7 +103,7 @@ async def test_litellm_generator_gets_rate_limiter(mock_response):
     # t = 2.0 -> request 3
     elapsed_time = end_time - start_time
     assert elapsed_time >= 2
-    assert elapsed_time < 2 + rate_limiter.strategy.min_interval
+    assert elapsed_time < 3
 
 
 async def test_generator_without_rate_limiter(mock_response):
@@ -121,17 +123,6 @@ async def test_generator_without_rate_limiter(mock_response):
     assert elapsed_time < 10e-3  # arbitrary small number, here 10ms
 
 
-async def test_generator_rate_limiter_context():
-    rate_limiter = RateLimiter.from_rpm(
-        rpm=100, rate_limiter_id="test_generator_rate_limiter_context"
-    )
-    generator = LiteLLMGenerator(
-        model="test-model",
-        rate_limiter="test_generator_rate_limiter_context",  # pyright: ignore[reportArgumentType]
-    )
-    assert generator.rate_limiter is rate_limiter
-
-
 def test_generator_with_params():
     generator = LiteLLMGenerator(model="test-model")
     generator = generator.with_params(temperature=0.5)
@@ -149,11 +140,11 @@ def test_generator_with_params():
 
 def test_generator_with_params_and_rate_limiter():
     """Test that with_params works correctly with a rate limiter."""
-    rate_limiter = RateLimiter.from_rpm(rpm=100, max_concurrent=5)
+    rate_limiter = MinIntervalRateLimiter.from_rpm(100, max_concurrent=5)
     generator = LiteLLMGenerator(model="test-model", rate_limiter=rate_limiter)
 
     # Verify initial state
-    assert generator.rate_limiter is rate_limiter
+    assert generator.rate_limiter == rate_limiter
 
     # Call with_params and verify rate limiter is preserved
     generator_with_params = generator.with_params(temperature=0.5, max_tokens=100)
@@ -161,48 +152,12 @@ def test_generator_with_params_and_rate_limiter():
     assert generator_with_params.params.temperature == 0.5
     assert generator_with_params.params.max_tokens == 100
     # Verify rate limiter is preserved and the same instance
-    assert generator_with_params.rate_limiter is rate_limiter
+    assert generator_with_params.rate_limiter == rate_limiter
 
     # Verify original generator is unchanged
     assert generator.params.temperature == 1.0  # default value
     assert generator.params.max_tokens is None
-    assert generator.rate_limiter is rate_limiter
-
-
-def test_generator_serialization_keep_rate_limiter_instance():
-    """Test that serializing and deserializing a generator preserves the rate limiter instance."""
-    rate_limiter = RateLimiter.from_rpm(rpm=100, max_concurrent=5)
-    generator = LiteLLMGenerator(model="test-model", rate_limiter=rate_limiter)
-
-    json_str = generator.model_dump_json()
-    deserialized_generator = LiteLLMGenerator.model_validate_json(json_str)
-
-    assert deserialized_generator.rate_limiter is rate_limiter
-
-
-def test_generator_serialization_recreate_rate_limiter_instance_if_not_in_registry():
-    """Test that deserializing a generator recreates the rate limiter if it's not in the registry."""
-    rate_limiter = RateLimiter.from_rpm(rpm=100, max_concurrent=5)
-    generator = LiteLLMGenerator(model="test-model", rate_limiter=rate_limiter)
-
-    json_str = generator.model_dump_json()
-    del _rate_limiters[rate_limiter.rate_limiter_id]
-    deserialized_generator = LiteLLMGenerator.model_validate_json(json_str)
-
-    assert deserialized_generator.rate_limiter is not rate_limiter
-    assert deserialized_generator.rate_limiter is not None
-    assert (
-        deserialized_generator.rate_limiter.rate_limiter_id
-        == rate_limiter.rate_limiter_id
-    )
-    assert (
-        deserialized_generator.rate_limiter.strategy.min_interval
-        == rate_limiter.strategy.min_interval
-    )
-    assert (
-        deserialized_generator.rate_limiter.strategy.max_concurrent
-        == rate_limiter.strategy.max_concurrent
-    )
+    assert generator.rate_limiter == rate_limiter
 
 
 async def test_generator_with_params_overwrite(mock_response):
@@ -210,6 +165,7 @@ async def test_generator_with_params_overwrite(mock_response):
     generator = LiteLLMGenerator(model="test-model").with_params(
         temperature=0.5,  # This should be preserved.
         max_tokens=100,  # This should be overwritten.
+        timeout=30,  # This should be overwritten.
     )
 
     with patch(
@@ -219,7 +175,7 @@ async def test_generator_with_params_overwrite(mock_response):
         # ACT: Call complete() with overriding parameters.
         await generator.complete(
             messages=[Message(role="user", content="Test message")],
-            params=GenerationParams(max_tokens=200),
+            params=GenerationParams(max_tokens=200, timeout=60),
         )
 
         # ASSERT: Verify that parameters were merged correctly.
@@ -230,5 +186,8 @@ async def test_generator_with_params_overwrite(mock_response):
         )  # Preserved from the generator's params.
         assert (
             call_kwargs["max_tokens"] == 200
+        )  # Overwritten by the complete() call's params.
+        assert (
+            call_kwargs["timeout"] == 60
         )  # Overwritten by the complete() call's params.
         assert call_kwargs["model"] == "test-model"

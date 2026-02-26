@@ -1,4 +1,4 @@
-from typing import cast
+from typing import cast, override
 
 from litellm import Choices, ModelResponse, acompletion
 from litellm import Message as LiteLLMMessage
@@ -7,21 +7,30 @@ from pydantic import Field
 
 from ..chat import Message
 from .base import BaseGenerator, GenerationParams, Response
-from .mixins import WithRateLimiter, WithRetryPolicy
+from .rate_limiting import WithRateLimiter
+from .retries import WithRetryPolicy
 
 
 @BaseGenerator.register("litellm")
 class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
-    """A generator for creating chat completion pipelines."""
+    """A generator for creating chat completion pipelines.
+
+    The MRO places rate limiting inside the retry loop: each retry attempt
+    individually acquires the rate limiter. This prevents retry storms from
+    bypassing rate limits, at the cost of consuming one rate-limit slot per
+    attempt (including failed ones).
+    """
 
     model: str = Field(
         description="The model identifier to use (e.g. 'gemini/gemini-2.0-flash')"
     )
 
+    @override
     def _should_retry(self, err: Exception) -> bool:
         return litellm_should_retry(getattr(err, "status_code", 0))
 
-    async def _complete_once(
+    @override
+    async def _attempt_complete(
         self, messages: list[Message], params: GenerationParams | None = None
     ) -> Response:
         params_ = self.params.model_dump(exclude={"tools"})
@@ -34,7 +43,7 @@ class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
         if tools:
             params_["tools"] = [t.to_litellm_function() for t in tools]
 
-        async with self._rate_limiter_context():
+        async with self._throttle():
             response = cast(
                 ModelResponse,
                 await acompletion(
