@@ -5,7 +5,7 @@ from giskard.core import provide_not_none
 from pydantic import Field
 
 from ..core.check import Check
-from ..core.extraction import NoMatch, provided_or_resolve, resolve
+from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve, resolve
 from ..core.mixin import WithEmbeddingMixin
 from ..core.result import CheckResult
 from ..core.trace import Trace
@@ -90,11 +90,11 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
     reference_text: str | None = Field(
         default=None, description="The reference text to compare the output with"
     )
-    reference_text_key: str = Field(
+    reference_text_key: JSONPathStr = Field(
         default="trace.last.metadata.reference_text",
         description="The key to extract the reference text from the trace",
     )
-    actual_answer_key: str = Field(
+    actual_answer_key: JSONPathStr = Field(
         default="trace.last.outputs",
         description="The key to extract the actual answer from the trace",
     )

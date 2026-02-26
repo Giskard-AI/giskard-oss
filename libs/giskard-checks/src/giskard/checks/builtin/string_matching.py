@@ -13,7 +13,7 @@ from giskard.core import provide_not_none
 from pydantic import Field, model_validator
 
 from ..core.check import Check
-from ..core.extraction import NoMatch, provided_or_resolve
+from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve
 from ..core.result import CheckResult
 from ..core.trace import Trace
 from ..utils.normalization import NormalizationForm, normalize_string
@@ -91,7 +91,7 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
         default=None,
         description="The text string to search within. If None, extracted from trace using text_key.",
     )
-    text_key: str = Field(
+    text_key: JSONPathStr = Field(
         default="trace.last.outputs",
         description="JSONPath expression to extract the text from the trace (e.g., 'trace.last.outputs.response').",
     )
@@ -99,7 +99,7 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
         default=None,
         description="The keyword to search for within the text. Either this or keyword_key must be provided.",
     )
-    keyword_key: str | None = Field(
+    keyword_key: JSONPathStr | None = Field(
         default=None,
         description="JSONPath expression to extract the keyword from the trace (e.g., 'trace.last.inputs.expected'). Either this or keyword must be provided.",
     )

@@ -58,8 +58,10 @@ class _ScenarioStepsBuilder[InputType, OutputType, TraceType: Trace]:  # pyright
 
     def add_interaction(
         self,
-        interaction: Interaction[InputType, OutputType]
-        | InteractionGenerator[Interaction[InputType, OutputType], TraceType],
+        interaction: (
+            Interaction[InputType, OutputType]
+            | InteractionGenerator[Interaction[InputType, OutputType], TraceType]
+        ),
     ):
         if len(self.current_step.checks) > 0:
             self.add_step()

@@ -1013,10 +1013,7 @@ class TestScenarioErrorHandling:
         check = MockCheck(result=CheckResult.success())
 
         result = await (
-            scenario("adds_empty_test")
-            .extend()  # No arguments
-            .append(check)
-            .run()
+            scenario("adds_empty_test").extend().append(check).run()  # No arguments
         )
 
         assert result.passed
