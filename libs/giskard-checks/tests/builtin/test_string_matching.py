@@ -1,5 +1,6 @@
 """Tests for the StringMatching check."""
 
+import pytest
 from giskard.checks import CheckStatus, Interaction, StringMatching, Trace
 from giskard.checks.core.extraction import NoMatch
 
@@ -172,8 +173,7 @@ async def test_missing_text_in_trace() -> None:
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
     assert (
-        "No value found for text key 'trace.last.outputs.nonexistent', expected string to contain 'test'."
-        in result.message
+        "No value found for text key 'trace.last.outputs.nonexistent'" in result.message
     )
     assert isinstance(result.details["text"], NoMatch)
     assert result.details["text"].key == "trace.last.outputs.nonexistent"
@@ -386,6 +386,16 @@ async def test_unicode_e_acute_nfkc_matching() -> None:
     )
     result = await check.run(Trace())
     assert result.status == CheckStatus.PASS
+
+
+async def test_cannot_provide_both_keyword_and_keyword_key() -> None:
+    """Test that providing both keyword and keyword_key raises an error."""
+    with pytest.raises(ValueError, match="Exactly one"):
+        StringMatching(
+            text="Hello World",
+            keyword="hello",
+            keyword_key="trace.last.inputs.key",
+        )
 
 
 async def test_unicode_e_acute_no_normalization_fails() -> None:

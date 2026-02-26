@@ -7,7 +7,7 @@ from giskard.core import NOT_PROVIDED, NotProvided, provide_not_none
 from pydantic import Field, model_validator
 
 from ..core.check import Check
-from ..core.extraction import NoMatch, provided_or_resolve, resolve
+from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve, resolve
 from ..core.result import CheckResult
 from ..core.trace import Trace
 from ..utils.normalization import NormalizationForm, normalize_data
@@ -34,14 +34,14 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     - Result formatting
     """
 
-    key: str = Field(
+    key: JSONPathStr = Field(
         ..., description="The key to extract the actual value from the trace"
     )
     expected_value: ExpectedType | None = Field(
         default=None,
         description="The expected value to compare against. If None, the expected value is extracted from the trace using the expected_value_key.",
     )
-    expected_value_key: str | NotProvided = Field(
+    expected_value_key: JSONPathStr | NotProvided = Field(
         default=NOT_PROVIDED,
         description="The key to extract the expected value from the trace. If None, the expected value is used as is. If provided, the expected value is extracted from the trace using the expected_value_key.",
     )

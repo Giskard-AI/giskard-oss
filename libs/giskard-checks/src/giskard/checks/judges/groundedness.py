@@ -5,7 +5,7 @@ from giskard.core import provide_not_none
 from pydantic import Field
 
 from ..core.check import Check
-from ..core.extraction import provided_or_resolve
+from ..core.extraction import JSONPathStr, provided_or_resolve
 from ..core.trace import Trace
 from .base import BaseLLMCheck
 
@@ -51,14 +51,14 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     answer: str | None = Field(
         default=None, description="Input source for the answer to evaluate"
     )
-    answer_key: str = Field(
+    answer_key: JSONPathStr = Field(
         default="trace.last.outputs",
         description="Key to extract the answer from the trace",
     )
     context: str | list[str] | None = Field(
         default=None, description="Input source for the reference context"
     )
-    context_key: str = Field(
+    context_key: JSONPathStr = Field(
         default="trace.last.metadata.context",
         description="Key to extract the context from the trace",
     )

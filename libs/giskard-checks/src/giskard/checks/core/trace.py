@@ -86,6 +86,10 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     """
 
     interactions: list[Interaction[InputType, OutputType]] = Field(default_factory=list)
+    annotations: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Shared Scenario/Trace-level annotations.",
+    )
 
     @computed_field
     @property
@@ -133,8 +137,10 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     async def with_interaction(
         self,
-        interaction: Interaction[InputType, OutputType]
-        | InteractionGenerator[Interaction[InputType, OutputType], Self],
+        interaction: (
+            Interaction[InputType, OutputType]
+            | InteractionGenerator[Interaction[InputType, OutputType], Self]
+        ),
     ) -> Self:
         if isinstance(interaction, Interaction):
             return self.model_copy(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -76,6 +77,10 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
     trace_type: type[TraceType] | None = Field(
         default=None,
         description="Type of trace to use for the scenario. If not provided, the trace type will be inferred from the sequence of components.",
+    )
+    annotations: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Scenario-level annotations that will be injected in the trace.",
     )
 
     async def run(

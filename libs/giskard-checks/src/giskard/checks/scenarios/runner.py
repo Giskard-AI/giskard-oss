@@ -58,8 +58,10 @@ class _ScenarioStepsBuilder[InputType, OutputType, TraceType: Trace]:  # pyright
 
     def add_interaction(
         self,
-        interaction: Interaction[InputType, OutputType]
-        | InteractionGenerator[Interaction[InputType, OutputType], TraceType],
+        interaction: (
+            Interaction[InputType, OutputType]
+            | InteractionGenerator[Interaction[InputType, OutputType], TraceType]
+        ),
     ):
         if len(self.current_step.checks) > 0:
             self.add_step()
@@ -127,9 +129,12 @@ class ScenarioRunner:
 
         start_time = time.perf_counter()
         trace = (
-            scenario.trace_type()
+            scenario.trace_type(annotations=scenario.annotations)
             if scenario.trace_type is not None
-            else cast(TraceType, Trace[InputType, OutputType]())
+            else cast(
+                TraceType,
+                Trace[InputType, OutputType](annotations=scenario.annotations),
+            )
         )
         steps = _ScenarioStepsBuilder(*scenario.sequence).build()
         steps_results: list[TestCaseResult] = []
