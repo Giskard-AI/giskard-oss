@@ -80,8 +80,8 @@ async def test_step_type_completion_when_no_tools():
     assert collected[0].step_type == StepType.COMPLETION
 
 
-async def test_step_type_available_via_run():
-    """step_type is set on the last step accessible through chat."""
+async def test_run_returns_successful_chat():
+    """run() returns a Chat with the assistant's response."""
     gen = MagicMock(spec=BaseGenerator)
     gen.complete = AsyncMock(
         return_value=Response(
