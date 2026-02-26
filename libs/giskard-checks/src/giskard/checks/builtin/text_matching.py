@@ -15,7 +15,7 @@ from giskard.core import provide_not_none
 from pydantic import Field, model_validator
 
 from ..core.check import Check
-from ..core.extraction import NoMatch, provided_or_resolve
+from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve
 from ..core.result import CheckResult
 from ..core.trace import Trace
 from ..utils.normalization import NormalizationForm, normalize_string
@@ -37,7 +37,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
     text : str | None
         The text string to search within. If None, will be extracted from
         trace using `text_key`.
-    text_key : str
+    text_key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
     """
@@ -46,7 +46,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
         default=None,
         description="The text string to search within.",
     )
-    text_key: str = Field(
+    text_key: JSONPathStr = Field(
         default="trace.last.outputs",
         description="JSONPath expression to extract text from trace.",
     )
@@ -55,7 +55,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
         self,
         trace: TraceType,
         target_value: str | None,
-        target_key: str | None,
+        target_key: JSONPathStr | None,
         target_name: str,
     ) -> tuple[str, str, dict[str, Any]] | tuple[None, None, CheckResult]:
         """Extract and validate text and target from trace or direct values.
@@ -66,7 +66,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
             The trace to extract values from.
         target_value : str | None
             Direct target value (keyword/pattern).
-        target_key : str | None
+        target_key : JSONPathStr | None
             JSONPath key to extract target from trace.
         target_name : str
             Name of the target parameter (for error messages).
@@ -161,13 +161,13 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
     text : str | None
         The text string to search within. If None, will be extracted from
         trace using `text_key`.
-    text_key : str
+    text_key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
     keyword : str | None
         The keyword to search for within the text. If None, must provide
         `keyword_key` to extract from trace.
-    keyword_key : str | None
+    keyword_key : JSONPathStr | None
         JSONPath expression to extract the keyword from the trace. Either
         `keyword` or `keyword_key` must be provided.
     normalization_form : NormalizationForm | None
@@ -210,7 +210,7 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
         default=None,
         description="The keyword to search for within the text. Either this or keyword_key must be provided.",
     )
-    keyword_key: str | None = Field(
+    keyword_key: JSONPathStr | None = Field(
         default=None,
         description="JSONPath expression to extract the keyword from the trace (e.g., 'trace.last.inputs.expected'). Either this or keyword must be provided.",
     )
@@ -342,12 +342,12 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     text : str | None
         The text string to search within. If None, will be extracted from
         trace using `text_key`.
-    text_key : str
+    text_key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
     pattern : str | None
         The regex pattern to search for. Either this or pattern_key must be provided.
-    pattern_key : str | None
+    pattern_key : JSONPathStr | None
         JSONPath expression to extract pattern from trace.
 
     Examples
@@ -399,7 +399,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         default=None,
         description="The regex pattern to search for within the text.",
     )
-    pattern_key: str | None = Field(
+    pattern_key: JSONPathStr | None = Field(
         default=None,
         description="JSONPath expression to extract the pattern from the trace.",
     )
