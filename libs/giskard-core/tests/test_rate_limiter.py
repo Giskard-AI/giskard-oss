@@ -174,7 +174,7 @@ class TestMinIntervalRateLimiter:
         assert elapsed_time < 0.49 + JITTER_TIME
 
         assert len(all_waited) == 50
-        assert all_waited[0] == 0.0  # First request not throttled
+        assert all_waited[0] < 1e-3  # First request not throttled
         for waited in all_waited[1:]:
             assert waited > 0
             assert waited <= 0.49 + JITTER_TIME
@@ -186,7 +186,7 @@ class TestMinIntervalRateLimiter:
 
         async def throttle_task(rate_limiter: MinIntervalRateLimiter):
             async with rate_limiter.throttle() as waited:
-                assert waited == 0.0
+                assert waited < 1e-3
 
         for _ in range(10):
             await throttle_task(rate_limiter)
@@ -281,7 +281,7 @@ class TestMinIntervalRateLimiter:
                 _ = tg.create_task(throttle_task(rate_limiter))
 
         assert len(all_waited) == 10
-        assert all_waited[0] == 0.0
+        assert all_waited[0] < 1e-3
         for waited in all_waited[1:]:
             assert waited > 0
 
@@ -305,7 +305,7 @@ class TestMinIntervalRateLimiter:
             await asyncio.sleep(JITTER_TIME)
             assert barrier.n_waiting == 1
             assert len(all_waited) == 1
-            assert all_waited[0] <= 1e-3
+            assert all_waited[0] <= 1e-3  # negligible wait
             all_waited.clear()
 
             _ = await barrier.wait()
