@@ -110,9 +110,9 @@ Concepts
 --------
 
 - **Fluent API**: The recommended way to create tests using `scenario().interact().check()`. This API builds a scenario and handles interaction generation.
-- **InteractionRecord**: A recorded exchange with `inputs`, `outputs`, and optional `metadata`.
 - **Interaction**: A specification for generating interactions dynamically (static values, callables, or generators).
 - **Trace**: Immutable history of all `InteractionRecord` objects produced while executing a scenario. Use `trace.last` in JSONPath expressions (e.g., `trace.last.outputs`).
+- **InteractionRecord**: A recorded exchange with `inputs`, `outputs`, and optional `metadata`.
 - **Check**: Inspects the `Trace` and returns a `CheckResult`.
 - **Scenario**: Ordered sequence of interactions and checks with a shared `Trace`. Execution stops at the first failing check and later steps are skipped.
 
