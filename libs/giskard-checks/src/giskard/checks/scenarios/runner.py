@@ -127,11 +127,13 @@ class ScenarioRunner:
 
         start_time = time.perf_counter()
         trace = (
-            scenario.trace_type()
+            scenario.trace_type(annotations=scenario.annotations)
             if scenario.trace_type is not None
-            else cast(TraceType, Trace[InputType, OutputType]())
+            else cast(
+                TraceType,
+                Trace[InputType, OutputType](annotations=scenario.annotations),
+            )
         )
-        trace = trace.with_annotations(scenario.annotations)
         steps = _ScenarioStepsBuilder(*scenario.sequence).build()
         steps_results: list[TestCaseResult] = []
 

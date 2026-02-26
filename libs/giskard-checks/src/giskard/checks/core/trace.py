@@ -158,14 +158,6 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
             if generator is not None:
                 await generator.aclose()
 
-    def with_annotations(self, annotations: dict[str, Any]) -> Self:
-        """Return a new trace instance with updated annotations.
-
-        This keeps the trace model immutable while allowing scenario-level
-        annotations to be projected onto all derived traces.
-        """
-        return self.model_copy(update={"annotations": annotations})
-
     # TODO def steps() -> list[list[Interaction[InputType, OutputType]]]: # Index based
 
     def __rich_console__(
