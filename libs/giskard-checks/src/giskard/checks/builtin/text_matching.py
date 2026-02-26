@@ -376,7 +376,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     Multiline matching with anchors (using inline modifier)::
 
         check = RegexMatching(
-            text="Line 1\\nLine 2\\nLine 3",
+            text="Line 1\nLine 2\nLine 3",
             pattern=r"(?m)^Line 2$"
         )
 
