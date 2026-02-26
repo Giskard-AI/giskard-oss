@@ -82,11 +82,16 @@ async def test_from_messages_with_tool_calls():
     )
 
     assert len(wf.messages) == 3
-    assert wf.messages[1].tool_calls is not None
-    assert len(wf.messages[1].tool_calls) == 1
-    assert wf.messages[1].tool_calls[0].function.name == "my_tool"
-    assert wf.messages[2].role == "tool"
-    assert wf.messages[2].tool_call_id == "tc_1"
+    assistant_msg = wf.messages[1]
+    tool_msg = wf.messages[2]
+    assert isinstance(assistant_msg, Message)
+    assert isinstance(tool_msg, Message)
+
+    assert assistant_msg.tool_calls is not None
+    assert len(assistant_msg.tool_calls) == 1
+    assert assistant_msg.tool_calls[0].function.name == "my_tool"
+    assert tool_msg.role == "tool"
+    assert tool_msg.tool_call_id == "tc_1"
 
 
 async def test_from_messages_runs_workflow():
