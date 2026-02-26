@@ -158,17 +158,13 @@ class Tool(BaseModel):
             The result of calling the function.
         """
 
-        # Coerce inputs through the params model (dict -> BaseModel, etc.)
+        # Coerce dict arguments into typed objects via the Pydantic params model.
         # We use getattr() instead of model_dump() to preserve coerced types
-        # (e.g. a dict becomes a Person instance) and only include fields the
-        # caller explicitly provided, letting Python defaults handle the rest.
+        # (e.g. a raw dict becomes a BaseModel instance). Extra keys that are
+        # not in model_fields are dropped (Pydantic defaults to extra='ignore').
         if self._params_model is not None:
             validated = self._params_model.model_validate(arguments)
-            arguments = {
-                name: getattr(validated, name)
-                for name in self._params_model.model_fields
-                if name in arguments
-            }
+            arguments = {name: getattr(validated, name) for name in arguments if name in self._params_model.model_fields}
 
         # Inject the context after coercion (RunContext is excluded from the model)
         if ctx and self.run_context_param:
