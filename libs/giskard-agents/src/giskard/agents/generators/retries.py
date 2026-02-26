@@ -106,8 +106,8 @@ class WithRetryPolicy(BaseModel):
     ) -> Response:
         """Complete with retry logic applied.
 
-        This method wraps _complete_once with the configured retry policy.
-        If no retry policy is set, it directly calls _complete_once.
+        This method wraps _attempt_complete with the configured retry policy.
+        If no retry policy is set, it directly calls _attempt_complete.
 
         Parameters
         ----------
