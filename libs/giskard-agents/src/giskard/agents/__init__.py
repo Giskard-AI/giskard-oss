@@ -19,7 +19,7 @@ from .templates import (
     set_prompts_path,
 )
 from .tools import Tool, tool
-from .workflow import ChatWorkflow, ErrorPolicy
+from .workflow import ChatWorkflow, ErrorPolicy, StepType
 
 __all__ = [
     "Generator",
@@ -44,4 +44,5 @@ __all__ = [
     "WorkflowError",
     "Error",
     "EmbeddingModel",
+    "StepType",
 ]
