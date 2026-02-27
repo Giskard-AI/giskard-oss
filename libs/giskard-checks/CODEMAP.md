@@ -18,17 +18,25 @@ modules, core abstractions, and expected workflows.
 ├─ CODEMAP.md                  # This file
 ├─ Makefile                    # Canonical dev workflow (lint, typecheck, tests)
 ├─ src/giskard/checks/
-│  ├─ __init__.py              # Public re-exports: all core classes, builtin checks, and settings helpers
+│  ├─ __init__.py              # Public re-exports: all core classes, builtin/LLM-based checks, and settings helpers
 │  ├─ builtin/                 # Built-in Check implementations (fn, equality, LLM, etc.)
-│  ├─ core/                    # Core abstractions: Check, Scenario, Trace, results, extraction
-│  ├─ interaction/             # `Interaction` implementation
+│  ├─ core/                    # Core abstractions: Interaction, Check, Scenario, Trace, results, extraction
+│  ├─ generators/              # User-facing generators (e.g., UserSimulator) and related helpers
+│  ├─ judges/                  # LLM-based Check implementations (Groundedness, Conformity, etc.)
+│  ├─ prompts/                 # Jinja templates used by generators and judges (LLM prompts)
 │  ├─ scenarios/               # Runner, TestCase model, and helper utilities
 │  ├─ settings.py              # Global generator configuration for LLM checks
-│  └─ trace/                   # Reserved for future trace utilities (currently empty)
+│  ├─ testing/                 # Testing helpers (spies, runners) for checks and scenarios
+│  └─ utils/                   # Shared utilities: value providers, normalization, generator helpers, parameter injection
 └─ tests/
+   ├─ builtin/                 # Tests for builtin and LLM-based checks
+   ├─ conftest.py              # Shared pytest fixtures and configuration for tests
    ├─ core/                    # Unit tests for Check/Scenario primitives
+   ├─ generators/              # Tests for user simulator and generator helpers
+   ├─ integration/             # End-to-end scenarios exercising multiple components together
    ├─ scenarios/               # TestCase + runner scenarios
-   └─ trace/                   # Trace/interaction behavior
+   ├─ trace/                   # Trace/interaction behavior
+   └─ utils/                   # Tests for utility helpers (normalization, etc.)
 ```
 
 ## Core concepts & files
