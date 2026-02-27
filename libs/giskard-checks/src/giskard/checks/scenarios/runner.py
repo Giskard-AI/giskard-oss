@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from typing import Any, cast
 
-from giskard.core.utils import NotProvided
+from giskard.core.utils import NOT_PROVIDED, NotProvided
 
 from ..core import Trace
 from ..core.check import Check
@@ -107,6 +107,7 @@ class ScenarioRunner:
     async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
+        target: Any | NotProvided = NOT_PROVIDED,
         return_exception: bool = False,
     ) -> ScenarioResult[InputType, OutputType]:
         """Execute a sequential scenario with shared Trace.
@@ -139,16 +140,15 @@ class ScenarioRunner:
                 Trace[InputType, OutputType](annotations=scenario.annotations),
             )
         )
+        target = target if not isinstance(target, NotProvided) else scenario.target
 
         sequence = []
         for component in scenario.sequence:
             if isinstance(component, Interact) and isinstance(
                 component.outputs, NotProvided
             ):
-                if not isinstance(scenario.target, NotProvided):
-                    component = component.model_copy(
-                        update={"outputs": scenario.target}
-                    )
+                if not isinstance(target, NotProvided):
+                    component = component.model_copy(update={"outputs": target})
                     cast(Any, component)._validate_injection_mappings()
             sequence.append(component)
 

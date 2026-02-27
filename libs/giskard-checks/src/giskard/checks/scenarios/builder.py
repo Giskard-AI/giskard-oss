@@ -329,6 +329,11 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         self.annotations = annotations
         return self
 
+    def with_target(self, target: Any) -> Self:
+        """Set scenario-level target for the builder."""
+        self.target = target
+        return self
+
     def build(self) -> Scenario[InputType, OutputType, TraceType]:
         """Build the scenario from the accumulated sequence.
 
@@ -346,7 +351,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         )
 
     async def run(
-        self, return_exception: bool = False
+        self, target: Any | NotProvided = NOT_PROVIDED, return_exception: bool = False
     ) -> ScenarioResult[InputType, OutputType]:
         """Build and run the scenario.
 
@@ -374,7 +379,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         result = await scenario_obj.run()
         ```
         """
-        return await self.build().run(return_exception=return_exception)
+        return await self.build().run(target=target, return_exception=return_exception)
 
 
 def scenario[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]

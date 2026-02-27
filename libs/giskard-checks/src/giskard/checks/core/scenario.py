@@ -79,7 +79,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
     )
 
     async def run(
-        self, return_exception: bool = False
+        self, target: Any | NotProvided = NOT_PROVIDED, return_exception: bool = False
     ) -> ScenarioResult[InputType, OutputType]:
         """Execute the scenario components sequentially with shared trace.
 
@@ -96,4 +96,4 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
         from ..scenarios.runner import get_runner
 
         runner = get_runner()
-        return await runner.run(self, return_exception)
+        return await runner.run(self, target=target, return_exception=return_exception)
