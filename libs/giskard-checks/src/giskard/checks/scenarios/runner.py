@@ -148,8 +148,9 @@ class ScenarioRunner:
                 component.outputs, NotProvided
             ):
                 if not isinstance(target, NotProvided):
-                    component = component.model_copy(update={"outputs": target})
-                    cast(Any, component)._validate_injection_mappings()
+                    new_data = component.model_dump()
+                    new_data["outputs"] = target
+                    component = type(component).model_validate(new_data)
             sequence.append(component)
 
         steps = _ScenarioStepsBuilder(*sequence).build()
