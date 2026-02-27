@@ -78,7 +78,7 @@ __all__ = [
     "Interact",
     "Interaction",
     "InteractionSpec",
-    # Builtin checks
+    # Builtin and LLM-based checks
     "BaseLLMCheck",
     "LLMCheckResult",
     "Conformity",
@@ -95,8 +95,6 @@ __all__ = [
     "SemanticSimilarity",
     "StringMatching",
     "RegexMatching",
-    # Interaction
-    "Interact",
     # Generators
     "UserSimulator",
     # Testing

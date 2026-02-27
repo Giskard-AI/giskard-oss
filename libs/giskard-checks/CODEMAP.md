@@ -39,13 +39,13 @@ modules, core abstractions, and expected workflows.
 
 ### Scenario components (`core/scenario.py`, `core/interaction.py`, `core/check.py`)
 - `ScenarioComponent`: discriminated base for anything that can be executed in a scenario
-  (either an `Interaction`/`Interaction` or a `Check`).
+  (either an `Interact` or a `Check`).
 - `Scenario`: ordered sequence of components with a shared `Trace`. Components execute
   sequentially, stopping at the first failing check. Supports custom trace types.
-- `BaseInteraction`: base class for specs that emit `Interaction` objects via
+- `InteractionSpec`: base class for specs that emit `Interaction` objects via
   the `generate()` async generator method. Each yielded interaction receives the updated
   trace via `generator.asend()`.
-- `Interaction` (`interaction/interaction.py`): default implementation accepting
+- `Interact` (`interaction/interact.py`): default implementation accepting
   static values, callables, or generators for both inputs and outputs. Supports
   multi-turn interactions through generators.
 - `Check`: base class for executable validations; subclasses return `CheckResult`.
@@ -66,7 +66,7 @@ modules, core abstractions, and expected workflows.
 ### Scenario runner (`scenarios/runner.py`)
 - `ScenarioRunner`: orchestrates sequences of `ScenarioComponent`s using async
   generators and shared traces. Processes components sequentially:
-  - `Interaction` components: call `generate()` to yield interactions, send
+  - `InteractionSpec` components: call `generate()` to yield interactions, send
     updated trace back via `asend()`
   - `Check` components: call `run()` to validate trace, stop on failure/error
 - Adds duration metrics, converts exceptions into `CheckResult.error`, and stops
@@ -74,15 +74,10 @@ modules, core abstractions, and expected workflows.
 - `TraceBuilder`: helper class for incrementally building trace instances.
 - `_default_runner` singleton accessible via `get_runner()`.
 
-### Test cases (`scenarios/testcase.py`)
+### Test cases (`core/testcase.py`)
 - `TestCase`: wraps a single interaction spec + a list of checks.
 - `run(max_runs=1)` delegates to the runner and returns `TestCaseResult`.
 - `assert_passed()` helper runs + asserts success.
-
-### Utilities (`scenarios/utils.py`)
-- `with_params`, `execute_code`, `generate`: adapt sync/async callables or generators
-  into forms consumable by `Interaction`.
-- Provide ergonomic wrappers when binding user callables into specs.
 
 ### Built-in checks (`builtin/`)
 - `from_fn`, `FnCheck`: wrap arbitrary callables (sync/async) that receive a `Trace`.
@@ -103,15 +98,14 @@ modules, core abstractions, and expected workflows.
 
 ## Typical workflows
 
-1. **Describe interactions** using `Interaction` (static payloads, callables, or
+1. **Describe interactions** using `Interact` (static payloads, callables, or
    generators that can themselves depend on the current `Trace`).
 2. **Author checks** by subclassing `Check` or using `from_fn`. Access the
    current output via `trace.interactions[-1]`.
-3. **Bundle scenarios/test cases**:
+3. **Bundle scenarios**:
    - `Scenario(sequence=[...])`: compose multiple interactions and checks in order
-   - `TestCase(interaction=spec, checks=[...])`: convenience wrapper for single interaction
-   - `await scenario.run()` or `await tc.run()` (optionally `max_runs > 1`).
-4. **Inspect results** via `ScenarioResult` or `TestCaseResult`:
+   - `await scenario.run()`
+4. **Inspect results** via `ScenarioResult`:
    - `result.passed`, `result.failed`, `result.errored` convenience booleans
    - `result.check_results`: list of all check results
    - `result.final_trace`: final trace state after execution
@@ -133,30 +127,42 @@ All public classes and functions are exported from the main `giskard.checks` pac
 
 ```python
 from giskard.checks import (
+    # Modules
+    builtin, judges
+
     # Core classes
     Check, CheckResult, CheckStatus, Metric,
     Scenario, ScenarioResult,
     TestCase, TestCaseResult,
-    Trace, Interaction,
-    BaseInteraction, Interaction,
-    Extractor, JsonPathExtractor,
-    # Builtin checks
+    Trace, Interact,
+    Interaction, InteractionSpec,
+
+    # Builtin and LLM-based checks
     BaseLLMCheck, LLMCheckResult,
-    Conformity, Equality, ExtractionCheck,
+    Conformity, Equals, NotEquals,
+    LesserThan, GreaterThan,
+    LesserThanEquals, GreaterEquals,
     FnCheck, from_fn,
     Groundedness, LLMJudge,
-    StringMatching,
-    # Testing utilities
-    WithSpy, TestCaseRunner, ScenarioRunner,
+    SemanticSimilarity,
+    StringMatching, RegexMatching,
+
+    # Generators
+    UserSimulator,
+
+    # Testing
+    WithSpy, TestCaseRunner,
+
+    # Scenarios
+    ScenarioBuilder, scenario, ScenarioRunner,
+
     # Settings
     set_default_generator, get_default_generator,
-    # Modules
-    builtin,
 )
 ```
 
-- All core types, builtin checks, and utilities are available directly from `giskard.checks`.
-- The `builtin` module is still accessible for accessing the submodule directly if needed.
+- All core types, builtin and LLM-based checks, and utilities are available directly from `giskard.checks`.
+- The `builtin` and `judges` modules are still accessible for accessing the submodule directly if needed.
 
 ## Environment knobs
 
