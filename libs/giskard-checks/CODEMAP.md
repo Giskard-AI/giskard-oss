@@ -128,7 +128,7 @@ modules, core abstractions, and expected workflows.
    - `result.final_trace`: final trace state after execution.
    - `result.duration_ms`: execution time (also available on `ScenarioResult`).
    - `result.assert_passed()`: raise AssertionError with formatted failures.
-   - `result.pass_rate`: pass rate (only available on `ScenarioResult`).
+   - `result.pass_rate`: pass rate (only available on `SuiteResult`).
 
 ## Tooling & conventions
 
