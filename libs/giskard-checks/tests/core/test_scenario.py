@@ -669,12 +669,12 @@ class TestScenarioErrorHandling:
         assert result.errored
 
     async def test_generator_raises_exception_after_yield(self):
-        """Test that generator exceptions from BaseInteraction propagate."""
+        """Test that generator exceptions from InteractionSpec propagate."""
         check1 = MockCheck(result=CheckResult.success(message="Check 1"))
         generator_error_component = GeneratorErrorComponent()
         check2 = MockCheck(result=CheckResult.success(message="Check 2"))
 
-        # BaseInteraction generator errors currently propagate and stop execution
+        # InteractionSpec generator errors currently propagate and stop execution
         # The first interaction should be added before the error is raised
         with pytest.raises(RuntimeError, match="Generator error"):
             _ = await (
@@ -775,7 +775,7 @@ class TestScenarioErrorHandling:
         assert result.duration_ms < 1000
 
     async def test_append_with_interaction_spec(self):
-        """Test that append() method works with BaseInteraction objects."""
+        """Test that append() method works with InteractionSpec objects."""
         interaction = Interaction(inputs="Hello", outputs="Hi")
         mock_interaction = MockInteractionSpec(interactions=[interaction])
         check = MockCheck(result=CheckResult.success())

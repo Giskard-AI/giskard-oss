@@ -212,13 +212,13 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
     ) -> Self:
         """Add multiple InteractionSpec objects to the scenario sequence.
 
-        Adds one or more custom `BaseInteraction` subclass instances to the
+        Adds one or more custom `InteractionSpec` subclass instances to the
         sequence. This is useful when using custom interaction generators or when
         you need more complex interaction generation logic.
 
         Parameters
         ----------
-        *interactions : BaseInteraction
+        *interactions : InteractionSpec
             One or more interaction specs to add to the scenario.
 
         Returns
@@ -250,13 +250,12 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
     ) -> Self:
         """Append any component to the scenario sequence.
 
-        Generic method to append any valid scenario component (Interaction,
-        BaseInteraction, or Check) to the sequence. This provides maximum
+        Generic method to append any valid scenario component (InteractionSpec or Check) to the sequence. This provides maximum
         flexibility when constructing scenarios.
 
         Parameters
         ----------
-        component : Interaction | BaseInteraction | Check
+        component : InteractionSpec | Check
             The component to append to the scenario.
 
         Returns
@@ -286,12 +285,12 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         """Extend the scenario sequence with multiple components of any type.
 
         Generic method to extend the sequence with multiple valid scenario components
-        (Interaction, BaseInteraction, or Check). This is useful when you
+        (InteractionSpec, or Check). This is useful when you
         have a mixed list of components to add.
 
         Parameters
         ----------
-        *components : Interaction | BaseInteraction | Check
+        *components : InteractionSpec | Check
             One or more components of any type to extend the scenario with.
 
         Returns

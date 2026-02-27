@@ -57,7 +57,7 @@ modules, core abstractions, and expected workflows.
   static values, callables, or generators for both inputs and outputs. Supports
   multi-turn interactions through generators.
 - `Check`: base class for executable validations; subclasses return `CheckResult`.
-- Registration via `@Check.register("kind")` and `@BaseInteraction.register("kind")`
+- Registration via `@Check.register("kind")` and `@InteractionSpec.register("kind")`
   enables polymorphic serialization.
 
 ### Results (`core/result.py`)

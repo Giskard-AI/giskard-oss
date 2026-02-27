@@ -20,7 +20,7 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
     on the accumulated trace history.
 
     Subclasses must implement `generate()` to produce interactions. They should
-    be registered using `@BaseInteraction.register("kind")` for polymorphic
+    be registered using `@InteractionSpec.register("kind")` for polymorphic
     serialization.
 
     Attributes
