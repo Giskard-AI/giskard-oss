@@ -115,7 +115,7 @@ s2 = scenario("s2").interact("world").check(Equals(expected_value="Echo: world",
 target_sut = lambda x: f"Echo: {x}"
 suite = Suite(name="my_suite", target=target_sut)
 
-# Add scenarios (builders are automatically built)
+# Add scenarios
 suite.append(s1)
 suite.append(s2)
 
