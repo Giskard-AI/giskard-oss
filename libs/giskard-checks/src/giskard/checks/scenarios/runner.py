@@ -19,6 +19,7 @@ from ..core.protocols import InteractionGenerator
 from ..core.result import CheckResult, ScenarioResult, TestCaseResult
 from ..core.scenario import Scenario
 from ..core.testcase import TestCase
+from ..core.types import ProviderType
 
 
 class _ScenarioStep[InputType, OutputType, TraceType: Trace]:  # pyright: ignore[reportMissingTypeArgument]
@@ -107,7 +108,11 @@ class ScenarioRunner:
     async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: Any | NotProvided = NOT_PROVIDED,
+        target: (
+            ProviderType[[InputType], OutputType]
+            | ProviderType[[InputType, TraceType], OutputType]
+            | NotProvided
+        ) = NOT_PROVIDED,
         return_exception: bool = False,
     ) -> ScenarioResult[InputType, OutputType]:
         """Execute a sequential scenario with shared Trace.

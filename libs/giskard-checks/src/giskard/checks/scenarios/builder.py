@@ -56,7 +56,11 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         default_factory=dict,
         description="Scenario-level annotations.",
     )
-    target: Any | NotProvided = Field(
+    target: (
+        ProviderType[[InputType], OutputType]
+        | ProviderType[[InputType, TraceType], OutputType]
+        | NotProvided
+    ) = Field(
         default=NOT_PROVIDED,
         description="Scenario-level target SUT.",
     )
@@ -329,7 +333,13 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         self.annotations = annotations
         return self
 
-    def with_target(self, target: Any) -> Self:
+    def with_target(
+        self,
+        target: (
+            ProviderType[[InputType], OutputType]
+            | ProviderType[[InputType, TraceType], OutputType]
+        ),
+    ) -> Self:
         """Set scenario-level target for the builder."""
         self.target = target
         return self
@@ -351,7 +361,13 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         )
 
     async def run(
-        self, target: Any | NotProvided = NOT_PROVIDED, return_exception: bool = False
+        self,
+        target: (
+            ProviderType[[InputType], OutputType]
+            | ProviderType[[InputType, TraceType], OutputType]
+            | NotProvided
+        ) = NOT_PROVIDED,
+        return_exception: bool = False,
     ) -> ScenarioResult[InputType, OutputType]:
         """Build and run the scenario.
 
@@ -386,7 +402,11 @@ def scenario[InputType, OutputType, TraceType: Trace](  # pyright: ignore[report
     name: str | None = None,
     trace_type: type[TraceType] | None = None,
     annotations: dict[str, Any] | None = None,
-    target: Any | NotProvided = NOT_PROVIDED,
+    target: (
+        ProviderType[[InputType], OutputType]
+        | ProviderType[[InputType, TraceType], OutputType]
+        | NotProvided
+    ) = NOT_PROVIDED,
 ) -> ScenarioBuilder[InputType, OutputType, TraceType]:
     """Create a new scenario builder.
 

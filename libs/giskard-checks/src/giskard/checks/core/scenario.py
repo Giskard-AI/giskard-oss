@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from .check import Check
 from .interaction import InteractionSpec, Trace
 from .result import ScenarioResult
+from .types import ProviderType
 
 
 class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):  # pyright: ignore[reportMissingTypeArgument]
@@ -73,13 +74,23 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
         default_factory=dict,
         description="Scenario-level annotations that will be injected in the trace.",
     )
-    target: Any | NotProvided = Field(
+    target: (
+        ProviderType[[InputType], OutputType]
+        | ProviderType[[InputType, TraceType], OutputType]
+        | NotProvided
+    ) = Field(
         default=NOT_PROVIDED,
         description="Scenario-level target SUT that will be used to replace NOT_PROVIDED outputs.",
     )
 
     async def run(
-        self, target: Any | NotProvided = NOT_PROVIDED, return_exception: bool = False
+        self,
+        target: (
+            ProviderType[[InputType], OutputType]
+            | ProviderType[[InputType, TraceType], OutputType]
+            | NotProvided
+        ) = NOT_PROVIDED,
+        return_exception: bool = False,
     ) -> ScenarioResult[InputType, OutputType]:
         """Execute the scenario components sequentially with shared trace.
 

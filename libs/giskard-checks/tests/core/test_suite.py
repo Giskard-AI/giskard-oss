@@ -109,3 +109,19 @@ async def test_suite_result_aggregation():
     assert result.results[0].scenario_name == "s1"
     assert result.results[1].scenario_name == "s2"
     assert result.duration_ms >= 0
+
+
+@pytest.mark.asyncio
+async def test_suite_callable_target():
+    """Verify that suite target can be a callable."""
+    s1 = scenario("s1").interact("hello").build()
+
+    # Suite with a callable target
+    suite = Suite(name="callable_suite", target=lambda x: f"Callable: {x}")
+    suite.append(s1)
+
+    result = await suite.run()
+    assert result.passed_count == 1
+    last_interaction = result.results[0].final_trace.last
+    assert last_interaction is not None
+    assert last_interaction.outputs == "Callable: hello"

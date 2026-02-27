@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from ..core.interaction import Trace
 from ..core.result import ScenarioResult, SuiteResult
 from ..core.scenario import Scenario
+from ..core.types import ProviderType
 
 InputType = TypeVar("InputType", infer_variance=True)
 OutputType = TypeVar("OutputType", infer_variance=True)
@@ -50,7 +51,11 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     scenarios: list[Scenario[InputType, OutputType, Trace[Any, Any]]] = Field(
         default_factory=list, description="Scenarios in the suite"
     )
-    target: Any | NotProvided = Field(
+    target: (
+        ProviderType[[InputType], OutputType]
+        | ProviderType[[InputType, Trace[Any, Any]], OutputType]
+        | NotProvided
+    ) = Field(
         default=NOT_PROVIDED,
         description="Suite-level target SUT that will override any scenario-level target.",
     )
@@ -69,7 +74,15 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         self.scenarios.append(scenario)
 
     async def run(
-        self, target: Any | NotProvided = NOT_PROVIDED, return_exception: bool = False
+        self,
+        target: (
+            ProviderType[[InputType], OutputType]
+            | ProviderType[
+                [InputType, Trace[Any, Any]], OutputType
+            ]  # Trace[Any, Any] because scenarios in suite have different TraceType
+            | NotProvided
+        ) = NOT_PROVIDED,
+        return_exception: bool = False,
     ) -> SuiteResult:
         """Run all scenarios in the suite serially.
 
