@@ -6,12 +6,15 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.rule import Rule
-from rich.table import Table
 
 from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
 
 STATUS_MAPPING = {
+    "total": {
+        "color": "default",
+        "title": "TOTAL",
+    },
     "pass": {
         "color": "green",
         "title": "✅ PASSED",
@@ -475,51 +478,38 @@ class SuiteResult(BaseModel):
     ) -> RenderResult:
         yield Rule("Suite Results", style="bold blue")
 
-        if len(self.results) <= 50:
-            table = Table(box=None, padding=(0, 1))
-            table.add_column("Scenario", style="bold")
-            table.add_column("Status", justify="right")
-            table.add_column("Duration", justify="right")
+        # Dots view
+        dots = ""
+        for r in self.results:
+            if r.status == ScenarioStatus.PASS:
+                char, color = ".", STATUS_MAPPING["pass"]["color"]
+            elif r.status == ScenarioStatus.FAIL:
+                char, color = "F", STATUS_MAPPING["fail"]["color"]
+            elif r.status == ScenarioStatus.ERROR:
+                char, color = "E", STATUS_MAPPING["error"]["color"]
+            else:  # SKIP
+                char, color = "s", STATUS_MAPPING["skip"]["color"]
+            dots += f"[{color}]{char}[/{color}]"
+        yield dots
 
-            for r in self.results:
-                status = STATUS_MAPPING[r.status]
-                table.add_row(
-                    r.scenario_name,
-                    f"[{status['color']}]{r.status.value.upper()}[/{status['color']}]",
-                    f"{r.duration_ms}ms",
-                )
-
-            yield table
-        else:
-            # Dots view for large suites
-            dots = ""
-            for r in self.results:
-                if r.status == ScenarioStatus.PASS:
-                    char, color = ".", STATUS_MAPPING["pass"]["color"]
-                elif r.status == ScenarioStatus.FAIL:
-                    char, color = "F", STATUS_MAPPING["fail"]["color"]
-                elif r.status == ScenarioStatus.ERROR:
-                    char, color = "E", STATUS_MAPPING["error"]["color"]
-                else:  # SKIP
-                    char, color = "s", STATUS_MAPPING["skip"]["color"]
-                dots += f"[{color}]{char}[/{color}]"
-            yield dots
-
-            # Failure/Error summary
-            failures = [r for r in self.results if r.failed or r.errored]
-            if failures:
-                yield ""
-                yield "[bold red]Failures/Errors Summary:[/bold red]"
-                for f in failures[:20]:
-                    status = STATUS_MAPPING[f.status]
-                    yield f"  [{status['color']}]{f.status.value.upper()}[/{status['color']}] {f.scenario_name}"
-                if len(failures) > 20:
-                    yield f"  ... and {len(failures) - 20} more"
+        # Failure/Error summary
+        failures_and_errors = [r for r in self.results if r.failed or r.errored]
+        if failures_and_errors:
+            yield ""
+            yield "[bold red]Failures/Errors Summary:[/bold red]"
+            for f in failures_and_errors[:20]:
+                status = STATUS_MAPPING[f.status]
+                yield f"  [{status['color']}]{f.status.value.upper()}[/{status['color']}] {f.scenario_name}"
+            if len(failures_and_errors) > 20:
+                yield f"  ... and {len(failures_and_errors) - 20} more"
 
         yield Rule(style="bold blue")
 
         # Summary metrics
         count_parts = []
+        count_parts.append(
+            f"[{STATUS_MAPPING['total']['color']} bold]{len(self.results)} total[/{STATUS_MAPPING['total']['color']} bold]"
+        )
         if self.errored_count:
             count_parts.append(
                 f"[{STATUS_MAPPING['error']['color']} bold]{self.errored_count} errored[/{STATUS_MAPPING['error']['color']} bold]"
@@ -538,4 +528,4 @@ class SuiteResult(BaseModel):
             )
 
         summary = ", ".join(count_parts)
-        yield f"Summary: {summary} | Pass Rate: [bold]{self.pass_rate:.1%}[/bold] | Total Duration: {self.duration_ms}ms"
+        yield f"Summary: {summary} | Pass Rate: [default bold]{self.pass_rate:.1%}[/default bold] | Total Duration: {self.duration_ms}ms"
