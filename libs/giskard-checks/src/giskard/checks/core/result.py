@@ -209,7 +209,7 @@ class ScenarioResult[InputType, OutputType](BaseModel):
     """
 
     scenario_name: str = Field(..., description="Scenario name")
-    steps: list[TestCaseResult]  # TODO: rename to test_cases
+    steps: list["TestCaseResult"]  # TODO: rename to test_cases
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
     final_trace: Trace[InputType, OutputType] = Field(
         ..., description="Final trace state after execution"
