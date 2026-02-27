@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from giskard.agents.chat import Message
@@ -109,7 +109,7 @@ async def test_retries_works_with_batch_complete():
 
 async def test_retries_with_max_delay():
     """Test that max_delay caps the exponential backoff."""
-    generator = _make_generator(max_attempts=5, base_delay=1e-3, max_delay=0.01)
+    generator = _make_generator(max_attempts=5, base_delay=1.0, max_delay=3.0)
     generator._complete_mock.side_effect = [
         RetriableError("Test error"),
         RetriableError("Test error"),
@@ -121,16 +121,21 @@ async def test_retries_with_max_delay():
         ),
     ]
 
-    res = await generator.complete(
-        messages=[Message(role="user", content="Test message")]
-    )
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        res = await generator.complete(
+            messages=[Message(role="user", content="Test message")]
+        )
+
     assert res.message.content == "Test response"
     assert generator._complete_mock.call_count == 5
+
+    for call in mock_sleep.call_args_list:
+        assert call.args[0] <= 3.0
 
 
 async def test_retries_exponential_backoff():
     """Test that exponential backoff increases sleep times correctly."""
-    generator = _make_generator(max_attempts=4, base_delay=1e-3)
+    generator = _make_generator(max_attempts=4, base_delay=1.0)
     generator._complete_mock.side_effect = [
         RetriableError("Test error"),
         RetriableError("Test error"),
@@ -141,8 +146,44 @@ async def test_retries_exponential_backoff():
         ),
     ]
 
-    res = await generator.complete(
-        messages=[Message(role="user", content="Test message")]
-    )
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        res = await generator.complete(
+            messages=[Message(role="user", content="Test message")]
+        )
+
     assert res.message.content == "Test response"
     assert generator._complete_mock.call_count == 4
+
+    sleep_times = [call.args[0] for call in mock_sleep.call_args_list]
+    assert len(sleep_times) == 3  # 3 sleeps for 4 attempts
+    for i in range(1, len(sleep_times)):
+        assert sleep_times[i] >= sleep_times[i - 1] * 1.5
+
+
+async def test_retries_exponential_backoff_with_max_delay():
+    """Test exponential backoff with max_delay capping."""
+    generator = _make_generator(max_attempts=6, base_delay=1.0, max_delay=5.0)
+    generator._complete_mock.side_effect = [
+        RetriableError("Test error"),
+        RetriableError("Test error"),
+        RetriableError("Test error"),
+        RetriableError("Test error"),
+        RetriableError("Test error"),
+        Response(
+            message=Message(role="assistant", content="Test response"),
+            finish_reason="stop",
+        ),
+    ]
+
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        res = await generator.complete(
+            messages=[Message(role="user", content="Test message")]
+        )
+
+    assert res.message.content == "Test response"
+    assert generator._complete_mock.call_count == 6
+
+    sleep_times = [call.args[0] for call in mock_sleep.call_args_list]
+    assert len(sleep_times) == 5  # 5 sleeps for 6 attempts
+    for sleep_time in sleep_times[2:]:
+        assert sleep_time <= 5.0
