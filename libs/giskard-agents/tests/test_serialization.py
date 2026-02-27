@@ -9,10 +9,7 @@ from giskard.agents.generators.litellm_generator import (
     LiteLLMGenerator,
     LiteLLMRetryMiddleware,
 )
-from giskard.agents.generators.middleware import (
-    RateLimiterMiddleware,
-    RetryMiddleware,
-)
+from giskard.agents.generators.middleware import RateLimiterMiddleware
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.tools import Tool
 from giskard.agents.workflow import ChatWorkflow, ErrorPolicy
@@ -20,8 +17,8 @@ from giskard.core import MinIntervalRateLimiter
 from pydantic import Field
 
 
-def _retry_mw(gen: BaseGenerator) -> RetryMiddleware:
-    return next(mw for mw in gen.middleware if isinstance(mw, RetryMiddleware))
+def _retry_mw(gen: BaseGenerator) -> LiteLLMRetryMiddleware:
+    return next(mw for mw in gen.middleware if isinstance(mw, LiteLLMRetryMiddleware))
 
 
 def _rl_mw(gen: BaseGenerator) -> RateLimiterMiddleware:
@@ -125,6 +122,13 @@ def test_chat_workflow_serialization():
     assert isinstance(deserialized.generator, Generator)
     assert isinstance(deserialized.generator, LiteLLMGenerator)
     assert deserialized.generator.model == "test-model"
+
+    retry = _retry_mw(deserialized.generator)
+    assert isinstance(retry, LiteLLMRetryMiddleware)
+    assert retry.max_attempts == 3
+    assert retry.base_delay == 1.0
+
+    assert _rl_mw(deserialized.generator).rate_limiter == rate_limiter
 
     assert len(deserialized.messages) == 2
     assert isinstance(deserialized.messages[0], MessageTemplate)
