@@ -418,3 +418,52 @@ class TestCaseResult(BaseModel):
         subtitle = ", ".join(count_parts) + f" in {self.duration_ms}ms"
 
         yield Rule(subtitle, style=f"{status['color']} bold")
+
+
+class SuiteResult(BaseModel):
+    """Aggregate result object for the suite.
+
+    Attributes
+    ----------
+    results:
+        List of all scenario results from executed scenarios.
+    duration_ms:
+        Total execution time in milliseconds.
+    """
+
+    results: list[ScenarioResult[Any, Any]] = Field(
+        ..., description="List of scenario results"
+    )
+    duration_ms: int = Field(..., description="Total execution time in milliseconds")
+
+    @computed_field
+    @property
+    def passed_count(self) -> int:
+        """Number of passed scenarios."""
+        return sum(1 for r in self.results if r.passed)
+
+    @computed_field
+    @property
+    def failed_count(self) -> int:
+        """Number of failed scenarios."""
+        return sum(1 for r in self.results if r.failed)
+
+    @computed_field
+    @property
+    def errored_count(self) -> int:
+        """Number of errored scenarios."""
+        return sum(1 for r in self.results if r.errored)
+
+    @computed_field
+    @property
+    def skipped_count(self) -> int:
+        """Number of skipped scenarios."""
+        return sum(1 for r in self.results if r.skipped)
+
+    @computed_field
+    @property
+    def pass_rate(self) -> float:
+        """The pass rate of the suite (passed scenarios / total scenarios)."""
+        if not self.results:
+            return 1.0
+        return self.passed_count / len(self.results)
