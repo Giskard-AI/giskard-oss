@@ -47,12 +47,12 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
 
     **Advanced**: Direct instantiation:
 
-        from giskard.checks import Scenario, Interaction, Equals
+        from giskard.checks import Scenario, Interact, Equals
 
         scenario = Scenario(
             name="multi_step_test",
             sequence=[
-                Interaction(inputs="Hello", outputs="Hi"),
+                Interact(inputs="Hello", outputs="Hi"),
                 Equals(expected="Hi", key="trace.last.outputs"),
             ],
         )

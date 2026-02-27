@@ -267,7 +267,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         --------
         ```python
         builder = scenario("my_test")
-        builder.append(Interaction(inputs="Hello", outputs="Hi"))
+        builder.append(Interact(inputs="Hello", outputs="Hi"))
         builder.append(CustomInteraction(...))
         builder.append(StringMatching(...))
         ```
@@ -285,7 +285,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         """Extend the scenario sequence with multiple components of any type.
 
         Generic method to extend the sequence with multiple valid scenario components
-        (InteractionSpec, or Check). This is useful when you
+        (InteractionSpec or Check). This is useful when you
         have a mixed list of components to add.
 
         Parameters
@@ -302,7 +302,7 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         --------
         ```python
         components = [
-            Interaction(inputs="Hello", outputs="Hi"),
+            Interact(inputs="Hello", outputs="Hi"),
             CustomInteraction(...),
             StringMatching(...),
         ]

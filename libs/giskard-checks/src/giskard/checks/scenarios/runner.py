@@ -84,7 +84,7 @@ class ScenarioRunner:
     or error.
 
     Components are processed in order:
-    1. **Interaction / Interaction components**: Add interactions to the trace.
+    1. **InteractionSpec components**: Add interactions to the trace.
        Specs generate interactions using their `generate()` method. Each yielded
        interaction is added to the trace, and the updated trace is sent back to
        the generator via `asend()`.
@@ -110,7 +110,7 @@ class ScenarioRunner:
         """Execute a sequential scenario with shared Trace.
 
         Components are executed in order:
-        - Interaction / Interaction components update the shared trace
+        - InteractionSpec components update the shared trace
         - Check components validate the current trace and stop execution on failure
 
         Execution stops on the first failing check; remaining components are not executed.
