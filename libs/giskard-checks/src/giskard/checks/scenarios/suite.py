@@ -63,7 +63,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         Parameters
         ----------
         scenario : Scenario
-            The scenario or scenario builder to add to the suite.
+            The scenario to add to the suite. For scenario builders, use `scenario.build()` first.
         """
 
         self.scenarios.append(scenario)
