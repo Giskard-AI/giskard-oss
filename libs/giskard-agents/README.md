@@ -4,7 +4,7 @@ Giskard Agents is a lightweight library that orchestrates LLM completions and ag
 
 ## Requirements
 
-- Python 3.10 or higher
+- Python 3.12 or higher
 
 ## Installation
 
@@ -65,6 +65,65 @@ chat = await (
     .chat("I'm fine, thank you!", role="assistant")
     .chat("What's your name?")
     .run()
+)
+```
+
+## Middleware
+
+Generators use a middleware pipeline to handle cross-cutting concerns like retries and rate limiting. Middleware is applied in order around the core completion call.
+
+### Retries
+
+By default, `LiteLLMGenerator` includes a retry middleware that retries failed requests with exponential backoff (using LiteLLM's retry-eligibility logic). You can customize retry parameters:
+
+```python
+from giskard.agents.generators.litellm_generator import LiteLLMRetryMiddleware
+
+generator = agents.Generator(
+    model="openai/gpt-4o-mini",
+    middleware=[LiteLLMRetryMiddleware(max_attempts=5, base_delay=2.0, max_delay=30.0)],
+)
+```
+
+### Rate limiting
+
+To add rate limiting, include a `RateLimiterMiddleware` in the middleware list:
+
+```python
+from giskard.agents.generators.middleware import RateLimiterMiddleware
+from giskard.core import MinIntervalRateLimiter
+
+generator = agents.Generator(
+    model="openai/gpt-4o-mini",
+    middleware=[
+        LiteLLMRetryMiddleware(),
+        RateLimiterMiddleware(
+            rate_limiter=MinIntervalRateLimiter.from_rpm(60, max_concurrent=5),
+        ),
+    ],
+)
+```
+
+Middleware order matters: in the example above, retries wrap rate limiting, so each retry attempt individually acquires the rate limiter.
+
+### Custom middleware
+
+You can write your own middleware by subclassing `CompletionMiddleware`:
+
+```python
+from giskard.agents.generators.middleware import CompletionMiddleware
+
+@CompletionMiddleware.register("logging")
+class LoggingMiddleware(CompletionMiddleware):
+    async def call(self, messages, params, next_fn):
+        print(f"Sending {len(messages)} messages")
+        response = await next_fn(messages, params)
+        print(f"Got response: {response.finish_reason}")
+        return response
+
+generator = agents.Generator(
+    model="openai/gpt-4o-mini",
+    middleware=[LoggingMiddleware(), LiteLLMRetryMiddleware()],
 )
 ```
 
@@ -357,13 +416,13 @@ make clean         # Clean build artifacts
 
 ### Python Compatibility
 
-This project maintains compatibility with Python 3.11+. We use [vermin](https://github.com/netromdk/vermin) to ensure code compatibility:
+This project maintains compatibility with Python 3.12+. We use [vermin](https://github.com/netromdk/vermin) to ensure code compatibility:
 
 ```bash
-# Check Python 3.11 compatibility
+# Check Python 3.12 compatibility
 make check-compat
 # or manually:
-uv tool run vermin --target=3.11- --no-tips --violations .
+uv tool run vermin --target=3.12- --no-tips --violations .
 ```
 
 #### Setting up Pre-commit Hooks
@@ -382,7 +441,7 @@ pre-commit install
 make pre-commit-run
 ```
 
-The hooks will now run automatically on `git commit` and prevent commits that don't meet Python 3.10 compatibility requirements.
+The hooks will now run automatically on `git commit` and prevent commits that don't meet Python 3.12 compatibility requirements.
 
 ### Security
 

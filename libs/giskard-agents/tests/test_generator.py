@@ -148,7 +148,9 @@ def test_generator_with_params_and_rate_limiter():
         middleware=[RateLimiterMiddleware(rate_limiter=rate_limiter)],
     )
 
-    rl_mw = next(mw for mw in generator.middleware if isinstance(mw, RateLimiterMiddleware))
+    rl_mw = next(
+        mw for mw in generator.middleware if isinstance(mw, RateLimiterMiddleware)
+    )
     assert rl_mw.rate_limiter == rate_limiter
 
     generator_with_params = generator.with_params(temperature=0.5, max_tokens=100)
@@ -156,7 +158,11 @@ def test_generator_with_params_and_rate_limiter():
     assert generator_with_params.params.temperature == 0.5
     assert generator_with_params.params.max_tokens == 100
 
-    rl_mw_copy = next(mw for mw in generator_with_params.middleware if isinstance(mw, RateLimiterMiddleware))
+    rl_mw_copy = next(
+        mw
+        for mw in generator_with_params.middleware
+        if isinstance(mw, RateLimiterMiddleware)
+    )
     assert rl_mw_copy.rate_limiter == rate_limiter
 
     assert generator.params.temperature == 1.0  # default value

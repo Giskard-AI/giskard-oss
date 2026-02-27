@@ -132,4 +132,3 @@ class BaseGenerator(Discriminated, ABC):
         generator = self.model_copy(deep=True)
         generator.params = generator.params.model_copy(update=kwargs)
         return generator
-

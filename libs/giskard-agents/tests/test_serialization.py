@@ -37,9 +37,7 @@ def test_generator_serialization():
             temperature=0.5,
             max_tokens=100,
             response_format=None,
-            tools=[
-                Tool(name="test-tool", description="Test tool", fn=lambda: "test")
-            ],
+            tools=[Tool(name="test-tool", description="Test tool", fn=lambda: "test")],
         ),
         middleware=[
             LiteLLMRetryMiddleware(max_attempts=3, base_delay=1.0),

@@ -31,7 +31,11 @@ class MockGenerator(BaseGenerator):
 
 
 def _make_generator(**retry_kwargs) -> MockGenerator:
-    mw = _RetriableOnlyMiddleware(**retry_kwargs) if retry_kwargs else _RetriableOnlyMiddleware()
+    mw = (
+        _RetriableOnlyMiddleware(**retry_kwargs)
+        if retry_kwargs
+        else _RetriableOnlyMiddleware()
+    )
     return MockGenerator(middleware=[mw])
 
 
