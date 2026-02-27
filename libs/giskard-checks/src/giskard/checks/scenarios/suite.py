@@ -31,10 +31,19 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
     Examples
     --------
-    >>> suite = Suite(name="my_suite", target=my_sut)
-    >>> suite.append(scenario1)
-    >>> suite.append(scenario2)
-    >>> result = await suite.run()
+    ```python
+    from giskard.checks import Suite, scenario
+
+    scenario1 = scenario("scenario_1").interact("hello").build()
+    scenario2 = scenario("scenario_2").interact("hi").build()
+
+    suite = Suite(name="my_suite", target=my_sut)
+    suite.append(scenario1)
+    suite.append(scenario2)
+
+    result = await suite.run()
+    print(result.pass_rate)
+    ```
     """
 
     name: str = Field(..., description="Suite name")
@@ -79,11 +88,15 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
         Examples
         --------
-        >>> suite = Suite(name="my_suite", target=my_sut_v1)
-        >>> suite.append(scenario_1)
-        >>> suite.append(scenario_2)
-        >>> result_v1 = await suite.run()
-        >>> result_v2 = await suite.run(target=my_sut_v2)
+        ```python
+        from giskard.checks import Suite
+
+        suite = Suite(name="my_suite", target=my_sut_v1)
+        suite.append(scenario_1)
+        suite.append(scenario_2)
+        result_v1 = await suite.run()
+        result_v2 = await suite.run(target=my_sut_v2)
+        ```
         """
         start_time = time.perf_counter()
         results: list[ScenarioResult[InputType, OutputType]] = []
