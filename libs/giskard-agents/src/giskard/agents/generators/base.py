@@ -1,40 +1,17 @@
 import asyncio
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Literal, Type
+from functools import reduce
+from typing import TYPE_CHECKING, Any, Self
 
 from giskard.core import Discriminated, discriminated_base
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ..chat import Message, Role
-from ..tools import Tool
+from ._types import GenerationParams, Response
+from .middleware import CompletionMiddleware, NextFn
 
 if TYPE_CHECKING:
     from ..workflow import ChatWorkflow
-
-
-class Response(BaseModel):
-    message: Message
-    finish_reason: (
-        Literal["stop", "length", "tool_calls", "content_filter", "null"] | None
-    )
-
-
-class GenerationParams(BaseModel):
-    """Parameters for generating a completion.
-
-    Attributes
-    ----------
-    tools : list[Any], optional
-        List of tools available to the model.
-    timeout : float | int | None, optional
-        Maximum time in seconds to wait for the completion request.
-    """
-
-    temperature: float = Field(default=1.0)
-    max_tokens: int | None = Field(default=None)
-    response_format: Type[BaseModel] | None = Field(default=None)
-    tools: list[Tool] = Field(default_factory=list)
-    timeout: float | int | None = Field(default=None)
 
 
 @discriminated_base
@@ -42,6 +19,7 @@ class BaseGenerator(Discriminated, ABC):
     """Base class for all generators."""
 
     params: GenerationParams = Field(default_factory=GenerationParams)
+    middleware: list[CompletionMiddleware] = Field(default_factory=list)
 
     @abstractmethod
     async def _complete(
@@ -57,17 +35,31 @@ class BaseGenerator(Discriminated, ABC):
 
         Parameters
         ----------
-        messages : List[Message]
+        messages : list[Message]
             List of messages to send to the model.
         params: GenerationParams | None
             Parameters for the generation.
 
         Returns
         -------
-        Message
-            The model's response message.
+        Response
+            The model's response.
         """
-        return await self._complete(messages, params)
+        chain = self._build_chain(self._complete)
+        return await chain(messages, params)
+
+    def _build_chain(self, core: NextFn) -> NextFn:
+        """Fold ``self.middleware`` around *core*, first element = outermost."""
+
+        def _wrap(next_fn: NextFn, mw: CompletionMiddleware) -> NextFn:
+            async def _wrapped(
+                messages: list[Message], params: GenerationParams | None
+            ) -> Response:
+                return await mw.call(messages, params, next_fn)
+
+            return _wrapped
+
+        return reduce(_wrap, reversed(self.middleware), core)
 
     async def batch_complete(
         self, messages: list[list[Message]], params: GenerationParams | None = None
@@ -76,9 +68,9 @@ class BaseGenerator(Discriminated, ABC):
 
         Parameters
         ----------
-        messages : List[List[Message]]
+        messages : list[list[Message]]
             List of lists of messages to send to the model.
-        params : GenerationParams, optional
+        params : GenerationParams | None, optional
             Parameters for the generation.
 
         Returns
@@ -86,12 +78,12 @@ class BaseGenerator(Discriminated, ABC):
         list[Response]
             A list of model's responses.
         """
-        completion_requests = [self._complete(m, params) for m in messages]
+        completion_requests = [self.complete(m, params) for m in messages]
         responses = await asyncio.gather(*completion_requests)
         return responses
 
     def chat(self, message: str, role: Role = "user") -> "ChatWorkflow[Any]":
-        """Create a new chat pipeline with the given message.
+        """Create a new chat workflow with the given message.
 
         Parameters
         ----------
@@ -100,43 +92,44 @@ class BaseGenerator(Discriminated, ABC):
 
         Returns
         -------
-        Pipeline
-            A Pipeline object that can be used to run the completion.
+        ChatWorkflow
+            A ChatWorkflow that can be used to run the completion.
         """
         from ..workflow import ChatWorkflow
 
         return ChatWorkflow(generator=self).chat(message, role)
 
     def template(self, template_name: str) -> "ChatWorkflow[Any]":
-        """Create a new chat pipeline with the given message.
+        """Create a new chat workflow from a template.
 
         Parameters
         ----------
-        template_path : str
-            The path to the template file.
+        template_name : str
+            The name of the template.
 
         Returns
         -------
-        Pipeline
-            A Pipeline object that can be used to run the completion.
+        ChatWorkflow
+            A ChatWorkflow that can be used to run the completion.
         """
         from ..workflow import ChatWorkflow
 
         return ChatWorkflow(generator=self).template(template_name)
 
-    def with_params(self, **kwargs: Any) -> "BaseGenerator":
+    def with_params(self, **kwargs: Any) -> Self:
         """Create a new generator with the given parameters.
 
         Parameters
         ----------
-        **kwargs : GenerationParamsKwargs
+        **kwargs
             The parameters to set. All fields are optional.
 
         Returns
         -------
-        BaseGenerator
+        Self
             A new generator with the given parameters.
         """
         generator = self.model_copy(deep=True)
         generator.params = generator.params.model_copy(update=kwargs)
         return generator
+

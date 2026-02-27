@@ -5,6 +5,7 @@ import pytest
 from giskard.agents.chat import Chat, Message
 from giskard.agents.generators.base import GenerationParams, Response
 from giskard.agents.generators.litellm_generator import LiteLLMGenerator
+from giskard.agents.generators.middleware import RateLimiterMiddleware
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow
 from giskard.core import MinIntervalRateLimiter
@@ -82,9 +83,10 @@ async def test_generator_chat(generator: LiteLLMGenerator):
 
 
 async def test_litellm_generator_gets_rate_limiter(mock_response):
+    rate_limiter = MinIntervalRateLimiter.from_rpm(60, max_concurrent=1)
     generator = LiteLLMGenerator(
         model="test-model",
-        rate_limiter=MinIntervalRateLimiter.from_rpm(60, max_concurrent=1),
+        middleware=[RateLimiterMiddleware(rate_limiter=rate_limiter)],
     )
     with patch(
         "giskard.agents.generators.litellm_generator.acompletion",
@@ -141,23 +143,24 @@ def test_generator_with_params():
 def test_generator_with_params_and_rate_limiter():
     """Test that with_params works correctly with a rate limiter."""
     rate_limiter = MinIntervalRateLimiter.from_rpm(100, max_concurrent=5)
-    generator = LiteLLMGenerator(model="test-model", rate_limiter=rate_limiter)
+    generator = LiteLLMGenerator(
+        model="test-model",
+        middleware=[RateLimiterMiddleware(rate_limiter=rate_limiter)],
+    )
 
-    # Verify initial state
-    assert generator.rate_limiter == rate_limiter
+    rl_mw = next(mw for mw in generator.middleware if isinstance(mw, RateLimiterMiddleware))
+    assert rl_mw.rate_limiter == rate_limiter
 
-    # Call with_params and verify rate limiter is preserved
     generator_with_params = generator.with_params(temperature=0.5, max_tokens=100)
     assert isinstance(generator_with_params, LiteLLMGenerator)
     assert generator_with_params.params.temperature == 0.5
     assert generator_with_params.params.max_tokens == 100
-    # Verify rate limiter is preserved and the same instance
-    assert generator_with_params.rate_limiter == rate_limiter
 
-    # Verify original generator is unchanged
+    rl_mw_copy = next(mw for mw in generator_with_params.middleware if isinstance(mw, RateLimiterMiddleware))
+    assert rl_mw_copy.rate_limiter == rate_limiter
+
     assert generator.params.temperature == 1.0  # default value
     assert generator.params.max_tokens is None
-    assert generator.rate_limiter == rate_limiter
 
 
 async def test_generator_with_params_overwrite(mock_response):
