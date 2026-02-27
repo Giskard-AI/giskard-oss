@@ -18,7 +18,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
     accumulates all interactions. Execution stops immediately if any check fails.
 
     Components are processed in order:
-    - **InteractionSpec / Interact** components: Add interactions to the trace
+    - **InteractionSpec** components: Add interactions to the trace
     - **Check** components: Validate the current trace state
 
     Attributes
