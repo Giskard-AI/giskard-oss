@@ -449,7 +449,7 @@ Advanced Usage
 For advanced use cases where you need direct control over interactions or trace construction, you can build a `Trace` for `TestCase` directly, using `Interaction`:
 
 ``` python
-from giskard.checks Interaction, TestCase, Trace
+from giskard.checks import Interaction, TestCase, Trace
 
 # Build a Trace manually for a TestCase
 trace = Trace(interactions=[
