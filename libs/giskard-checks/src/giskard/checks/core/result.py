@@ -6,6 +6,7 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.rule import Rule
+from rich.table import Table
 
 from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
@@ -463,7 +464,78 @@ class SuiteResult(BaseModel):
     @computed_field
     @property
     def pass_rate(self) -> float:
-        """The pass rate of the suite (passed scenarios / total scenarios)."""
-        if not self.results:
+        """The pass rate of the suite (passed scenarios / (total scenarios - skipped scenarios))."""
+        denominator = len(self.results) - self.skipped_count
+        if denominator == 0:
             return 1.0
-        return self.passed_count / len(self.results)
+        return self.passed_count / denominator
+
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        yield Rule("Suite Results", style="bold blue")
+
+        if len(self.results) <= 50:
+            table = Table(box=None, padding=(0, 1))
+            table.add_column("Scenario", style="bold")
+            table.add_column("Status", justify="right")
+            table.add_column("Duration", justify="right")
+
+            for r in self.results:
+                status = STATUS_MAPPING[r.status]
+                table.add_row(
+                    r.scenario_name,
+                    f"[{status['color']}]{r.status.value.upper()}[/{status['color']}]",
+                    f"{r.duration_ms}ms",
+                )
+
+            yield table
+        else:
+            # Dots view for large suites
+            dots = ""
+            for r in self.results:
+                if r.status == ScenarioStatus.PASS:
+                    char, color = ".", STATUS_MAPPING["pass"]["color"]
+                elif r.status == ScenarioStatus.FAIL:
+                    char, color = "F", STATUS_MAPPING["fail"]["color"]
+                elif r.status == ScenarioStatus.ERROR:
+                    char, color = "E", STATUS_MAPPING["error"]["color"]
+                else:  # SKIP
+                    char, color = "s", STATUS_MAPPING["skip"]["color"]
+                dots += f"[{color}]{char}[/{color}]"
+            yield dots
+
+            # Failure/Error summary
+            failures = [r for r in self.results if r.failed or r.errored]
+            if failures:
+                yield ""
+                yield "[bold red]Failures/Errors Summary:[/bold red]"
+                for f in failures[:20]:
+                    status = STATUS_MAPPING[f.status]
+                    yield f"  [{status['color']}]{f.status.value.upper()}[/{status['color']}] {f.scenario_name}"
+                if len(failures) > 20:
+                    yield f"  ... and {len(failures) - 20} more"
+
+        yield Rule(style="bold blue")
+
+        # Summary metrics
+        count_parts = []
+        if self.errored_count:
+            count_parts.append(
+                f"[{STATUS_MAPPING['error']['color']} bold]{self.errored_count} errored[/{STATUS_MAPPING['error']['color']} bold]"
+            )
+        if self.failed_count:
+            count_parts.append(
+                f"[{STATUS_MAPPING['fail']['color']} bold]{self.failed_count} failed[/{STATUS_MAPPING['fail']['color']} bold]"
+            )
+        if self.skipped_count:
+            count_parts.append(
+                f"[{STATUS_MAPPING['skip']['color']} bold]{self.skipped_count} skipped[/{STATUS_MAPPING['skip']['color']} bold]"
+            )
+        if self.passed_count:
+            count_parts.append(
+                f"[{STATUS_MAPPING['pass']['color']} bold]{self.passed_count} passed[/{STATUS_MAPPING['pass']['color']} bold]"
+            )
+
+        summary = ", ".join(count_parts)
+        yield f"Summary: {summary} | Pass Rate: [bold]{self.pass_rate:.1%}[/bold] | Total Duration: {self.duration_ms}ms"
