@@ -12,7 +12,7 @@ InputType = TypeVar("InputType", infer_variance=True)
 OutputType = TypeVar("OutputType", infer_variance=True)
 
 
-class Suite(Generic[InputType, OutputType], BaseModel):
+class Suite(BaseModel, Generic[InputType, OutputType]):
     """A suite of scenarios that can be run together with a shared target.
 
     A suite holds multiple scenarios and can run them serially, optionally
