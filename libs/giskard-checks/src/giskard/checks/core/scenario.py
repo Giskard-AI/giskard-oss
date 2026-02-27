@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
 
 from .check import Check
@@ -71,6 +72,10 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
     annotations: dict[str, Any] = Field(
         default_factory=dict,
         description="Scenario-level annotations that will be injected in the trace.",
+    )
+    target: Any | NotProvided = Field(
+        default=NOT_PROVIDED,
+        description="Scenario-level target SUT that will be used to replace NOT_PROVIDED outputs.",
     )
 
     async def run(

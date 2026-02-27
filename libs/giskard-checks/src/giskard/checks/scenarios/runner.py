@@ -10,9 +10,11 @@ from __future__ import annotations
 import time
 from typing import Any, cast
 
+from giskard.core.utils import NotProvided
+
 from ..core import Trace
 from ..core.check import Check
-from ..core.interaction import Interaction
+from ..core.interaction import Interact, Interaction
 from ..core.protocols import InteractionGenerator
 from ..core.result import CheckResult, ScenarioResult, TestCaseResult
 from ..core.scenario import Scenario
@@ -137,7 +139,20 @@ class ScenarioRunner:
                 Trace[InputType, OutputType](annotations=scenario.annotations),
             )
         )
-        steps = _ScenarioStepsBuilder(*scenario.sequence).build()
+
+        sequence = []
+        for component in scenario.sequence:
+            if isinstance(component, Interact) and isinstance(
+                component.outputs, NotProvided
+            ):
+                if not isinstance(scenario.target, NotProvided):
+                    component = component.model_copy(
+                        update={"outputs": scenario.target}
+                    )
+                    cast(Any, component)._validate_injection_mappings()
+            sequence.append(component)
+
+        steps = _ScenarioStepsBuilder(*sequence).build()
         steps_results: list[TestCaseResult] = []
 
         for step in steps:
