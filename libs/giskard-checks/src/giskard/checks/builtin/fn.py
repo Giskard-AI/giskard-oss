@@ -6,9 +6,9 @@ from typing import Any, Callable, override
 
 from pydantic import Field
 
+from ..core import Trace
 from ..core.check import Check
 from ..core.result import CheckResult
-from ..core.trace import Trace
 
 """Function-backed check implementation.
 

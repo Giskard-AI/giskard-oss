@@ -5,8 +5,8 @@ from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import TemplateReference
 from pydantic import Field, model_validator
 
+from ..core import Trace
 from ..core.check import Check
-from ..core.trace import Trace
 from .base import BaseLLMCheck
 
 

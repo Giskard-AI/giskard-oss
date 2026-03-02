@@ -2,11 +2,12 @@ from collections.abc import AsyncGenerator
 
 from giskard.core import Discriminated, discriminated_base
 
-from .trace import Interaction, Trace
+from .interaction import Interaction
+from .trace import Trace
 
 
 @discriminated_base
-class BaseInteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     Discriminated
 ):
     """Base class for interaction specifications that generate interactions.
@@ -19,7 +20,7 @@ class BaseInteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: 
     on the accumulated trace history.
 
     Subclasses must implement `generate()` to produce interactions. They should
-    be registered using `@BaseInteractionSpec.register("kind")` for polymorphic
+    be registered using `@InteractionSpec.register("kind")` for polymorphic
     serialization.
 
     Attributes
@@ -47,7 +48,7 @@ class BaseInteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: 
         Yields
         ------
         Interaction[InputType, OutputType]
-            An interaction to add to the trace.
+            An interaction record to add to the trace.
 
         Receives
         --------
@@ -59,14 +60,12 @@ class BaseInteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: 
         --------
         ```python
         async def generate(self, trace: TraceType) -> AsyncGenerator[Interaction, TraceType]:
-            # Generate first interaction
-            interaction = Interaction(inputs="hello", outputs="hi")
-            updated_trace = yield interaction
+            record = Interaction(inputs="hello", outputs="hi")
+            updated_trace = yield record
 
-            # Generate second interaction based on updated trace
             next_input = f"Previous had {len(updated_trace.interactions)} interactions"
-            interaction = Interaction(inputs=next_input, outputs="response")
-            yield interaction
+            record = Interaction(inputs=next_input, outputs="response")
+            yield record
         ```
         """
         raise NotImplementedError
