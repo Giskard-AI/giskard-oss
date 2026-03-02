@@ -481,14 +481,16 @@ class SuiteResult(BaseModel):
         # Dots view
         dots = ""
         for r in self.results:
-            if r.status == ScenarioStatus.PASS:
+            if r.passed:
                 char, color = ".", STATUS_MAPPING["pass"]["color"]
-            elif r.status == ScenarioStatus.FAIL:
+            elif r.failed:
                 char, color = "F", STATUS_MAPPING["fail"]["color"]
-            elif r.status == ScenarioStatus.ERROR:
+            elif r.errored:
                 char, color = "E", STATUS_MAPPING["error"]["color"]
-            else:  # SKIP
+            elif r.skipped:
                 char, color = "s", STATUS_MAPPING["skip"]["color"]
+            else:
+                raise NotImplementedError(f"Status {r.status} handling not implemented")
             dots += f"[{color}]{char}[/{color}]"
         yield dots
 
