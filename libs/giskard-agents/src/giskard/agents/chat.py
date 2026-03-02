@@ -1,6 +1,5 @@
-from typing import Any, Generic, Literal, Type, TypeVar
+from typing import Generic, Literal, Type, TypeVar
 
-from litellm import Message as LiteLLMMessage
 from pydantic import BaseModel, Field
 
 from .context import RunContext
@@ -41,14 +40,6 @@ class Message(BaseModel):
     content: str | Content | list[Content] | None = None
     tool_calls: list[ToolCall] | None = None
     tool_call_id: str | None = None
-
-    def to_litellm(self) -> dict[str, Any]:
-        msg = self.model_dump(include={"role", "content", "tool_calls", "tool_call_id"})
-        return msg
-
-    @classmethod
-    def from_litellm(cls, msg: LiteLLMMessage | dict[str, Any]):
-        return cls.model_validate(msg.model_dump())  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
 
     def parse(self, model_type: type[T]) -> T:
         return model_type.model_validate_json(self.content)  # pyright: ignore[reportArgumentType]

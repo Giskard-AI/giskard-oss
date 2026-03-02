@@ -8,7 +8,7 @@ from pydantic import Field
 
 from ..chat import Message, Role
 from ..tools import Tool
-from ._types import GenerationParams, Response
+from ._types import FinishReason, GenerationParams, Response
 from .middleware import CompletionMiddleware, NextFn
 
 if TYPE_CHECKING:
@@ -101,12 +101,64 @@ class BaseGenerator(Discriminated, ABC):
         data = raw if isinstance(raw, dict) else raw.model_dump()
         return Message.model_validate(data)
 
-    # -- Completion --------------------------------------------------------
+    # -- Completion pipeline -----------------------------------------------
+
+    def _resolve_params(
+        self, params: GenerationParams | None
+    ) -> tuple[dict[str, Any], list[Tool]]:
+        """Merge ``self.params`` with per-call *params* overrides.
+
+        Returns
+        -------
+        tuple[dict[str, Any], list[Tool]]
+            A ``(wire_params, tools)`` pair ready for serialization.
+        """
+        merged = self.params.model_dump(exclude={"tools"})
+        if params is not None:
+            merged.update(params.model_dump(exclude={"tools"}, exclude_unset=True))
+        tools = self.params.tools + (params.tools if params is not None else [])
+        return merged, tools
 
     @abstractmethod
+    async def _call_model(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        params: dict[str, Any],
+    ) -> tuple[Any, FinishReason]:
+        """Call the provider and return the raw response.
+
+        Parameters
+        ----------
+        messages : list[dict[str, Any]]
+            Messages in the provider's wire format (from ``serialize_messages``).
+        tools : list[dict[str, Any]]
+            Tool definitions in the provider's wire format (from ``serialize_tools``).
+            Empty list when no tools are available.
+        params : dict[str, Any]
+            Merged generation parameters (temperature, max_tokens, etc.).
+
+        Returns
+        -------
+        tuple[Any, FinishReason]
+            ``(raw_message, finish_reason)`` — the raw message will be passed
+            to ``deserialize_response``.
+        """
+        raise NotImplementedError
+
     async def _complete(
         self, messages: list[Message], params: GenerationParams | None = None
-    ) -> Response: ...
+    ) -> Response:
+        wire_params, tools = self._resolve_params(params)
+        wire_tools = self.serialize_tools(tools) if tools else []
+        wire_messages = self.serialize_messages(messages)
+        raw_message, finish_reason = await self._call_model(
+            wire_messages, wire_tools, wire_params
+        )
+        return Response(
+            message=self.deserialize_response(raw_message),
+            finish_reason=finish_reason,
+        )
 
     async def complete(
         self,

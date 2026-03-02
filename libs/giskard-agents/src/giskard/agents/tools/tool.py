@@ -205,23 +205,6 @@ class Tool(BaseModel):
 
         return res if isinstance(res, str) else json.dumps(res)
 
-    def to_litellm_function(self) -> dict[str, Any]:
-        """Convert the tool to a LiteLLM function format.
-
-        Returns
-        -------
-        dict[str, Any]
-            A dictionary in the LiteLLM function format.
-        """
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters_schema,
-            },
-        }
-
 
 class ToolMethod:
     """Descriptor to handle tool methods on classes."""

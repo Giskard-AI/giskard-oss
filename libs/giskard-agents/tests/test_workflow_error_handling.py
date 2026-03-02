@@ -1,6 +1,9 @@
+from typing import Any
+
 import pytest
 from giskard import agents
 from giskard.agents.errors import WorkflowError
+from giskard.agents.generators import FinishReason
 from giskard.agents.workflow import ErrorPolicy
 from pydantic import Field, PrivateAttr
 
@@ -9,20 +12,19 @@ class FailingGenerator(agents.generators.BaseGenerator):
     fail_after: int = Field(default=0)
     _num_calls: int = PrivateAttr(default=0)
 
-    async def _complete(
+    async def _call_model(
         self,
-        messages: list[agents.chat.Message],
-        params: agents.generators.GenerationParams | None = None,
-    ) -> agents.generators.Response:
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        params: dict[str, Any],
+    ) -> tuple[Any, FinishReason]:
         if self._num_calls >= self.fail_after:
             raise ValueError("Test error")
         self._num_calls += 1
-        return agents.generators.Response(
-            message=agents.chat.Message(
-                role="assistant", content=f"Test response {self._num_calls}"
-            ),
-            finish_reason="stop",
-        )
+        return {
+            "role": "assistant",
+            "content": f"Test response {self._num_calls}",
+        }, "stop"
 
 
 async def test_run_raises_error(generator):

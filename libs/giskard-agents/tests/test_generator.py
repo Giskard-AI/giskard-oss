@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 from giskard.agents.chat import Chat, Message
+from giskard.agents.generators import FinishReason
 from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
 from giskard.agents.generators.litellm_generator import LiteLLMGenerator
 from giskard.agents.generators.middleware import RateLimiterMiddleware
@@ -240,47 +241,32 @@ class SpyGenerator(BaseGenerator):
         self._calls["deserialize_response"].append(result)
         return result
 
-    async def _complete(
+    async def _call_model(
         self,
-        messages: list[Message],
-        params: GenerationParams | None = None,
-    ) -> Response:
-        tools = self.params.tools + (params.tools if params else [])
-        wire_tools = self.serialize_tools(tools) if tools else []
-        wire_messages = self.serialize_messages(messages)
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        params: dict[str, Any],
+    ) -> tuple[Any, FinishReason]:
         self._call_count += 1
 
-        if self._call_count == 1 and wire_tools:
-            tool_def = wire_tools[0]["function"]
-            return Response(
-                message=self.deserialize_response(
+        if self._call_count == 1 and tools:
+            tool_def = tools[0]["function"]
+            return {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
                     {
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [
-                            {
-                                "id": "call_spy_1",
-                                "type": "function",
-                                "function": {
-                                    "name": tool_def["name"],
-                                    "arguments": json.dumps({"city": "Paris"}),
-                                },
-                            }
-                        ],
+                        "id": "call_spy_1",
+                        "type": "function",
+                        "function": {
+                            "name": tool_def["name"],
+                            "arguments": json.dumps({"city": "Paris"}),
+                        },
                     }
-                ),
-                finish_reason="tool_calls",
-            )
+                ],
+            }, "tool_calls"
 
-        return Response(
-            message=self.deserialize_response(
-                {
-                    "role": "assistant",
-                    "content": self.canned_response,
-                }
-            ),
-            finish_reason="stop",
-        )
+        return {"role": "assistant", "content": self.canned_response}, "stop"
 
 
 async def test_translation_methods_called_during_workflow():
@@ -321,20 +307,14 @@ async def test_custom_serialize_messages_override():
     """A subclass can transform messages before they reach the provider."""
 
     class TaggingGenerator(BaseGenerator):
-        async def _complete(
-            self, messages: list[Message], params: GenerationParams | None = None
-        ) -> Response:
-            wire = self.serialize_messages(messages)
-            last_content = wire[-1].get("content", "")
-            return Response(
-                message=self.deserialize_response(
-                    {
-                        "role": "assistant",
-                        "content": last_content,
-                    }
-                ),
-                finish_reason="stop",
-            )
+        async def _call_model(
+            self,
+            messages: list[dict[str, Any]],
+            tools: list[dict[str, Any]],
+            params: dict[str, Any],
+        ) -> tuple[Any, FinishReason]:
+            last_content = messages[-1].get("content", "")
+            return {"role": "assistant", "content": last_content}, "stop"
 
         def serialize_messages(self, messages: list[Message]) -> list[dict[str, Any]]:
             result = super().serialize_messages(messages)
@@ -364,18 +344,14 @@ async def test_custom_serialize_tools_override():
         return x
 
     class RenamedToolGenerator(BaseGenerator):
-        async def _complete(
-            self, messages: list[Message], params: GenerationParams | None = None
-        ) -> Response:
-            tools = self.params.tools + (params.tools if params else [])
-            wire_tools = self.serialize_tools(tools) if tools else []
-            return Response(
-                message=Message(
-                    role="assistant",
-                    content=wire_tools[0]["function"]["name"] if wire_tools else "none",
-                ),
-                finish_reason="stop",
-            )
+        async def _call_model(
+            self,
+            messages: list[dict[str, Any]],
+            tools: list[dict[str, Any]],
+            params: dict[str, Any],
+        ) -> tuple[Any, FinishReason]:
+            content = tools[0]["function"]["name"] if tools else "none"
+            return {"role": "assistant", "content": content}, "stop"
 
         def serialize_tools(self, tools: list[Tool]) -> list[dict[str, Any]]:
             result = super().serialize_tools(tools)

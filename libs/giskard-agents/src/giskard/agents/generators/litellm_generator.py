@@ -1,11 +1,11 @@
-from typing import cast, override
+from typing import Any, cast, override
 
 from litellm import Choices, ModelResponse, acompletion
 from litellm import _should_retry as litellm_should_retry
 from pydantic import Field
 
-from ..chat import Message
-from .base import BaseGenerator, GenerationParams, Response
+from ._types import FinishReason
+from .base import BaseGenerator
 from .middleware import CompletionMiddleware, RetryMiddleware
 
 
@@ -30,29 +30,19 @@ class LiteLLMGenerator(BaseGenerator):
     )
 
     @override
-    async def _complete(
-        self, messages: list[Message], params: GenerationParams | None = None
-    ) -> Response:
-        params_ = self.params.model_dump(exclude={"tools"})
-
-        if params is not None:
-            params_.update(params.model_dump(exclude={"tools"}, exclude_unset=True))
-
-        tools = self.params.tools + (params.tools if params is not None else [])
+    async def _call_model(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        params: dict[str, Any],
+    ) -> tuple[Any, FinishReason]:
         if tools:
-            params_["tools"] = self.serialize_tools(tools)
+            params = {**params, "tools": tools}
 
         response = cast(
             ModelResponse,
-            await acompletion(
-                messages=self.serialize_messages(messages),
-                model=self.model,
-                **params_,
-            ),
+            await acompletion(messages=messages, model=self.model, **params),
         )
 
         choice = cast(Choices, response.choices[0])
-        return Response(
-            message=self.deserialize_response(choice.message),
-            finish_reason=choice.finish_reason,  # pyright: ignore[reportArgumentType]
-        )
+        return choice.message, choice.finish_reason  # pyright: ignore[reportReturnType]

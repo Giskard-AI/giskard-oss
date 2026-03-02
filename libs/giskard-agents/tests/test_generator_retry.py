@@ -1,8 +1,10 @@
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from giskard.agents.chat import Message
-from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
+from giskard.agents.generators import FinishReason
+from giskard.agents.generators.base import BaseGenerator
 from giskard.agents.generators.middleware import RetryMiddleware
 
 
@@ -22,12 +24,15 @@ class MockGenerator(BaseGenerator):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._complete_mock = AsyncMock()
+        self._call_model_mock = AsyncMock()
 
-    async def _complete(
-        self, messages: list[Message], params: GenerationParams | None = None
-    ) -> Response:
-        return await self._complete_mock(messages, params)
+    async def _call_model(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        params: dict[str, Any],
+    ) -> tuple[Any, FinishReason]:
+        return await self._call_model_mock(messages, tools, params)
 
 
 def _make_generator(**retry_kwargs) -> MockGenerator:
@@ -41,37 +46,34 @@ def _make_generator(**retry_kwargs) -> MockGenerator:
 
 async def test_raises_exception_after_retries_exhausted():
     generator = _make_generator(max_attempts=3, base_delay=1e-3)
-    generator._complete_mock.side_effect = RetriableError("Test error")
+    generator._call_model_mock.side_effect = RetriableError("Test error")
 
     with pytest.raises(RetriableError):
         await generator.complete(
             messages=[Message(role="user", content="Test message")]
         )
 
-    assert generator._complete_mock.call_count == 3
+    assert generator._call_model_mock.call_count == 3
 
 
 async def test_raises_exception_if_not_retriable():
     generator = _make_generator(max_attempts=3, base_delay=1e-3)
-    generator._complete_mock.side_effect = ValueError("Test error")
+    generator._call_model_mock.side_effect = ValueError("Test error")
 
     with pytest.raises(ValueError):
         await generator.complete(
             messages=[Message(role="user", content="Test message")]
         )
 
-    assert generator._complete_mock.call_count == 1
+    assert generator._call_model_mock.call_count == 1
 
 
 async def test_retries_with_result():
     generator = _make_generator(max_attempts=3, base_delay=1e-3)
-    generator._complete_mock.side_effect = [
+    generator._call_model_mock.side_effect = [
         RetriableError("Test error"),
         RetriableError("Test error"),
-        Response(
-            message=Message(role="assistant", content="Test response"),
-            finish_reason="stop",
-        ),
+        ({"role": "assistant", "content": "Test response"}, "stop"),
     ]
 
     res = await generator.complete(
@@ -80,18 +82,15 @@ async def test_retries_with_result():
     assert res.message.content == "Test response"
     assert res.finish_reason == "stop"
 
-    assert generator._complete_mock.call_count == 3
+    assert generator._call_model_mock.call_count == 3
 
 
 async def test_retries_works_with_batch_complete():
     generator = _make_generator(max_attempts=3, base_delay=1e-3)
-    generator._complete_mock.side_effect = [
+    generator._call_model_mock.side_effect = [
         RetriableError("Test error"),
         RetriableError("Test error"),
-        Response(
-            message=Message(role="assistant", content="Test response"),
-            finish_reason="stop",
-        ),
+        ({"role": "assistant", "content": "Test response"}, "stop"),
     ]
 
     res = await generator.batch_complete(
@@ -104,21 +103,18 @@ async def test_retries_works_with_batch_complete():
     assert res[0].message.content == "Test response"
     assert res[0].finish_reason == "stop"
 
-    assert generator._complete_mock.call_count == 3
+    assert generator._call_model_mock.call_count == 3
 
 
 async def test_retries_with_max_delay():
     """Test that max_delay caps the exponential backoff."""
     generator = _make_generator(max_attempts=5, base_delay=1.0, max_delay=3.0)
-    generator._complete_mock.side_effect = [
+    generator._call_model_mock.side_effect = [
         RetriableError("Test error"),
         RetriableError("Test error"),
         RetriableError("Test error"),
         RetriableError("Test error"),
-        Response(
-            message=Message(role="assistant", content="Test response"),
-            finish_reason="stop",
-        ),
+        ({"role": "assistant", "content": "Test response"}, "stop"),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
@@ -127,7 +123,7 @@ async def test_retries_with_max_delay():
         )
 
     assert res.message.content == "Test response"
-    assert generator._complete_mock.call_count == 5
+    assert generator._call_model_mock.call_count == 5
 
     for call in mock_sleep.call_args_list:
         assert call.args[0] <= 3.0
@@ -136,14 +132,11 @@ async def test_retries_with_max_delay():
 async def test_retries_exponential_backoff():
     """Test that exponential backoff increases sleep times correctly."""
     generator = _make_generator(max_attempts=4, base_delay=1.0)
-    generator._complete_mock.side_effect = [
+    generator._call_model_mock.side_effect = [
         RetriableError("Test error"),
         RetriableError("Test error"),
         RetriableError("Test error"),
-        Response(
-            message=Message(role="assistant", content="Test response"),
-            finish_reason="stop",
-        ),
+        ({"role": "assistant", "content": "Test response"}, "stop"),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
@@ -152,7 +145,7 @@ async def test_retries_exponential_backoff():
         )
 
     assert res.message.content == "Test response"
-    assert generator._complete_mock.call_count == 4
+    assert generator._call_model_mock.call_count == 4
 
     sleep_times = [call.args[0] for call in mock_sleep.call_args_list]
     assert len(sleep_times) == 3  # 3 sleeps for 4 attempts
@@ -163,16 +156,13 @@ async def test_retries_exponential_backoff():
 async def test_retries_exponential_backoff_with_max_delay():
     """Test exponential backoff with max_delay capping."""
     generator = _make_generator(max_attempts=6, base_delay=1.0, max_delay=5.0)
-    generator._complete_mock.side_effect = [
+    generator._call_model_mock.side_effect = [
         RetriableError("Test error"),
         RetriableError("Test error"),
         RetriableError("Test error"),
         RetriableError("Test error"),
         RetriableError("Test error"),
-        Response(
-            message=Message(role="assistant", content="Test response"),
-            finish_reason="stop",
-        ),
+        ({"role": "assistant", "content": "Test response"}, "stop"),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
@@ -181,7 +171,7 @@ async def test_retries_exponential_backoff_with_max_delay():
         )
 
     assert res.message.content == "Test response"
-    assert generator._complete_mock.call_count == 6
+    assert generator._call_model_mock.call_count == 6
 
     sleep_times = [call.args[0] for call in mock_sleep.call_args_list]
     assert len(sleep_times) == 5  # 5 sleeps for 6 attempts

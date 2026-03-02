@@ -2,9 +2,7 @@ from typing import Any
 
 import pytest
 from giskard import agents
-from giskard.agents.chat import Message
-from giskard.agents.generators import BaseGenerator, GenerationParams
-from giskard.agents.generators.base import Response
+from giskard.agents.generators import BaseGenerator, FinishReason
 from pydantic import BaseModel, Field, PrivateAttr, ValidationError
 
 
@@ -22,13 +20,13 @@ class MockValidationGenerator(BaseGenerator):
     responses: list[Any] = Field(default_factory=list)
     _call_count: int = PrivateAttr(default=0)
 
-    async def _complete(
+    async def _call_model(
         self,
-        messages: list[Message],
-        params: GenerationParams | None = None,
-    ) -> Response:
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        params: dict[str, Any],
+    ) -> tuple[Any, FinishReason]:
         if self._call_count >= len(self.responses):
-            # If we run out of responses, return the last one
             response_content = (
                 self.responses[-1]
                 if self.responses
@@ -39,10 +37,7 @@ class MockValidationGenerator(BaseGenerator):
 
         self._call_count += 1
 
-        return Response(
-            message=Message(role="assistant", content=response_content),
-            finish_reason="stop",
-        )
+        return {"role": "assistant", "content": response_content}, "stop"
 
 
 async def test_output_model_strict_validation_success():

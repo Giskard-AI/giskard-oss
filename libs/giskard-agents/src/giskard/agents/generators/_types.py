@@ -11,12 +11,12 @@ from pydantic import BaseModel, Field
 from ..chat import Message
 from ..tools import Tool
 
+FinishReason = Literal["stop", "length", "tool_calls", "content_filter", "null"] | None
+
 
 class Response(BaseModel):
     message: Message
-    finish_reason: (
-        Literal["stop", "length", "tool_calls", "content_filter", "null"] | None
-    )
+    finish_reason: FinishReason
 
 
 class GenerationParams(BaseModel):

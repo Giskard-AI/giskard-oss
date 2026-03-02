@@ -1,9 +1,15 @@
 """Unit tests for generator serialization and deserialization."""
 
 import uuid
+from typing import Any
 
 from giskard.agents.chat import Message
-from giskard.agents.generators import BaseGenerator, GenerationParams, Generator
+from giskard.agents.generators import (
+    BaseGenerator,
+    FinishReason,
+    GenerationParams,
+    Generator,
+)
 from giskard.agents.generators.base import Response
 from giskard.agents.generators.litellm_generator import (
     LiteLLMGenerator,
@@ -69,13 +75,13 @@ async def test_generator_serialization_custom_generator():
     class CustomGenerator(BaseGenerator):
         content: str = Field(description="The content of the response")
 
-        async def _complete(
-            self, messages: list[Message], params: GenerationParams | None = None
-        ) -> Response:
-            return Response(
-                message=Message(role="assistant", content=self.content),
-                finish_reason="stop",
-            )
+        async def _call_model(
+            self,
+            messages: list[dict[str, Any]],
+            tools: list[dict[str, Any]],
+            params: dict[str, Any],
+        ) -> tuple[Any, FinishReason]:
+            return {"role": "assistant", "content": self.content}, "stop"
 
     original = CustomGenerator(content="Test response")
     serialized = original.model_dump_json()
@@ -153,13 +159,13 @@ async def test_chat_workflow_serialization_custom_generator():
     class CustomGenerator(BaseGenerator):
         content: str = Field(description="The content of the response")
 
-        async def _complete(
-            self, messages: list[Message], params: GenerationParams | None = None
-        ) -> Response:
-            return Response(
-                message=Message(role="assistant", content=self.content),
-                finish_reason="stop",
-            )
+        async def _call_model(
+            self,
+            messages: list[dict[str, Any]],
+            tools: list[dict[str, Any]],
+            params: dict[str, Any],
+        ) -> tuple[Any, FinishReason]:
+            return {"role": "assistant", "content": self.content}, "stop"
 
     generator = CustomGenerator(content="Workflow test response")
     tool = Tool(
