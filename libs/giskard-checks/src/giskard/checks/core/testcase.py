@@ -12,8 +12,8 @@ from collections.abc import Sequence
 from pydantic import BaseModel, Field
 
 from .check import Check
+from .interaction import Trace
 from .result import TestCaseResult
-from .trace import Trace
 
 
 class TestCase[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]

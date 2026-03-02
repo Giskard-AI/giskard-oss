@@ -14,10 +14,10 @@ from typing import Any, Self, override
 from giskard.core import provide_not_none
 from pydantic import Field, model_validator
 
+from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve
 from ..core.result import CheckResult
-from ..core.trace import Trace
 from ..utils.normalization import NormalizationForm, normalize_string
 
 

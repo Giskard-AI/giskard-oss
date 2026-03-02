@@ -10,12 +10,13 @@ from __future__ import annotations
 import time
 from typing import Any, cast
 
+from ..core import Trace
 from ..core.check import Check
+from ..core.interaction import Interaction
 from ..core.protocols import InteractionGenerator
 from ..core.result import CheckResult, ScenarioResult, TestCaseResult
 from ..core.scenario import Scenario
 from ..core.testcase import TestCase
-from ..core.trace import Interaction, Trace
 
 
 class _ScenarioStep[InputType, OutputType, TraceType: Trace]:  # pyright: ignore[reportMissingTypeArgument]
@@ -83,7 +84,7 @@ class ScenarioRunner:
     or error.
 
     Components are processed in order:
-    1. **Interaction / InteractionSpec components**: Add interactions to the trace.
+    1. **InteractionSpec components**: Add interactions to the trace.
        Specs generate interactions using their `generate()` method. Each yielded
        interaction is added to the trace, and the updated trace is sent back to
        the generator via `asend()`.
@@ -109,7 +110,7 @@ class ScenarioRunner:
         """Execute a sequential scenario with shared Trace.
 
         Components are executed in order:
-        - Interaction / InteractionSpec components update the shared trace
+        - InteractionSpec components update the shared trace
         - Check components validate the current trace and stop execution on failure
 
         Execution stops on the first failing check; remaining components are not executed.

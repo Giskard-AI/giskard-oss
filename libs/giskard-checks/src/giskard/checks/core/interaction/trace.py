@@ -4,45 +4,8 @@ from pydantic import BaseModel, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.rule import Rule
 
-from .protocols import InteractionGenerator
-
-
-class Interaction[InputType, OutputType](BaseModel, frozen=True):
-    """A single interaction between inputs and outputs.
-
-    An interaction represents one exchange in a conversation or workflow,
-    capturing the inputs provided, the outputs produced, and optional metadata.
-
-    Attributes
-    ----------
-    inputs : InputType
-        The input values for this interaction (e.g., user message, API request).
-    outputs : OutputType
-        The output values produced in response (e.g., assistant reply, API response).
-    metadata : dict[str, Any]
-        Optional metadata associated with this interaction. Can include timing
-        information, tool calls, intermediate states, or any other relevant data.
-
-    Examples
-    --------
-    ```python
-    interaction = Interaction(
-        inputs="What is the capital of France?",
-        outputs="The capital of France is Paris.",
-        metadata={"model": "gpt-4", "tokens": 15}
-    )
-    ```
-    """
-
-    inputs: InputType
-    outputs: OutputType
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-    def __rich_console__(
-        self, console: Console, options: ConsoleOptions
-    ) -> RenderResult:
-        yield "Inputs: " + repr(self.inputs)
-        yield "Outputs: " + repr(self.outputs)
+from ..protocols import InteractionGenerator
+from .interaction import Interaction
 
 
 class Trace[InputType, OutputType](BaseModel, frozen=True):
@@ -68,24 +31,28 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     Examples
     --------
-    ```python
-    trace = Trace(interactions=[
-        Interaction(inputs="Hello", outputs="Hi there!"),
-        Interaction(inputs="How are you?", outputs="I'm doing well, thanks!"),
-    ])
+    >>> trace = Trace[str, str](interactions=[
+    ...    Interaction(inputs="Hello", outputs="Hi there!"),
+    ...    Interaction(inputs="How are you?", outputs="I'm doing well, thanks!"),
+    ... ])
 
-    # Access the most recent interaction (preferred in prompt templates and JSONPath)
-    last_interaction = trace.last
+    Access the most recent interaction in a trace:
+    >>> last_interaction = trace.last
+    >>> last_interaction
+    Interaction[str, str](inputs='How are you?', ...)
 
-    # Use in JSONPath expressions
-    check = Groundedness(answer_key="trace.last.outputs")
+    Use in JSONPath expressions:
+    >>> from giskard.checks import Groundedness
+    >>> check = Groundedness(answer_key="trace.last.outputs")
 
-    # Access all outputs
-    all_outputs = [interaction.outputs for interaction in trace.interactions]
-    ```
+    Access all outputs:
+    >>> all_outputs = [interaction.outputs for interaction in trace.interactions]
+    >>> all_outputs
+    ['Hi there!', "I'm doing well, thanks!"]
     """
 
     interactions: list[Interaction[InputType, OutputType]] = Field(default_factory=list)
+
     annotations: dict[str, Any] = Field(
         default_factory=dict,
         description="Shared Scenario/Trace-level annotations.",

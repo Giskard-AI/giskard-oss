@@ -4,11 +4,11 @@ import numpy as np
 from giskard.core import provide_not_none
 from pydantic import Field
 
+from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve, resolve
 from ..core.mixin import WithEmbeddingMixin
 from ..core.result import CheckResult
-from ..core.trace import Trace
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:

@@ -2,15 +2,15 @@ from collections.abc import AsyncGenerator
 from typing import override
 from unittest.mock import MagicMock, patch
 
-from ..core.interaction import BaseInteractionSpec
-from ..core.trace import Interaction, Trace
+from ..core import Trace
+from ..core.interaction import Interaction, InteractionSpec
 
 
-@BaseInteractionSpec.register("with_spy")
+@InteractionSpec.register("with_spy")
 class WithSpy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    BaseInteractionSpec[InputType, OutputType, TraceType]
+    InteractionSpec[InputType, OutputType, TraceType]
 ):
-    interaction_generator: BaseInteractionSpec[InputType, OutputType, TraceType]
+    interaction_generator: InteractionSpec[InputType, OutputType, TraceType]
     target: str
 
     @override
