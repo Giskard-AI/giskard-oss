@@ -8,6 +8,7 @@ from ..core.interaction import Trace
 from ..core.result import ScenarioResult, SuiteResult
 from ..core.scenario import Scenario
 from ..core.types import ProviderType
+from .builder import ScenarioBuilder
 
 InputType = TypeVar("InputType", infer_variance=True)
 OutputType = TypeVar("OutputType", infer_variance=True)
@@ -35,8 +36,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     ```python
     from giskard.checks import Suite, scenario
 
-    scenario1 = scenario("scenario_1").interact("hello").build()
-    scenario2 = scenario("scenario_2").interact("hi").build()
+    scenario1 = scenario("scenario_1").interact("hello")
+    scenario2 = scenario("scenario_2").interact("hi")
 
     suite = Suite(name="my_suite", target=my_sut)
     suite.append(scenario1)
@@ -61,17 +62,22 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     )
 
     def append(
-        self, scenario: Scenario[InputType, OutputType, Trace[Any, Any]]
+        self,
+        scenario: Scenario[InputType, OutputType, Trace[Any, Any]]
+        | ScenarioBuilder[InputType, OutputType, Trace[Any, Any]],
     ) -> None:
-        """Add a scenario to the suite.
+        """Add a scenario or scenario builder to the suite.
 
         Parameters
         ----------
-        scenario : Scenario
-            The scenario to add to the suite. For scenario builders, use `scenario.build()` first.
+        scenario : Scenario | ScenarioBuilder
+            The scenario or builder to add to the suite.
         """
 
-        self.scenarios.append(scenario)
+        if isinstance(scenario, ScenarioBuilder):
+            self.scenarios.append(scenario.build())
+        else:
+            self.scenarios.append(scenario)
 
     async def run(
         self,

@@ -30,7 +30,7 @@ async def test_suite_target_precedence(sut1, sut2):
         scenario("test", target=sut1)
         .interact("hello")
         .check(Equals(expected_value="SUT2: hello", key="trace.last.outputs"))
-    ).build()
+    )
 
     # Suite with a different target
     suite = Suite(name="my_suite", target=sut2)
@@ -48,7 +48,7 @@ async def test_suite_run_target_precedence(sut1, sut2, sut3):
         scenario("test", target=sut1)
         .interact("hello")
         .check(Equals(expected_value="SUT3: hello", key="trace.last.outputs"))
-    ).build()
+    )
 
     suite = Suite(name="my_suite", target=sut2)
     suite.append(s)
@@ -66,13 +66,13 @@ async def test_suite_mixed_targets(sut1, sut2):
         scenario("s1", target=sut1)
         .interact("hello")
         .check(Equals(expected_value="SUT1: hello", key="trace.last.outputs"))
-    ).build()
+    )
 
     s2 = (
         scenario("s2", target=sut2)
         .interact("world")
         .check(Equals(expected_value="SUT2: world", key="trace.last.outputs"))
-    ).build()
+    )
 
     # Suite with NO target
     suite = Suite(name="mixed_suite")
@@ -88,12 +88,11 @@ async def test_suite_mixed_targets(sut1, sut2):
 @pytest.mark.asyncio
 async def test_suite_result_aggregation():
     """Verify SuiteResult aggregation logic."""
-    s1 = scenario("s1").interact("a", "a").build()
+    s1 = scenario("s1").interact("a", "a")
     s2 = (
         scenario("s2")
         .interact("b", "c")
         .check(Equals(expected_value="b", key="trace.last.outputs"))
-        .build()
     )
 
     suite = Suite(name="agg_suite")
@@ -114,7 +113,7 @@ async def test_suite_result_aggregation():
 @pytest.mark.asyncio
 async def test_suite_callable_target():
     """Verify that suite target can be a callable."""
-    s1 = scenario("s1").interact("hello").build()
+    s1 = scenario("s1").interact("hello")
 
     # Suite with a callable target
     suite = Suite(name="callable_suite", target=lambda x: f"Callable: {x}")

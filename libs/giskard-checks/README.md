@@ -108,8 +108,16 @@ Use a `Suite` to run multiple scenarios against a shared target SUT. You can bin
 from giskard.checks import Suite, scenario, Equals
 
 # Define some scenarios without a target
-s1 = scenario("s1").interact("hello").check(Equals(expected_value="Echo: hello", key="trace.last.outputs")).build()
-s2 = scenario("s2").interact("world").check(Equals(expected_value="Echo: world", key="trace.last.outputs")).build()
+s1 = (
+    scenario("s1")
+    .interact("hello")
+    .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+)
+s2 = (
+    scenario("s2")
+    .interact("world")
+    .check(Equals(expected_value="Echo: world", key="trace.last.outputs"))
+)
 
 # Create a suite with a shared target
 target_sut = lambda x: f"Echo: {x}"
