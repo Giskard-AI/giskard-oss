@@ -75,15 +75,23 @@ class CheckResult(BaseModel):
 
     Attributes
     ----------
-    status:
+    status : CheckStatus
         Outcome status of the check.
-    message:
+    message : str or None
         Optional short message to surface to users (e.g., success/failure reason).
-    metrics:
-        List of auxiliary metrics captured by the check.
-    details:
+    metrics : list[Metric]
+        Auxiliary metrics captured by the check.
+    details : dict[str, Any]
         Arbitrary structured payload with additional context (e.g., failure reasons,
         timings, and any metadata the check wishes to include).
+    passed : bool
+        True if ``status`` is ``PASS``.
+    failed : bool
+        True if ``status`` is ``FAIL``.
+    errored : bool
+        True if ``status`` is ``ERROR``.
+    skipped : bool
+        True if ``status`` is ``SKIP``.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -201,16 +209,24 @@ class ScenarioResult[InputType, OutputType](BaseModel):
 
     Attributes
     ----------
-    scenario_name:
+    scenario_name : str
         Name of the scenario that was executed.
-    check_results:
-        List of all check results from executed checks.
-    passed:
-        Whether all executed checks passed.
-    duration_ms:
+    steps : list[TestCaseResult]
+        Ordered list of test case results produced during execution.
+    duration_ms : int
         Total execution time in milliseconds.
-    final_trace:
-        The trace state after execution, containing all interactions that occurred.
+    final_trace : Trace[InputType, OutputType]
+        Trace state after execution, containing all interactions that occurred.
+    status : ScenarioStatus
+        Aggregated outcome of the scenario derived from its steps.
+    passed : bool
+        True when all steps passed.
+    failed : bool
+        True when at least one step failed and none errored.
+    errored : bool
+        True when at least one step errored.
+    skipped : bool
+        True when all steps were skipped.
     """
 
     scenario_name: str = Field(..., description="Scenario name")
@@ -295,13 +311,20 @@ class TestCaseResult(BaseModel):
 
     Attributes
     ----------
-    all_runs:
-        List of check results for each run. Each inner list contains the
-        CheckResults from one execution of the test case.
-    duration_ms:
-        Total execution time in milliseconds across all runs.
-    total_runs:
-        Number of runs actually executed (may be less than max_runs if stopped early).
+    results : list[CheckResult]
+        Check results produced during the test case execution.
+    duration_ms : int
+        Total execution time in milliseconds.
+    status : TestCaseStatus
+        Aggregated outcome of the test case derived from its results.
+    passed : bool
+        True when all checks passed, or when there are no checks.
+    failed : bool
+        True when at least one check failed and none errored.
+    errored : bool
+        True when at least one check errored.
+    skipped : bool
+        True when all checks were skipped.
     """
 
     results: list[CheckResult] = Field(..., description="Check results for each run")
@@ -429,10 +452,20 @@ class SuiteResult(BaseModel):
 
     Attributes
     ----------
-    results:
-        List of all scenario results from executed scenarios.
-    duration_ms:
+    results : list[ScenarioResult]
+        Scenario results produced during the suite execution.
+    duration_ms : int
         Total execution time in milliseconds.
+    passed_count : int
+        Number of scenarios that passed.
+    failed_count : int
+        Number of scenarios that failed.
+    errored_count : int
+        Number of scenarios that errored.
+    skipped_count : int
+        Number of scenarios that were skipped.
+    pass_rate : float
+        Fraction of non-skipped scenarios that passed (1.0 when all scenarios are skipped).
     """
 
     results: list[ScenarioResult[Any, Any]] = Field(
