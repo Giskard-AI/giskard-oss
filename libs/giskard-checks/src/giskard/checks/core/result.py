@@ -497,13 +497,14 @@ class SuiteResult(BaseModel):
         # Failure/Error summary
         failures_and_errors = [r for r in self.results if r.failed or r.errored]
         if failures_and_errors:
+            n_loggable_failures = 20
             yield ""
             yield "[bold red]Failures/Errors Summary:[/bold red]"
-            for f in failures_and_errors[:20]:
+            for f in failures_and_errors[:n_loggable_failures]:
                 status = STATUS_MAPPING[f.status]
                 yield f"  [{status['color']}]{f.status.value.upper()}[/{status['color']}] {f.scenario_name}"
-            if len(failures_and_errors) > 20:
-                yield f"  ... and {len(failures_and_errors) - 20} more"
+            if len(failures_and_errors) > n_loggable_failures:
+                yield f"  ... and {len(failures_and_errors) - n_loggable_failures} more"
 
         yield Rule(style="bold blue")
 
