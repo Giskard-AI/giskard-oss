@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Self
 
+from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
 
 from ..core import Interact, Trace
@@ -55,6 +56,14 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         default_factory=dict,
         description="Scenario-level annotations.",
     )
+    target: (
+        ProviderType[[InputType], OutputType]
+        | ProviderType[[InputType, TraceType], OutputType]
+        | NotProvided
+    ) = Field(
+        default=NOT_PROVIDED,
+        description="Scenario-level target SUT.",
+    )
 
     def interact(
         self,
@@ -66,7 +75,8 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         outputs: (
             ProviderType[[InputType], OutputType]
             | ProviderType[[InputType, TraceType], OutputType]
-        ),
+            | NotProvided
+        ) = NOT_PROVIDED,
         metadata: dict[str, object] | None = None,
     ) -> Self:
         """Add an interaction to the scenario sequence.
@@ -323,6 +333,17 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         self.annotations = annotations
         return self
 
+    def with_target(
+        self,
+        target: (
+            ProviderType[[InputType], OutputType]
+            | ProviderType[[InputType, TraceType], OutputType]
+        ),
+    ) -> Self:
+        """Set scenario-level target for the builder."""
+        self.target = target
+        return self
+
     def build(self) -> Scenario[InputType, OutputType, TraceType]:
         """Build the scenario from the accumulated sequence.
 
@@ -336,10 +357,17 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
             sequence=self.sequence,
             trace_type=self.trace_type,
             annotations=self.annotations,
+            target=self.target,
         )
 
     async def run(
-        self, return_exception: bool = False
+        self,
+        target: (
+            ProviderType[[InputType], OutputType]
+            | ProviderType[[InputType, TraceType], OutputType]
+            | NotProvided
+        ) = NOT_PROVIDED,
+        return_exception: bool = False,
     ) -> ScenarioResult[InputType, OutputType]:
         """Build and run the scenario.
 
@@ -367,13 +395,18 @@ class ScenarioBuilder[InputType, OutputType, TraceType: Trace](BaseModel):  # py
         result = await scenario_obj.run()
         ```
         """
-        return await self.build().run(return_exception=return_exception)
+        return await self.build().run(target=target, return_exception=return_exception)
 
 
 def scenario[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     name: str | None = None,
     trace_type: type[TraceType] | None = None,
     annotations: dict[str, Any] | None = None,
+    target: (
+        ProviderType[[InputType], OutputType]
+        | ProviderType[[InputType, TraceType], OutputType]
+        | NotProvided
+    ) = NOT_PROVIDED,
 ) -> ScenarioBuilder[InputType, OutputType, TraceType]:
     """Create a new scenario builder.
 
@@ -385,6 +418,10 @@ def scenario[InputType, OutputType, TraceType: Trace](  # pyright: ignore[report
         Optional custom trace type to use. If not provided, the trace type will be
         inferred from the sequence of components. Useful when using custom trace
         subclasses with additional computed fields or methods.
+    annotations : dict[str, Any] | None
+        Optional scenario-level annotations.
+    target : Any | NotProvided
+        Optional scenario-level target SUT.
 
     Returns
     -------
@@ -396,15 +433,15 @@ def scenario[InputType, OutputType, TraceType: Trace](  # pyright: ignore[report
     ```python
     # Basic usage
     builder = scenario("my_test")
-    scenario = builder.build()
+    scenario_obj = builder.build()
 
-    # With custom trace type
-    builder = scenario("my_test", trace_type=CustomTrace)
-    scenario = builder.build()
+    # With target and annotations
+    builder = scenario("my_test", target=my_sut, annotations={"env": "prod"})
     ```
     """
     return ScenarioBuilder(
         name=name or "Unnamed Scenario",
         trace_type=trace_type,
         annotations=annotations or {},
+        target=target,
     )

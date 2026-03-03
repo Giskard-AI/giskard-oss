@@ -49,7 +49,8 @@ modules, core abstractions, and expected workflows.
 - `ScenarioComponent`: discriminated base for anything that can be executed in a scenario
   (either an `Interact` or a `Check`).
 - `Scenario`: ordered sequence of components with a shared `Trace`. Components execute
-  sequentially, stopping at the first failing check. Supports custom trace types.
+  sequentially, stopping at the first failing check. Supports custom trace types and an optional `target` SUT.
+- `Suite` (`scenarios/suite.py`): holds multiple scenarios and an optional shared `target`. Enables running a batch of scenarios against the same SUT.
 - `InteractionSpec`: base class for specs that emit `Interaction` objects via
   the `generate()` async generator method. Each yielded interaction receives the updated
   trace via `generator.asend()`.
@@ -63,6 +64,7 @@ modules, core abstractions, and expected workflows.
 ### Results (`core/result.py`)
 - `CheckStatus`, `CheckResult`, `Metric`: immutable check outcomes with helpers.
 - `ScenarioResult`: aggregated results + final trace for a single scenario execution.
+- `SuiteResult`: aggregated results from multiple scenarios (total count, pass/fail counts, pass rate, duration).
 - `TestCaseResult`: multi-run summary with helper predicates (`passed`, `failed`, etc.)
   and `format_failures()` / `assert_passed()` helpers.
 
@@ -111,14 +113,22 @@ modules, core abstractions, and expected workflows.
 2. **Author checks** by subclassing `Check` or using `from_fn`. Access the
    current output via `trace.interactions[-1]`.
 3. **Bundle scenarios**:
-   - `Scenario(sequence=[...])`: compose multiple interactions and checks in order
-   - `await scenario.run()`
-4. **Inspect results** via `ScenarioResult`:
-   - `result.passed`, `result.failed`, `result.errored` convenience booleans
-   - `result.check_results`: list of all check results
-   - `result.final_trace`: final trace state after execution
-   - `result.duration_ms`: execution time
-   - `result.assert_passed()`: raise AssertionError with formatted failures
+   - `Scenario(sequence=[...])`: compose multiple interactions and checks in order.
+   `Scenario(sequence=[...], target=my_sut)`: compose multiple interactions and checks in order and bind a target.
+   - `await scenario.run()`: execute the scenario.
+   - `await scenario.run(target=my_sut)`: execute the scenario with a different target.
+4. **Manage batches with Suite**:
+   - `suite = Suite(name="my_suite", target=shared_sut)`: create a suite with a shared target.
+   - `suite.append(s1)`: add a scenario to the suite.
+   - `result = await suite.run()`: execute the suite.
+   - `result = await suite.run(target=my_sut)`: execute the suite with a different target.
+5. **Inspect results** via `ScenarioResult` or `SuiteResult`:
+   - `result.passed`, `result.failed`, `result.errored` convenience booleans (for `SuiteResult`, the attributes are `passed_count`, `failed_count`, `errored_count`).
+   - `result.check_results`: list of all check results.
+   - `result.final_trace`: final trace state after execution.
+   - `result.duration_ms`: execution time (also available on `ScenarioResult`).
+   - `result.assert_passed()`: raise AssertionError with formatted failures.
+   - `result.pass_rate`: pass rate (only available on `SuiteResult`).
 
 ## Tooling & conventions
 
@@ -140,7 +150,7 @@ from giskard.checks import (
 
     # Core classes
     Check, CheckResult, CheckStatus, Metric,
-    Scenario, ScenarioResult,
+    Scenario, ScenarioResult, SuiteResult,
     TestCase, TestCaseResult,
     Trace, Interact,
     Interaction, InteractionSpec,
@@ -161,8 +171,8 @@ from giskard.checks import (
     # Testing
     WithSpy, TestCaseRunner,
 
-    # Scenarios
-    ScenarioBuilder, scenario, ScenarioRunner,
+    # Scenarios and Suite
+    ScenarioBuilder, scenario, Suite, ScenarioRunner,
 
     # Settings
     set_default_generator, get_default_generator,
@@ -171,11 +181,6 @@ from giskard.checks import (
 
 - All core types, builtin and LLM-based checks, and utilities are available directly from `giskard.checks`.
 - The `builtin` and `judges` modules are still accessible for accessing the submodule directly if needed.
-
-## Environment knobs
-
-- `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` (default truthy):
-  raises when duplicate `KIND`s are registered; set to `0` to allow last-one-wins (with warning).
 
 ## Contributing notes
 

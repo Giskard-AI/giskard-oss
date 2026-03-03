@@ -99,6 +99,39 @@ async def main():
 asyncio.run(main())
 ```
 
+Running Multiple Scenarios with Suite
+-------------------------------------
+
+Use a `Suite` to run multiple scenarios against a shared target SUT. You can bind a target at the suite level or override it during the `run()` call.
+
+```python
+from giskard.checks import Suite, scenario, Equals
+
+# Define some scenarios without a target
+s1 = (
+    scenario("s1")
+    .interact("hello")
+    .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+)
+s2 = (
+    scenario("s2")
+    .interact("world")
+    .check(Equals(expected_value="Echo: world", key="trace.last.outputs"))
+)
+
+# Create a suite with a shared target
+target_sut = lambda x: f"Echo: {x}"
+suite = Suite(name="my_suite", target=target_sut)
+
+# Add scenarios
+suite.append(s1)
+suite.append(s2)
+
+# Run the suite
+results = await suite.run()
+print(f"Aggregated pass rate: {results.pass_rate * 100}%")
+```
+
 Why this library?
 -----------------
 
@@ -114,7 +147,8 @@ Concepts
 - **Trace**: Immutable history of all `Interaction` objects produced while executing a scenario. Use `trace.last` in JSONPath expressions (e.g., `trace.last.outputs`).
 - **Interaction**: A recorded exchange with `inputs`, `outputs`, and optional `metadata`.
 - **Check**: Inspects the `Trace` and returns a `CheckResult`.
-- **Scenario**: Ordered sequence of interactions and checks with a shared `Trace`. Execution stops at the first failing check and later steps are skipped.
+- **Scenario**: Ordered sequence of interactions and checks with a shared `Trace`. Execution stops at the first failing check and later steps are skipped. Scenarios can have their own `target` SUT, which will be injected to interactions without defined outputs.
+- **Suite**: A collection of scenarios that can be executed together, optionally sharing a common `target`.
 
 **Advanced concepts** (used internally by the fluent API):
 - **TestCase**: Wrapper that runs a set of checks against a single trace step and returns a `TestCaseResult`.
@@ -248,6 +282,33 @@ scenario = Scenario(name="custom_test", sequence=[chat, check])
 
 serialized = scenario.model_dump()
 restored = Scenario.model_validate(serialized)
+```
+
+### Binding a Target SUT
+
+You can bind a System Under Test (SUT) at three different levels, with the following precedence:
+`run(target=...)` > `Suite(target=...)` > `scenario(target=...)`.
+
+#### 1. Scenario Level
+Pass the target directly to the `scenario()` helper:
+```python
+result = await scenario("test", target=my_sut).interact("hello").run()
+```
+
+#### 2. Suite Level
+Bind a target to all scenarios in a suite:
+```python
+suite = Suite(name="my_suite", target=shared_sut)
+suite.append(s1)
+result = await suite.run()
+```
+
+#### 3. Run Level
+Override everything at execution time:
+```python
+# This target will be used for all scenarios in the suite,
+# overriding any suite-level or scenario-level targets.
+result = await suite.run(target=emergency_override_sut)
 ```
 
 Troubleshooting Serialization Issues

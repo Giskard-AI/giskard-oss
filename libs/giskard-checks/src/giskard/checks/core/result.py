@@ -11,6 +11,10 @@ from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
 
 STATUS_MAPPING = {
+    "total": {
+        "color": "default",
+        "title": "TOTAL",
+    },
     "pass": {
         "color": "green",
         "title": "✅ PASSED",
@@ -71,15 +75,23 @@ class CheckResult(BaseModel):
 
     Attributes
     ----------
-    status:
+    status : CheckStatus
         Outcome status of the check.
-    message:
+    message : str or None
         Optional short message to surface to users (e.g., success/failure reason).
-    metrics:
-        List of auxiliary metrics captured by the check.
-    details:
+    metrics : list[Metric]
+        Auxiliary metrics captured by the check.
+    details : dict[str, Any]
         Arbitrary structured payload with additional context (e.g., failure reasons,
         timings, and any metadata the check wishes to include).
+    passed : bool
+        True if ``status`` is ``PASS``.
+    failed : bool
+        True if ``status`` is ``FAIL``.
+    errored : bool
+        True if ``status`` is ``ERROR``.
+    skipped : bool
+        True if ``status`` is ``SKIP``.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -197,16 +209,24 @@ class ScenarioResult[InputType, OutputType](BaseModel):
 
     Attributes
     ----------
-    scenario_name:
+    scenario_name : str
         Name of the scenario that was executed.
-    check_results:
-        List of all check results from executed checks.
-    passed:
-        Whether all executed checks passed.
-    duration_ms:
+    steps : list[TestCaseResult]
+        Ordered list of test case results produced during execution.
+    duration_ms : int
         Total execution time in milliseconds.
-    final_trace:
-        The trace state after execution, containing all interactions that occurred.
+    final_trace : Trace[InputType, OutputType]
+        Trace state after execution, containing all interactions that occurred.
+    status : ScenarioStatus
+        Aggregated outcome of the scenario derived from its steps.
+    passed : bool
+        True when all steps passed.
+    failed : bool
+        True when at least one step failed and none errored.
+    errored : bool
+        True when at least one step errored.
+    skipped : bool
+        True when all steps were skipped.
     """
 
     scenario_name: str = Field(..., description="Scenario name")
@@ -291,13 +311,20 @@ class TestCaseResult(BaseModel):
 
     Attributes
     ----------
-    all_runs:
-        List of check results for each run. Each inner list contains the
-        CheckResults from one execution of the test case.
-    duration_ms:
-        Total execution time in milliseconds across all runs.
-    total_runs:
-        Number of runs actually executed (may be less than max_runs if stopped early).
+    results : list[CheckResult]
+        Check results produced during the test case execution.
+    duration_ms : int
+        Total execution time in milliseconds.
+    status : TestCaseStatus
+        Aggregated outcome of the test case derived from its results.
+    passed : bool
+        True when all checks passed, or when there are no checks.
+    failed : bool
+        True when at least one check failed and none errored.
+    errored : bool
+        True when at least one check errored.
+    skipped : bool
+        True when all checks were skipped.
     """
 
     results: list[CheckResult] = Field(..., description="Check results for each run")
@@ -418,3 +445,123 @@ class TestCaseResult(BaseModel):
         subtitle = ", ".join(count_parts) + f" in {self.duration_ms}ms"
 
         yield Rule(subtitle, style=f"{status['color']} bold")
+
+
+class SuiteResult(BaseModel):
+    """Aggregate result object for the suite.
+
+    Attributes
+    ----------
+    results : list[ScenarioResult]
+        Scenario results produced during the suite execution.
+    duration_ms : int
+        Total execution time in milliseconds.
+    passed_count : int
+        Number of scenarios that passed.
+    failed_count : int
+        Number of scenarios that failed.
+    errored_count : int
+        Number of scenarios that errored.
+    skipped_count : int
+        Number of scenarios that were skipped.
+    pass_rate : float
+        Fraction of non-skipped scenarios that passed (1.0 when all scenarios are skipped).
+    """
+
+    results: list[ScenarioResult[Any, Any]] = Field(
+        ..., description="List of scenario results"
+    )
+    duration_ms: int = Field(..., description="Total execution time in milliseconds")
+
+    @computed_field
+    @property
+    def passed_count(self) -> int:
+        """Number of passed scenarios."""
+        return sum(1 for r in self.results if r.passed)
+
+    @computed_field
+    @property
+    def failed_count(self) -> int:
+        """Number of failed scenarios."""
+        return sum(1 for r in self.results if r.failed)
+
+    @computed_field
+    @property
+    def errored_count(self) -> int:
+        """Number of errored scenarios."""
+        return sum(1 for r in self.results if r.errored)
+
+    @computed_field
+    @property
+    def skipped_count(self) -> int:
+        """Number of skipped scenarios."""
+        return sum(1 for r in self.results if r.skipped)
+
+    @computed_field
+    @property
+    def pass_rate(self) -> float:
+        """The pass rate of the suite (passed scenarios / (total scenarios - skipped scenarios))."""
+        denominator = len(self.results) - self.skipped_count
+        if denominator == 0:
+            return 1.0
+        return self.passed_count / denominator
+
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        yield Rule("Suite Results", style="bold blue")
+
+        # Dots view
+        dots = ""
+        for r in self.results:
+            if r.passed:
+                char, color = ".", STATUS_MAPPING["pass"]["color"]
+            elif r.failed:
+                char, color = "F", STATUS_MAPPING["fail"]["color"]
+            elif r.errored:
+                char, color = "E", STATUS_MAPPING["error"]["color"]
+            elif r.skipped:
+                char, color = "s", STATUS_MAPPING["skip"]["color"]
+            else:
+                raise NotImplementedError(f"Status {r.status} handling not implemented")
+            dots += f"[{color}]{char}[/{color}]"
+        yield dots
+
+        # Failure/Error summary
+        failures_and_errors = [r for r in self.results if r.failed or r.errored]
+        if failures_and_errors:
+            n_loggable_failures = 20
+            yield ""
+            yield "[bold red]Failures/Errors Summary:[/bold red]"
+            for f in failures_and_errors[:n_loggable_failures]:
+                status = STATUS_MAPPING[f.status]
+                yield f"  [{status['color']}]{f.status.value.upper()}[/{status['color']}] {f.scenario_name}"
+            if len(failures_and_errors) > n_loggable_failures:
+                yield f"  ... and {len(failures_and_errors) - n_loggable_failures} more"
+
+        yield Rule(style="bold blue")
+
+        # Summary metrics
+        count_parts = []
+        count_parts.append(
+            f"[{STATUS_MAPPING['total']['color']} bold]{len(self.results)} total[/{STATUS_MAPPING['total']['color']} bold]"
+        )
+        if self.errored_count:
+            count_parts.append(
+                f"[{STATUS_MAPPING['error']['color']} bold]{self.errored_count} errored[/{STATUS_MAPPING['error']['color']} bold]"
+            )
+        if self.failed_count:
+            count_parts.append(
+                f"[{STATUS_MAPPING['fail']['color']} bold]{self.failed_count} failed[/{STATUS_MAPPING['fail']['color']} bold]"
+            )
+        if self.skipped_count:
+            count_parts.append(
+                f"[{STATUS_MAPPING['skip']['color']} bold]{self.skipped_count} skipped[/{STATUS_MAPPING['skip']['color']} bold]"
+            )
+        if self.passed_count:
+            count_parts.append(
+                f"[{STATUS_MAPPING['pass']['color']} bold]{self.passed_count} passed[/{STATUS_MAPPING['pass']['color']} bold]"
+            )
+
+        summary = ", ".join(count_parts)
+        yield f"Summary: {summary} | Pass Rate: [default bold]{self.pass_rate:.1%}[/default bold] | Total Duration: {self.duration_ms}ms"
