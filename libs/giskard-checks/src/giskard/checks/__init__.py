@@ -23,17 +23,18 @@ from .core import (
     Check,
     CheckResult,
     CheckStatus,
+    Interact,
     Interaction,
+    InteractionSpec,
     Metric,
     Scenario,
     ScenarioResult,
+    SuiteResult,
     TestCase,
     TestCaseResult,
     Trace,
 )
-from .core.interaction import BaseInteractionSpec
 from .generators.user import UserSimulator
-from .interaction import InteractionSpec
 from .judges import (
     BaseLLMCheck,
     Conformity,
@@ -43,6 +44,7 @@ from .judges import (
 )
 from .scenarios.builder import ScenarioBuilder, scenario
 from .scenarios.runner import ScenarioRunner
+from .scenarios.suite import Suite
 from .settings import get_default_generator, set_default_generator
 from .testing import WithSpy
 from .testing.runner import TestCaseRunner
@@ -72,12 +74,14 @@ __all__ = [
     "Metric",
     "Scenario",
     "ScenarioResult",
+    "SuiteResult",
     "TestCase",
     "TestCaseResult",
     "Trace",
+    "Interact",
     "Interaction",
-    "BaseInteractionSpec",
-    # Builtin checks
+    "InteractionSpec",
+    # Builtin and LLM-based checks
     "BaseLLMCheck",
     "LLMCheckResult",
     "Conformity",
@@ -94,8 +98,6 @@ __all__ = [
     "SemanticSimilarity",
     "StringMatching",
     "RegexMatching",
-    # Interaction
-    "InteractionSpec",
     # Generators
     "UserSimulator",
     # Testing
@@ -104,6 +106,7 @@ __all__ = [
     # Scenarios
     "ScenarioBuilder",
     "scenario",
+    "Suite",
     "ScenarioRunner",
     # Settings
     "set_default_generator",

@@ -11,8 +11,8 @@ from giskard.checks import (
     Check,
     CheckResult,
     Equals,
+    Interact,
     Interaction,
-    InteractionSpec,
     TestCase,
     Trace,
 )
@@ -391,7 +391,7 @@ class TestTestCaseEdgeCases:
             return f"Processed: {inputs}"
 
         trace = await Trace.from_interactions(
-            InteractionSpec(inputs="test", outputs=output_func)
+            Interact(inputs="test", outputs=output_func)
         )
         check = Equals(
             expected_value="Processed: test",

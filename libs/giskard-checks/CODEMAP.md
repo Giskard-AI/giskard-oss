@@ -18,17 +18,25 @@ modules, core abstractions, and expected workflows.
 ├─ CODEMAP.md                  # This file
 ├─ Makefile                    # Canonical dev workflow (lint, typecheck, tests)
 ├─ src/giskard/checks/
-│  ├─ __init__.py              # Public re-exports: all core classes, builtin checks, and settings helpers
+│  ├─ __init__.py              # Public re-exports: all core classes, builtin/LLM-based checks, and settings helpers
 │  ├─ builtin/                 # Built-in Check implementations (fn, equality, LLM, etc.)
-│  ├─ core/                    # Core abstractions: Check, Scenario, Trace, results, extraction
-│  ├─ interaction/             # `InteractionSpec` implementation
+│  ├─ core/                    # Core abstractions: Interaction, Check, Scenario, Trace, results, extraction
+│  ├─ generators/              # User-facing generators (e.g., UserSimulator) and related helpers
+│  ├─ judges/                  # LLM-based Check implementations (Groundedness, Conformity, etc.)
+│  ├─ prompts/                 # Jinja templates used by generators and judges (LLM prompts)
 │  ├─ scenarios/               # Runner, TestCase model, and helper utilities
 │  ├─ settings.py              # Global generator configuration for LLM checks
-│  └─ trace/                   # Reserved for future trace utilities (currently empty)
+│  ├─ testing/                 # Testing helpers (spies, runners) for checks and scenarios
+│  └─ utils/                   # Shared utilities: value providers, normalization, generator helpers, parameter injection
 └─ tests/
+   ├─ builtin/                 # Tests for builtin and LLM-based checks
+   ├─ conftest.py              # Shared pytest fixtures and configuration for tests
    ├─ core/                    # Unit tests for Check/Scenario primitives
+   ├─ generators/              # Tests for user simulator and generator helpers
+   ├─ integration/             # End-to-end scenarios exercising multiple components together
    ├─ scenarios/               # TestCase + runner scenarios
-   └─ trace/                   # Trace/interaction behavior
+   ├─ trace/                   # Trace/interaction behavior
+   └─ utils/                   # Tests for utility helpers (normalization, etc.)
 ```
 
 ## Core concepts & files
@@ -39,22 +47,24 @@ modules, core abstractions, and expected workflows.
 
 ### Scenario components (`core/scenario.py`, `core/interaction.py`, `core/check.py`)
 - `ScenarioComponent`: discriminated base for anything that can be executed in a scenario
-  (either an `InteractionSpec` or a `Check`).
+  (either an `Interact` or a `Check`).
 - `Scenario`: ordered sequence of components with a shared `Trace`. Components execute
-  sequentially, stopping at the first failing check. Supports custom trace types.
-- `BaseInteractionSpec`: base class for specs that emit `Interaction` objects via
+  sequentially, stopping at the first failing check. Supports custom trace types and an optional `target` SUT.
+- `Suite` (`scenarios/suite.py`): holds multiple scenarios and an optional shared `target`. Enables running a batch of scenarios against the same SUT.
+- `InteractionSpec`: base class for specs that emit `Interaction` objects via
   the `generate()` async generator method. Each yielded interaction receives the updated
   trace via `generator.asend()`.
-- `InteractionSpec` (`interaction/__init__.py`): default implementation accepting
+- `Interact` (`interaction/interact.py`): default implementation accepting
   static values, callables, or generators for both inputs and outputs. Supports
   multi-turn interactions through generators.
 - `Check`: base class for executable validations; subclasses return `CheckResult`.
-- Registration via `@Check.register("kind")` and `@BaseInteractionSpec.register("kind")`
+- Registration via `@Check.register("kind")` and `@InteractionSpec.register("kind")`
   enables polymorphic serialization.
 
 ### Results (`core/result.py`)
 - `CheckStatus`, `CheckResult`, `Metric`: immutable check outcomes with helpers.
 - `ScenarioResult`: aggregated results + final trace for a single scenario execution.
+- `SuiteResult`: aggregated results from multiple scenarios (total count, pass/fail counts, pass rate, duration).
 - `TestCaseResult`: multi-run summary with helper predicates (`passed`, `failed`, etc.)
   and `format_failures()` / `assert_passed()` helpers.
 
@@ -74,15 +84,10 @@ modules, core abstractions, and expected workflows.
 - `TraceBuilder`: helper class for incrementally building trace instances.
 - `_default_runner` singleton accessible via `get_runner()`.
 
-### Test cases (`scenarios/testcase.py`)
+### Test cases (`core/testcase.py`)
 - `TestCase`: wraps a single interaction spec + a list of checks.
 - `run(max_runs=1)` delegates to the runner and returns `TestCaseResult`.
 - `assert_passed()` helper runs + asserts success.
-
-### Utilities (`scenarios/utils.py`)
-- `with_params`, `execute_code`, `generate`: adapt sync/async callables or generators
-  into forms consumable by `InteractionSpec`.
-- Provide ergonomic wrappers when binding user callables into specs.
 
 ### Built-in checks (`builtin/`)
 - `from_fn`, `FnCheck`: wrap arbitrary callables (sync/async) that receive a `Trace`.
@@ -103,20 +108,27 @@ modules, core abstractions, and expected workflows.
 
 ## Typical workflows
 
-1. **Describe interactions** using `InteractionSpec` (static payloads, callables, or
+1. **Describe interactions** using `Interact` (static payloads, callables, or
    generators that can themselves depend on the current `Trace`).
 2. **Author checks** by subclassing `Check` or using `from_fn`. Access the
    current output via `trace.interactions[-1]`.
-3. **Bundle scenarios/test cases**:
-   - `Scenario(sequence=[...])`: compose multiple interactions and checks in order
-   - `TestCase(interaction=spec, checks=[...])`: convenience wrapper for single interaction
-   - `await scenario.run()` or `await tc.run()` (optionally `max_runs > 1`).
-4. **Inspect results** via `ScenarioResult` or `TestCaseResult`:
-   - `result.passed`, `result.failed`, `result.errored` convenience booleans
-   - `result.check_results`: list of all check results
-   - `result.final_trace`: final trace state after execution
-   - `result.duration_ms`: execution time
-   - `result.assert_passed()`: raise AssertionError with formatted failures
+3. **Bundle scenarios**:
+   - `Scenario(sequence=[...])`: compose multiple interactions and checks in order.
+   `Scenario(sequence=[...], target=my_sut)`: compose multiple interactions and checks in order and bind a target.
+   - `await scenario.run()`: execute the scenario.
+   - `await scenario.run(target=my_sut)`: execute the scenario with a different target.
+4. **Manage batches with Suite**:
+   - `suite = Suite(name="my_suite", target=shared_sut)`: create a suite with a shared target.
+   - `suite.append(s1)`: add a scenario to the suite.
+   - `result = await suite.run()`: execute the suite.
+   - `result = await suite.run(target=my_sut)`: execute the suite with a different target.
+5. **Inspect results** via `ScenarioResult` or `SuiteResult`:
+   - `result.passed`, `result.failed`, `result.errored` convenience booleans (for `SuiteResult`, the attributes are `passed_count`, `failed_count`, `errored_count`).
+   - `result.check_results`: list of all check results.
+   - `result.final_trace`: final trace state after execution.
+   - `result.duration_ms`: execution time (also available on `ScenarioResult`).
+   - `result.assert_passed()`: raise AssertionError with formatted failures.
+   - `result.pass_rate`: pass rate (only available on `SuiteResult`).
 
 ## Tooling & conventions
 
@@ -133,35 +145,42 @@ All public classes and functions are exported from the main `giskard.checks` pac
 
 ```python
 from giskard.checks import (
+    # Modules
+    builtin, judges
+
     # Core classes
     Check, CheckResult, CheckStatus, Metric,
-    Scenario, ScenarioResult,
+    Scenario, ScenarioResult, SuiteResult,
     TestCase, TestCaseResult,
-    Trace, Interaction,
-    BaseInteractionSpec, InteractionSpec,
-    Extractor, JsonPathExtractor,
-    # Builtin checks
+    Trace, Interact,
+    Interaction, InteractionSpec,
+
+    # Builtin and LLM-based checks
     BaseLLMCheck, LLMCheckResult,
-    Conformity, Equality, ExtractionCheck,
+    Conformity, Equals, NotEquals,
+    LesserThan, GreaterThan,
+    LesserThanEquals, GreaterEquals,
     FnCheck, from_fn,
     Groundedness, LLMJudge,
-    StringMatching,
-    # Testing utilities
-    WithSpy, TestCaseRunner, ScenarioRunner,
+    SemanticSimilarity,
+    StringMatching, RegexMatching,
+
+    # Generators
+    UserSimulator,
+
+    # Testing
+    WithSpy, TestCaseRunner,
+
+    # Scenarios and Suite
+    ScenarioBuilder, scenario, Suite, ScenarioRunner,
+
     # Settings
     set_default_generator, get_default_generator,
-    # Modules
-    builtin,
 )
 ```
 
-- All core types, builtin checks, and utilities are available directly from `giskard.checks`.
-- The `builtin` module is still accessible for accessing the submodule directly if needed.
-
-## Environment knobs
-
-- `GISKARD_CHECK_KIND_ENFORCE_UNIQUENESS` (default truthy):
-  raises when duplicate `KIND`s are registered; set to `0` to allow last-one-wins (with warning).
+- All core types, builtin and LLM-based checks, and utilities are available directly from `giskard.checks`.
+- The `builtin` and `judges` modules are still accessible for accessing the submodule directly if needed.
 
 ## Contributing notes
 

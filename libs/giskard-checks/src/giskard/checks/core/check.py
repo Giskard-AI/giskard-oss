@@ -3,8 +3,8 @@ from __future__ import annotations
 from giskard.core import Discriminated, discriminated_base
 from pydantic import Field
 
+from .interaction import Trace
 from .result import CheckResult
-from .trace import Trace
 
 
 @discriminated_base

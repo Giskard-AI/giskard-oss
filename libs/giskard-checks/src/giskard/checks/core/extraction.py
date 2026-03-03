@@ -18,7 +18,7 @@ from jsonpath_ng import (
 from jsonpath_ng.exceptions import JsonPathLexerError, JsonPathParserError
 from pydantic import AfterValidator, BaseModel, Field
 
-from .trace import Trace
+from .interaction import Trace
 
 
 class _JSONPathStrMarker:

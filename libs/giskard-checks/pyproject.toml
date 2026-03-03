@@ -16,7 +16,8 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "src"]
+addopts = "--doctest-modules"
 asyncio_mode = "auto"
 pythonpath = ["src"]
 markers = [

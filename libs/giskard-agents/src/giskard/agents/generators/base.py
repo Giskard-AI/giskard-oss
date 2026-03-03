@@ -26,12 +26,15 @@ class GenerationParams(BaseModel):
     ----------
     tools : list[Any], optional
         List of tools available to the model.
+    timeout : float | int | None, optional
+        Maximum time in seconds to wait for the completion request.
     """
 
     temperature: float = Field(default=1.0)
     max_tokens: int | None = Field(default=None)
     response_format: Type[BaseModel] | None = Field(default=None)
     tools: list[Tool] = Field(default_factory=list)
+    timeout: float | int | None = Field(default=None)
 
 
 @discriminated_base
