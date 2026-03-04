@@ -8,7 +8,7 @@ from giskard.checks import Interaction, Trace, UserSimulator
 from pydantic import Field
 
 
-class MockPersonaGenerator(BaseGenerator):
+class MockGenerator(BaseGenerator):
     """Mock generator for UserSimulator tests."""
 
     responses: list[dict[str, Any]]
@@ -103,7 +103,7 @@ def test_negative_max_steps_rejected():
 
 async def test_user_simulator_first_turn_generates_message():
     """Test that first turn generates a message from persona."""
-    generator = MockPersonaGenerator(
+    generator = MockGenerator(
         responses=[
             create_mock_response(False, "Hi, I need help with my order"),
             create_mock_response(True, None),
@@ -134,7 +134,7 @@ async def test_user_simulator_first_turn_generates_message():
 
 async def test_user_simulator_multi_turn_flow():
     """Test multi-turn flow with persona."""
-    generator = MockPersonaGenerator(
+    generator = MockGenerator(
         responses=[
             create_mock_response(False, "First message"),
             create_mock_response(False, "Second message"),
@@ -162,7 +162,7 @@ async def test_user_simulator_multi_turn_flow():
 
 async def test_user_simulator_respects_max_steps():
     """Test that simulator respects max_steps limit."""
-    generator = MockPersonaGenerator(
+    generator = MockGenerator(
         responses=[
             create_mock_response(False, "Message 1"),
             create_mock_response(False, "Message 2"),

@@ -1,23 +1,20 @@
 from collections.abc import AsyncGenerator
-from typing import override
 
 from pydantic import BaseModel, Field
 
+from ..core import Trace
 from ..core.input_generator import InputGenerator
 from ..core.mixin import WithGeneratorMixin
-from ..core.trace import Trace
 
 
 class UserSimulatorOutput(BaseModel):
-    """Output from UserSimulator."""
-
     goal_reached: bool = Field(
         ...,
-        description="Whether the goal has been reached.",
+        description="Whether the goal has been reached. Meaning that the persona's goal has been achieved and no more messages are needed.",
     )
     message: str | None = Field(
         default=None,
-        description="The message from this client. None if goal_reached is True.",
+        description="The message that the user would send. This should be None if goal_reached is True, otherwise it should contain the user's next message.",
     )
 
 
@@ -28,7 +25,7 @@ class UserSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgum
     """User simulation with predefined or custom personas.
 
     Accepts either a predefined persona name (e.g., "frustrated_customer") or a custom
-    persona description. No client description is generated; the persona is used directly.
+    persona description.
 
     Parameters
     ----------
@@ -55,19 +52,16 @@ class UserSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgum
     )
     max_steps: int = Field(default=3, ge=0)
 
-    @override
     async def __call__(self, trace: TraceType) -> AsyncGenerator[str, TraceType]:
-        persona_generator_workflow_ = self.generator.template(
-            "giskard.checks::generators/user_simulator.j2"
-        ).with_output(UserSimulatorOutput)
+        user_generator_workflow_ = (
+            self.generator.template("giskard.checks::generators/user_simulator.j2")
+            .with_inputs(persona=self.persona, context=self.context)
+            .with_output(UserSimulatorOutput)
+        )
 
         step = 0
         while step < self.max_steps:
-            chat = await persona_generator_workflow_.with_inputs(
-                persona=self.persona,
-                context=self.context,
-                history=trace,
-            ).run()
+            chat = await user_generator_workflow_.with_inputs(history=trace).run()
 
             output = chat.output
 
