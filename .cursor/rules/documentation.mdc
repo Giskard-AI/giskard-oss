@@ -1,0 +1,66 @@
+---
+description: Documentation and commenting guidelines for an OSS, beginner-friendly codebase.
+globs: "**/*.py"
+alwaysApply: false
+---
+# Documentation Guidelines
+
+This is an open-source project. Code should be understandable by newcomers who may not have prior context on the architecture.
+
+## Public API Docstrings
+
+Every public class, method, and function **must** have a NumPy-style docstring that includes:
+- A one-line summary of what it does
+- Parameters with types and descriptions
+- Return value description
+- A short usage example when the behavior is non-obvious
+
+```python
+async def run(self, max_steps: int | None = None) -> Chat:
+    """Execute the workflow and return the resulting chat.
+
+    Parameters
+    ----------
+    max_steps : int, optional
+        Maximum number of steps to run. If not provided, the workflow
+        runs until completion.
+
+    Returns
+    -------
+    Chat
+        The completed chat with all messages and tool call results.
+
+    Example
+    -------
+    >>> chat = await generator.chat("Hello!").run()
+    >>> print(chat.last.content)
+    """
+```
+
+## Inline Comments
+
+- **Do** comment non-obvious control flow, especially async orchestration, retry logic, and tool dispatch.
+- **Do** explain *why* something is done when the reason isn't obvious from the code.
+- **Don't** narrate what the code does line-by-line ("increment counter", "return result").
+- **Don't** leave TODO comments without a linked issue or clear owner.
+
+```python
+# Good — explains the why
+# Re-parse tool_calls from the raw response because LiteLLM may
+# return partial function arguments when streaming.
+tool_calls = _reparse_tool_calls(raw)
+
+# Bad — restates the code
+# Parse the tool calls
+tool_calls = _reparse_tool_calls(raw)
+```
+
+## Module-Level Docstrings
+
+Each module (`.py` file) should have a brief docstring explaining its role in the system. This helps newcomers navigate the codebase.
+
+## README and Examples
+
+- Keep `README.md` examples accurate and runnable.
+- When adding a new feature, add a corresponding example to the README.
+- Use progressive disclosure: simple usage first, advanced patterns later.

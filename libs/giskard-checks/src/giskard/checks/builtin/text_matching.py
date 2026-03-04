@@ -5,8 +5,6 @@ This module provides checks for text matching:
 - RegexMatching: Regular expression pattern matching
 """
 
-from __future__ import annotations
-
 import re
 from abc import ABC, abstractmethod
 from typing import Any, Self, override
