@@ -43,6 +43,10 @@ class LLMTrace(Trace[str, str], frozen=True):
         )
 
 
+def _wrap_in_xml_tag(text: str, tag: str) -> str:
+    return f"<{tag}>\n{text}\n</{tag}>"
+
+
 def create_mock_response(
     goal_reached: bool,
     message: str | None,
@@ -52,17 +56,6 @@ def create_mock_response(
         "goal_reached": goal_reached,
         "message": message,
     }
-
-
-async def advance_turn(
-    gen, trace: LLMTrace, response_text: str
-) -> tuple[LLMTrace, str]:
-    """Helper to advance generator by one turn and return updated trace and next input."""
-    next_input = await gen.asend(trace)
-    updated_trace = await trace.with_interaction(
-        Interaction(inputs=next_input, outputs=response_text)
-    )
-    return updated_trace, next_input
 
 
 @pytest.mark.parametrize(
@@ -101,87 +94,122 @@ def test_negative_max_steps_rejected():
         UserSimulator(persona="test_user", max_steps=-1)
 
 
-async def test_user_simulator_first_turn_generates_message():
-    """Test that first turn generates a message from persona."""
+async def test_user_simulator_returns_messages_until_goal_reached():
     generator = MockGenerator(
         responses=[
-            create_mock_response(False, "Hi, I need help with my order"),
+            create_mock_response(False, "Hello, how are you?"),
             create_mock_response(True, None),
         ]
     )
-
-    simulator = UserSimulator(
-        generator=generator,
-        persona="frustrated_customer",
-        context="Order delayed 5 days",
-        max_steps=2,
+    user_simulator = UserSimulator(
+        generator=generator, persona="Greet the chatbot", max_steps=2
     )
 
     trace = LLMTrace()
-    gen = simulator(trace)
-
-    first_input = await anext(gen)
-    assert first_input == "Hi, I need help with my order"
-    first_call_content = str(generator.calls[0][-1].content)
-    assert "frustrated" in first_call_content.lower()
+    gen = user_simulator(trace)
+    inputs = await anext(gen)
+    assert inputs == "Hello, how are you?"
+    assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
+        generator.calls[0][-1].content
+    )
+    assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
+        generator.calls[0][-1].content
+    )
 
     trace = await trace.with_interaction(
-        Interaction(inputs=first_input, outputs="How can I help?")
+        Interaction(inputs=inputs, outputs="I'm good, thank you!")
     )
     with pytest.raises(StopAsyncIteration):
-        await gen.asend(trace)
+        _ = await gen.asend(trace)
+
+    assert len(generator.calls) == 2
+    assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
+        generator.calls[1][-1].content
+    )
+    assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
+        generator.calls[1][-1].content
+    )
 
 
-async def test_user_simulator_multi_turn_flow():
-    """Test multi-turn flow with persona."""
+async def test_user_simulator_returns_messages_until_max_steps():
     generator = MockGenerator(
         responses=[
-            create_mock_response(False, "First message"),
-            create_mock_response(False, "Second message"),
+            create_mock_response(False, "Hello, how are you?"),
+            create_mock_response(False, "I'm good too"),
             create_mock_response(True, None),
         ]
     )
-
-    simulator = UserSimulator(generator=generator, persona="helpful_user", max_steps=3)
+    user_simulator = UserSimulator(
+        generator=generator, persona="Greet the chatbot", max_steps=1
+    )
 
     trace = LLMTrace()
-    gen = simulator(trace)
-
-    input1 = await anext(gen)
-    assert input1 == "First message"
-
-    trace, input2 = await advance_turn(gen, trace, "Response 1")
-    assert input2 == "Second message"
+    gen = user_simulator(trace)
+    inputs = await anext(gen)
+    assert inputs == "Hello, how are you?"
+    assert len(generator.calls) == 1
+    assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
+        generator.calls[0][-1].content
+    )
+    assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
+        generator.calls[0][-1].content
+    )
 
     trace = await trace.with_interaction(
-        Interaction(inputs=input2, outputs="Response 2")
+        Interaction(inputs=inputs, outputs="I'm good and you?")
     )
     with pytest.raises(StopAsyncIteration):
-        await gen.asend(trace)
+        _ = await gen.asend(trace)
+
+    assert len(generator.calls) == 1
 
 
-async def test_user_simulator_respects_max_steps():
-    """Test that simulator respects max_steps limit."""
+async def test_user_simulatorm_multiple_steps():
     generator = MockGenerator(
         responses=[
-            create_mock_response(False, "Message 1"),
-            create_mock_response(False, "Message 2"),
+            create_mock_response(False, "Hello, how are you?"),
+            create_mock_response(False, "I'm good too"),
+            create_mock_response(True, None),
         ]
     )
-
-    simulator = UserSimulator(generator=generator, persona="helpful_user", max_steps=1)
+    user_simulator = UserSimulator(generator=generator, persona="Greet the chatbot")
 
     trace = LLMTrace()
-    gen = simulator(trace)
-
-    first_input = await anext(gen)
-    assert first_input == "Message 1"
+    gen = user_simulator(trace)
+    inputs = await anext(gen)
+    assert inputs == "Hello, how are you?"
     assert len(generator.calls) == 1
+    assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
+        generator.calls[0][-1].content
+    )
+    assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
+        generator.calls[0][-1].content
+    )
 
     trace = await trace.with_interaction(
-        Interaction(inputs=first_input, outputs="Response")
+        Interaction(inputs=inputs, outputs="I'm good and you?")
+    )
+    inputs = await gen.asend(trace)
+    assert inputs == "I'm good too"
+
+    assert len(generator.calls) == 2
+    assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
+        generator.calls[1][-1].content
+    )
+    assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
+        generator.calls[1][-1].content
+    )
+
+    trace = await trace.with_interaction(
+        Interaction(inputs=inputs, outputs="How do I get to the city center?")
     )
     with pytest.raises(StopAsyncIteration):
-        await gen.asend(trace)
+        inputs = await gen.asend(trace)
 
-    assert len(generator.calls) == 1
+    assert len(generator.calls) == 3
+    assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
+        generator.calls[2][-1].content
+    )
+    assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
+        generator.calls[2][-1].content
+    )

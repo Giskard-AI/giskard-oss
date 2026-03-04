@@ -62,7 +62,6 @@ class UserSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgum
         step = 0
         while step < self.max_steps:
             chat = await user_generator_workflow_.with_inputs(history=trace).run()
-
             output = chat.output
 
             if output.goal_reached or not output.message:
