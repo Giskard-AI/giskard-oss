@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from typing import override
 
 from pydantic import BaseModel, Field
 
@@ -8,13 +9,15 @@ from ..core.trace import Trace
 
 
 class UserSimulatorOutput(BaseModel):
+    """Output from UserSimulator."""
+
     goal_reached: bool = Field(
         ...,
-        description="Whether the goal has been reached. Meanining that the instructions have been followed and no more messages are needed.",
+        description="Whether the goal has been reached.",
     )
     message: str | None = Field(
         default=None,
-        description="The message that the user would send. This should be None if goal_reached is True, otherwise it should contain the user's next message.",
+        description="The message from this client. None if goal_reached is True.",
     )
 
 
@@ -22,19 +25,50 @@ class UserSimulatorOutput(BaseModel):
 class UserSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     InputGenerator[str, TraceType], WithGeneratorMixin
 ):
-    instructions: str
-    max_steps: int = Field(default=3)
+    """User simulation with predefined or custom personas.
 
+    Accepts either a predefined persona name (e.g., "frustrated_customer") or a custom
+    persona description. No client description is generated; the persona is used directly.
+
+    Parameters
+    ----------
+    persona : str
+        Predefined persona name or custom persona description
+    context : str | None
+        Optional context to customize the persona's behavior
+    max_steps : int
+        Maximum number of conversation turns (default: 3)
+
+    Examples
+    --------
+    >>> simulator = UserSimulator(
+    ...     persona="A polite elderly user who needs step-by-step guidance",
+    ...     context="Ask about using the mobile app"
+    ... )
+    """
+
+    persona: str = Field(
+        ..., description="Predefined persona name or custom description", min_length=1
+    )
+    context: str | None = Field(
+        default=None, description="Optional context to customize persona behavior"
+    )
+    max_steps: int = Field(default=3, ge=0)
+
+    @override
     async def __call__(self, trace: TraceType) -> AsyncGenerator[str, TraceType]:
-        user_generator_workflow_ = (
-            self.generator.template("giskard.checks::generators/user_simulator.j2")
-            .with_inputs(instructions=self.instructions)
-            .with_output(UserSimulatorOutput)
-        )
+        persona_generator_workflow_ = self.generator.template(
+            "giskard.checks::generators/user_simulator.j2"
+        ).with_output(UserSimulatorOutput)
 
         step = 0
         while step < self.max_steps:
-            chat = await user_generator_workflow_.with_inputs(history=trace).run()
+            chat = await persona_generator_workflow_.with_inputs(
+                persona=self.persona,
+                context=self.context,
+                history=trace,
+            ).run()
+
             output = chat.output
 
             if output.goal_reached or not output.message:

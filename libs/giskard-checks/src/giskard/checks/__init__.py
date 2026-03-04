@@ -31,7 +31,6 @@ from .core import (
     Trace,
 )
 from .core.interaction import BaseInteractionSpec
-from .generators.persona import PersonaSimulator
 from .generators.user import UserSimulator
 from .interaction import InteractionSpec
 from .judges import (
@@ -97,7 +96,6 @@ __all__ = [
     "InteractionSpec",
     # Generators
     "UserSimulator",
-    "PersonaSimulator",
     # Testing
     "WithSpy",
     "TestCaseRunner",

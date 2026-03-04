@@ -722,11 +722,9 @@ class TestInteractionSpec:
 
     def test_interaction_spec_serialization_with_user_simulator_inputs(self):
         """Test that InteractionSpec with UserSimulator inputs and static outputs can be serialized and deserialized."""
-        user_simulator = UserSimulator(
-            instructions="Ask about the weather", max_steps=2
-        )
+        simulator = UserSimulator(persona="Ask about the weather", max_steps=2)
         interaction_spec = InteractionSpec(
-            inputs=user_simulator, outputs="This is a static response"
+            inputs=simulator, outputs="This is a static response"
         )
 
         # Serialize to JSON
@@ -740,7 +738,7 @@ class TestInteractionSpec:
 
         # Verify the UserSimulator was restored correctly
         assert isinstance(restored_spec.inputs, UserSimulator)
-        assert restored_spec.inputs.instructions == "Ask about the weather"
+        assert restored_spec.inputs.persona == "Ask about the weather"
         assert restored_spec.inputs.max_steps == 2
 
         # Verify the static output was preserved
