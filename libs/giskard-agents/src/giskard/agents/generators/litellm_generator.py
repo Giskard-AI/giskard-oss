@@ -7,7 +7,7 @@ from pydantic import Field
 
 from ..chat import Message
 from .base import BaseGenerator, GenerationParams, Response
-from .middleware import CompletionMiddleware, RetryMiddleware
+from .middleware import CompletionMiddleware, RetryMiddleware, RetryPolicy
 
 
 @CompletionMiddleware.register("litellm_retry")
@@ -26,9 +26,13 @@ class LiteLLMGenerator(BaseGenerator):
     model: str = Field(
         description="The model identifier to use (e.g. 'gemini/gemini-2.0-flash')"
     )
-    middleware: list[CompletionMiddleware] = Field(
-        default_factory=lambda: [LiteLLMRetryMiddleware()]
-    )
+    retry_policy: RetryPolicy | None = Field(default_factory=RetryPolicy)
+
+    @override
+    def _create_retry_middleware(self) -> LiteLLMRetryMiddleware | None:
+        if self.retry_policy is None:
+            return None
+        return LiteLLMRetryMiddleware(retry_policy=self.retry_policy)
 
     @override
     async def _complete(

@@ -68,47 +68,49 @@ chat = await (
 )
 ```
 
-## Middleware
+## Retries and rate limiting
 
-Generators use a middleware pipeline to handle cross-cutting concerns like retries and rate limiting. Middleware is applied in order around the core completion call.
+Generators have built-in support for retries and rate limiting via dedicated fields. The correct middleware ordering is handled automatically (retry wraps rate limiting wraps custom middlewares).
 
 ### Retries
 
-By default, `LiteLLMGenerator` includes a retry middleware that retries failed requests with exponential backoff (using LiteLLM's retry-eligibility logic). You can customize retry parameters:
+By default, `LiteLLMGenerator` retries failed requests with exponential backoff using LiteLLM's retry-eligibility logic. You can customize the retry policy:
 
 ```python
-from giskard.agents.generators.litellm_generator import LiteLLMRetryMiddleware
+from giskard.agents.generators.middleware import RetryPolicy
 
 generator = agents.Generator(
     model="openai/gpt-4o-mini",
-    middleware=[LiteLLMRetryMiddleware(max_attempts=5, base_delay=2.0, max_delay=30.0)],
+    retry_policy=RetryPolicy(max_attempts=5, base_delay=2.0, max_delay=30.0),
 )
+```
+
+Or use the convenience method:
+
+```python
+generator = agents.Generator(model="openai/gpt-4o-mini").with_retries(5, base_delay=2.0, max_delay=30.0)
 ```
 
 ### Rate limiting
 
-To add rate limiting, include a `RateLimiterMiddleware` in the middleware list:
-
 ```python
-from giskard.agents.generators.middleware import RateLimiterMiddleware
 from giskard.core import MinIntervalRateLimiter
 
 generator = agents.Generator(
     model="openai/gpt-4o-mini",
-    middleware=[
-        LiteLLMRetryMiddleware(),
-        RateLimiterMiddleware(
-            rate_limiter=MinIntervalRateLimiter.from_rpm(60, max_concurrent=5),
-        ),
-    ],
+    rate_limiter=MinIntervalRateLimiter.from_rpm(60, max_concurrent=5),
 )
 ```
 
-Middleware order matters: in the example above, retries wrap rate limiting, so each retry attempt individually acquires the rate limiter.
+Or use the convenience method:
 
-### Custom middleware
+```python
+generator = generator.with_rate_limiter(MinIntervalRateLimiter.from_rpm(60, max_concurrent=5))
+```
 
-You can write your own middleware by subclassing `CompletionMiddleware`:
+## Custom middleware
+
+For advanced cross-cutting concerns (logging, caching, etc.), you can write custom middleware by subclassing `CompletionMiddleware` and adding it to the `middlewares` list:
 
 ```python
 from giskard.agents.generators.middleware import CompletionMiddleware
@@ -123,9 +125,11 @@ class LoggingMiddleware(CompletionMiddleware):
 
 generator = agents.Generator(
     model="openai/gpt-4o-mini",
-    middleware=[LoggingMiddleware(), LiteLLMRetryMiddleware()],
+    middlewares=[LoggingMiddleware()],
 )
 ```
+
+Custom middlewares run after the built-in retry and rate-limiter middleware.
 
 ## Structured output
 

@@ -4,6 +4,7 @@ from .middleware import (
     CompletionMiddleware,
     RateLimiterMiddleware,
     RetryMiddleware,
+    RetryPolicy,
 )
 
 # Default generator uses LiteLLM
@@ -17,6 +18,7 @@ __all__ = [
     "LiteLLMGenerator",
     "CompletionMiddleware",
     "RetryMiddleware",
+    "RetryPolicy",
     "RateLimiterMiddleware",
     "LiteLLMRetryMiddleware",
 ]

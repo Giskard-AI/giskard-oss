@@ -3,12 +3,18 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from typing import TYPE_CHECKING, Any, Self
 
-from giskard.core import Discriminated, discriminated_base
+from giskard.core import BaseRateLimiter, Discriminated, discriminated_base
 from pydantic import Field
 
 from ..chat import Message, Role
 from ._types import GenerationParams, Response
-from .middleware import CompletionMiddleware, NextFn
+from .middleware import (
+    CompletionMiddleware,
+    NextFn,
+    RateLimiterMiddleware,
+    RetryMiddleware,
+    RetryPolicy,
+)
 
 if TYPE_CHECKING:
     from ..workflow import ChatWorkflow
@@ -19,7 +25,9 @@ class BaseGenerator(Discriminated, ABC):
     """Base class for all generators."""
 
     params: GenerationParams = Field(default_factory=GenerationParams)
-    middleware: list[CompletionMiddleware] = Field(default_factory=list)
+    retry_policy: RetryPolicy | None = Field(default=None)
+    rate_limiter: BaseRateLimiter | None = Field(default=None)
+    middlewares: list[CompletionMiddleware] = Field(default_factory=list)
 
     @abstractmethod
     async def _complete(
@@ -49,7 +57,14 @@ class BaseGenerator(Discriminated, ABC):
         return await chain(messages, params)
 
     def _build_chain(self, core: NextFn) -> NextFn:
-        """Fold ``self.middleware`` around *core*, first element = outermost."""
+        """Compose built-in retry/rate-limiter and custom middlewares around *core*."""
+        built_in: list[CompletionMiddleware] = []
+        if retry_mw := self._create_retry_middleware():
+            built_in.append(retry_mw)
+        if self.rate_limiter is not None:
+            built_in.append(RateLimiterMiddleware(rate_limiter=self.rate_limiter))
+
+        all_mw = built_in + list(self.middlewares)
 
         def _wrap(next_fn: NextFn, mw: CompletionMiddleware) -> NextFn:
             async def _wrapped(
@@ -59,7 +74,39 @@ class BaseGenerator(Discriminated, ABC):
 
             return _wrapped
 
-        return reduce(_wrap, reversed(self.middleware), core)
+        return reduce(_wrap, reversed(all_mw), core)
+
+    def _create_retry_middleware(self) -> RetryMiddleware | None:
+        """Create the retry middleware from ``retry_policy``.
+
+        Subclasses can override to return a provider-specific middleware.
+        """
+        if self.retry_policy is None:
+            return None
+        return RetryMiddleware(retry_policy=self.retry_policy)
+
+    def with_retries(
+        self,
+        max_attempts: int,
+        *,
+        base_delay: float | None = None,
+        max_delay: float | None = None,
+    ) -> Self:
+        """Return a copy with an updated retry policy."""
+        updates: dict[str, Any] = {"max_attempts": max_attempts}
+        if base_delay is not None:
+            updates["base_delay"] = base_delay
+        if max_delay is not None:
+            updates["max_delay"] = max_delay
+
+        policy = (self.retry_policy or RetryPolicy()).model_copy(update=updates)
+        return self.model_copy(update={"retry_policy": policy})
+
+    def with_rate_limiter(self, rate_limiter: BaseRateLimiter | str | None) -> Self:
+        """Return a copy with the given rate limiter."""
+        if isinstance(rate_limiter, str):
+            rate_limiter = BaseRateLimiter.from_id(rate_limiter)
+        return self.model_copy(update={"rate_limiter": rate_limiter})
 
     async def batch_complete(
         self, messages: list[list[Message]], params: GenerationParams | None = None
