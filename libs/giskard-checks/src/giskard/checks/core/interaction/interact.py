@@ -3,15 +3,16 @@ from typing import Any, cast, override
 
 from pydantic import Field, PrivateAttr, model_validator
 
-from ..core.input_generator import InputGenerator
-from ..core.interaction import BaseInteractionSpec
-from ..core.trace import Interaction, Trace
-from ..core.types import GeneratorType, ProviderType
-from ..utils.parameter_injection import ParameterInjectionRequirement
-from ..utils.value_provider import (
+from ...utils.parameter_injection import ParameterInjectionRequirement
+from ...utils.value_provider import (
     ValueGeneratorProvider,
     ValueProvider,
 )
+from ..input_generator import InputGenerator
+from ..types import GeneratorType, ProviderType
+from .base import InteractionSpec
+from .interaction import Interaction
+from .trace import Trace
 
 INJECTABLE_TRACE = ParameterInjectionRequirement(
     class_info=Trace,
@@ -24,38 +25,65 @@ INJECTABLE_INPUT = ParameterInjectionRequirement(
 )
 
 
-@BaseInteractionSpec.register("interaction_spec")
-class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    BaseInteractionSpec[InputType, OutputType, TraceType]
+@InteractionSpec.register("interact")
+class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    InteractionSpec[InputType, OutputType, TraceType]
 ):
-    """Flexible interaction specification supporting static values, callables, and generators.
+    """Defines how to interact with a system.
 
-    **Note**: For most use cases, the fluent API (`scenario().interact()`) is recommended
-    as it automatically creates `InteractionSpec` objects and is simpler to use. This class
-    is useful for advanced use cases where you need direct control over interaction specification.
+    `Interact` is an interaction specification representing a logical exchange
+    with a system (steps in a workflow, turns in a chat, etc.).
 
-    This is the default implementation of `BaseInteractionSpec` that provides
-    a convenient way to specify interactions with varying levels of dynamism:
+    It describes *how* to generate one or more `Interaction` objects. At runtime,
+    its `inputs` and `outputs` specifications are resolved by `Interact.generate`
+    to produce a sequence of immutable `Interaction` realizations.
 
-    - **Static values**: Direct input/output values
-    - **Callables**: Functions that compute inputs/outputs (sync or async)
-    - **Generators**: Functions that yield multiple inputs over time
+    In the simplest case, `Interact` is a static input and output pair:
+
+        Interact(inputs="Hello", outputs="Hi")
+
+    For dynamic interactions, you can use a callable or a generator:
+
+        Interact(
+            inputs=lambda trace: f"Here's a random number: {random.randint(1, 100)}",
+            outputs=lambda inputs: f"I received the number {inputs}"
+        )
+
+    At test time, the callables will be invoked and produce a realization of
+    `Interaction` such as:
+
+        Interaction(inputs="Here's a random number: 42", outputs="I received the number 42")
+
+    If you use a generator, a sequence of `Interaction` realizations will be
+    produced, until exhaustion of the generator:
+
+        async def input_generator(trace: Trace) -> AsyncGenerator[str, Trace]:
+            for i in range(3):
+                yield f"Message {i+1}"
+
+        interact = Interact(inputs=input_generator, outputs=lambda inputs: f"Received: {inputs}")
+
+    At test time, this will produce a sequence of 3 interactions:
+
+        Interaction(inputs="Message 1", outputs="Received: Message 1")
+        Interaction(inputs="Message 2", outputs="Received: Message 2")
+        Interaction(inputs="Message 3", outputs="Received: Message 3")
+
+    Both `inputs` and `outputs` support static and dynamic forms.
 
     The `inputs` field can be:
-    - A static value of type `InputType`
-    - A callable with no arguments that returns `InputType` (or awaitable/generator)
-    - A callable that takes the current `Trace` and returns `InputType` (or awaitable/generator)
-    - A generator/async generator that yields `InputType` values
+    - A static value
+    - A callable with no arguments
+    - A callable that takes the current `Trace`
+    - A generator/async generator
 
     The `outputs` field can be:
-    - A static value of type `OutputType`
-    - A callable that takes `InputType` and returns `OutputType` (or awaitable)
-    - A callable that takes `(InputType, Trace)` and returns `OutputType` (or awaitable)
+    - A static value
+    - A callable that takes `InputType` arguments
+    - A callable that takes `(InputType, Trace)` arguments
     - A callable that returns an `Interaction` object directly
 
-    When using generators for inputs, the spec will yield multiple interactions,
-    one for each input value produced by the generator. Each interaction receives
-    the updated trace (including previous interactions) via the generator protocol.
+    Awaitable callables will be awaited before being used.
 
     Attributes
     ----------
@@ -74,41 +102,41 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
     Examples
     --------
     Static inputs and outputs:
-    ```python
-    InteractionSpec(
-        inputs="Hello",
-        outputs="Hi there!",
-        metadata={"source": "test"}
-    )
-    ```
+
+    >>> Interact(
+    ...     inputs="Hello",
+    ...     outputs="Hi there!",
+    ...     metadata={"source": "test"}
+    ... )
+    Interact(inputs='Hello', outputs='Hi there!', metadata=...)
 
     Callable-based outputs:
-    ```python
-    InteractionSpec(
-        inputs="What is 2+2?",
-        outputs=lambda inputs: f"Answer: {eval(inputs)}"
-    )
-    ```
+
+    >>> Interact(
+    ...     inputs="What is 2+2?",
+    ...     outputs=lambda inputs: f"Answer: {eval(inputs)}"
+    ... )
+    Interact(inputs='What is 2+2?', outputs=<function <lambda> at 0x...>, metadata=...)
 
     Trace-dependent inputs:
-    ```python
-    InteractionSpec(
-        inputs=lambda trace: f"Message #{len(trace.interactions) + 1}",
-        outputs=lambda inputs, trace: f"Received: {inputs}"
-    )
-    ```
+
+    >>> Interact(
+    ...     inputs=lambda trace: f"Message #{len(trace.interactions) + 1}",
+    ...     outputs=lambda inputs, trace: f"Received: {inputs}"
+    ... )
+    Interact(inputs=<function <lambda> at 0x...>, outputs=<function <lambda> at 0x...>, metadata=...)
 
     Generator for multiple interactions:
-    ```python
-    async def input_gen(trace: Trace) -> AsyncGenerator[str, Trace]:
-        for i in range(3):
-            yield f"Message {i+1}"
 
-    InteractionSpec(
-        inputs=input_gen,
-        outputs=lambda inputs: f"Echo: {inputs}"
-    )
-    ```
+    >>> async def input_gen(trace: Trace) -> AsyncGenerator[str, Trace]:
+    ...     for i in range(3):
+    ...         yield f"Message {i+1}"
+    ...
+    >>> Interact(
+    ...     inputs=input_gen,
+    ...     outputs=lambda inputs: f"Echo: {inputs}"
+    ... )
+    Interact(inputs=<function input_gen at 0x...>, outputs=<function <lambda> at 0x...>, metadata=...)
     """
 
     inputs: (
@@ -134,7 +162,7 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
     @model_validator(mode="after")
     def _validate_injection_mappings(
         self,
-    ) -> "InteractionSpec[InputType, OutputType, TraceType]":
+    ) -> "Interact[InputType, OutputType, TraceType]":
         try:
             self._input_value_generator_provider = ValueGeneratorProvider.from_mapping(
                 self.inputs, INJECTABLE_TRACE
@@ -188,6 +216,3 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
             if isinstance(outputs, Interaction)
             else Interaction(inputs=inputs, outputs=outputs, metadata=self.metadata)
         )
-
-
-__all__ = ["InteractionSpec"]

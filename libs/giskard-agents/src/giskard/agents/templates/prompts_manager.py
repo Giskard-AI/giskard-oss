@@ -56,9 +56,12 @@ class PromptsManager(BaseModel):
 
     def add_prompts_path(self, path: str | Path, namespace: str):
         """Add a custom prompts path for a given namespace."""
+        resolved = Path(path)
         if namespace in self.namespaces:
+            if self.namespaces[namespace] == resolved:
+                return
             raise ValueError(f"Namespace {namespace} already exists")
-        self.namespaces[namespace] = Path(path)
+        self.namespaces[namespace] = resolved
 
     def remove_prompts_path(self, namespace: str):
         """Remove a custom prompts path for a given namespace."""

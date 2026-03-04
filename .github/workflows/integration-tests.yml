@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.12", "3.13", "3.14"]
         package: [giskard-core, giskard-agents, giskard-checks]
     name: test-functional / ${{ matrix.package }} / ${{ matrix.python-version }}
     env:

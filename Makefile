@@ -66,11 +66,11 @@ lint: ## Run linting checks
 	uv run ruff check .
 
 format: ## Format code with ruff
-	uv tool run ruff format .
-	uv tool run ruff check --fix .
+	uv run ruff format .
+	uv run ruff check --fix .
 
 check-format: ## Check if code is formatted correctly
-	uv tool run ruff format --check .
+	uv run ruff format --check .
 
 check-compat: ## Check Python 3.12 compatibility
 	uv tool run vermin --target=3.12- --no-tips --violations .
