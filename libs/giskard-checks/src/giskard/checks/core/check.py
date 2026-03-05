@@ -1,4 +1,3 @@
-
 from giskard.core import Discriminated, discriminated_base
 from pydantic import Field
 

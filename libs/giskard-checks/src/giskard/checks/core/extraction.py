@@ -1,4 +1,3 @@
-
 from typing import Annotated, Any, override
 
 from giskard.core import NOT_PROVIDED, NotProvided

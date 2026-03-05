@@ -1,4 +1,3 @@
-
 from typing import Any, Self
 
 from pydantic import BaseModel, Field
