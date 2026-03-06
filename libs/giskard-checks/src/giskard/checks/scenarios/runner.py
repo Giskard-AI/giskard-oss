@@ -14,7 +14,7 @@ from giskard.core.utils import NOT_PROVIDED, NotProvided
 
 from ..core import Trace
 from ..core.check import Check
-from ..core.interaction import Interact, Interaction
+from ..core.interaction import Interact, Interaction, InteractionSpec
 from ..core.protocols import InteractionGenerator
 from ..core.result import CheckResult, ScenarioResult, TestCaseResult
 from ..core.scenario import Scenario
@@ -77,6 +77,30 @@ class _ScenarioStepsBuilder[InputType, OutputType, TraceType: Trace]:  # pyright
 
     def build(self) -> list[_ScenarioStep[InputType, OutputType, TraceType]]:
         return self.steps
+
+
+def _bind_target[InputType, OutputType, TraceType: Trace[Any, Any]](
+    component: InteractionSpec[InputType, OutputType, TraceType]
+    | Check[InputType, OutputType, TraceType],
+    target: ProviderType[[InputType], OutputType]
+    | ProviderType[[InputType, TraceType], OutputType]
+    | NotProvided,
+) -> (
+    InteractionSpec[InputType, OutputType, TraceType]
+    | Check[InputType, OutputType, TraceType]
+):
+    if (
+        isinstance(component, Interact)
+        and isinstance(component.outputs, NotProvided)
+        and not isinstance(target, NotProvided)
+    ):
+        # model_copy(update=...) does not run model_post_init, so _output_value_provider
+        # would not be rebuilt. Use model_validate so injection mappings (trace/input) are
+        # validated and the provider is correctly initialized from the new outputs.
+        return type(component).model_validate(
+            component.model_copy(update={"outputs": target})
+        )
+    return component
 
 
 class ScenarioRunner:
@@ -147,16 +171,7 @@ class ScenarioRunner:
         )
         target = target if not isinstance(target, NotProvided) else scenario.target
 
-        sequence = []
-        for component in scenario.sequence:
-            if isinstance(component, Interact) and isinstance(
-                component.outputs, NotProvided
-            ):
-                if not isinstance(target, NotProvided):
-                    new_data = component.model_dump()
-                    new_data["outputs"] = target
-                    component = type(component).model_validate(new_data)
-            sequence.append(component)
+        sequence = [_bind_target(component, target) for component in scenario.sequence]
 
         steps = _ScenarioStepsBuilder(*sequence).build()
         steps_results: list[TestCaseResult] = []

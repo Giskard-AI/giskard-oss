@@ -8,7 +8,10 @@ from giskard.checks import Check, CheckStatus, Interaction, LLMJudge, Trace
 from pydantic import Field, ValidationError
 
 
+@BaseGenerator.register("mock")
 class MockGenerator(BaseGenerator):
+    """Mock generator that returns predictable pass/fail and reason."""
+
     passed: bool
     reason: str | None
     calls: list[list[Message]] = Field(default_factory=list)

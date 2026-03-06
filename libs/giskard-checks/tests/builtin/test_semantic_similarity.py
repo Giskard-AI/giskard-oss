@@ -14,6 +14,7 @@ from giskard.checks.builtin.semantic_similarity import cosine_similarity
 from giskard.checks.core.extraction import NoMatch
 
 
+@BaseEmbeddingModel.register("mock")
 class MockEmbeddingModel(BaseEmbeddingModel):
     """Mock embedding model that returns predictable embeddings."""
 
