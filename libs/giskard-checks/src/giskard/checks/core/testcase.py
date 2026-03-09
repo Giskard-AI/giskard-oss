@@ -5,15 +5,13 @@ execution to a `TestCaseRunner`. It offers a single `run()` method that returns 
 `TestCaseResult` summarizing the outcomes.
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 
 from pydantic import BaseModel, Field
 
 from .check import Check
+from .interaction import Trace
 from .result import TestCaseResult
-from .trace import Trace
 
 
 class TestCase[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]

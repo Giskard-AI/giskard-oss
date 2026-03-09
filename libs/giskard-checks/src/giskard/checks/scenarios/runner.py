@@ -5,17 +5,19 @@ pattern, where components yield Interactions or CheckResults and receive
 updated Trace objects via the async generator protocol.
 """
 
-from __future__ import annotations
-
 import time
 from typing import Any, cast
 
+from giskard.core.utils import NOT_PROVIDED, NotProvided
+
+from ..core import Trace
 from ..core.check import Check
+from ..core.interaction import Interact, Interaction
 from ..core.protocols import InteractionGenerator
 from ..core.result import CheckResult, ScenarioResult, TestCaseResult
 from ..core.scenario import Scenario
 from ..core.testcase import TestCase
-from ..core.trace import Interaction, Trace
+from ..core.types import ProviderType
 
 
 class _ScenarioStep[InputType, OutputType, TraceType: Trace]:  # pyright: ignore[reportMissingTypeArgument]
@@ -83,7 +85,7 @@ class ScenarioRunner:
     or error.
 
     Components are processed in order:
-    1. **Interaction / InteractionSpec components**: Add interactions to the trace.
+    1. **InteractionSpec components**: Add interactions to the trace.
        Specs generate interactions using their `generate()` method. Each yielded
        interaction is added to the trace, and the updated trace is sent back to
        the generator via `asend()`.
@@ -104,12 +106,17 @@ class ScenarioRunner:
     async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
+        target: (
+            ProviderType[[InputType], OutputType]
+            | ProviderType[[InputType, TraceType], OutputType]
+            | NotProvided
+        ) = NOT_PROVIDED,
         return_exception: bool = False,
     ) -> ScenarioResult[InputType, OutputType]:
         """Execute a sequential scenario with shared Trace.
 
         Components are executed in order:
-        - Interaction / InteractionSpec components update the shared trace
+        - InteractionSpec components update the shared trace
         - Check components validate the current trace and stop execution on failure
 
         Execution stops on the first failing check; remaining components are not executed.
@@ -136,7 +143,20 @@ class ScenarioRunner:
                 Trace[InputType, OutputType](annotations=scenario.annotations),
             )
         )
-        steps = _ScenarioStepsBuilder(*scenario.sequence).build()
+        target = target if not isinstance(target, NotProvided) else scenario.target
+
+        sequence = []
+        for component in scenario.sequence:
+            if isinstance(component, Interact) and isinstance(
+                component.outputs, NotProvided
+            ):
+                if not isinstance(target, NotProvided):
+                    new_data = component.model_dump()
+                    new_data["outputs"] = target
+                    component = type(component).model_validate(new_data)
+            sequence.append(component)
+
+        steps = _ScenarioStepsBuilder(*sequence).build()
         steps_results: list[TestCaseResult] = []
 
         for step in steps:

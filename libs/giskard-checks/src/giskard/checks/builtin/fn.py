@@ -1,14 +1,12 @@
-from __future__ import annotations
-
 import inspect
 from collections.abc import Awaitable
 from typing import Any, Callable, override
 
 from pydantic import Field
 
+from ..core import Trace
 from ..core.check import Check
 from ..core.result import CheckResult
-from ..core.trace import Trace
 
 """Function-backed check implementation.
 

@@ -3,7 +3,13 @@ from typing import cast
 import numpy as np
 import pytest
 from giskard.agents.embeddings.base import BaseEmbeddingModel, EmbeddingParams
-from giskard.checks import Check, CheckStatus, Interaction, SemanticSimilarity, Trace
+from giskard.checks import (
+    Check,
+    CheckStatus,
+    Interaction,
+    SemanticSimilarity,
+    Trace,
+)
 from giskard.checks.builtin.semantic_similarity import cosine_similarity
 from giskard.checks.core.extraction import NoMatch
 

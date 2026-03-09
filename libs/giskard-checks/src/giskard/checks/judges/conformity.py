@@ -4,8 +4,8 @@ from giskard.agents.workflow import TemplateReference
 from jinja2 import Template
 from pydantic import Field
 
+from ..core import Trace
 from ..core.check import Check
-from ..core.trace import Trace
 from .base import BaseLLMCheck
 
 
