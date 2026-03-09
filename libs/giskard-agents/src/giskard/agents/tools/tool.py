@@ -171,22 +171,21 @@ class Tool(BaseModel):
             The serialized result of calling the function.
         """
 
-        # Coerce dict arguments into typed objects via the Pydantic params model.
-        # Extra keys not in model_fields are dropped (Pydantic extra='ignore').
-        if self._params_model is not None:
-            validated = self._params_model.model_validate(arguments)
-            arguments = {
-                name: getattr(validated, name)
-                for name in arguments
-                if name in self._params_model.model_fields
-            }
-
-        # Inject the context after coercion (RunContext is excluded from the model)
-        if ctx and self.run_context_param:
-            arguments = arguments.copy()
-            arguments[self.run_context_param] = ctx
-
         try:
+            # Coerce dict arguments into typed objects via the Pydantic params model.
+            # Extra keys not in model_fields are dropped (Pydantic extra='ignore').
+            if self._params_model is not None:
+                validated = self._params_model.model_validate(arguments)
+                arguments = {
+                    name: getattr(validated, name)
+                    for name in self._params_model.model_fields
+                    if name in arguments
+                }
+
+            if ctx and self.run_context_param:
+                arguments = arguments.copy()
+                arguments[self.run_context_param] = ctx
+
             res = self.fn(**arguments)
             if inspect.isawaitable(res):
                 res = await res
