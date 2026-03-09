@@ -1,0 +1,17 @@
+---
+description: Team-wide guardrails for AI-assisted development.
+alwaysApply: true
+---
+# Guidelines
+
+## No Inventions
+
+Only make changes that are explicitly requested. Do not add unrequested features, refactors, or improvements.
+
+## Preserve Existing Code
+
+Do not remove unrelated code, functionalities, or comments without explicit reason. Pay attention to preserving existing structures.
+
+## No CODEMAP
+
+Never generate architecture maps, codemap files, or similar high-maintenance documentation that duplicates what is already in cursor rules, docstrings, and README. These files go stale fast and create maintenance burden.

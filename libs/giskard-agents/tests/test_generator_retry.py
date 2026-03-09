@@ -5,7 +5,7 @@ import pytest
 from giskard.agents.chat import Message
 from giskard.agents.generators import FinishReason
 from giskard.agents.generators.base import BaseGenerator
-from giskard.agents.generators.middleware import RetryMiddleware
+from giskard.agents.generators.middleware import RetryMiddleware, RetryPolicy
 
 
 class RetriableError(Exception):
@@ -36,12 +36,9 @@ class MockGenerator(BaseGenerator):
 
 
 def _make_generator(**retry_kwargs) -> MockGenerator:
-    mw = (
-        _RetriableOnlyMiddleware(**retry_kwargs)
-        if retry_kwargs
-        else _RetriableOnlyMiddleware()
-    )
-    return MockGenerator(middleware=[mw])
+    policy = RetryPolicy(**retry_kwargs) if retry_kwargs else RetryPolicy()
+    mw = _RetriableOnlyMiddleware(retry_policy=policy)
+    return MockGenerator(middlewares=[mw])
 
 
 async def test_raises_exception_after_retries_exhausted():

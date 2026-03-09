@@ -42,10 +42,18 @@ class ErrorPolicy(StrEnum):
     SKIP = "skip"
 
 
+class StepType(StrEnum):
+    """Discriminator for workflow step types."""
+
+    TOOL_RESULT = "tool_result"
+    COMPLETION = "completion"
+
+
 class WorkflowStep(BaseModel):
     """A step in a workflow."""
 
     index: int = Field(default=0)
+    step_type: StepType
     workflow: "ChatWorkflow[Any]"
     chat: Chat[Any]
     message: Message
@@ -109,6 +117,7 @@ class _StepRunner:
             async for tool_message in self._run_tools(chat):
                 chat = chat.clone().add(tool_message)
                 step = WorkflowStep(
+                    step_type=StepType.TOOL_RESULT,
                     workflow=self._workflow,
                     chat=chat,
                     message=tool_message,
@@ -130,6 +139,7 @@ class _StepRunner:
             message = await self._run_completion(chat)
             chat = chat.clone().add(message)
             step = WorkflowStep(
+                step_type=StepType.COMPLETION,
                 workflow=self._workflow,
                 chat=chat,
                 message=message,

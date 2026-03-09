@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 from typing import Any, cast, override
 
+from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import Field, PrivateAttr, model_validator
 
 from ...utils.parameter_injection import ParameterInjectionRequirement
@@ -147,7 +148,8 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     outputs: (
         ProviderType[[InputType], OutputType]
         | ProviderType[[InputType, TraceType], OutputType]
-    ) = Field(..., description="The outputs of the interaction.")
+        | NotProvided
+    ) = Field(default=NOT_PROVIDED, description="The outputs of the interaction.")
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="The metadata of the interaction."
     )
@@ -171,9 +173,10 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
             raise ValueError(f"Error getting injection settings for inputs: {e}") from e
 
         try:
-            self._output_value_provider = ValueProvider.from_mapping(
-                self.outputs, INJECTABLE_INPUT, INJECTABLE_TRACE
-            )
+            if not isinstance(self.outputs, NotProvided):
+                self._output_value_provider = ValueProvider.from_mapping(
+                    self.outputs, INJECTABLE_INPUT, INJECTABLE_TRACE
+                )
         except ValueError as e:
             raise ValueError(
                 f"Error getting injection settings for outputs: {e}"
@@ -190,6 +193,10 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         try:
             inputs = await anext(generator)
             while True:
+                if isinstance(self.outputs, NotProvided):
+                    raise ValueError(
+                        "Interaction outputs are not provided and no target was bound."
+                    )
                 # Execute user-provided logic to transform inputs into either raw outputs
                 # or a fully constructed Interaction instance.
                 outputs = await self._output_value_provider(inputs, trace)

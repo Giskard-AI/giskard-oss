@@ -13,22 +13,13 @@ from giskard.agents.generators import (
 from giskard.agents.generators.base import Response
 from giskard.agents.generators.litellm_generator import (
     LiteLLMGenerator,
-    LiteLLMRetryMiddleware,
 )
-from giskard.agents.generators.middleware import RateLimiterMiddleware
+from giskard.agents.generators.middleware import RetryPolicy
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.tools import Tool
 from giskard.agents.workflow import ChatWorkflow, ErrorPolicy
 from giskard.core import MinIntervalRateLimiter
 from pydantic import Field
-
-
-def _retry_mw(gen: BaseGenerator) -> LiteLLMRetryMiddleware:
-    return next(mw for mw in gen.middleware if isinstance(mw, LiteLLMRetryMiddleware))
-
-
-def _rl_mw(gen: BaseGenerator) -> RateLimiterMiddleware:
-    return next(mw for mw in gen.middleware if isinstance(mw, RateLimiterMiddleware))
 
 
 def test_generator_serialization():
@@ -42,10 +33,8 @@ def test_generator_serialization():
             response_format=None,
             tools=[Tool(name="test-tool", description="Test tool", fn=lambda: "test")],
         ),
-        middleware=[
-            LiteLLMRetryMiddleware(max_attempts=3, base_delay=1.0),
-            RateLimiterMiddleware(rate_limiter=rate_limiter),
-        ],
+        retry_policy=RetryPolicy(max_attempts=3, base_delay=1.0),
+        rate_limiter=rate_limiter,
     )
     serialized = original.model_dump_json(exclude={"params": {"tools"}})
     deserialized = BaseGenerator.model_validate_json(serialized)
@@ -54,11 +43,11 @@ def test_generator_serialization():
     assert isinstance(deserialized, LiteLLMGenerator)
     assert deserialized.model == "test-model"
 
-    retry = _retry_mw(deserialized)
-    assert retry.max_attempts == 3
-    assert retry.base_delay == 1.0
+    assert deserialized.retry_policy is not None
+    assert deserialized.retry_policy.max_attempts == 3
+    assert deserialized.retry_policy.base_delay == 1.0
 
-    assert _rl_mw(deserialized).rate_limiter == rate_limiter
+    assert deserialized.rate_limiter == rate_limiter
 
     assert deserialized.params is not None
     assert deserialized.params.temperature == 0.5
@@ -105,10 +94,8 @@ def test_chat_workflow_serialization():
     rate_limiter = MinIntervalRateLimiter.from_rpm(100, max_concurrent=10)
     generator = Generator(
         model="test-model",
-        middleware=[
-            LiteLLMRetryMiddleware(max_attempts=3, base_delay=1.0),
-            RateLimiterMiddleware(rate_limiter=rate_limiter),
-        ],
+        retry_policy=RetryPolicy(max_attempts=3, base_delay=1.0),
+        rate_limiter=rate_limiter,
     )
 
     tool = Tool(name="test-tool", description="Test tool", fn=lambda: "test")
@@ -129,12 +116,11 @@ def test_chat_workflow_serialization():
     assert isinstance(deserialized.generator, LiteLLMGenerator)
     assert deserialized.generator.model == "test-model"
 
-    retry = _retry_mw(deserialized.generator)
-    assert isinstance(retry, LiteLLMRetryMiddleware)
-    assert retry.max_attempts == 3
-    assert retry.base_delay == 1.0
+    assert deserialized.generator.retry_policy is not None
+    assert deserialized.generator.retry_policy.max_attempts == 3
+    assert deserialized.generator.retry_policy.base_delay == 1.0
 
-    assert _rl_mw(deserialized.generator).rate_limiter == rate_limiter
+    assert deserialized.generator.rate_limiter == rate_limiter
 
     assert len(deserialized.messages) == 2
     assert isinstance(deserialized.messages[0], MessageTemplate)

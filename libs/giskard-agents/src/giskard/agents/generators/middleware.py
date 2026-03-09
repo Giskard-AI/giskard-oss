@@ -11,7 +11,7 @@ from collections.abc import Awaitable, Callable
 
 import tenacity as t
 from giskard.core import BaseRateLimiter, Discriminated, discriminated_base
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from ..chat import Message
 from ._types import GenerationParams, Response
@@ -38,6 +38,14 @@ class CompletionMiddleware(Discriminated, ABC):
         """Invoke the middleware, calling *next_fn* to continue the chain."""
 
 
+class RetryPolicy(BaseModel):
+    """Configuration for retry behavior."""
+
+    max_attempts: int = Field(default=3)
+    base_delay: float = Field(default=1.0)
+    max_delay: float | None = Field(default=None)
+
+
 @CompletionMiddleware.register("retry")
 class RetryMiddleware(CompletionMiddleware):
     """Retries failed completions with exponential back-off (tenacity).
@@ -45,9 +53,7 @@ class RetryMiddleware(CompletionMiddleware):
     Override ``_should_retry`` in subclasses for provider-specific logic.
     """
 
-    max_attempts: int = Field(default=3)
-    base_delay: float = Field(default=1.0)
-    max_delay: float | None = Field(default=None)
+    retry_policy: RetryPolicy = Field(default_factory=RetryPolicy)
 
     def _should_retry(self, err: Exception) -> bool:  # noqa: ARG002
         """Return ``True`` if *err* warrants a retry.  Default: retry all."""
@@ -59,12 +65,13 @@ class RetryMiddleware(CompletionMiddleware):
         params: GenerationParams | None,
         next_fn: NextFn,
     ) -> Response:
-        wait_kwargs: dict[str, float] = {"multiplier": self.base_delay}
-        if self.max_delay is not None:
-            wait_kwargs["max"] = self.max_delay
+        policy = self.retry_policy
+        wait_kwargs: dict[str, float] = {"multiplier": policy.base_delay}
+        if policy.max_delay is not None:
+            wait_kwargs["max"] = policy.max_delay
 
         retrier = t.AsyncRetrying(
-            stop=t.stop_after_attempt(self.max_attempts),
+            stop=t.stop_after_attempt(policy.max_attempts),
             wait=t.wait_exponential(**wait_kwargs),
             retry=self._tenacity_retry_condition,
             reraise=True,
