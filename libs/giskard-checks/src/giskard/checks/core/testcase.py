@@ -5,8 +5,6 @@ execution to a `TestCaseRunner`. It offers a single `run()` method that returns 
 `TestCaseResult` summarizing the outcomes.
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 
 from pydantic import BaseModel, Field
