@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import inspect
 from collections.abc import Awaitable
 from typing import Any, Callable, override

@@ -1,0 +1,148 @@
+---
+description: Python conventions for the giskard workspace (3.12+, Pydantic v2, async, testing).
+globs: "**/*.py"
+alwaysApply: false
+---
+# Python Conventions
+
+## Python Version
+
+- Python >= 3.12 required across all projects.
+- **Never use `from __future__ import annotations`** — it breaks Pydantic v2 model resolution at runtime and is unnecessary with 3.12+.
+
+## Modern Python 3.12+ Features
+
+Prefer modern syntax over legacy `typing` equivalents.
+
+### PEP 695 — Type Parameter Syntax
+
+```python
+# Good — PEP 695 inline type parameters
+class Box[T]:
+    def __init__(self, value: T): ...
+
+def first[T](items: list[T]) -> T: ...
+
+# Bad — legacy TypeVar / Generic
+from typing import TypeVar, Generic
+T = TypeVar('T')
+class Box(Generic[T]):
+    def __init__(self, value: T): ...
+```
+
+### PEP 695 — Bounded and Constrained Generics
+
+```python
+# Good
+class NumberBox[T: (int, float)]: ...
+class Comparable[T: int]: ...
+
+# Bad
+T = TypeVar('T', int, float)
+T = TypeVar('T', bound=int)
+```
+
+### PEP 695 — `type` Statement for Type Aliases
+
+```python
+# Good — unambiguous, supports forward references and recursive types
+type Vector = list[float]
+type Tree[T] = T | list[Tree[T]]
+
+# Bad — legacy TypeAlias
+from typing import TypeAlias
+Vector: TypeAlias = list[float]
+```
+
+### PEP 695 — ParamSpec in Class Syntax
+
+Niche — document with a docstring when used.
+
+```python
+# Good
+class Wrapper[**P, R]:
+    """Generic wrapper preserving the signature of the wrapped callable.
+
+    Type Parameters
+    ---------------
+    **P
+        Parameter specification of the wrapped callable.
+    R
+        Return type of the wrapped callable.
+    """
+    ...
+
+# Bad
+from typing import ParamSpec
+P = ParamSpec('P')
+```
+
+### Union Syntax (PEP 604)
+
+```python
+# Good
+def process(value: str | int) -> str | None: ...
+
+# Bad
+from typing import Optional, Union
+def process(value: Union[str, int]) -> Optional[str]: ...
+```
+
+### Built-in Generics
+
+Use built-in types directly — do not import from `typing`.
+
+```python
+# Good
+def transform(items: list[str]) -> dict[str, int]: ...
+coords: tuple[float, float, float]
+
+# Bad
+from typing import List, Dict, Tuple
+def transform(items: List[str]) -> Dict[str, int]: ...
+```
+
+### `@override` Decorator
+
+Optional but recommended for methods overriding a parent, especially in large class hierarchies. Catches silent breakage when the parent method is renamed.
+
+```python
+from typing import override
+
+class Child(Base):
+    @override
+    def process(self) -> None: ...
+```
+
+## Pydantic v2
+
+- Use `BaseModel` for structured data that needs serialization.
+- Prefer immutable models with `ConfigDict(frozen=True)`.
+- Discriminated unions via `@discriminated_base` / `@Cls.register("kind")` from `giskard-core`.
+- Validate external inputs at boundaries; keep internal code operating on typed objects.
+
+## Imports and Naming
+
+- Absolute imports within each `giskard.*` package.
+- Import order enforced by Ruff (`isort`).
+- PEP 8 naming: `snake_case` functions/variables, `PascalCase` classes, `UPPER_CASE` constants.
+
+## Async Patterns
+
+- All workflow execution is async. Never use blocking calls inside async code.
+- Use `asyncio.gather` for parallel execution.
+- Checks and generators may be sync or async — design APIs to support both.
+
+## Error Handling
+
+- Prefer result objects (e.g. `CheckResult`) over exceptions for control flow.
+- Raise exceptions only for truly exceptional states (invalid config, programmer errors).
+- Let runners catch and wrap exceptions when appropriate.
+
+## Testing
+
+- pytest with `asyncio_mode = "auto"` — no `@pytest.mark.asyncio` needed.
+- Parametrize tests with descriptive IDs.
+- `@pytest.mark.functional` for tests hitting external APIs.
+- Co-locate tests under `tests/` mirroring package structure.
+- Test success, failure, error, and edge-case paths.

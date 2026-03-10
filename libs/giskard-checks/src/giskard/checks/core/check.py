@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from giskard.core import Discriminated, discriminated_base
 from pydantic import Field
 

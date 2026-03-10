@@ -10,6 +10,7 @@ import pytest
 from giskard.checks import (
     Check,
     CheckResult,
+    Equals,
     Interact,
     Interaction,
     InteractionSpec,
@@ -1013,3 +1014,65 @@ class TestScenarioErrorHandling:
         assert len(result.final_trace.interactions) == 1
         assert result.final_trace.interactions[0].inputs == "Message #1"
         assert result.final_trace.interactions[0].outputs == "Received: Message #1"
+
+
+@pytest.fixture
+def echo_sut():
+    return lambda x: f"Echo: {x}"
+
+
+@pytest.fixture
+def echo_upper_sut():
+    return lambda x: f"Echo: {x.upper()}"
+
+
+class TestScenarioDynamicBinding:
+    """Test dynamic target binding for scenarios."""
+
+    async def test_dynamic_binding_scenario_level(self, echo_sut):
+        """Test dynamic target binding at scenario level."""
+        result = await (
+            scenario("test", target=echo_sut)  # target provided on scenario level
+            .interact("hello")  # no outputs provided
+            .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+            .run()
+        )
+
+        assert result.passed
+
+    async def test_dynamic_binding_run_level(self, echo_sut):
+        """Test dynamic target binding at run level."""
+        result = await (
+            scenario("test")  # no target provided
+            .interact("hello")  # no outputs provided
+            .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+            .run(target=echo_sut)  # target provided on run
+        )
+        assert result.passed
+
+    async def test_dynamic_binding_run_level_override(self, echo_sut, echo_upper_sut):
+        """Test dynamic target binding at run level overrides scenario level target."""
+        result = await (
+            scenario("test", target=echo_sut)  # target provided on scenario level
+            .interact("hello")  # no outputs provided
+            .check(Equals(expected_value="Echo: HELLO", key="trace.last.outputs"))
+            .run(
+                target=echo_upper_sut
+            )  # target provided on run (overrides scenario level target)
+        )
+        assert result.passed
+
+    async def test_error_if_no_target_provided(self):
+        """Test error if no target is provided at any level if outputs are not provided inside interact."""
+        s = (
+            scenario("test")
+            .interact("hello")  # no outputs provided
+            .build()
+        )
+
+        # Should raise ValueError because no target is provided at any level
+        with pytest.raises(
+            ValueError,
+            match="Interaction outputs are not provided and no target was bound",
+        ):
+            await s.run()
