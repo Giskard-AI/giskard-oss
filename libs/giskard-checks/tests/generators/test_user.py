@@ -59,23 +59,21 @@ def create_mock_response(
 
 
 @pytest.mark.parametrize(
-    "persona,context,description",
+    "persona,context",
     [
-        ("frustrated_customer", None, "persona without context"),
-        ("frustrated_customer", "delayed order", "persona with context"),
-        (
-            "A polite elderly user who needs step-by-step guidance",
-            None,
-            "custom persona without context",
-        ),
-        (
-            "A busy executive",
-            "Looking for quick answers",
-            "custom persona with context",
-        ),
+        ("frustrated_customer", None),
+        ("frustrated_customer", "delayed order"),
+        ("A polite elderly user who needs step-by-step guidance", None),
+        ("A busy executive", "Looking for quick answers"),
+    ],
+    ids=[
+        "persona without context",
+        "persona with context",
+        "custom persona without context",
+        "custom persona with context",
     ],
 )
-def test_persona_and_context_assignment(persona, context, description):
+def test_persona_and_context_assignment(persona, context):
     """Test persona and context field assignments."""
     simulator = UserSimulator(persona=persona, context=context)
     assert simulator.persona == persona
@@ -164,7 +162,7 @@ async def test_user_simulator_returns_messages_until_max_steps():
     assert len(generator.calls) == 1
 
 
-async def test_user_simulatorm_multiple_steps():
+async def test_user_simulator_multiple_steps():
     generator = MockGenerator(
         responses=[
             create_mock_response(False, "Hello, how are you?"),

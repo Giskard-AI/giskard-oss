@@ -166,7 +166,8 @@ API Overview
 
 **Interaction specs**
 - `giskard.checks.InteractionSpec`: discriminated base for describing inputs/outputs. Subclasses implement `generate()` to yield interactions.
-- `giskard.checks.Interact`: batteries-included spec that supports static values, callables, or generators for both inputs and outputs. Supports multi-turn interactions via generators.
+- `giskard.checks.Interact`: batteries-included spec that supports static values, callables, generators, or `InputGenerator` instances for both inputs and outputs. Supports multi-turn interactions via generators.
+- `giskard.checks.UserSimulator`: LLM-powered input generator that simulates user personas (predefined or custom) for multi-turn scenarios.
 
 **Scenarios and runners**
 - `giskard.checks.Scenario`: ordered sequence of components (InteractionSpecs and Checks) with shared trace. Components execute sequentially, stopping at first failure.
@@ -414,6 +415,27 @@ result = await (
         }
     )
     .check(from_fn(lambda trace: True, name="noop"))
+    .run()
+)
+```
+
+User simulation
+--------------
+
+Use `UserSimulator` for LLM-powered user personas in multi-turn scenarios. Supports predefined personas (e.g., ``frustrated_customer``, ``helpful_user``) or custom descriptions.
+
+```python
+from giskard.checks import scenario, UserSimulator, set_default_generator
+from giskard.agents.generators import Generator
+
+set_default_generator(Generator(model="openai/gpt-4o-mini"))
+
+result = await (
+    scenario("user-simulation")
+    .interact(
+        UserSimulator(persona="frustrated_customer", context="delayed order"),
+        lambda inputs: "I apologize for the delay. Let me look into that.",
+    )
     .run()
 )
 ```

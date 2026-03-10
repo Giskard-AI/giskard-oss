@@ -38,6 +38,12 @@ class UserSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgum
 
     Examples
     --------
+    Predefined persona:
+
+    >>> simulator = UserSimulator(persona="frustrated_customer")
+
+    Custom persona with optional context:
+
     >>> simulator = UserSimulator(
     ...     persona="A polite elderly user who needs step-by-step guidance",
     ...     context="Ask about using the mobile app"
