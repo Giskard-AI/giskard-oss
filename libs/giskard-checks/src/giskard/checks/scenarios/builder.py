@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any, Self
 
 from giskard.core.utils import NOT_PROVIDED, NotProvided
