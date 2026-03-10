@@ -164,7 +164,11 @@ class Tool(BaseModel):
         # not in model_fields are dropped (Pydantic defaults to extra='ignore').
         if self._params_model is not None:
             validated = self._params_model.model_validate(arguments)
-            arguments = {name: getattr(validated, name) for name in arguments if name in self._params_model.model_fields}
+            arguments = {
+                name: getattr(validated, name)
+                for name in arguments
+                if name in self._params_model.model_fields
+            }
 
         # Inject the context after coercion (RunContext is excluded from the model)
         if ctx and self.run_context_param:
