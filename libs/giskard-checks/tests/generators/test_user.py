@@ -1,5 +1,5 @@
 import json
-from typing import override
+from typing import Any, override
 
 import pytest
 from giskard.agents.chat import Message
@@ -9,7 +9,9 @@ from pydantic import Field
 
 
 class MockGenerator(BaseGenerator):
-    responses: list[str | None]
+    """Mock generator for UserSimulator tests."""
+
+    responses: list[dict[str, Any]]
     index: int = 0
     calls: list[list[Message]] = Field(default_factory=list)
 
@@ -21,12 +23,7 @@ class MockGenerator(BaseGenerator):
         response = Response(
             message=Message(
                 role="assistant",
-                content=json.dumps(
-                    {
-                        "message": self.responses[self.index],
-                        "goal_reached": self.responses[self.index] is None,
-                    }
-                ),
+                content=json.dumps(self.responses[self.index]),
             ),
             finish_reason="stop",
         )
@@ -50,10 +47,60 @@ def _wrap_in_xml_tag(text: str, tag: str) -> str:
     return f"<{tag}>\n{text}\n</{tag}>"
 
 
+def create_mock_response(
+    goal_reached: bool,
+    message: str | None,
+) -> dict[str, Any]:
+    """Helper to create mock response dictionaries."""
+    return {
+        "goal_reached": goal_reached,
+        "message": message,
+    }
+
+
+@pytest.mark.parametrize(
+    "persona,context",
+    [
+        ("frustrated_customer", None),
+        ("frustrated_customer", "delayed order"),
+        ("A polite elderly user who needs step-by-step guidance", None),
+        ("A busy executive", "Looking for quick answers"),
+    ],
+    ids=[
+        "persona without context",
+        "persona with context",
+        "custom persona without context",
+        "custom persona with context",
+    ],
+)
+def test_persona_and_context_assignment(persona, context):
+    """Test persona and context field assignments."""
+    simulator = UserSimulator(persona=persona, context=context)
+    assert simulator.persona == persona
+    assert simulator.context == context
+
+
+def test_empty_persona_rejected():
+    """Test that empty persona string is rejected."""
+    with pytest.raises(ValueError, match="at least 1 character"):
+        UserSimulator(persona="")
+
+
+def test_negative_max_steps_rejected():
+    """Test that negative max_steps is rejected."""
+    with pytest.raises(ValueError, match="greater than or equal to 0"):
+        UserSimulator(persona="test_user", max_steps=-1)
+
+
 async def test_user_simulator_returns_messages_until_goal_reached():
-    generator = MockGenerator(responses=["Hello, how are you?", None])
+    generator = MockGenerator(
+        responses=[
+            create_mock_response(False, "Hello, how are you?"),
+            create_mock_response(True, None),
+        ]
+    )
     user_simulator = UserSimulator(
-        generator=generator, instructions="Greet the chatbot", max_steps=2
+        generator=generator, persona="Greet the chatbot", max_steps=2
     )
 
     trace = LLMTrace()
@@ -63,7 +110,7 @@ async def test_user_simulator_returns_messages_until_goal_reached():
     assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
         generator.calls[0][-1].content
     )
-    assert _wrap_in_xml_tag(user_simulator.instructions, "instructions") in str(
+    assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
         generator.calls[0][-1].content
     )
 
@@ -77,15 +124,21 @@ async def test_user_simulator_returns_messages_until_goal_reached():
     assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
         generator.calls[1][-1].content
     )
-    assert _wrap_in_xml_tag(user_simulator.instructions, "instructions") in str(
+    assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
         generator.calls[1][-1].content
     )
 
 
 async def test_user_simulator_returns_messages_until_max_steps():
-    generator = MockGenerator(responses=["Hello, how are you?", "I'm good too", None])
+    generator = MockGenerator(
+        responses=[
+            create_mock_response(False, "Hello, how are you?"),
+            create_mock_response(False, "I'm good too"),
+            create_mock_response(True, None),
+        ]
+    )
     user_simulator = UserSimulator(
-        generator=generator, instructions="Greet the chatbot", max_steps=1
+        generator=generator, persona="Greet the chatbot", max_steps=1
     )
 
     trace = LLMTrace()
@@ -96,7 +149,7 @@ async def test_user_simulator_returns_messages_until_max_steps():
     assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
         generator.calls[0][-1].content
     )
-    assert _wrap_in_xml_tag(user_simulator.instructions, "instructions") in str(
+    assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
         generator.calls[0][-1].content
     )
 
@@ -109,11 +162,15 @@ async def test_user_simulator_returns_messages_until_max_steps():
     assert len(generator.calls) == 1
 
 
-async def test_user_simulatorm_multiple_steps():
-    generator = MockGenerator(responses=["Hello, how are you?", "I'm good too", None])
-    user_simulator = UserSimulator(
-        generator=generator, instructions="Greet the chatbot"
+async def test_user_simulator_multiple_steps():
+    generator = MockGenerator(
+        responses=[
+            create_mock_response(False, "Hello, how are you?"),
+            create_mock_response(False, "I'm good too"),
+            create_mock_response(True, None),
+        ]
     )
+    user_simulator = UserSimulator(generator=generator, persona="Greet the chatbot")
 
     trace = LLMTrace()
     gen = user_simulator(trace)
@@ -123,7 +180,7 @@ async def test_user_simulatorm_multiple_steps():
     assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
         generator.calls[0][-1].content
     )
-    assert _wrap_in_xml_tag(user_simulator.instructions, "instructions") in str(
+    assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
         generator.calls[0][-1].content
     )
 
@@ -137,7 +194,7 @@ async def test_user_simulatorm_multiple_steps():
     assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
         generator.calls[1][-1].content
     )
-    assert _wrap_in_xml_tag(user_simulator.instructions, "instructions") in str(
+    assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
         generator.calls[1][-1].content
     )
 
@@ -151,6 +208,6 @@ async def test_user_simulatorm_multiple_steps():
     assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
         generator.calls[2][-1].content
     )
-    assert _wrap_in_xml_tag(user_simulator.instructions, "instructions") in str(
+    assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
         generator.calls[2][-1].content
     )

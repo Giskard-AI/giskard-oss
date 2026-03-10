@@ -5,10 +5,10 @@ from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow, TemplateReference
 from pydantic import BaseModel, Field
 
+from ..core import Trace
 from ..core.check import Check
 from ..core.mixin import WithGeneratorMixin
 from ..core.result import CheckResult
-from ..core.trace import Trace
 
 
 class LLMCheckResult(BaseModel):

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Annotated, Any, override
 
 from giskard.core import NOT_PROVIDED, NotProvided
@@ -18,7 +16,7 @@ from jsonpath_ng import (
 from jsonpath_ng.exceptions import JsonPathLexerError, JsonPathParserError
 from pydantic import AfterValidator, BaseModel, Field
 
-from .trace import Trace
+from .interaction import Trace
 
 
 class _JSONPathStrMarker:

@@ -5,7 +5,7 @@ description = " A lightweight library that orchestrates LLM completions and agen
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Giskard R&D", email = "rnd@giskard.ai" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "litellm>=1.72.0,<2",
     "pydantic>=2.11.0,<3",
