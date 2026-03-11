@@ -7,30 +7,35 @@ from pydantic import Field
 
 from ..chat import Message
 from .base import BaseGenerator, GenerationParams, Response
-from .rate_limiting import WithRateLimiter
-from .retries import WithRetryPolicy
+from .middleware import CompletionMiddleware, RetryMiddleware, RetryPolicy
 
 
-@BaseGenerator.register("litellm")
-class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
-    """A generator for creating chat completion pipelines.
-
-    The MRO places rate limiting inside the retry loop: each retry attempt
-    individually acquires the rate limiter. This prevents retry storms from
-    bypassing rate limits, at the cost of consuming one rate-limit slot per
-    attempt (including failed ones).
-    """
-
-    model: str = Field(
-        description="The model identifier to use (e.g. 'gemini/gemini-2.0-flash')"
-    )
+@CompletionMiddleware.register("litellm_retry")
+class LiteLLMRetryMiddleware(RetryMiddleware):
+    """Retry middleware using LiteLLM's built-in retry-eligibility check."""
 
     @override
     def _should_retry(self, err: Exception) -> bool:
         return litellm_should_retry(getattr(err, "status_code", 0))
 
+
+@BaseGenerator.register("litellm")
+class LiteLLMGenerator(BaseGenerator):
+    """A generator for creating chat completion pipelines using LiteLLM."""
+
+    model: str = Field(
+        description="The model identifier to use (e.g. 'gemini/gemini-2.0-flash')"
+    )
+    retry_policy: RetryPolicy | None = Field(default_factory=RetryPolicy)
+
     @override
-    async def _attempt_complete(
+    def _create_retry_middleware(self) -> LiteLLMRetryMiddleware | None:
+        if self.retry_policy is None:
+            return None
+        return LiteLLMRetryMiddleware(retry_policy=self.retry_policy)
+
+    @override
+    async def _complete(
         self, messages: list[Message], params: GenerationParams | None = None
     ) -> Response:
         params_ = self.params.model_dump(exclude={"tools"})
@@ -38,20 +43,18 @@ class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
         if params is not None:
             params_.update(params.model_dump(exclude={"tools"}, exclude_unset=True))
 
-        # Now special handling of the tools
         tools = self.params.tools + (params.tools if params is not None else [])
         if tools:
             params_["tools"] = [t.to_litellm_function() for t in tools]
 
-        async with self._throttle():
-            response = cast(
-                ModelResponse,
-                await acompletion(
-                    messages=[m.to_litellm() for m in messages],
-                    model=self.model,
-                    **params_,
-                ),
-            )
+        response = cast(
+            ModelResponse,
+            await acompletion(
+                messages=[m.to_litellm() for m in messages],
+                model=self.model,
+                **params_,
+            ),
+        )
 
         choice = cast(Choices, response.choices[0])
         return Response(
