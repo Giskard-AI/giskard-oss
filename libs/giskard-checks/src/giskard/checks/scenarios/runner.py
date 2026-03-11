@@ -44,9 +44,7 @@ def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
             if isinstance(interact, Interact) and isinstance(
                 interact.outputs, NotProvided
             ):
-                interact = type(interact).model_validate(
-                    interact.model_copy(update={"outputs": target})
-                )
+                interact = interact.model_copy().set_outputs(target)
             interacts.append(interact)
 
         steps.append(step.model_copy(update={"interacts": interacts}))
