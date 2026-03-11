@@ -13,17 +13,15 @@ from .base import BaseRateLimiter
 
 
 class _MinIntervalRateLimiterState:
-    """Internal state for MinIntervalRateLimiter: semaphore, lock, and next allowed request time."""
+    """Internal state for MinIntervalRateLimiter: semaphore and next allowed request time."""
 
     semaphore: asyncio.Semaphore | None
-    lock: asyncio.Lock
     next_request_time: float
 
     def __init__(self, max_concurrent: int | None):
         self.semaphore = (
             asyncio.Semaphore(max_concurrent) if max_concurrent is not None else None
         )
-        self.lock = asyncio.Lock()
         self.next_request_time = time.monotonic()
 
 
@@ -45,12 +43,11 @@ class MinIntervalRateLimiter(BaseRateLimiter):
         """Wait for rate limit, then yields the time waited in seconds."""
         start_time = time.monotonic()
         async with self._state.semaphore or nullcontext():
-            async with self._state.lock:
-                current_time = time.monotonic()
-                wait_time = self._state.next_request_time - current_time
-                self._state.next_request_time = (
-                    max(self._state.next_request_time, current_time) + self.min_interval
-                )
+            current_time = time.monotonic()
+            wait_time = self._state.next_request_time - current_time
+            self._state.next_request_time = (
+                max(self._state.next_request_time, current_time) + self.min_interval
+            )
 
             if wait_time > 0:
                 await asyncio.sleep(wait_time)

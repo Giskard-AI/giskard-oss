@@ -29,6 +29,7 @@ from .core import (
     Metric,
     Scenario,
     ScenarioResult,
+    Step,
     SuiteResult,
     TestCase,
     TestCaseResult,
@@ -42,7 +43,6 @@ from .judges import (
     LLMCheckResult,
     LLMJudge,
 )
-from .scenarios.builder import ScenarioBuilder, scenario
 from .scenarios.runner import ScenarioRunner
 from .scenarios.suite import Suite
 from .settings import get_default_generator, set_default_generator
@@ -74,6 +74,7 @@ __all__ = [
     "Metric",
     "Scenario",
     "ScenarioResult",
+    "Step",
     "SuiteResult",
     "TestCase",
     "TestCaseResult",
@@ -104,8 +105,6 @@ __all__ = [
     "WithSpy",
     "TestCaseRunner",
     # Scenarios
-    "ScenarioBuilder",
-    "scenario",
     "Suite",
     "ScenarioRunner",
     # Settings

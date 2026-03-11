@@ -11,86 +11,61 @@ from typing import Any, cast
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 
 from ..core import Trace
-from ..core.check import Check
-from ..core.interaction import Interact, Interaction
-from ..core.protocols import InteractionGenerator
+from ..core.interaction import Interact
 from ..core.result import CheckResult, ScenarioResult, TestCaseResult
-from ..core.scenario import Scenario
+from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
 from ..core.types import ProviderType
 
 
-class _ScenarioStep[InputType, OutputType, TraceType: Trace]:  # pyright: ignore[reportMissingTypeArgument]
-    interactions: list[
-        Interaction[InputType, OutputType]
-        | InteractionGenerator[Interaction[InputType, OutputType], TraceType]
-    ]
-    checks: list[Check[InputType, OutputType, TraceType]]
+def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
+    scenario: Scenario[InputType, OutputType, TraceType],
+    target: (
+        ProviderType[[InputType], OutputType]
+        | ProviderType[[InputType, TraceType], OutputType]
+        | NotProvided
+    ),
+) -> list[Step[InputType, OutputType, TraceType]]:
+    """Build steps with target bound to Interact outputs where needed.
 
-    def __init__(self):
-        self.interactions = []
-        self.checks = []
+    If no target is provided, returns the scenario's steps as-is. Otherwise,
+    returns new Step objects with interacts that have NOT_PROVIDED outputs
+    replaced by the given target.
+    """
+    target = target if not isinstance(target, NotProvided) else scenario.target
 
+    if isinstance(target, NotProvided):
+        return scenario.steps
 
-class _ScenarioStepsBuilder[InputType, OutputType, TraceType: Trace]:  # pyright: ignore[reportMissingTypeArgument]
-    steps: list[_ScenarioStep[InputType, OutputType, TraceType]]
+    steps = []
+    for step in scenario.steps:
+        interacts = []
+        for interact in step.interacts:
+            if isinstance(interact, Interact) and isinstance(
+                interact.outputs, NotProvided
+            ):
+                interact = interact.model_copy().set_outputs(target)
+            interacts.append(interact)
 
-    def __init__(
-        self,
-        *sequence: Interaction[InputType, OutputType]
-        | InteractionGenerator[Interaction[InputType, OutputType], TraceType]
-        | Check[InputType, OutputType, TraceType],
-    ):
-        self.steps = []
-        for component in sequence:
-            if isinstance(component, Check):
-                self.add_check(component)
-            else:
-                self.add_interaction(component)
+        steps.append(step.model_copy(update={"interacts": interacts}))
 
-    def add_step(self):
-        self.steps.append(_ScenarioStep[InputType, OutputType, TraceType]())
-
-    @property
-    def current_step(self) -> _ScenarioStep[InputType, OutputType, TraceType]:
-        if not self.steps:
-            self.add_step()
-
-        return self.steps[-1]
-
-    def add_interaction(
-        self,
-        interaction: (
-            Interaction[InputType, OutputType]
-            | InteractionGenerator[Interaction[InputType, OutputType], TraceType]
-        ),
-    ):
-        if len(self.current_step.checks) > 0:
-            self.add_step()
-
-        self.current_step.interactions.append(interaction)
-
-    def add_check(self, check: Check[InputType, OutputType, TraceType]):
-        self.current_step.checks.append(check)
-
-    def build(self) -> list[_ScenarioStep[InputType, OutputType, TraceType]]:
-        return self.steps
+    return steps
 
 
 class ScenarioRunner:
-    """Execute scenarios by running sequences of scenario components.
+    """Execute scenarios by running their steps sequentially.
 
-    The runner processes components sequentially, maintaining a shared Trace
-    that accumulates interactions. Execution stops on the first check failure
-    or error.
+    The runner processes each step: first applies interactions to the trace,
+    then runs checks against the resulting trace. Execution stops on the first
+    check failure or error.
 
-    Components are processed in order:
-    1. **InteractionSpec components**: Add interactions to the trace.
+    Each step is processed as follows:
+    1. **Interacts** (InteractionSpec): Add interactions to the trace.
        Specs generate interactions using their `generate()` method. Each yielded
        interaction is added to the trace, and the updated trace is sent back to
        the generator via `asend()`.
-    2. **Check components**: Validate the current trace state using their `run()`
-       method. If a check fails or errors, execution stops immediately.
+    2. **Checks**: Validate the current trace state using their `run()` method.
+       If a check fails or errors, execution stops immediately.
 
     The runner handles exceptions from checks by converting them into
     `CheckResult.error` objects and stopping execution.
@@ -99,7 +74,7 @@ class ScenarioRunner:
     --------
     ```python
     runner = ScenarioRunner()
-    result = await runner.run_scenario(scenario)
+    result = await runner.run(scenario)
     ```
     """
 
@@ -113,13 +88,13 @@ class ScenarioRunner:
         ) = NOT_PROVIDED,
         return_exception: bool = False,
     ) -> ScenarioResult[InputType, OutputType]:
-        """Execute a sequential scenario with shared Trace.
+        """Execute a scenario's steps sequentially with shared Trace.
 
-        Components are executed in order:
-        - InteractionSpec components update the shared trace
-        - Check components validate the current trace and stop execution on failure
+        Each step is executed in order:
+        - Interaction specs update the shared trace
+        - Checks validate the current trace and stop execution on failure
 
-        Execution stops on the first failing check; remaining components are not executed.
+        Execution stops on the first failing check; remaining steps are not executed.
 
         Parameters
         ----------
@@ -131,7 +106,7 @@ class ScenarioRunner:
         Returns
         -------
         ScenarioResult
-            Results from executing the scenario components.
+            Results from executing the scenario.
         """
 
         start_time = time.perf_counter()
@@ -143,24 +118,12 @@ class ScenarioRunner:
                 Trace[InputType, OutputType](annotations=scenario.annotations),
             )
         )
-        target = target if not isinstance(target, NotProvided) else scenario.target
 
-        sequence = []
-        for component in scenario.sequence:
-            if isinstance(component, Interact) and isinstance(
-                component.outputs, NotProvided
-            ):
-                if not isinstance(target, NotProvided):
-                    new_data = component.model_dump()
-                    new_data["outputs"] = target
-                    component = type(component).model_validate(new_data)
-            sequence.append(component)
-
-        steps = _ScenarioStepsBuilder(*sequence).build()
+        steps = _build_steps(scenario, target)
         steps_results: list[TestCaseResult] = []
 
         for step in steps:
-            trace = await trace.with_interactions(*step.interactions)
+            trace = await trace.with_interactions(*step.interacts)
 
             test_case = TestCase(
                 trace=trace,

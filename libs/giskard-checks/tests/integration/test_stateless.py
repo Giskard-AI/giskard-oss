@@ -12,7 +12,6 @@ from giskard.checks import (
     Scenario,
     Trace,
     WithSpy,
-    scenario,
 )
 from pydantic import BaseModel, Field, computed_field
 
@@ -92,41 +91,39 @@ def adapter(
 async def test_single_message(
     adapter: Callable[[agents.Message, MessageTraces], Awaitable[agents.Message]],
 ):
-    scenario = Scenario[Any, Any, MessageTraces](
+    scenario = Scenario[Any, Any, MessageTraces].from_sequence(
+        WithSpy(
+            interaction_generator=Interact(
+                inputs=agents.Message(
+                    role="user",
+                    content="Hello, I want to apply for a job. My email is test@test.com and my message is 'Hello, I want to apply for a job.'",
+                ),
+                outputs=adapter,
+            ),
+            target="tests.integration.test_stateless.mock_apply_tool",
+        ),
+        Interact(
+            inputs=1,
+            outputs=2,
+            metadata={"type": "info"},
+        ),
+        LLMJudge(
+            prompt="The application has been saved and its uuid is stated: {{ trace.messages[-1] }}."
+        ),
+        Equals(
+            expected_value=1,
+            key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_count']",
+        ),
+        Equals(
+            expected_value="test@test.com",
+            key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[0]",
+        ),
+        Equals(
+            expected_value="Hello, I want to apply for a job.",
+            key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[1]",
+        ),
         name="test_single_message",
         trace_type=MessageTraces,
-        sequence=[
-            WithSpy(
-                interaction_generator=Interact(
-                    inputs=agents.Message(
-                        role="user",
-                        content="Hello, I want to apply for a job. My email is test@test.com and my message is 'Hello, I want to apply for a job.'",
-                    ),
-                    outputs=adapter,
-                ),
-                target="tests.integration.test_stateless.mock_apply_tool",
-            ),
-            Interact(
-                inputs=1,
-                outputs=2,
-                metadata={"type": "info"},
-            ),
-            LLMJudge(
-                prompt="The application has been saved and its uuid is stated: {{ trace.messages[-1] }}."
-            ),
-            Equals(
-                expected_value=1,
-                key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_count']",
-            ),
-            Equals(
-                expected_value="test@test.com",
-                key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[0]",
-            ),
-            Equals(
-                expected_value="Hello, I want to apply for a job.",
-                key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[1]",
-            ),
-        ],
     )
     result = await scenario.run()
     assert result.failed  # No tool call is made somehow
@@ -183,7 +180,7 @@ async def test_user_simulator(
             current_step += 1
 
     result = await (
-        scenario("test_single_message", trace_type=MessageTraces)
+        Scenario("test_single_message", trace_type=MessageTraces)
         .add_interaction(
             Interact(
                 inputs=partial(

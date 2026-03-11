@@ -161,10 +161,7 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         PrivateAttr()
     )
 
-    @model_validator(mode="after")
-    def _validate_injection_mappings(
-        self,
-    ) -> "Interact[InputType, OutputType, TraceType]":
+    def _validate_inputs(self) -> None:
         try:
             self._input_value_generator_provider = ValueGeneratorProvider.from_mapping(
                 self.inputs, INJECTABLE_TRACE
@@ -172,6 +169,7 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         except ValueError as e:
             raise ValueError(f"Error getting injection settings for inputs: {e}") from e
 
+    def _validate_outputs(self) -> None:
         try:
             if not isinstance(self.outputs, NotProvided):
                 self._output_value_provider = ValueProvider.from_mapping(
@@ -181,6 +179,27 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
             raise ValueError(
                 f"Error getting injection settings for outputs: {e}"
             ) from e
+
+    @model_validator(mode="after")
+    def _validate_injection_mappings(
+        self,
+    ) -> "Interact[InputType, OutputType, TraceType]":
+        self._validate_inputs()
+        self._validate_outputs()
+
+        return self
+
+    def set_outputs(
+        self,
+        outputs: (
+            ProviderType[[InputType], OutputType]
+            | ProviderType[[InputType, TraceType], OutputType]
+            | NotProvided
+        ),
+    ) -> "Interact[InputType, OutputType, TraceType]":
+        """Update the outputs of the interact and recompute the injection mappings. Returns self for chaining."""
+        self.outputs = outputs
+        self._validate_outputs()
 
         return self
 

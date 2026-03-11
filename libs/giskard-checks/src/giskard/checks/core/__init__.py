@@ -8,11 +8,12 @@ from .result import (
     SuiteResult,
     TestCaseResult,
 )
-from .scenario import Scenario
+from .scenario import Scenario, Step
 from .testcase import TestCase
 
 __all__ = [
     "Scenario",
+    "Step",
     "Trace",
     "InteractionSpec",
     "Interact",
