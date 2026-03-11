@@ -4,7 +4,7 @@ import inspect
 from typing import Any, Callable, Literal, TypeVar
 
 import logfire_api as logfire
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter, create_model
 
 from ..context import RunContext
 from ..errors.serializable import Error
@@ -38,6 +38,8 @@ class Tool(BaseModel):
     catch: Callable[[Exception], Any] | None = Field(default=None)
 
     run_context_param: str | None = Field(default=None)
+    _params_model: type[BaseModel] | None = PrivateAttr(default=None)
+    _return_adapter: TypeAdapter[Any] | None = PrivateAttr(default=None)
 
     @classmethod
     def from_callable(
@@ -96,7 +98,9 @@ class Tool(BaseModel):
             **fields,
         )
 
-        return cls(
+        return_annotation = sig.return_annotation
+
+        tool_instance = cls(
             name=fn.__name__,
             description=description,
             parameters_schema=model.model_json_schema(),
@@ -104,6 +108,10 @@ class Tool(BaseModel):
             run_context_param=run_context_param,
             catch=catch,
         )
+        tool_instance._params_model = model
+        if return_annotation is not inspect.Parameter.empty:
+            tool_instance._return_adapter = TypeAdapter(return_annotation)
+        return tool_instance
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the underlying function without modification.
@@ -150,7 +158,19 @@ class Tool(BaseModel):
             The result of calling the function.
         """
 
-        # Inject the context if the tool expects it
+        # Coerce dict arguments into typed objects via the Pydantic params model.
+        # We use getattr() instead of model_dump() to preserve coerced types
+        # (e.g. a raw dict becomes a BaseModel instance). Extra keys that are
+        # not in model_fields are dropped (Pydantic defaults to extra='ignore').
+        if self._params_model is not None:
+            validated = self._params_model.model_validate(arguments)
+            arguments = {
+                name: getattr(validated, name)
+                for name in arguments
+                if name in self._params_model.model_fields
+            }
+
+        # Inject the context after coercion (RunContext is excluded from the model)
         if ctx and self.run_context_param:
             arguments = arguments.copy()
             arguments[self.run_context_param] = ctx
@@ -169,8 +189,8 @@ class Tool(BaseModel):
             logfire.error("tool.run.error", error=res)
             return str(res)
 
-        if isinstance(res, BaseModel):
-            res = res.model_dump()
+        if self._return_adapter is not None:
+            res = self._return_adapter.dump_python(res, mode="json")
 
         return res
 

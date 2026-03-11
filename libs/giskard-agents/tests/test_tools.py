@@ -1,10 +1,13 @@
 """Tests for the tools module."""
 
+from datetime import datetime, timezone
 from typing import List
+from uuid import UUID
 
 import pytest
 from giskard import agents
 from giskard.agents.tools import Tool, tool
+from pydantic import BaseModel
 
 
 def test_tool_decorator():
@@ -182,3 +185,174 @@ async def test_tool_method_catches_errors(generator):
     # The original function behavior is not modified
     with pytest.raises(ValueError):
         weather.get_weather("Paris")
+
+
+# ---------------------------------------------------------------------------
+# GAP-005: Input coercion and output serialization
+# ---------------------------------------------------------------------------
+
+
+class Address(BaseModel):
+    street: str
+    city: str
+
+
+class Person(BaseModel):
+    name: str
+    address: Address
+
+
+class TimestampedRecord(BaseModel):
+    id: UUID
+    created_at: datetime
+    label: str
+
+
+async def test_tool_run_coerces_basemodel_input():
+    """Tool.run() should coerce a dict into a BaseModel instance."""
+    received = {}
+
+    @tool
+    def process_person(person: Person) -> str:
+        """Process a person.
+
+        Parameters
+        ----------
+        person : Person
+            The person to process.
+        """
+        received["person"] = person
+        return person.name
+
+    result = await process_person.run(
+        {"person": {"name": "Alice", "address": {"street": "123 Main", "city": "NYC"}}}
+    )
+    assert result == "Alice"
+    assert isinstance(received["person"], Person)
+    assert isinstance(received["person"].address, Address)
+
+
+async def test_tool_run_coerces_optional_basemodel_input():
+    """Tool.run() should coerce a dict into BaseModel | None."""
+    received = {}
+
+    @tool
+    def process_optional(person: Person | None = None) -> str:
+        """Process an optional person.
+
+        Parameters
+        ----------
+        person : Person | None
+            The person to process.
+        """
+        received["person"] = person
+        return person.name if person else "nobody"
+
+    result = await process_optional.run(
+        {"person": {"name": "Bob", "address": {"street": "1 Elm", "city": "LA"}}}
+    )
+    assert result == "Bob"
+    assert isinstance(received["person"], Person)
+
+    result = await process_optional.run({"person": None})
+    assert result == "nobody"
+    assert received["person"] is None
+
+
+async def test_tool_run_coerces_list_basemodel_input():
+    """Tool.run() should coerce a list of dicts into list[BaseModel]."""
+    received = {}
+
+    @tool
+    def process_people(people: list[Person]) -> int:
+        """Process a list of people.
+
+        Parameters
+        ----------
+        people : list[Person]
+            People to process.
+        """
+        received["people"] = people
+        return len(people)
+
+    result = await process_people.run(
+        {
+            "people": [
+                {"name": "A", "address": {"street": "1", "city": "X"}},
+                {"name": "B", "address": {"street": "2", "city": "Y"}},
+            ]
+        }
+    )
+    assert result == 2
+    assert all(isinstance(p, Person) for p in received["people"])
+
+
+async def test_tool_run_serializes_basemodel_output_json_safe():
+    """Tool.run() should produce JSON-safe output for BaseModel returns."""
+    ts = datetime(2025, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
+    uid = UUID("12345678-1234-5678-1234-567812345678")
+
+    @tool
+    def create_record(label: str) -> TimestampedRecord:
+        """Create a record.
+
+        Parameters
+        ----------
+        label : str
+            The label.
+        """
+        return TimestampedRecord(id=uid, created_at=ts, label=label)
+
+    result = await create_record.run({"label": "test"})
+    assert isinstance(result, dict)
+    assert isinstance(result["id"], str)
+    assert isinstance(result["created_at"], str)
+    assert result["label"] == "test"
+
+
+async def test_tool_run_serializes_list_basemodel_output():
+    """Tool.run() should serialize list[BaseModel] to list of JSON-safe dicts."""
+
+    @tool
+    def list_addresses(n: int) -> list[Address]:
+        """List addresses.
+
+        Parameters
+        ----------
+        n : int
+            Count.
+        """
+        return [Address(street=f"St {i}", city=f"City {i}") for i in range(n)]
+
+    result = await list_addresses.run({"n": 3})
+    assert isinstance(result, list)
+    assert len(result) == 3
+    assert all(isinstance(item, dict) for item in result)
+    assert result[0] == {"street": "St 0", "city": "City 0"}
+
+
+@pytest.mark.parametrize(
+    "args,expected",
+    [
+        pytest.param({"query": "hello", "limit": 5}, "hello:5", id="str-int"),
+        pytest.param({"query": "x", "limit": 0}, "x:0", id="str-zero"),
+    ],
+)
+async def test_tool_run_primitive_types_unchanged(args, expected):
+    """Primitive types should pass through coercion and serialization unchanged."""
+
+    @tool
+    def search(query: str, limit: int) -> str:
+        """Search.
+
+        Parameters
+        ----------
+        query : str
+            Query text.
+        limit : int
+            Max results.
+        """
+        return f"{query}:{limit}"
+
+    result = await search.run(args)
+    assert result == expected
