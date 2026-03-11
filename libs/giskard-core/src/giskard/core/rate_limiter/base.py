@@ -68,7 +68,7 @@ class RateLimiterRegistry:
                 raise ValueError(
                     (
                         f"Rate limiter with id '{rate_limiter.id}' already registered. "
-                        "Set GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS=1 to disable this warning"
+                        "Set GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS=1 to downgrade this error to a warning"
                     )
                 )
             warnings.warn(
