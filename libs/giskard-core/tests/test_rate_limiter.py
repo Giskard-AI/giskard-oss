@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 from giskard.core import BaseRateLimiter, MinIntervalRateLimiter
+from pydantic import ValidationError
 
 JITTER_TIME = 0.02  # 20ms jitter
 
@@ -27,34 +28,23 @@ class CustomRateLimiter(BaseRateLimiter):
 
 
 class TestRateLimiterRegistry:
-    def test_warns_when_creating_rate_limiter_with_duplicate_id(self):
+    def test_raises_when_creating_rate_limiter_with_duplicate_id(self):
         rl_id = _uid()
-        with pytest.warns(
-            RuntimeWarning,
-            match=f"Rate limiter with id '{rl_id}' already registered",
-        ):
-            _rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
-            _rate_limiter_b = MinIntervalRateLimiter.from_rpm(120, id=rl_id)
+        _rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
+        with pytest.raises(ValidationError, match="already registered"):
+            MinIntervalRateLimiter.from_rpm(120, id=rl_id)
 
         rl_id = _uid()
-        with pytest.warns(
-            RuntimeWarning,
-            match=f"Rate limiter with id '{rl_id}' already registered",
-        ):
-            _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id=rl_id)
-            _rate_limiter_b = MinIntervalRateLimiter.from_rpm(
-                rpm=60, max_concurrent=1, id=rl_id
-            )
+        _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id=rl_id)
+        with pytest.raises(ValidationError, match="already registered"):
+            MinIntervalRateLimiter.from_rpm(rpm=60, max_concurrent=1, id=rl_id)
 
         rl_id = _uid()
-        with pytest.warns(
-            RuntimeWarning,
-            match=f"Rate limiter with id '{rl_id}' already registered",
-        ):
-            _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id=rl_id)
-            _rate_limiter_b = CustomRateLimiter(id=rl_id)
+        _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id=rl_id)
+        with pytest.raises(ValidationError, match="already registered"):
+            CustomRateLimiter(id=rl_id)
 
-    def test_does_not_warn_when_disabled_and_creating_rate_limiter_with_duplicate_id(
+    def test_does_not_raise_when_disabled_and_creating_rate_limiter_with_duplicate_id(
         self,
     ):
         with patch(
@@ -66,23 +56,22 @@ class TestRateLimiterRegistry:
                 rl_id = _uid()
                 _rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
                 _rate_limiter_b = MinIntervalRateLimiter.from_rpm(120, id=rl_id)
-            assert not any("already registered" in str(w.message) for w in record)
 
-            with warnings.catch_warnings(record=True) as record:
-                warnings.simplefilter("always")
                 rl_id = _uid()
                 _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id=rl_id)
                 _rate_limiter_b = MinIntervalRateLimiter.from_rpm(
                     rpm=60, max_concurrent=1, id=rl_id
                 )
-            assert not any("already registered" in str(w.message) for w in record)
 
-            with warnings.catch_warnings(record=True) as record:
-                warnings.simplefilter("always")
                 rl_id = _uid()
                 _rate_limiter_a = MinIntervalRateLimiter.from_rpm(rpm=60, id=rl_id)
                 _rate_limiter_b = CustomRateLimiter(id=rl_id)
-            assert not any("already registered" in str(w.message) for w in record)
+
+            duplicate_warnings = [
+                w for w in record if "already registered" in str(w.message)
+            ]
+            assert len(duplicate_warnings) == 3
+            assert all(w.category is RuntimeWarning for w in duplicate_warnings)
 
     def test_same_rate_limiter_with_same_id_should_not_raise_error(
         self,
