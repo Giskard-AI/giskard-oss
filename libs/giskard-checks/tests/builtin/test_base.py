@@ -1,9 +1,9 @@
 import json
-from typing import override
+from typing import Any, override
 
 import pytest
 from giskard.agents.chat import Message
-from giskard.agents.generators._types import FinishReason
+from giskard.agents.generators._types import Response
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import BaseLLMCheck, Trace
 from pydantic import BaseModel, Field
@@ -20,18 +20,22 @@ class MockGenerator(BaseGenerator):
         self,
         messages: list[Message],
         params: GenerationParams,
-    ) -> tuple[Message, FinishReason]:
+        metadata: dict[str, Any] | None = None,
+    ) -> Response:
         self.calls.append(messages)
-        return Message(
-            role="assistant",
-            content=json.dumps(
-                {
-                    "score": self.score,
-                    "passed": self.passed,
-                    "reasoning": self.reasoning,
-                }
+        return Response(
+            message=Message(
+                role="assistant",
+                content=json.dumps(
+                    {
+                        "score": self.score,
+                        "passed": self.passed,
+                        "reasoning": self.reasoning,
+                    }
+                ),
             ),
-        ), "stop"
+            finish_reason="stop",
+        )
 
 
 class TestBaseLLMCheck:

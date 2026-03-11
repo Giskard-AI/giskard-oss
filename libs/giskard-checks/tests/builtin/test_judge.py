@@ -1,9 +1,9 @@
 import json
-from typing import cast, override
+from typing import Any, cast, override
 
 import pytest
 from giskard.agents.chat import Message
-from giskard.agents.generators._types import FinishReason
+from giskard.agents.generators._types import Response
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import Check, CheckStatus, Interaction, LLMJudge, Trace
 from pydantic import Field, ValidationError
@@ -19,12 +19,16 @@ class MockGenerator(BaseGenerator):
         self,
         messages: list[Message],
         params: GenerationParams,
-    ) -> tuple[Message, FinishReason]:
+        metadata: dict[str, Any] | None = None,
+    ) -> Response:
         self.calls.append(messages)
-        return Message(
-            role="assistant",
-            content=json.dumps({"passed": self.passed, "reason": self.reason}),
-        ), "stop"
+        return Response(
+            message=Message(
+                role="assistant",
+                content=json.dumps({"passed": self.passed, "reason": self.reason}),
+            ),
+            finish_reason="stop",
+        )
 
 
 def serialization_roundtrip[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]

@@ -3,7 +3,7 @@ from typing import Any, override
 
 import pytest
 from giskard.agents.chat import Message
-from giskard.agents.generators._types import FinishReason
+from giskard.agents.generators._types import Response
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import Interaction, Trace, UserSimulator
 from pydantic import Field
@@ -21,14 +21,15 @@ class MockGenerator(BaseGenerator):
         self,
         messages: list[Message],
         params: GenerationParams,
-    ) -> tuple[Message, FinishReason]:
+        metadata: dict[str, Any] | None = None,
+    ) -> Response:
         self.calls.append(messages)
         message = Message(
             role="assistant",
             content=json.dumps(self.responses[self.index]),
         )
         self.index += 1
-        return message, "stop"
+        return Response(message=message, finish_reason="stop")
 
 
 class LLMTrace(Trace[str, str], frozen=True):
