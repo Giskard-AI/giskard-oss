@@ -13,7 +13,7 @@ from .base import BaseRateLimiter
 
 
 class _MinIntervalRateLimiterState:
-    """Internal state for MinIntervalRateLimiter: semaphore, lock, and next allowed request time."""
+    """Internal state for MinIntervalRateLimiter: semaphore and next allowed request time."""
 
     semaphore: asyncio.Semaphore | None
     next_request_time: float
