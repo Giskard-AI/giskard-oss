@@ -1,3 +1,4 @@
+from typing import Any, override
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -14,6 +15,7 @@ class RetriableError(Exception):
 class _RetriableOnlyMiddleware(RetryMiddleware):
     """Retry middleware that only retries RetriableError."""
 
+    @override
     def _should_retry(self, err: Exception) -> bool:
         return isinstance(err, RetriableError)
 
@@ -21,10 +23,11 @@ class _RetriableOnlyMiddleware(RetryMiddleware):
 class MockGenerator(BaseGenerator):
     """A mock generator for testing the retry middleware."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
         self._call_model_mock = AsyncMock()
 
+    @override
     async def _call_model(
         self,
         messages: list[Message],
@@ -33,7 +36,7 @@ class MockGenerator(BaseGenerator):
         return await self._call_model_mock(messages, params)
 
 
-def _make_generator(**retry_kwargs) -> MockGenerator:
+def _make_generator(**retry_kwargs: Any) -> MockGenerator:
     policy = RetryPolicy(**retry_kwargs) if retry_kwargs else RetryPolicy()
     mw = _RetriableOnlyMiddleware(retry_policy=policy)
     return MockGenerator(middlewares=[mw])
@@ -44,7 +47,7 @@ async def test_raises_exception_after_retries_exhausted():
     generator._call_model_mock.side_effect = RetriableError("Test error")
 
     with pytest.raises(RetriableError):
-        await generator.complete(
+        _ = await generator.complete(
             messages=[Message(role="user", content="Test message")]
         )
 
@@ -56,7 +59,7 @@ async def test_raises_exception_if_not_retriable():
     generator._call_model_mock.side_effect = ValueError("Test error")
 
     with pytest.raises(ValueError):
-        await generator.complete(
+        _ = await generator.complete(
             messages=[Message(role="user", content="Test message")]
         )
 

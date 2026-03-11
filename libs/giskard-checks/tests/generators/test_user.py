@@ -73,7 +73,7 @@ def create_mock_response(
         "custom persona with context",
     ],
 )
-def test_persona_and_context_assignment(persona, context):
+def test_persona_and_context_assignment(persona: str, context: str | None):
     """Test persona and context field assignments."""
     simulator = UserSimulator(persona=persona, context=context)
     assert simulator.persona == persona
@@ -83,13 +83,13 @@ def test_persona_and_context_assignment(persona, context):
 def test_empty_persona_rejected():
     """Test that empty persona string is rejected."""
     with pytest.raises(ValueError, match="at least 1 character"):
-        UserSimulator(persona="")
+        _ = UserSimulator(persona="")
 
 
 def test_negative_max_steps_rejected():
     """Test that negative max_steps is rejected."""
     with pytest.raises(ValueError, match="greater than or equal to 0"):
-        UserSimulator(persona="test_user", max_steps=-1)
+        _ = UserSimulator(persona="test_user", max_steps=-1)
 
 
 async def test_user_simulator_returns_messages_until_goal_reached():

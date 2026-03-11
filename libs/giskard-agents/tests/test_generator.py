@@ -1,6 +1,6 @@
 import json
 import time
-from typing import Any
+from typing import Any, override
 from unittest.mock import patch
 
 import pytest
@@ -13,7 +13,7 @@ from giskard.agents.tools import Function, Tool, ToolCall, tool
 from giskard.agents.workflow import ChatWorkflow
 from giskard.core import MinIntervalRateLimiter
 from litellm import ModelResponse
-from pydantic import Field, PrivateAttr
+from pydantic import Field
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def mock_response():
 
 
 async def test_litellm_generator_completion_with_mock(
-    generator: LiteLLMGenerator, mock_response
+    generator: LiteLLMGenerator, mock_response: ModelResponse
 ):
     with patch(
         "giskard.agents.generators.litellm_generator.acompletion",
@@ -86,7 +86,7 @@ async def test_generator_chat(generator: LiteLLMGenerator):
     assert isinstance(chats[2], Chat)
 
 
-async def test_litellm_generator_gets_rate_limiter(mock_response):
+async def test_litellm_generator_gets_rate_limiter(mock_response: ModelResponse):
     rate_limiter = MinIntervalRateLimiter.from_rpm(60, max_concurrent=1)
     generator = LiteLLMGenerator(
         model="test-model",
@@ -98,7 +98,7 @@ async def test_litellm_generator_gets_rate_limiter(mock_response):
     ):
         start_time = time.monotonic()
         for _ in range(3):
-            await generator.complete(
+            _ = await generator.complete(
                 messages=[Message(role="user", content="Test message")]
             )
         end_time = time.monotonic()
@@ -112,7 +112,7 @@ async def test_litellm_generator_gets_rate_limiter(mock_response):
     assert elapsed_time < 3
 
 
-async def test_generator_without_rate_limiter(mock_response):
+async def test_generator_without_rate_limiter(mock_response: ModelResponse):
     generator = LiteLLMGenerator(model="test-model")
     with patch(
         "giskard.agents.generators.litellm_generator.acompletion",
@@ -120,7 +120,7 @@ async def test_generator_without_rate_limiter(mock_response):
     ):
         start_time = time.monotonic()
         for _ in range(3):
-            await generator.complete(
+            _ = await generator.complete(
                 messages=[Message(role="user", content="Test message")]
             )
         end_time = time.monotonic()
@@ -165,7 +165,7 @@ def test_generator_with_params_and_rate_limiter():
     assert generator.params.max_tokens is None
 
 
-async def test_generator_with_params_overwrite(mock_response):
+async def test_generator_with_params_overwrite(mock_response: ModelResponse):
     # ARRANGE: Create a generator with base parameters.
     generator = LiteLLMGenerator(model="test-model").with_params(
         temperature=0.5,  # This should be preserved.
@@ -178,7 +178,7 @@ async def test_generator_with_params_overwrite(mock_response):
         return_value=mock_response,
     ) as mock_acompletion:
         # ACT: Call complete() with overriding parameters.
-        await generator.complete(
+        _ = await generator.complete(
             messages=[Message(role="user", content="Test message")],
             params=GenerationParams(max_tokens=200, timeout=60),
         )
@@ -208,18 +208,19 @@ class SpyGenerator(BaseGenerator):
     a tool-calling LLM for one round."""
 
     canned_response: str = Field(default="done")
-    _calls: list[dict[str, Any]] = PrivateAttr(default_factory=list)
-    _call_count: int = PrivateAttr(default=0)
+    calls: list[dict[str, Any]] = Field(default_factory=list)
+    call_count: int = Field(default=0)
 
+    @override
     async def _call_model(
         self,
         messages: list[Message],
         params: GenerationParams,
     ) -> tuple[Message, FinishReason]:
-        self._call_count += 1
-        self._calls.append({"messages": messages, "params": params})
+        self.call_count += 1
+        self.calls.append({"messages": messages, "params": params})
 
-        if self._call_count == 1 and params.tools:
+        if self.call_count == 1 and params.tools:
             return Message(
                 role="assistant",
                 content=None,
@@ -259,10 +260,10 @@ async def test_call_model_receives_internal_types():
         .run()
     )
 
-    assert len(gen._calls) >= 1
-    assert all(isinstance(m, Message) for m in gen._calls[0]["messages"])
-    assert isinstance(gen._calls[0]["params"], GenerationParams)
-    assert all(isinstance(t, Tool) for t in gen._calls[0]["params"].tools)
+    assert len(gen.calls) >= 1
+    assert all(isinstance(m, Message) for m in gen.calls[0]["messages"])
+    assert isinstance(gen.calls[0]["params"], GenerationParams)
+    assert all(isinstance(t, Tool) for t in gen.calls[0]["params"].tools)
 
     assert chat.last.content == "All done"
 
@@ -275,6 +276,7 @@ async def test_subclass_controls_message_serialization():
     """A subclass can transform messages however it likes inside _call_model."""
 
     class TaggingGenerator(BaseGenerator):
+        @override
         async def _call_model(
             self,
             messages: list[Message],
@@ -305,6 +307,7 @@ async def test_subclass_controls_tool_serialization():
         return x
 
     class RenamedToolGenerator(BaseGenerator):
+        @override
         async def _call_model(
             self,
             messages: list[Message],

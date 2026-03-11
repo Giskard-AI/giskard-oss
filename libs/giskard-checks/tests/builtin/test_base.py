@@ -47,10 +47,11 @@ class TestBaseLLMCheck:
                 return "What is the score?"
 
             @property
+            @override
             def output_type(self) -> type[BaseModel]:
                 return CustomOutputType
 
         generator = MockGenerator(score=0.85, passed=True, reasoning="Good score")
         check = CustomLLMCheck(generator=generator)
         with pytest.raises(NotImplementedError):
-            await check.run(Trace())
+            _ = await check.run(Trace())

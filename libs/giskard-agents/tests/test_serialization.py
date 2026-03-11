@@ -1,6 +1,7 @@
 """Unit tests for generator serialization and deserialization."""
 
 import uuid
+from typing import override
 
 from giskard.agents.chat import Message
 from giskard.agents.generators import (
@@ -63,6 +64,7 @@ async def test_generator_serialization_custom_generator():
     class CustomGenerator(BaseGenerator):
         content: str = Field(description="The content of the response")
 
+        @override
         async def _call_model(
             self,
             messages: list[Message],
@@ -143,6 +145,7 @@ async def test_chat_workflow_serialization_custom_generator():
     class CustomGenerator(BaseGenerator):
         content: str = Field(description="The content of the response")
 
+        @override
         async def _call_model(
             self,
             messages: list[Message],
