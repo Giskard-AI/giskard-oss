@@ -4,7 +4,9 @@ from litellm import Choices, ModelResponse, acompletion
 from litellm import _should_retry as litellm_should_retry
 from pydantic import Field
 
-from ._types import FinishReason
+from ..chat import Message
+from ..tools import Tool
+from ._types import FinishReason, GenerationParams
 from .base import BaseGenerator
 from .middleware import CompletionMiddleware, RetryMiddleware, RetryPolicy
 
@@ -33,20 +35,49 @@ class LiteLLMGenerator(BaseGenerator):
             return None
         return LiteLLMRetryMiddleware(retry_policy=self.retry_policy)
 
+    def _serialize_tools(self, tools: list[Tool]) -> list[dict[str, Any]]:
+        """Convert ``Tool`` objects to the OpenAI function-calling format."""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": t.parameters_schema,
+                },
+            }
+            for t in tools
+        ]
+
+    def _serialize_messages(self, messages: list[Message]) -> list[dict[str, Any]]:
+        """Convert ``Message`` objects to LiteLLM's dict format."""
+        return [
+            m.model_dump(include={"role", "content", "tool_calls", "tool_call_id"})
+            for m in messages
+        ]
+
+    def _deserialize_response(self, raw: Any) -> Message:
+        """Convert a LiteLLM response object into an internal ``Message``."""
+        data = raw if isinstance(raw, dict) else raw.model_dump()
+        return Message.model_validate(data)
+
     @override
     async def _call_model(
         self,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]],
-        params: dict[str, Any],
-    ) -> tuple[Any, FinishReason]:
-        if tools:
-            params = {**params, "tools": tools}
+        messages: list[Message],
+        params: GenerationParams,
+    ) -> tuple[Message, FinishReason]:
+        wire_messages = self._serialize_messages(messages)
+        wire_params = params.model_dump(exclude={"tools"})
+        wire_tools = self._serialize_tools(params.tools) if params.tools else []
+        if wire_tools:
+            wire_params["tools"] = wire_tools
 
         response = cast(
             ModelResponse,
-            await acompletion(messages=messages, model=self.model, **params),
+            await acompletion(messages=wire_messages, model=self.model, **wire_params),
         )
 
         choice = cast(Choices, response.choices[0])
-        return choice.message, choice.finish_reason  # pyright: ignore[reportReturnType]
+        message = self._deserialize_response(choice.message)
+        return message, choice.finish_reason  # pyright: ignore[reportReturnType]

@@ -1,9 +1,8 @@
-from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from giskard.agents.chat import Message
-from giskard.agents.generators import FinishReason
+from giskard.agents.generators import FinishReason, GenerationParams
 from giskard.agents.generators.base import BaseGenerator
 from giskard.agents.generators.middleware import RetryMiddleware, RetryPolicy
 
@@ -28,11 +27,10 @@ class MockGenerator(BaseGenerator):
 
     async def _call_model(
         self,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]],
-        params: dict[str, Any],
-    ) -> tuple[Any, FinishReason]:
-        return await self._call_model_mock(messages, tools, params)
+        messages: list[Message],
+        params: GenerationParams,
+    ) -> tuple[Message, FinishReason]:
+        return await self._call_model_mock(messages, params)
 
 
 def _make_generator(**retry_kwargs) -> MockGenerator:
@@ -70,7 +68,7 @@ async def test_retries_with_result():
     generator._call_model_mock.side_effect = [
         RetriableError("Test error"),
         RetriableError("Test error"),
-        ({"role": "assistant", "content": "Test response"}, "stop"),
+        (Message(role="assistant", content="Test response"), "stop"),
     ]
 
     res = await generator.complete(
@@ -87,7 +85,7 @@ async def test_retries_works_with_batch_complete():
     generator._call_model_mock.side_effect = [
         RetriableError("Test error"),
         RetriableError("Test error"),
-        ({"role": "assistant", "content": "Test response"}, "stop"),
+        (Message(role="assistant", content="Test response"), "stop"),
     ]
 
     res = await generator.batch_complete(
@@ -111,7 +109,7 @@ async def test_retries_with_max_delay():
         RetriableError("Test error"),
         RetriableError("Test error"),
         RetriableError("Test error"),
-        ({"role": "assistant", "content": "Test response"}, "stop"),
+        (Message(role="assistant", content="Test response"), "stop"),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
@@ -133,7 +131,7 @@ async def test_retries_exponential_backoff():
         RetriableError("Test error"),
         RetriableError("Test error"),
         RetriableError("Test error"),
-        ({"role": "assistant", "content": "Test response"}, "stop"),
+        (Message(role="assistant", content="Test response"), "stop"),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
@@ -159,7 +157,7 @@ async def test_retries_exponential_backoff_with_max_delay():
         RetriableError("Test error"),
         RetriableError("Test error"),
         RetriableError("Test error"),
-        ({"role": "assistant", "content": "Test response"}, "stop"),
+        (Message(role="assistant", content="Test response"), "stop"),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:

@@ -11,7 +11,9 @@ from pydantic import BaseModel, Field
 from ..chat import Message
 from ..tools import Tool
 
-FinishReason = Literal["stop", "length", "tool_calls", "content_filter", "null"] | None
+type FinishReason = (
+    Literal["stop", "length", "tool_calls", "content_filter", "null"] | None
+)
 
 
 class Response(BaseModel):
@@ -35,3 +37,27 @@ class GenerationParams(BaseModel):
     response_format: type[BaseModel] | None = Field(default=None)
     tools: list[Tool] = Field(default_factory=list)
     timeout: float | int | None = Field(default=None)
+
+    def merge(self, overrides: "GenerationParams | None") -> "GenerationParams":
+        """Return a copy with *overrides*' explicitly-set fields applied on top.
+
+        Scalar fields from *overrides* replace the base values (only if set).
+        Tools are concatenated.
+
+        Parameters
+        ----------
+        overrides : GenerationParams or None
+            Per-call overrides. Only explicitly-set fields take effect.
+            If None, returns an unmodified copy.
+
+        Returns
+        -------
+        GenerationParams
+            A new instance with merged values.
+        """
+        if overrides is None:
+            return self.model_copy()
+        updates = overrides.model_dump(exclude={"tools"}, exclude_unset=True)
+        merged = self.model_copy(update=updates)
+        merged.tools = self.tools + overrides.tools
+        return merged

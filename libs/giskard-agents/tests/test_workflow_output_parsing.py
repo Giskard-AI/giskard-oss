@@ -2,7 +2,8 @@ from typing import Any
 
 import pytest
 from giskard import agents
-from giskard.agents.generators import BaseGenerator, FinishReason
+from giskard.agents.chat import Message
+from giskard.agents.generators import BaseGenerator, FinishReason, GenerationParams
 from pydantic import BaseModel, Field, PrivateAttr, ValidationError
 
 
@@ -22,10 +23,9 @@ class MockValidationGenerator(BaseGenerator):
 
     async def _call_model(
         self,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]],
-        params: dict[str, Any],
-    ) -> tuple[Any, FinishReason]:
+        messages: list[Message],
+        params: GenerationParams,
+    ) -> tuple[Message, FinishReason]:
         if self._call_count >= len(self.responses):
             response_content = (
                 self.responses[-1]
@@ -37,7 +37,7 @@ class MockValidationGenerator(BaseGenerator):
 
         self._call_count += 1
 
-        return {"role": "assistant", "content": response_content}, "stop"
+        return Message(role="assistant", content=response_content), "stop"
 
 
 async def test_output_model_strict_validation_success():

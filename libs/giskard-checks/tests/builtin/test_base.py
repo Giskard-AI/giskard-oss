@@ -1,10 +1,10 @@
 import json
-from typing import Any, override
+from typing import override
 
 import pytest
 from giskard.agents.chat import Message
 from giskard.agents.generators._types import FinishReason
-from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
+from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import BaseLLMCheck, Trace
 from pydantic import BaseModel, Field
 
@@ -18,30 +18,20 @@ class MockGenerator(BaseGenerator):
     @override
     async def _call_model(
         self,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]],
-        params: dict[str, Any],
-    ) -> tuple[Any, FinishReason]:
-        raise NotImplementedError
-
-    @override
-    async def _complete(
-        self, messages: list[Message], params: GenerationParams | None = None
-    ) -> Response:
+        messages: list[Message],
+        params: GenerationParams,
+    ) -> tuple[Message, FinishReason]:
         self.calls.append(messages)
-        return Response(
-            message=Message(
-                role="assistant",
-                content=json.dumps(
-                    {
-                        "score": self.score,
-                        "passed": self.passed,
-                        "reasoning": self.reasoning,
-                    }
-                ),
+        return Message(
+            role="assistant",
+            content=json.dumps(
+                {
+                    "score": self.score,
+                    "passed": self.passed,
+                    "reasoning": self.reasoning,
+                }
             ),
-            finish_reason="stop",
-        )
+        ), "stop"
 
 
 class TestBaseLLMCheck:

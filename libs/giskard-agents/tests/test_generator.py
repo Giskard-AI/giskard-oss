@@ -9,7 +9,7 @@ from giskard.agents.generators import FinishReason
 from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
 from giskard.agents.generators.litellm_generator import LiteLLMGenerator
 from giskard.agents.templates import MessageTemplate
-from giskard.agents.tools import Tool, tool
+from giskard.agents.tools import Function, Tool, ToolCall, tool
 from giskard.agents.workflow import ChatWorkflow
 from giskard.core import MinIntervalRateLimiter
 from litellm import ModelResponse
@@ -204,65 +204,41 @@ async def test_generator_with_params_overwrite(mock_response):
 
 
 class SpyGenerator(BaseGenerator):
-    """A generator that records calls to translation methods and simulates
+    """A generator that records _call_model invocations and simulates
     a tool-calling LLM for one round."""
 
     canned_response: str = Field(default="done")
-    _calls: dict[str, list[object]] = PrivateAttr(
-        default_factory=lambda: {
-            "serialize_tools": [],
-            "serialize_messages": [],
-            "deserialize_response": [],
-        }
-    )
+    _calls: list[dict[str, Any]] = PrivateAttr(default_factory=list)
     _call_count: int = PrivateAttr(default=0)
-
-    def serialize_tools(self, tools: list[Tool]) -> list[dict[str, Any]]:
-        result = super().serialize_tools(tools)
-        self._calls["serialize_tools"].append(result)
-        return result
-
-    def serialize_messages(self, messages: list[Message]) -> list[dict[str, Any]]:
-        result = super().serialize_messages(messages)
-        self._calls["serialize_messages"].append(result)
-        return result
-
-    def deserialize_response(self, raw: Any) -> Message:
-        result = super().deserialize_response(raw)
-        self._calls["deserialize_response"].append(result)
-        return result
 
     async def _call_model(
         self,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]],
-        params: dict[str, Any],
-    ) -> tuple[Any, FinishReason]:
+        messages: list[Message],
+        params: GenerationParams,
+    ) -> tuple[Message, FinishReason]:
         self._call_count += 1
+        self._calls.append({"messages": messages, "params": params})
 
-        if self._call_count == 1 and tools:
-            tool_def = tools[0]["function"]
-            return {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_spy_1",
-                        "type": "function",
-                        "function": {
-                            "name": tool_def["name"],
-                            "arguments": json.dumps({"city": "Paris"}),
-                        },
-                    }
+        if self._call_count == 1 and params.tools:
+            return Message(
+                role="assistant",
+                content=None,
+                tool_calls=[
+                    ToolCall(
+                        id="call_spy_1",
+                        function=Function(
+                            name=params.tools[0].name,
+                            arguments=json.dumps({"city": "Paris"}),
+                        ),
+                    )
                 ],
-            }, "tool_calls"
+            ), "tool_calls"
 
-        return {"role": "assistant", "content": self.canned_response}, "stop"
+        return Message(role="assistant", content=self.canned_response), "stop"
 
 
-async def test_translation_methods_called_during_workflow():
-    """Verify serialize_tools, serialize_messages, deserialize_response
-    are all invoked when a workflow runs with tools."""
+async def test_call_model_receives_internal_types():
+    """Verify _call_model receives Message and Tool objects, not dicts."""
 
     @tool
     def get_weather(city: str) -> str:
@@ -283,9 +259,10 @@ async def test_translation_methods_called_during_workflow():
         .run()
     )
 
-    assert len(gen._calls["serialize_tools"]) >= 1
-    assert len(gen._calls["serialize_messages"]) >= 1
-    assert len(gen._calls["deserialize_response"]) >= 1
+    assert len(gen._calls) >= 1
+    assert all(isinstance(m, Message) for m in gen._calls[0]["messages"])
+    assert isinstance(gen._calls[0]["params"], GenerationParams)
+    assert all(isinstance(t, Tool) for t in gen._calls[0]["params"].tools)
 
     assert chat.last.content == "All done"
 
@@ -294,25 +271,18 @@ async def test_translation_methods_called_during_workflow():
     assert tool_msg.tool_call_id == "call_spy_1"
 
 
-async def test_custom_serialize_messages_override():
-    """A subclass can transform messages before they reach the provider."""
+async def test_subclass_controls_message_serialization():
+    """A subclass can transform messages however it likes inside _call_model."""
 
     class TaggingGenerator(BaseGenerator):
         async def _call_model(
             self,
-            messages: list[dict[str, Any]],
-            tools: list[dict[str, Any]],
-            params: dict[str, Any],
-        ) -> tuple[Any, FinishReason]:
-            last_content = messages[-1].get("content", "")
-            return {"role": "assistant", "content": last_content}, "stop"
-
-        def serialize_messages(self, messages: list[Message]) -> list[dict[str, Any]]:
-            result = super().serialize_messages(messages)
-            for msg in result:
-                if msg.get("content"):
-                    msg["content"] = f"[tagged] {msg['content']}"
-            return result
+            messages: list[Message],
+            params: GenerationParams,
+        ) -> tuple[Message, FinishReason]:
+            last_content = messages[-1].content or ""
+            tagged = f"[tagged] {last_content}"
+            return Message(role="assistant", content=tagged), "stop"
 
     gen = TaggingGenerator()
     chat = await ChatWorkflow(generator=gen).chat("hello", role="user").run()
@@ -320,8 +290,8 @@ async def test_custom_serialize_messages_override():
     assert chat.last.content == "[tagged] hello"
 
 
-async def test_custom_serialize_tools_override():
-    """A subclass can reshape tool definitions."""
+async def test_subclass_controls_tool_serialization():
+    """A subclass can reshape tool definitions inside _call_model."""
 
     @tool
     def my_tool(x: str) -> str:
@@ -337,18 +307,11 @@ async def test_custom_serialize_tools_override():
     class RenamedToolGenerator(BaseGenerator):
         async def _call_model(
             self,
-            messages: list[dict[str, Any]],
-            tools: list[dict[str, Any]],
-            params: dict[str, Any],
-        ) -> tuple[Any, FinishReason]:
-            content = tools[0]["function"]["name"] if tools else "none"
-            return {"role": "assistant", "content": content}, "stop"
-
-        def serialize_tools(self, tools: list[Tool]) -> list[dict[str, Any]]:
-            result = super().serialize_tools(tools)
-            for t in result:
-                t["function"]["name"] = f"custom_{t['function']['name']}"
-            return result
+            messages: list[Message],
+            params: GenerationParams,
+        ) -> tuple[Message, FinishReason]:
+            content = f"custom_{params.tools[0].name}" if params.tools else "none"
+            return Message(role="assistant", content=content), "stop"
 
     gen = RenamedToolGenerator()
     chat = await (

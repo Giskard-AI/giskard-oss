@@ -7,7 +7,6 @@ from giskard.core import BaseRateLimiter, Discriminated, discriminated_base
 from pydantic import Field
 
 from ..chat import Message, Role
-from ..tools import Tool
 from ._types import FinishReason, GenerationParams, Response
 from .middleware import (
     CompletionMiddleware,
@@ -25,13 +24,10 @@ if TYPE_CHECKING:
 class BaseGenerator(Discriminated, ABC):
     """Base class for all generators.
 
-    Generators act as **protocol adapters**: they own all translation between
-    the internal ``Message`` format and whatever wire format the LLM provider
-    expects.  The three translation methods—``serialize_tools``,
-    ``serialize_messages``, and ``deserialize_response``—are the extension
-    points that provider-specific subclasses override.  Workflow, tool, and
-    chat code must never call provider APIs directly; they work exclusively
-    with ``Message`` objects and delegate wire translation to the generator.
+    Each subclass is responsible for translating between the internal
+    ``Message`` / ``Tool`` objects and whatever wire format its provider
+    expects.  Workflow, tool, and chat code work exclusively with
+    ``Message`` objects and never call provider APIs directly.
     """
 
     params: GenerationParams = Field(default_factory=GenerationParams)
@@ -39,134 +35,38 @@ class BaseGenerator(Discriminated, ABC):
     rate_limiter: BaseRateLimiter | None = Field(default=None)
     middlewares: list[CompletionMiddleware] = Field(default_factory=list)
 
-    # -- Protocol adapter methods ------------------------------------------
-
-    def serialize_tools(self, tools: list[Tool]) -> list[dict[str, Any]]:
-        """Convert internal ``Tool`` objects to the provider's wire format.
-
-        Override in subclasses to produce a different tool schema layout
-        (e.g. Anthropic's tool format).
-
-        Parameters
-        ----------
-        tools : list[Tool]
-            Tools to serialize.
-
-        Returns
-        -------
-        list[dict[str, Any]]
-            Tool definitions in the provider's expected format.
-        """
-        return [
-            {
-                "type": "function",
-                "function": {
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": t.parameters_schema,
-                },
-            }
-            for t in tools
-        ]
-
-    def serialize_messages(self, messages: list[Message]) -> list[dict[str, Any]]:
-        """Convert internal ``Message`` objects to the provider's wire format.
-
-        Override in subclasses to reshape messages for providers that use a
-        different message layout (e.g. Anthropic batches tool results into a
-        single ``role="user"`` message with ``tool_result`` content blocks).
-
-        Parameters
-        ----------
-        messages : list[Message]
-            Messages to serialize.
-
-        Returns
-        -------
-        list[dict[str, Any]]
-            Messages in the provider's expected format.
-        """
-        return [
-            m.model_dump(include={"role", "content", "tool_calls", "tool_call_id"})
-            for m in messages
-        ]
-
-    def deserialize_response(self, raw: Any) -> Message:
-        """Convert a provider's raw response into an internal ``Message``.
-
-        Override in subclasses to handle provider-specific response shapes.
-
-        Parameters
-        ----------
-        raw : Any
-            The raw response object from the provider.
-
-        Returns
-        -------
-        Message
-            An internal Message instance.
-        """
-        data = raw if isinstance(raw, dict) else raw.model_dump()
-        return Message.model_validate(data)
-
     # -- Completion pipeline -----------------------------------------------
-
-    def _resolve_params(
-        self, params: GenerationParams | None
-    ) -> tuple[dict[str, Any], list[Tool]]:
-        """Merge ``self.params`` with per-call *params* overrides.
-
-        Returns
-        -------
-        tuple[dict[str, Any], list[Tool]]
-            A ``(wire_params, tools)`` pair ready for serialization.
-        """
-        merged = self.params.model_dump(exclude={"tools"})
-        if params is not None:
-            merged.update(params.model_dump(exclude={"tools"}, exclude_unset=True))
-        tools = self.params.tools + (params.tools if params is not None else [])
-        return merged, tools
 
     @abstractmethod
     async def _call_model(
         self,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]],
-        params: dict[str, Any],
-    ) -> tuple[Any, FinishReason]:
-        """Call the provider and return the raw response.
+        messages: list[Message],
+        params: GenerationParams,
+    ) -> tuple[Message, FinishReason]:
+        """Call the provider and return the response as an internal Message.
+
+        Subclasses handle all serialization/deserialization internally.
 
         Parameters
         ----------
-        messages : list[dict[str, Any]]
-            Messages in the provider's wire format (from ``serialize_messages``).
-        tools : list[dict[str, Any]]
-            Tool definitions in the provider's wire format (from ``serialize_tools``).
-            Empty list when no tools are available.
-        params : dict[str, Any]
-            Merged generation parameters (temperature, max_tokens, etc.).
+        messages : list[Message]
+            Conversation messages in internal format.
+        params : GenerationParams
+            Merged generation parameters (including tools).
 
         Returns
         -------
-        tuple[Any, FinishReason]
-            ``(raw_message, finish_reason)`` — the raw message will be passed
-            to ``deserialize_response``.
+        tuple[Message, FinishReason]
+            The assistant message and the finish reason.
         """
         raise NotImplementedError
 
     async def _complete(
         self, messages: list[Message], params: GenerationParams | None = None
     ) -> Response:
-        wire_params, tools = self._resolve_params(params)
-        wire_tools = self.serialize_tools(tools) if tools else []
-        wire_messages = self.serialize_messages(messages)
-        raw_message, finish_reason = await self._call_model(
-            wire_messages, wire_tools, wire_params
-        )
-        return Response(
-            message=self.deserialize_response(raw_message),
-            finish_reason=finish_reason,
-        )
+        merged = self.params.merge(params)
+        message, finish_reason = await self._call_model(messages, merged)
+        return Response(message=message, finish_reason=finish_reason)
 
     async def complete(
         self,

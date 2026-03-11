@@ -4,7 +4,7 @@ from typing import Any, override
 import pytest
 from giskard.agents.chat import Message
 from giskard.agents.generators._types import FinishReason
-from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
+from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import Interaction, Trace, UserSimulator
 from pydantic import Field
 
@@ -19,26 +19,16 @@ class MockGenerator(BaseGenerator):
     @override
     async def _call_model(
         self,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]],
-        params: dict[str, Any],
-    ) -> tuple[Any, FinishReason]:
-        raise NotImplementedError
-
-    @override
-    async def _complete(
-        self, messages: list[Message], params: GenerationParams | None = None
-    ) -> Response:
+        messages: list[Message],
+        params: GenerationParams,
+    ) -> tuple[Message, FinishReason]:
         self.calls.append(messages)
-        response = Response(
-            message=Message(
-                role="assistant",
-                content=json.dumps(self.responses[self.index]),
-            ),
-            finish_reason="stop",
+        message = Message(
+            role="assistant",
+            content=json.dumps(self.responses[self.index]),
         )
         self.index += 1
-        return response
+        return message, "stop"
 
 
 class LLMTrace(Trace[str, str], frozen=True):
