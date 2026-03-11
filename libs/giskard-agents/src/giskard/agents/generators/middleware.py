@@ -8,6 +8,7 @@ and round-trips via ``model_dump_json`` / ``model_validate_json``.
 
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 import tenacity as t
 from giskard.core import BaseRateLimiter, Discriminated, discriminated_base
@@ -16,7 +17,10 @@ from pydantic import BaseModel, Field
 from ..chat import Message
 from ._types import GenerationParams, Response
 
-type NextFn = Callable[[list[Message], GenerationParams | None], Awaitable[Response]]
+type NextFn = Callable[
+    [list[Message], GenerationParams | None, dict[str, Any] | None],
+    Awaitable[Response],
+]
 
 
 @discriminated_base
@@ -33,6 +37,7 @@ class CompletionMiddleware(Discriminated, ABC):
         self,
         messages: list[Message],
         params: GenerationParams | None,
+        metadata: dict[str, Any] | None,
         next_fn: NextFn,
     ) -> Response:
         """Invoke the middleware, calling *next_fn* to continue the chain."""
@@ -63,6 +68,7 @@ class RetryMiddleware(CompletionMiddleware):
         self,
         messages: list[Message],
         params: GenerationParams | None,
+        metadata: dict[str, Any] | None,
         next_fn: NextFn,
     ) -> Response:
         policy = self.retry_policy
@@ -77,7 +83,7 @@ class RetryMiddleware(CompletionMiddleware):
             reraise=True,
         )
 
-        return await retrier(next_fn, messages, params)
+        return await retrier(next_fn, messages, params, metadata)
 
     def _tenacity_retry_condition(self, retry_state: t.RetryCallState) -> bool:
         if retry_state.outcome is None or not retry_state.outcome.failed:
@@ -95,7 +101,8 @@ class RateLimiterMiddleware(CompletionMiddleware):
         self,
         messages: list[Message],
         params: GenerationParams | None,
+        metadata: dict[str, Any] | None,
         next_fn: NextFn,
     ) -> Response:
         async with self.rate_limiter.throttle():
-            return await next_fn(messages, params)
+            return await next_fn(messages, params, metadata)

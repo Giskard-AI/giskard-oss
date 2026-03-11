@@ -4,7 +4,7 @@ Kept in a separate module to break the circular dependency between
 ``base`` (BaseGenerator) and ``middleware`` (CompletionMiddleware).
 """
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -19,6 +19,7 @@ type FinishReason = (
 class Response(BaseModel):
     message: Message
     finish_reason: FinishReason
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class GenerationParams(BaseModel):

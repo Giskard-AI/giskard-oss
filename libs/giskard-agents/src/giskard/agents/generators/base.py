@@ -7,7 +7,7 @@ from giskard.core import BaseRateLimiter, Discriminated, discriminated_base
 from pydantic import Field
 
 from ..chat import Message, Role
-from ._types import FinishReason, GenerationParams, Response
+from ._types import GenerationParams, Response
 from .middleware import (
     CompletionMiddleware,
     NextFn,
@@ -42,8 +42,9 @@ class BaseGenerator(Discriminated, ABC):
         self,
         messages: list[Message],
         params: GenerationParams,
-    ) -> tuple[Message, FinishReason]:
-        """Call the provider and return the response as an internal Message.
+        metadata: dict[str, Any] | None = None,
+    ) -> Response:
+        """Call the provider and return a Response.
 
         Subclasses handle all serialization/deserialization internally.
 
@@ -53,25 +54,30 @@ class BaseGenerator(Discriminated, ABC):
             Conversation messages in internal format.
         params : GenerationParams
             Merged generation parameters (including tools).
+        metadata : dict[str, Any] | None
+            Optional metadata from the caller (e.g. trace IDs, tags).
 
         Returns
         -------
-        tuple[Message, FinishReason]
-            The assistant message and the finish reason.
+        Response
+            The model's response including message, finish reason, and metadata.
         """
         raise NotImplementedError
 
     async def _complete(
-        self, messages: list[Message], params: GenerationParams | None = None
+        self,
+        messages: list[Message],
+        params: GenerationParams | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Response:
         merged = self.params.merge(params)
-        message, finish_reason = await self._call_model(messages, merged)
-        return Response(message=message, finish_reason=finish_reason)
+        return await self._call_model(messages, merged, metadata)
 
     async def complete(
         self,
         messages: list[Message],
         params: GenerationParams | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Response:
         """Get a completion from the model.
 
@@ -81,6 +87,8 @@ class BaseGenerator(Discriminated, ABC):
             List of messages to send to the model.
         params: GenerationParams | None
             Parameters for the generation.
+        metadata : dict[str, Any] | None
+            Optional metadata to pass through the completion pipeline.
 
         Returns
         -------
@@ -88,7 +96,7 @@ class BaseGenerator(Discriminated, ABC):
             The model's response.
         """
         chain = self._build_chain(self._complete)
-        return await chain(messages, params)
+        return await chain(messages, params, metadata)
 
     def _build_chain(self, core: NextFn) -> NextFn:
         """Compose built-in retry/rate-limiter and custom middlewares around *core*."""
@@ -102,9 +110,11 @@ class BaseGenerator(Discriminated, ABC):
 
         def _wrap(next_fn: NextFn, mw: CompletionMiddleware) -> NextFn:
             async def _wrapped(
-                messages: list[Message], params: GenerationParams | None
+                messages: list[Message],
+                params: GenerationParams | None,
+                metadata: dict[str, Any] | None,
             ) -> Response:
-                return await mw.call(messages, params, next_fn)
+                return await mw.call(messages, params, metadata, next_fn)
 
             return _wrapped
 
@@ -143,7 +153,10 @@ class BaseGenerator(Discriminated, ABC):
         return self.model_copy(update={"rate_limiter": rate_limiter})
 
     async def batch_complete(
-        self, messages: list[list[Message]], params: GenerationParams | None = None
+        self,
+        messages: list[list[Message]],
+        params: GenerationParams | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> list[Response]:
         """Get a batch of completions from the model.
 
@@ -153,13 +166,15 @@ class BaseGenerator(Discriminated, ABC):
             List of lists of messages to send to the model.
         params : GenerationParams | None, optional
             Parameters for the generation.
+        metadata : dict[str, Any] | None, optional
+            Optional metadata to pass through the completion pipeline.
 
         Returns
         -------
         list[Response]
             A list of model's responses.
         """
-        completion_requests = [self.complete(m, params) for m in messages]
+        completion_requests = [self.complete(m, params, metadata) for m in messages]
         responses = await asyncio.gather(*completion_requests)
         return responses
 

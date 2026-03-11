@@ -17,8 +17,8 @@ alwaysApply: true
 
 - **Do not call provider APIs (litellm, anthropic, openai, etc.) from workflow, tool, or chat code.** Provider calls belong exclusively in generator subclasses.
 - **Do not import provider libraries outside of generator modules.** The `generators/` package is the only place that should depend on provider SDKs.
-- **`_complete` is the template method.** It merges params via `GenerationParams.merge()`, calls the abstract `_call_model`, and wraps the result in a `Response`. Do not override `_complete` in production subclasses — override `_call_model` instead.
-- **`_call_model` receives internal types.** Signature: `_call_model(messages: list[Message], params: GenerationParams) -> tuple[Message, FinishReason]`. The base class never touches wire formats.
+- **`_complete` is the template method.** It merges params via `GenerationParams.merge()` and delegates to the abstract `_call_model`. Do not override `_complete` in production subclasses — override `_call_model` instead.
+- **`_call_model` receives internal types and returns `Response`.** Signature: `_call_model(messages: list[Message], params: GenerationParams, metadata: dict[str, Any] | None = None) -> Response`. The base class never touches wire formats. The `metadata` parameter carries caller-provided context (e.g. trace IDs, tags) and the returned `Response.metadata` carries provider-side information back to the caller.
 - **Serialization is the subclass's concern.** Each subclass handles translating `Message`/`Tool` to its provider's wire format inside `_call_model` (e.g. `LiteLLMGenerator._serialize_messages`). Do not add serialization methods to `BaseGenerator`.
 - **Param merging lives on `GenerationParams.merge()`.** Scalar fields from overrides replace the base; tools are concatenated. Do not reimplement merge logic elsewhere.
 - **Adding a new provider?** Subclass `BaseGenerator` and implement `_call_model`. Handle all serialization/deserialization inside the subclass. Do not modify `Message`, `Tool`, or workflow code.

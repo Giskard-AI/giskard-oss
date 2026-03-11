@@ -1,12 +1,11 @@
 """Unit tests for generator serialization and deserialization."""
 
 import uuid
-from typing import override
+from typing import Any, override
 
 from giskard.agents.chat import Message
 from giskard.agents.generators import (
     BaseGenerator,
-    FinishReason,
     GenerationParams,
     Generator,
 )
@@ -69,8 +68,12 @@ async def test_generator_serialization_custom_generator():
             self,
             messages: list[Message],
             params: GenerationParams,
-        ) -> tuple[Message, FinishReason]:
-            return Message(role="assistant", content=self.content), "stop"
+            metadata: dict[str, Any] | None = None,
+        ) -> Response:
+            return Response(
+                message=Message(role="assistant", content=self.content),
+                finish_reason="stop",
+            )
 
     original = CustomGenerator(content="Test response")
     serialized = original.model_dump_json()
@@ -150,8 +153,12 @@ async def test_chat_workflow_serialization_custom_generator():
             self,
             messages: list[Message],
             params: GenerationParams,
-        ) -> tuple[Message, FinishReason]:
-            return Message(role="assistant", content=self.content), "stop"
+            metadata: dict[str, Any] | None = None,
+        ) -> Response:
+            return Response(
+                message=Message(role="assistant", content=self.content),
+                finish_reason="stop",
+            )
 
     generator = CustomGenerator(content="Workflow test response")
     tool = Tool(

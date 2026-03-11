@@ -6,7 +6,7 @@ from pydantic import Field
 
 from ..chat import Message
 from ..tools import Tool
-from ._types import FinishReason, GenerationParams
+from ._types import GenerationParams, Response
 from .base import BaseGenerator
 from .middleware import CompletionMiddleware, RetryMiddleware, RetryPolicy
 
@@ -66,18 +66,19 @@ class LiteLLMGenerator(BaseGenerator):
         self,
         messages: list[Message],
         params: GenerationParams,
-    ) -> tuple[Message, FinishReason]:
+        metadata: dict[str, Any] | None = None,
+    ) -> Response:
         wire_messages = self._serialize_messages(messages)
         wire_params = params.model_dump(exclude={"tools"})
         wire_tools = self._serialize_tools(params.tools) if params.tools else []
         if wire_tools:
             wire_params["tools"] = wire_tools
 
-        response = cast(
+        raw = cast(
             ModelResponse,
             await acompletion(messages=wire_messages, model=self.model, **wire_params),
         )
 
-        choice = cast(Choices, response.choices[0])
+        choice = cast(Choices, raw.choices[0])
         message = self._deserialize_response(choice.message)
-        return message, choice.finish_reason  # pyright: ignore[reportReturnType]
+        return Response(message=message, finish_reason=choice.finish_reason)  # pyright: ignore[reportArgumentType]
