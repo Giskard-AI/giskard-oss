@@ -73,6 +73,8 @@ class LiteLLMGenerator(BaseGenerator):
         wire_tools = self._serialize_tools(params.tools) if params.tools else []
         if wire_tools:
             wire_params["tools"] = wire_tools
+        if metadata:
+            wire_params["metadata"] = metadata
 
         raw = cast(
             ModelResponse,
@@ -81,4 +83,9 @@ class LiteLLMGenerator(BaseGenerator):
 
         choice = cast(Choices, raw.choices[0])
         message = self._deserialize_response(choice.message)
-        return Response(message=message, finish_reason=choice.finish_reason)  # pyright: ignore[reportArgumentType]
+        response_metadata = raw.model_dump(exclude={"choices"})
+        return Response(
+            message=message,
+            finish_reason=choice.finish_reason,  # pyright: ignore[reportArgumentType]
+            metadata={"litellm": response_metadata},
+        )

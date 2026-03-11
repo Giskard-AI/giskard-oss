@@ -70,6 +70,11 @@ class BaseGenerator(Discriminated, ABC):
         params: GenerationParams | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> Response:
+        """Template method: merge generation params and delegate to the subclass.
+
+        This is the core of the middleware pipeline.  Do not override in
+        production subclasses — override ``_call_model`` instead.
+        """
         merged = self.params.merge(params)
         return await self._call_model(messages, merged, metadata)
 
