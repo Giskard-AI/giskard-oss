@@ -22,7 +22,7 @@ from pydantic import (
 from ..discriminated import Discriminated, discriminated_base
 
 GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS = os.environ.get(
-    "GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_ERRORS", ""
+    "GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS", ""
 ).lower() in ("true", "1", "yes")
 
 
