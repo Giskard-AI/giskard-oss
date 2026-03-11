@@ -6,7 +6,7 @@ Lightweight primitives to define and run checks against model interactions.
 This library provides:
 
 - Core types for describing interactions (`Interact`, `Interaction`, `Trace`)
-- A fluent scenario builder and runner (`scenario`, `Scenario`, `ScenarioResult`)
+- A fluent scenario builder and runner (`Scenario`, `ScenarioResult`)
 - Built-in checks including string matching, comparisons, and LLM-based evaluation
 - JSONPath-based extraction utilities for referencing trace data
 - Seamless integration with `giskard-agents` generators for LLM-backed checks
@@ -32,10 +32,11 @@ Quickstart
 Use the fluent API to create and run scenarios:
 
 ```python
-from giskard.checks import Groundedness, scenario
+from giskard.checks import Groundedness, Scenario
 
-test_scenario = (
-    scenario("test_france_capital")
+# Natural variable name: no shadowing (Scenario is the class, scenario is your instance)
+scenario = (
+    Scenario("test_france_capital")
     .interact(
         inputs="What is the capital of France?",
         outputs="The capital of France is Paris."
@@ -51,7 +52,7 @@ test_scenario = (
     )
 )
 
-result = await test_scenario.run()
+result = await scenario.run()
 assert result.passed
 print(f"Scenario completed in {result.duration_ms}ms")
 ```
@@ -60,7 +61,7 @@ The fluent API accepts static values or callables for `inputs` and `outputs`, so
 
 ```python
 from openai import OpenAI
-from giskard.checks import Groundedness, scenario
+from giskard.checks import Groundedness, Scenario
 
 client = OpenAI()
 
@@ -71,8 +72,8 @@ def get_answer(inputs: str) -> str:
     )
     return response.choices[0].message.content
 
-test_scenario = (
-    scenario("test_dynamic_output")
+scenario = (
+    Scenario("test_dynamic_output")
     .interact(
         inputs="What is the capital of France?",
         outputs=get_answer
@@ -93,7 +94,7 @@ The `run()` method is async. In a script, wrap it with `asyncio.run()`:
 import asyncio
 
 async def main():
-    result = await test_scenario.run()
+    result = await scenario.run()
     print(result)
 
 asyncio.run(main())
@@ -105,16 +106,16 @@ Running Multiple Scenarios with Suite
 Use a `Suite` to run multiple scenarios against a shared target SUT. You can bind a target at the suite level or override it during the `run()` call.
 
 ```python
-from giskard.checks import Suite, scenario, Equals
+from giskard.checks import Equals, Scenario, Suite
 
-# Define some scenarios without a target
-s1 = (
-    scenario("s1")
+# Define some scenarios without a target (no shadowing: Scenario is the class)
+scenario1 = (
+    Scenario("s1")
     .interact("hello")
     .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
 )
-s2 = (
-    scenario("s2")
+scenario2 = (
+    Scenario("s2")
     .interact("world")
     .check(Equals(expected_value="Echo: world", key="trace.last.outputs"))
 )
@@ -124,8 +125,8 @@ target_sut = lambda x: f"Echo: {x}"
 suite = Suite(name="my_suite", target=target_sut)
 
 # Add scenarios
-suite.append(s1)
-suite.append(s2)
+suite.append(scenario1)
+suite.append(scenario2)
 
 # Run the suite
 results = await suite.run()
@@ -142,7 +143,7 @@ Why this library?
 Concepts
 --------
 
-- **Fluent API**: The recommended way to create tests using `scenario().interact().check()`. This API builds a scenario and handles interaction generation.
+- **Fluent API**: The recommended way to create tests using `Scenario(...).interact().check()`. This API builds a scenario and handles interaction generation.
 - **Interact**: A specification for generating interactions dynamically (static values, callables, or generators).
 - **Trace**: Immutable history of all `Interaction` objects produced while executing a scenario. Use `trace.last` in JSONPath expressions (e.g., `trace.last.outputs`).
 - **Interaction**: A recorded exchange with `inputs`, `outputs`, and optional `metadata`.
@@ -288,19 +289,19 @@ restored = Scenario.model_validate(serialized)
 ### Binding a Target SUT
 
 You can bind a System Under Test (SUT) at three different levels, with the following precedence:
-`run(target=...)` > `Suite(target=...)` > `scenario(target=...)`.
+`run(target=...)` > `Suite(target=...)` > `Scenario(..., target=...)`.
 
 #### 1. Scenario Level
-Pass the target directly to the `scenario()` helper:
+Pass the target directly to `Scenario()`:
 ```python
-result = await scenario("test", target=my_sut).interact("hello").run()
+result = await Scenario("test", target=my_sut).interact("hello").run()
 ```
 
 #### 2. Suite Level
 Bind a target to all scenarios in a suite:
 ```python
 suite = Suite(name="my_suite", target=shared_sut)
-suite.append(s1)
+suite.append(scenario)
 result = await suite.run()
 ```
 
@@ -335,10 +336,10 @@ Structured data example
 ------------------------
 
 ```python
-from giskard.checks import scenario, Equals, StringMatching
+from giskard.checks import Equals, Scenario, StringMatching
 
 result = await (
-    scenario("structured-example")
+    Scenario("structured-example")
     .interact(
         {"question": "What is the capital of France?"},
         lambda inputs: {"answer": "Paris is the capital of France.", "confidence": 0.95}
@@ -366,10 +367,10 @@ Multi-step workflows
 Use the fluent API to create multi-turn scenarios. Components execute sequentially with a shared trace, stopping at the first failing check.
 
 ```python
-from giskard.checks import scenario, LLMJudge, RegexMatching
+from giskard.checks import LLMJudge, RegexMatching, Scenario
 
 result = await (
-    scenario("multi_step_conversation")
+    Scenario("multi_step_conversation")
     .interact(
         "Hello, I want to apply for a job.",
         lambda inputs: "Hi! I'd be happy to help. Please provide your email."
@@ -397,7 +398,7 @@ Dynamic interaction generation
 The fluent API supports callables (sync/async) or generators for dynamic inputs. Multiple inputs can be produced by yielding from a generator.
 
 ```python
-from giskard.checks import scenario, Trace, from_fn
+from giskard.checks import Scenario, Trace, from_fn
 
 
 async def input_generator(trace: Trace):
@@ -407,7 +408,7 @@ async def input_generator(trace: Trace):
 
 
 result = await (
-    scenario("dynamic-example")
+    Scenario("dynamic-example")
     .interact(
         input_generator,
         lambda inputs: {
@@ -447,9 +448,9 @@ LLM-based checks
 from giskard.agents.generators import Generator
 
 from giskard.checks import (
-    scenario,
     Conformity,
     LLMJudge,
+    Scenario,
     set_default_generator,
 )
 
@@ -457,7 +458,7 @@ from giskard.checks import (
 set_default_generator(Generator(model="openai/gpt-4o-mini"))
 
 result = await (
-    scenario("llm-example")
+    Scenario("llm-example")
     .interact(
         {"question": "What is the capital of France?"},
         lambda inputs: {"answer": "Paris is the capital of France."}
@@ -562,7 +563,7 @@ scenario = Scenario(
 result = await scenario.run()
 ```
 
-**Note**: For most use cases, the fluent API (`scenario().interact().check()`) is recommended as it's simpler and more readable.
+**Note**: For most use cases, the fluent API (`Scenario(...).interact().check()`) is recommended as it's simpler and more readable.
 
 Development
 -----------

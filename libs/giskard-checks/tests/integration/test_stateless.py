@@ -12,7 +12,6 @@ from giskard.checks import (
     Scenario,
     Trace,
     WithSpy,
-    scenario,
 )
 from pydantic import BaseModel, Field, computed_field
 
@@ -183,7 +182,7 @@ async def test_user_simulator(
             current_step += 1
 
     result = await (
-        scenario("test_single_message", trace_type=MessageTraces)
+        Scenario("test_single_message", trace_type=MessageTraces)
         .add_interaction(
             Interact(
                 inputs=partial(

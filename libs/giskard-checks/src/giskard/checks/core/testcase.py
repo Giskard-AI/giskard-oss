@@ -17,7 +17,7 @@ from .result import TestCaseResult
 class TestCase[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
     """Bundle a trace with a set of checks to execute.
 
-    **Note**: For most use cases, the fluent API (`scenario().interact().check()`) is
+    **Note**: For most use cases, the fluent API (`Scenario(...).interact().check()`) is
     recommended as it's simpler and more readable. This class is useful for advanced
     use cases where you need direct control over trace construction and check execution.
 

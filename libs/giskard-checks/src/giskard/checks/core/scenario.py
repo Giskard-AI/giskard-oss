@@ -1,16 +1,16 @@
-from collections.abc import Sequence
-from typing import Any
+from typing import Any, Self
 
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
 
 from .check import Check
-from .interaction import InteractionSpec, Trace
+from .input_generator import InputGenerator
+from .interaction import Interact, InteractionSpec, Trace
 from .result import ScenarioResult
-from .types import ProviderType
+from .types import GeneratorType, ProviderType
 
 
-class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):  # pyright: ignore[reportMissingTypeArgument]
+class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
     """A scenario composed of an ordered sequence of components InteractionSpecs
     or Checks with a shared trace.
 
@@ -21,34 +21,19 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
     - **InteractionSpec** components: Add interactions to the trace
     - **Check** components: Validate the current trace state
 
-    Attributes
-    ----------
-    name : str
-        Scenario identifier.
-    sequence : Sequence[InteractionSpec | Check]
-        Sequential steps to execute. Each component can be an InteractionSpec or
-        a Check (which validates the current trace).
-    trace_type : type[TraceType] | None
-        Optional custom trace type to use. If not provided, the trace type will be
-        inferred from the sequence of components. Useful when using custom trace
-        subclasses with additional computed fields or methods.
+    Use the fluent API to build a scenario, then call ``run()``:
 
-    Examples
-    --------
-    **Recommended**: Use the fluent API:
-
-        from giskard.checks import scenario, Equals
-        result = await (
-            scenario("multi_step_test")
+        from giskard.checks import Scenario, Equals
+        scenario = (
+            Scenario("multi_step_test")
             .interact("Hello", lambda inputs: "Hi")
             .check(Equals(expected="Hi", key="trace.last.outputs"))
-            .run()
         )
+        result = await scenario.run()
 
-    **Advanced**: Direct instantiation:
+    For advanced usage you can instantiate with a pre-filled sequence:
 
         from giskard.checks import Scenario, Interact, Equals
-
         scenario = Scenario(
             name="multi_step_test",
             sequence=[
@@ -57,13 +42,28 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
             ],
         )
         result = await scenario.run()
+
+    Attributes
+    ----------
+    name : str
+        Scenario identifier.
+    sequence : list[InteractionSpec | Check]
+        Sequential steps to execute. Each component can be an InteractionSpec or
+        a Check (which validates the current trace).
+    trace_type : type[TraceType] | None
+        Optional custom trace type to use. If not provided, the trace type will be
+        inferred from the sequence of components. Useful when using custom trace
+        subclasses with additional computed fields or methods.
     """
 
-    name: str = Field(..., description="Scenario name")
-    sequence: Sequence[
+    name: str = Field(
+        default="Unnamed Scenario",
+        description="Scenario name",
+    )
+    sequence: list[
         InteractionSpec[InputType, OutputType, TraceType]
         | Check[InputType, OutputType, TraceType]
-    ] = Field(..., description="Sequential components to execute")
+    ] = Field(default_factory=list, description="Sequential components to execute")
     trace_type: type[TraceType] | None = Field(
         default=None,
         description="Type of trace to use for the scenario. If not provided, the trace type will be inferred from the sequence of components.",
@@ -80,6 +80,126 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel, frozen=True):
         default=NOT_PROVIDED,
         description="Scenario-level target SUT that will be used to replace NOT_PROVIDED outputs.",
     )
+
+    def __init__(
+        self,
+        name: str | None = None,
+        /,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize a scenario. Name can be passed positionally: Scenario(\"my_name\")."""
+        if name is not None:
+            kwargs["name"] = name
+        super().__init__(**kwargs)
+
+    def interact(
+        self,
+        inputs: (
+            InputGenerator[InputType, TraceType]
+            | GeneratorType[[], InputType, None]
+            | GeneratorType[[TraceType], InputType, TraceType]
+        ),
+        outputs: (
+            ProviderType[[InputType], OutputType]
+            | ProviderType[[InputType, TraceType], OutputType]
+            | NotProvided
+        ) = NOT_PROVIDED,
+        metadata: dict[str, object] | None = None,
+    ) -> Self:
+        """Add an interaction to the scenario sequence.
+
+        Creates an `Interact` with the provided inputs and outputs and adds
+        it to the scenario sequence. Supports static values, callables, and generators
+        just like `Interact`.
+
+        Parameters
+        ----------
+        inputs : InputType | Callable | Generator | InputGenerator
+            The input specification for the interaction.
+        outputs : OutputType | Callable
+            The output specification for the interaction.
+        metadata : dict[str, object] | None
+            Optional metadata to attach to the interaction.
+
+        Returns
+        -------
+        Scenario
+            Self for method chaining.
+        """
+        interaction = Interact(
+            inputs=inputs,
+            outputs=outputs,
+            metadata=metadata or {},
+        )
+        self.sequence.append(interaction)
+        return self
+
+    def check(self, check: Check[InputType, OutputType, TraceType]) -> Self:
+        """Add a check to the scenario sequence."""
+        self.sequence.append(check)
+        return self
+
+    def checks(self, *checks: Check[InputType, OutputType, TraceType]) -> Self:
+        """Add multiple checks to the scenario sequence."""
+        self.sequence.extend(checks)
+        return self
+
+    def add_interaction(
+        self,
+        interaction: InteractionSpec[InputType, OutputType, TraceType],
+    ) -> Self:
+        """Add a custom InteractionSpec to the scenario sequence."""
+        self.sequence.append(interaction)
+        return self
+
+    def add_interactions(
+        self, *interactions: InteractionSpec[InputType, OutputType, TraceType]
+    ) -> Self:
+        """Add multiple InteractionSpec objects to the scenario sequence."""
+        self.sequence.extend(interactions)
+        return self
+
+    def append(
+        self,
+        component: (
+            InteractionSpec[InputType, OutputType, TraceType]
+            | Check[InputType, OutputType, TraceType]
+        ),
+    ) -> Self:
+        """Append any component to the scenario sequence."""
+        self.sequence.append(component)
+        return self
+
+    def extend(
+        self,
+        *components: (
+            InteractionSpec[InputType, OutputType, TraceType]
+            | Check[InputType, OutputType, TraceType]
+        ),
+    ) -> Self:
+        """Extend the scenario sequence with multiple components of any type."""
+        self.sequence.extend(components)
+        return self
+
+    def with_annotations(self, annotations: dict[str, Any]) -> Self:
+        """Set scenario-level annotations.
+
+        Annotations provide shared, read-only context available on the Trace
+        as `trace.annotations` during scenario execution.
+        """
+        self.annotations = annotations
+        return self
+
+    def with_target(
+        self,
+        target: (
+            ProviderType[[InputType], OutputType]
+            | ProviderType[[InputType, TraceType], OutputType]
+        ),
+    ) -> Self:
+        """Set scenario-level target for the scenario."""
+        self.target = target
+        return self
 
     async def run(
         self,
