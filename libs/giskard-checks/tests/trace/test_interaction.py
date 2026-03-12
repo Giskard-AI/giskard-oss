@@ -513,6 +513,39 @@ class TestInteraction:
         record = await anext(generator)
         assert record.outputs == "echo_0: hello"
 
+    async def test_outputs_fn_with_keyword_only_inputs_param(self):
+        """Test outputs as function with keyword-only inputs parameter."""
+
+        def get_output(*, inputs: str) -> str:
+            return f"echo: {inputs}"
+
+        interaction = Interact(inputs="hello", outputs=get_output)
+        generator = interaction.generate(Trace(interactions=[]))
+        record = await anext(generator)
+        assert record.outputs == "echo: hello"
+
+    async def test_outputs_fn_with_positional_only_inputs_param(self):
+        """Test outputs as function with positional-only inputs parameter."""
+
+        def get_output(inputs: str, /) -> str:
+            return f"echo: {inputs}"
+
+        interaction = Interact(inputs="hello", outputs=get_output)
+        generator = interaction.generate(Trace(interactions=[]))
+        record = await anext(generator)
+        assert record.outputs == "echo: hello"
+
+    async def test_outputs_fn_with_positional_only_inputs_and_trace_params(self):
+        """Test outputs as function with positional-only inputs and trace parameters."""
+
+        def get_output(inputs: str, trace: Trace[str, str], /) -> str:
+            return f"[{len(trace.interactions)}] {inputs}"
+
+        interaction = Interact(inputs="hello", outputs=get_output)
+        generator = interaction.generate(Trace(interactions=[]))
+        record = await anext(generator)
+        assert record.outputs == "[0] hello"
+
     async def test_outputs_fn_with_inputs_and_trace_params_no_type_hint(self):
         """Test outputs as function with inputs and trace parameters but no type hints."""
 
@@ -585,30 +618,80 @@ class TestInteraction:
             return f"message_{unmapped}"
 
         # TypeError is raised directly (not wrapped because code only catches ValueError)
-        with pytest.raises(TypeError, match="Parameter 'unmapped'.*no matching"):
+        with pytest.raises(
+            TypeError,
+            match="Parameter 'unmapped' is required but not in the injection requirements",
+        ):
             Interact(inputs=get_input, outputs="hi")
 
-    async def test_outputs_fn_with_unmapped_required_param_passes_validation_but_fails_runtime(
+    async def test_outputs_fn_with_unmapped_required_param_raises_validation_error(
         self,
     ):
-        """Test that outputs function with unmapped required parameter passes validation but fails at runtime.
+        """Test that outputs function with unmapped required parameter raises at validation time.
 
-        Note: Since INJECTABLE_INPUT has class_info=Any, it matches any parameter type,
-        so validation passes. However, at runtime it fails because the unmapped parameter
-        cannot be resolved from the provided arguments.
+        Injection only passes params whose names exactly match; required params
+        not in the injectable set cause TypeError when building Interact.
         """
 
         def get_output(inputs: str, trace: Trace[str, str], unmapped: str) -> str:
-            # unmapped will match INJECTABLE_INPUT (Any) during validation
             return f"echo_{unmapped}: {inputs}"
 
-        # Validation passes because INJECTABLE_INPUT (Any) matches unmapped: str
-        interaction = Interact(inputs="hello", outputs=get_output)
+        with pytest.raises(
+            TypeError,
+            match="Parameter 'unmapped' is required but not in the injection requirements",
+        ):
+            Interact(inputs="hello", outputs=get_output)
+
+    async def test_outputs_fn_with_renamed_inputs_param_raises_validation_error(self):
+        """Test that outputs function requiring a non-injectable param name fails validation."""
+
+        def get_output(x: str) -> str:
+            return f"echo: {x}"
+
+        with pytest.raises(
+            TypeError,
+            match="Parameter 'x' is required but not in the injection requirements",
+        ):
+            Interact(inputs="hello", outputs=get_output)
+
+    async def test_outputs_fn_with_keyword_only_unmapped_required_param_raises_validation_error(
+        self,
+    ):
+        """Test that keyword-only required params not in injectable set fail validation."""
+
+        def get_output(*, x: str) -> str:
+            return f"echo: {x}"
+
+        with pytest.raises(
+            TypeError,
+            match="Parameter 'x' is required but not in the injection requirements",
+        ):
+            Interact(inputs="hello", outputs=get_output)
+
+    async def test_inputs_fn_with_keyword_only_trace_param(self):
+        """Test inputs as function with keyword-only trace parameter."""
+
+        def get_input(*, trace: Trace[str, str]) -> str:
+            return f"message_{len(trace.interactions)}"
+
+        interaction = Interact(inputs=get_input, outputs="hi")
         generator = interaction.generate(Trace(interactions=[]))
-        # Fails at runtime with IndexError because unmapped parameter (position 2)
-        # cannot be resolved from args (only inputs and trace are provided)
-        with pytest.raises(IndexError):
-            await anext(generator)
+        record = await anext(generator)
+        assert record.inputs == "message_0"
+
+    async def test_inputs_fn_with_keyword_only_unmapped_required_param_raises_error(
+        self,
+    ):
+        """Test that keyword-only required params not in injectable set fail validation."""
+
+        def get_input(*, trace: Trace[str, str], unmapped: str) -> str:
+            return f"message_{unmapped}_{len(trace.interactions)}"
+
+        with pytest.raises(
+            TypeError,
+            match="Parameter 'unmapped' is required but not in the injection requirements",
+        ):
+            Interact(inputs=get_input, outputs="hi")
 
     async def test_inputs_fn_with_var_positional_works(self):
         """Test that inputs function with *args works (var args are skipped)."""
@@ -657,6 +740,41 @@ class TestInteraction:
         generator = interaction.generate(Trace(interactions=[]))
         record = await anext(generator)
         assert record.outputs == "hi"
+
+    async def test_inputs_fn_with_positional_only_trace_param(self):
+        """Test inputs as function with positional-only trace parameter."""
+
+        def get_input(trace: Trace[str, str], /) -> str:
+            return f"message_{len(trace.interactions)}"
+
+        interaction = Interact(inputs=get_input, outputs="hi")
+        generator = interaction.generate(Trace(interactions=[]))
+        record = await anext(generator)
+        assert record.inputs == "message_0"
+
+    async def test_inputs_fn_with_optional_trace_param_receives_trace(self):
+        """Test that optional trace param still receives injected trace."""
+
+        def get_input(trace: Trace[str, str] | None = None) -> str:
+            assert trace is not None
+            return f"message_{len(trace.interactions)}"
+
+        interaction = Interact(inputs=get_input, outputs="hi")
+        generator = interaction.generate(Trace(interactions=[]))
+        record = await anext(generator)
+        assert record.inputs == "message_0"
+
+    async def test_outputs_fn_with_optional_trace_param_receives_trace(self):
+        """Test that optional trace param still receives injected trace."""
+
+        def get_output(inputs: str, trace: Trace[str, str] | None = None) -> str:
+            assert trace is not None
+            return f"[{len(trace.interactions)}] {inputs}"
+
+        interaction = Interact(inputs="hello", outputs=get_output)
+        generator = interaction.generate(Trace(interactions=[]))
+        record = await anext(generator)
+        assert record.outputs == "[0] hello"
 
     # ========== Combined tests ==========
 
