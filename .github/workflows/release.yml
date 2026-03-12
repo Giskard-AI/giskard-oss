@@ -125,12 +125,12 @@ jobs:
           git commit -m "chore($PACKAGE): bump version to $NEW_VERSION"
 
       - name: Push to main
-        if: ${{ github.event.inputs.dry_run == false && github.ref_name == 'main' }}
+        if: ${{ github.event.inputs.dry_run == 'false' && github.ref_name == 'main' }}
         run: |
           git push origin main
 
       - name: Create tag
-        if: ${{ github.event.inputs.dry_run == false }}
+        if: ${{ github.event.inputs.dry_run == 'false' }}
         env:
           TAG: ${{ steps.bump.outputs.tag }}
         run: |
@@ -139,7 +139,7 @@ jobs:
 
 
       - name: Create GitHub Release
-        if: ${{ github.event.inputs.dry_run == false }}
+        if: ${{ github.event.inputs.dry_run == 'false' }}
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
         with:
           tag_name: ${{ steps.bump.outputs.tag }}
@@ -148,9 +148,9 @@ jobs:
           files: |
             libs/${{ env.PACKAGE }}/dist/*.tar.gz
             libs/${{ env.PACKAGE }}/dist/*.whl
-            
+
       - name: Push to PyPI
-        if: ${{ github.event.inputs.dry_run == false }}
+        if: ${{ github.event.inputs.dry_run == 'false' }}
         working-directory: libs/${{ env.PACKAGE }}
         env:
           PIPY_USERNAME: ${{ secrets.PIPY_USERNAME }}

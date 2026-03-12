@@ -1,6 +1,6 @@
 [project]
 name = "giskard-core"
-version = "1.0.0a1"
+version = "1.0.1a1"
 description = "Core shared utilities and foundational components for the Giskard library ecosystem."
 readme = "README.md"
 license = { text = "MIT" }
