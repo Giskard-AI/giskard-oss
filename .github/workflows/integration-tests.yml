@@ -63,6 +63,6 @@ jobs:
       - name: Run functional tests
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           TEST_MODEL: "gemini/gemini-2.0-flash"
+          TEST_EMBEDDING_MODEL: "gemini/gemini-embedding-001"
         run: make test-functional PACKAGE=$PACKAGE

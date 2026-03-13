@@ -50,7 +50,6 @@ async def test_litellm_embedding_model_embed_with_mock(
 
 
 @pytest.mark.functional
-@pytest.mark.skip(reason="Requires OPENAI API key")
 async def test_embedding_model_real_embedding(
     embedding_model: LitellmEmbeddingModel,
 ) -> None:
