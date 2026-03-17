@@ -4,22 +4,22 @@ from giskard.checks import Equals, Scenario, Suite
 
 @pytest.fixture
 def sut1():
-    return lambda x: f"SUT1: {x}"
+    return lambda inputs: f"SUT1: {inputs}"
 
 
 @pytest.fixture
 def sut2():
-    return lambda x: f"SUT2: {x}"
+    return lambda inputs: f"SUT2: {inputs}"
 
 
 @pytest.fixture
 def sut3():
-    return lambda x: f"SUT3: {x}"
+    return lambda inputs: f"SUT3: {inputs}"
 
 
 @pytest.fixture
 def identity_sut():
-    return lambda x: x
+    return lambda inputs: inputs
 
 
 @pytest.mark.asyncio
@@ -116,7 +116,7 @@ async def test_suite_callable_target():
     scenario = Scenario("s1").interact("hello")
 
     # Suite with a callable target
-    suite = Suite(name="callable_suite", target=lambda x: f"Callable: {x}")
+    suite = Suite(name="callable_suite", target=lambda inputs: f"Callable: {inputs}")
     suite.append(scenario)
 
     result = await suite.run()

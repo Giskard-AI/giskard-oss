@@ -16,6 +16,6 @@ async def generator():
 def embedding_model():
     """Fixture providing a configured embedding model for tests."""
     return EmbeddingModel(
-        model=os.getenv("TEST_EMBEDDING_MODEL", "text-embedding-3-small"),
+        model=os.getenv("TEST_EMBEDDING_MODEL", "gemini/gemini-embedding-001"),
         params=EmbeddingParams(dimensions=1536),
     )

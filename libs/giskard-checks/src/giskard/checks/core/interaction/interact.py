@@ -1,29 +1,15 @@
 from collections.abc import AsyncGenerator
 from typing import Any, cast, override
 
+from giskard.checks.utils.injectable import ValueGenerator, ValueProvider
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import Field, PrivateAttr, model_validator
 
-from ...utils.parameter_injection import ParameterInjectionRequirement
-from ...utils.value_provider import (
-    ValueGeneratorProvider,
-    ValueProvider,
-)
 from ..input_generator import InputGenerator
 from ..types import GeneratorType, ProviderType
 from .base import InteractionSpec
 from .interaction import Interaction
 from .trace import Trace
-
-INJECTABLE_TRACE = ParameterInjectionRequirement(
-    class_info=Trace,
-    optional=True,
-)
-
-INJECTABLE_INPUT = ParameterInjectionRequirement(
-    class_info=Any,
-    optional=True,
-)
 
 
 @InteractionSpec.register("interact")
@@ -154,17 +140,16 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         default_factory=dict, description="The metadata of the interaction."
     )
 
-    _input_value_generator_provider: ValueGeneratorProvider[
-        [TraceType], InputType, TraceType
-    ] = PrivateAttr()
-    _output_value_provider: ValueProvider[[InputType, TraceType], OutputType] = (
+    _input_value_generator_provider: ValueGenerator[..., InputType, TraceType] = (
         PrivateAttr()
     )
+    _output_injectable: ValueProvider[..., OutputType] = PrivateAttr()
 
     def _validate_inputs(self) -> None:
         try:
-            self._input_value_generator_provider = ValueGeneratorProvider.from_mapping(
-                self.inputs, INJECTABLE_TRACE
+            self._input_value_generator_provider = cast(
+                ValueGenerator[[TraceType], InputType, TraceType],
+                ValueGenerator(self.inputs, {"trace"}),
             )
         except ValueError as e:
             raise ValueError(f"Error getting injection settings for inputs: {e}") from e
@@ -172,8 +157,8 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     def _validate_outputs(self) -> None:
         try:
             if not isinstance(self.outputs, NotProvided):
-                self._output_value_provider = ValueProvider.from_mapping(
-                    self.outputs, INJECTABLE_INPUT, INJECTABLE_TRACE
+                self._output_injectable = ValueProvider(
+                    self.outputs, {"inputs", "trace"}
                 )
         except ValueError as e:
             raise ValueError(
@@ -207,7 +192,7 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     async def generate(
         self, trace: TraceType
     ) -> AsyncGenerator[Interaction[InputType, OutputType], TraceType]:
-        generator = await self._input_value_generator_provider(trace)
+        generator = await self._input_value_generator_provider(trace=trace)
 
         try:
             inputs = await anext(generator)
@@ -218,7 +203,7 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
                     )
                 # Execute user-provided logic to transform inputs into either raw outputs
                 # or a fully constructed Interaction instance.
-                outputs = await self._output_value_provider(inputs, trace)
+                outputs = await self._output_injectable(inputs=inputs, trace=trace)
                 # Yield the interaction back to the caller and wait for an updated trace
                 # that captures the evaluation of this iteration.
                 trace = yield self._get_interaction(

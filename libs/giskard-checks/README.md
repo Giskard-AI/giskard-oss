@@ -121,7 +121,7 @@ scenario2 = (
 )
 
 # Create a suite with a shared target
-target_sut = lambda x: f"Echo: {x}"
+target_sut = lambda inputs: f"Echo: {inputs}"
 suite = Suite(name="my_suite", target=target_sut)
 
 # Add scenarios

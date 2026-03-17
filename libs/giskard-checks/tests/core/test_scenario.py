@@ -1086,12 +1086,12 @@ class TestScenarioFromSequenceAndSerialization:
 
 @pytest.fixture
 def echo_sut():
-    return lambda x: f"Echo: {x}"
+    return lambda inputs: f"Echo: {inputs}"
 
 
 @pytest.fixture
 def echo_upper_sut():
-    return lambda x: f"Echo: {x.upper()}"
+    return lambda inputs: f"Echo: {inputs.upper()}"
 
 
 class TestScenarioDynamicBinding:
