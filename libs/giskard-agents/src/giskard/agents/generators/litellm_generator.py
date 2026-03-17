@@ -87,5 +87,5 @@ class LiteLLMGenerator(BaseGenerator):
         return Response(
             message=message,
             finish_reason=choice.finish_reason,  # pyright: ignore[reportArgumentType]
-            metadata={**(metadata or {}), "litellm": response_metadata},
+            metadata=response_metadata,
         )
