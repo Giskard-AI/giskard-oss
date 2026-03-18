@@ -1,4 +1,5 @@
 from .check import Check
+from .extraction import resolve
 from .interaction import Interact, Interaction, InteractionSpec, Trace
 from .result import (
     CheckResult,
@@ -26,4 +27,5 @@ __all__ = [
     "SuiteResult",
     "TestCaseResult",
     "TestCase",
+    "resolve",
 ]

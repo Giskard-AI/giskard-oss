@@ -34,6 +34,7 @@ from .core import (
     TestCase,
     TestCaseResult,
     Trace,
+    resolve,
 )
 from .generators.user import UserSimulator
 from .judges import (
@@ -110,4 +111,6 @@ __all__ = [
     # Settings
     "set_default_generator",
     "get_default_generator",
+    # Extraction
+    "resolve",
 ]
