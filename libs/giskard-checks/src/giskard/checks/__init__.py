@@ -34,6 +34,7 @@ from .core import (
     TestCase,
     TestCaseResult,
     Trace,
+    resolve,
 )
 from .generators.user import UserSimulator
 from .judges import (
@@ -79,6 +80,7 @@ __all__ = [
     "TestCase",
     "TestCaseResult",
     "Trace",
+    "resolve",
     "Interact",
     "Interaction",
     "InteractionSpec",
