@@ -124,3 +124,25 @@ async def test_suite_callable_target():
     last_interaction = result.results[0].final_trace.last
     assert last_interaction is not None
     assert last_interaction.outputs == "Callable: hello"
+
+
+def test_suite_append_returns_self():
+    """Verify that append() returns the suite itself for fluent chaining."""
+    suite = Suite(name="chain_suite")
+    scenario_a = Scenario("a").interact("hello")
+
+    result = suite.append(scenario_a)
+    assert result is suite
+
+
+@pytest.mark.asyncio
+async def test_suite_append_chaining():
+    """Verify that chained append() calls add all scenarios correctly."""
+    scenario_a = Scenario("a", target=lambda x: x).interact("hello")
+    scenario_b = Scenario("b", target=lambda x: x).interact("world")
+
+    suite = Suite(name="chain_suite").append(scenario_a).append(scenario_b)
+
+    assert len(suite.scenarios) == 2
+    result = await suite.run()
+    assert len(result.results) == 2
