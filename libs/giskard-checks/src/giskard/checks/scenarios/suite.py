@@ -39,8 +39,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     scenario2 = Scenario("scenario_2").interact("hi")
 
     suite = Suite(name="my_suite", target=my_sut)
-    suite.append(scenario1)
-    suite.append(scenario2)
+    suite.append(scenario1).append(scenario2)
 
     result = await suite.run()
     print(result.pass_rate)
@@ -63,15 +62,21 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     def append(
         self,
         scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
-    ) -> None:
+    ) -> "Suite[InputType, OutputType]":
         """Add a scenario to the suite.
 
         Parameters
         ----------
         scenario : Scenario
             The scenario to add to the suite.
+
+        Returns
+        -------
+        Suite
+            The suite itself, allowing fluent chaining.
         """
         self.scenarios.append(scenario)
+        return self
 
     async def run(
         self,
