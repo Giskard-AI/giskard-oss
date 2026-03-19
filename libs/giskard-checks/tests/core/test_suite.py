@@ -138,8 +138,8 @@ def test_suite_append_returns_self():
 @pytest.mark.asyncio
 async def test_suite_append_chaining():
     """Verify that chained append() calls add all scenarios correctly."""
-    scenario_a = Scenario("a", target=lambda x: x).interact("hello")
-    scenario_b = Scenario("b", target=lambda x: x).interact("world")
+    scenario_a = Scenario("a", target=lambda inputs: inputs).interact("hello")
+    scenario_b = Scenario("b", target=lambda inputs: inputs).interact("world")
 
     suite = Suite(name="chain_suite").append(scenario_a).append(scenario_b)
 
