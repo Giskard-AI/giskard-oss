@@ -144,5 +144,9 @@ async def test_suite_append_chaining():
     suite = Suite(name="chain_suite").append(scenario_a).append(scenario_b)
 
     assert len(suite.scenarios) == 2
+    assert suite.scenarios[0] is scenario_a
+    assert suite.scenarios[1] is scenario_b
     result = await suite.run()
     assert len(result.results) == 2
+    assert result.results[0].scenario_name == "a"
+    assert result.results[1].scenario_name == "b"
