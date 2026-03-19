@@ -111,6 +111,25 @@ async def test_suite_result_aggregation():
 
 
 @pytest.mark.asyncio
+async def test_suite_append_chainable(sut1):
+    """Verify that append() returns self so calls can be chained."""
+    scenario1 = Scenario("s1").interact("hello")
+    scenario2 = Scenario("s2").interact("world")
+
+    suite = (
+        Suite(name="chain_suite", target=sut1)
+        .append(scenario1)
+        .append(scenario2)
+    )
+
+    assert isinstance(suite, Suite)
+    assert len(suite.scenarios) == 2
+
+    result = await suite.run()
+    assert result.passed_count == 2
+
+
+@pytest.mark.asyncio
 async def test_suite_callable_target():
     """Verify that suite target can be a callable."""
     scenario = Scenario("s1").interact("hello")

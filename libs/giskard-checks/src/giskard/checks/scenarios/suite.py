@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import time
 from typing import Any, Generic, TypeVar
 
@@ -38,9 +40,11 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     scenario1 = Scenario("scenario_1").interact("hello")
     scenario2 = Scenario("scenario_2").interact("hi")
 
-    suite = Suite(name="my_suite", target=my_sut)
-    suite.append(scenario1)
-    suite.append(scenario2)
+    suite = (
+        Suite(name="my_suite", target=my_sut)
+        .append(scenario1)
+        .append(scenario2)
+    )
 
     result = await suite.run()
     print(result.pass_rate)
@@ -63,15 +67,21 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     def append(
         self,
         scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
-    ) -> None:
+    ) -> Suite[InputType, OutputType]:
         """Add a scenario to the suite.
 
         Parameters
         ----------
         scenario : Scenario
             The scenario to add to the suite.
+
+        Returns
+        -------
+        Suite
+            The suite itself, enabling fluent chaining.
         """
         self.scenarios.append(scenario)
+        return self
 
     async def run(
         self,
