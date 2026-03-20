@@ -230,6 +230,6 @@ class BaseGenerator(Discriminated, ABC):
         Self
             A new generator with the given parameters.
         """
-        generator = self.model_copy(deep=True)
+        generator = self.model_copy()
         generator.params = generator.params.model_copy(update=kwargs)
         return generator

@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import time
 import uuid
 import warnings
@@ -119,6 +120,12 @@ class TestRateLimiterRegistry:
             60, max_concurrent=1, id=_uid()
         )
         assert _rate_limiter_a._state is not _rate_limiter_b._state
+
+
+class TestDeepCopy:
+    def test_deepcopy_returns_same_instance(self):
+        rate_limiter = MinIntervalRateLimiter.from_rpm(60, max_concurrent=5, id=_uid())
+        assert copy.deepcopy(rate_limiter) is rate_limiter
 
 
 class TestMinIntervalRateLimiter:

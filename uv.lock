@@ -748,7 +748,7 @@ requires-dist = [
 
 [[package]]
 name = "giskard-checks"
-version = "1.0.1a1"
+version = "1.0.1a2"
 source = { editable = "libs/giskard-checks" }
 dependencies = [
     { name = "giskard-agents" },

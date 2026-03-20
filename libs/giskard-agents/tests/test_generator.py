@@ -1,7 +1,7 @@
 import json
 import time
 from typing import Any, override
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from giskard.agents.chat import Chat, Message
@@ -144,7 +144,7 @@ def test_generator_with_params():
 
 
 def test_generator_with_params_and_rate_limiter():
-    """Test that with_params works correctly with a rate limiter."""
+    """with_params uses a shallow copy: rate limiter is shared, not deep-copied."""
     rate_limiter = MinIntervalRateLimiter.from_rpm(100, max_concurrent=5)
     generator = LiteLLMGenerator(
         model="test-model",
@@ -153,12 +153,17 @@ def test_generator_with_params_and_rate_limiter():
 
     assert generator.rate_limiter == rate_limiter
 
-    generator_with_params = generator.with_params(temperature=0.5, max_tokens=100)
+    with patch.object(
+        type(rate_limiter), "__deepcopy__", new_callable=MagicMock
+    ) as mock_deepcopy:
+        generator_with_params = generator.with_params(temperature=0.5, max_tokens=100)
+        mock_deepcopy.assert_not_called()
+
     assert isinstance(generator_with_params, LiteLLMGenerator)
     assert generator_with_params.params.temperature == 0.5
     assert generator_with_params.params.max_tokens == 100
 
-    assert generator_with_params.rate_limiter == rate_limiter
+    assert generator_with_params.rate_limiter is rate_limiter
 
     assert generator.params.temperature == 1.0  # default value
     assert generator.params.max_tokens is None
