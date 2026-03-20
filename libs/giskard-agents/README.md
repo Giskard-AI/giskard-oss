@@ -113,6 +113,7 @@ generator = generator.with_rate_limiter(MinIntervalRateLimiter.from_rpm(60, max_
 For advanced cross-cutting concerns (logging, caching, etc.), you can write custom middleware by subclassing `CompletionMiddleware` and adding it to the `middlewares` list:
 
 ```python
+import logging
 from typing import Any
 
 from giskard.agents import Message
@@ -128,9 +129,9 @@ class LoggingMiddleware(CompletionMiddleware):
         metadata: dict[str, Any] | None,
         next_fn: NextFn,
     ) -> Response:
-        print(f"Sending {len(messages)} messages")
+        logging.info(f"Sending {len(messages)} messages")
         response = await next_fn(messages, params, metadata)
-        print(f"Got response: {response.finish_reason}")
+        logging.info(f"Got response: {response.finish_reason}")
         return response
 
 generator = agents.Generator(
