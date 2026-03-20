@@ -68,7 +68,14 @@ class Metric(BaseModel):
     value: float
 
 
-class CheckResult(BaseModel):
+class BaseResult(BaseModel, frozen=True):
+    def print_report(self, console: Console | None = None) -> None:
+        """Format the result as a report."""
+        console = console or Console()
+        console.print(self)
+
+
+class CheckResult(BaseResult, frozen=True):
     """Immutable result produced by running a `Check`.
 
     Attributes
@@ -202,7 +209,7 @@ class ScenarioStatus(str, Enum):
     SKIP = "skip"
 
 
-class ScenarioResult[InputType, OutputType](BaseModel):
+class ScenarioResult[InputType, OutputType](BaseResult, frozen=True):
     """Result of executing an entire scenario.
 
     Attributes
@@ -304,7 +311,7 @@ class TestCaseStatus(str, Enum):
     SKIP = "skip"
 
 
-class TestCaseResult(BaseModel):
+class TestCaseResult(BaseResult, frozen=True):
     """Immutable summary of a test case execution with full run history.
 
     Attributes
@@ -445,7 +452,7 @@ class TestCaseResult(BaseModel):
         yield Rule(subtitle, style=f"{status['color']} bold")
 
 
-class SuiteResult(BaseModel):
+class SuiteResult(BaseResult, frozen=True):
     """Aggregate result object for the suite.
 
     Attributes

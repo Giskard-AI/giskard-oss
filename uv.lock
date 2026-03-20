@@ -719,7 +719,7 @@ dev = [
 
 [[package]]
 name = "giskard-agents"
-version = "1.0.1a1"
+version = "1.0.2a1"
 source = { editable = "libs/giskard-agents" }
 dependencies = [
     { name = "giskard-core" },

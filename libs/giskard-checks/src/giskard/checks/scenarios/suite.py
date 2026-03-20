@@ -1,5 +1,5 @@
 import time
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Self, TypeVar
 
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
@@ -39,8 +39,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     scenario2 = Scenario("scenario_2").interact("hi")
 
     suite = Suite(name="my_suite", target=my_sut)
-    suite.append(scenario1)
-    suite.append(scenario2)
+    suite.append(scenario1).append(scenario2)
 
     result = await suite.run()
     print(result.pass_rate)
@@ -63,15 +62,21 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     def append(
         self,
         scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
-    ) -> None:
+    ) -> Self:
         """Add a scenario to the suite.
 
         Parameters
         ----------
         scenario : Scenario
             The scenario to add to the suite.
+
+        Returns
+        -------
+        Suite
+            The suite itself, allowing fluent chaining.
         """
         self.scenarios.append(scenario)
+        return self
 
     async def run(
         self,
@@ -105,8 +110,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         from giskard.checks import Suite
 
         suite = Suite(name="my_suite", target=my_sut_v1)
-        suite.append(scenario_1)
-        suite.append(scenario_2)
+        suite.append(scenario_1).append(scenario_2)
         result_v1 = await suite.run()
         result_v2 = await suite.run(target=my_sut_v2)
         ```
