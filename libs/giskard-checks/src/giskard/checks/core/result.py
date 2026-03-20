@@ -532,19 +532,22 @@ class SuiteResult(BaseResult, frozen=True):
             dots += f"[{color}]{char}[/{color}]"
         yield dots
 
-        # Failure/Error summary
+        # Detailed error information for failed/errored scenarios
         failures_and_errors = [r for r in self.results if r.failed or r.errored]
         if failures_and_errors:
-            n_loggable_failures = 20
             yield ""
-            yield "[bold red]Failures/Errors Summary:[/bold red]"
-            for f in failures_and_errors[:n_loggable_failures]:
-                status = STATUS_MAPPING[f.status]
-                yield f"  [{status['color']}]{f.status.value.upper()}[/{status['color']}] {f.scenario_name}"
-            if len(failures_and_errors) > n_loggable_failures:
-                yield f"  ... and {len(failures_and_errors) - n_loggable_failures} more"
+            yield "[bold red]Failures/Errors Details:[/bold red]"
+            for i, scenario_result in enumerate(failures_and_errors):
+                if i > 0:
+                    yield ""  # Separator between scenarios
+                yield from scenario_result.__rich_console__(console, options)
 
-        yield Rule(style="bold blue")
+            # Summary count if there are many failures
+            n_loggable_failures = 20
+            if len(failures_and_errors) > n_loggable_failures:
+                yield f"... and {len(failures_and_errors) - n_loggable_failures} more"
+
+            yield Rule(style="bold blue")
 
         # Summary metrics
         count_parts = []
