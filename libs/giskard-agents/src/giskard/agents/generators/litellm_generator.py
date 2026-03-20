@@ -1,60 +1,91 @@
-from typing import cast, override
+from typing import Any, cast, override
 
 from litellm import Choices, ModelResponse, acompletion
-from litellm import Message as LiteLLMMessage
 from litellm import _should_retry as litellm_should_retry
 from pydantic import Field
 
 from ..chat import Message
-from .base import BaseGenerator, GenerationParams, Response
-from .rate_limiting import WithRateLimiter
-from .retries import WithRetryPolicy
+from ..tools import Tool
+from ._types import GenerationParams, Response
+from .base import BaseGenerator
+from .middleware import CompletionMiddleware, RetryMiddleware, RetryPolicy
 
 
-@BaseGenerator.register("litellm")
-class LiteLLMGenerator(WithRateLimiter, WithRetryPolicy, BaseGenerator):
-    """A generator for creating chat completion pipelines.
-
-    The MRO places rate limiting inside the retry loop: each retry attempt
-    individually acquires the rate limiter. This prevents retry storms from
-    bypassing rate limits, at the cost of consuming one rate-limit slot per
-    attempt (including failed ones).
-    """
-
-    model: str = Field(
-        description="The model identifier to use (e.g. 'gemini/gemini-2.0-flash')"
-    )
+@CompletionMiddleware.register("litellm_retry")
+class LiteLLMRetryMiddleware(RetryMiddleware):
+    """Retry middleware using LiteLLM's built-in retry-eligibility check."""
 
     @override
     def _should_retry(self, err: Exception) -> bool:
         return litellm_should_retry(getattr(err, "status_code", 0))
 
+
+@BaseGenerator.register("litellm")
+class LiteLLMGenerator(BaseGenerator):
+    """A generator for creating chat completion pipelines using LiteLLM."""
+
+    model: str = Field(
+        description="The model identifier to use (e.g. 'gemini/gemini-2.0-flash')"
+    )
+    retry_policy: RetryPolicy | None = Field(default_factory=RetryPolicy)
+
     @override
-    async def _attempt_complete(
-        self, messages: list[Message], params: GenerationParams | None = None
+    def _create_retry_middleware(self) -> LiteLLMRetryMiddleware | None:
+        if self.retry_policy is None:
+            return None
+        return LiteLLMRetryMiddleware(retry_policy=self.retry_policy)
+
+    def _serialize_tools(self, tools: list[Tool]) -> list[dict[str, Any]]:
+        """Convert ``Tool`` objects to the OpenAI function-calling format."""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": t.parameters_schema,
+                },
+            }
+            for t in tools
+        ]
+
+    def _serialize_messages(self, messages: list[Message]) -> list[dict[str, Any]]:
+        """Convert ``Message`` objects to LiteLLM's dict format."""
+        return [
+            m.model_dump(include={"role", "content", "tool_calls", "tool_call_id"})
+            for m in messages
+        ]
+
+    def _deserialize_response(self, raw: Any) -> Message:
+        """Convert a LiteLLM response object into an internal ``Message``."""
+        data = raw if isinstance(raw, dict) else raw.model_dump()
+        return Message.model_validate(data)
+
+    @override
+    async def _call_model(
+        self,
+        messages: list[Message],
+        params: GenerationParams,
+        metadata: dict[str, Any] | None = None,
     ) -> Response:
-        params_ = self.params.model_dump(exclude={"tools"})
+        wire_messages = self._serialize_messages(messages)
+        wire_params = params.model_dump(exclude={"tools"})
+        wire_tools = self._serialize_tools(params.tools) if params.tools else []
+        if wire_tools:
+            wire_params["tools"] = wire_tools
+        if metadata:
+            wire_params["metadata"] = metadata
 
-        if params is not None:
-            params_.update(params.model_dump(exclude={"tools"}, exclude_unset=True))
+        raw = cast(
+            ModelResponse,
+            await acompletion(messages=wire_messages, model=self.model, **wire_params),
+        )
 
-        # Now special handling of the tools
-        tools = self.params.tools + (params.tools if params is not None else [])
-        if tools:
-            params_["tools"] = [t.to_litellm_function() for t in tools]
-
-        async with self._throttle():
-            response = cast(
-                ModelResponse,
-                await acompletion(
-                    messages=[m.to_litellm() for m in messages],
-                    model=self.model,
-                    **params_,
-                ),
-            )
-
-        choice = cast(Choices, response.choices[0])
+        choice = cast(Choices, raw.choices[0])
+        message = self._deserialize_response(choice.message)
+        response_metadata = raw.model_dump(exclude={"choices"})
         return Response(
-            message=Message.from_litellm(cast(LiteLLMMessage, choice.message)),
+            message=message,
             finish_reason=choice.finish_reason,  # pyright: ignore[reportArgumentType]
+            metadata=response_metadata,
         )

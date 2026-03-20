@@ -1,4 +1,5 @@
 from .check import Check
+from .extraction import resolve
 from .interaction import Interact, Interaction, InteractionSpec, Trace
 from .result import (
     CheckResult,
@@ -8,11 +9,12 @@ from .result import (
     SuiteResult,
     TestCaseResult,
 )
-from .scenario import Scenario
+from .scenario import Scenario, Step
 from .testcase import TestCase
 
 __all__ = [
     "Scenario",
+    "Step",
     "Trace",
     "InteractionSpec",
     "Interact",
@@ -25,4 +27,5 @@ __all__ = [
     "SuiteResult",
     "TestCaseResult",
     "TestCase",
+    "resolve",
 ]

@@ -1,8 +1,9 @@
 import json
-from typing import cast, override
+from typing import Any, cast, override
 
 from giskard.agents.chat import Message
-from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
+from giskard.agents.generators._types import Response
+from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import CheckStatus, Groundedness, Interaction, Trace
 from pydantic import Field
 
@@ -13,8 +14,11 @@ class MockGenerator(BaseGenerator):
     calls: list[list[Message]] = Field(default_factory=list)
 
     @override
-    async def _complete(
-        self, messages: list[Message], params: GenerationParams | None = None
+    async def _call_model(
+        self,
+        messages: list[Message],
+        params: GenerationParams,
+        metadata: dict[str, Any] | None = None,
     ) -> Response:
         self.calls.append(messages)
         return Response(

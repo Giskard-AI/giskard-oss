@@ -1,5 +1,5 @@
 import time
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Self, TypeVar
 
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
@@ -8,7 +8,6 @@ from ..core.interaction import Trace
 from ..core.result import ScenarioResult, SuiteResult
 from ..core.scenario import Scenario
 from ..core.types import ProviderType
-from .builder import ScenarioBuilder
 
 InputType = TypeVar("InputType", infer_variance=True)
 OutputType = TypeVar("OutputType", infer_variance=True)
@@ -34,14 +33,13 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     Examples
     --------
     ```python
-    from giskard.checks import Suite, scenario
+    from giskard.checks import Suite, Scenario
 
-    scenario1 = scenario("scenario_1").interact("hello")
-    scenario2 = scenario("scenario_2").interact("hi")
+    scenario1 = Scenario("scenario_1").interact("hello")
+    scenario2 = Scenario("scenario_2").interact("hi")
 
     suite = Suite(name="my_suite", target=my_sut)
-    suite.append(scenario1)
-    suite.append(scenario2)
+    suite.append(scenario1).append(scenario2)
 
     result = await suite.run()
     print(result.pass_rate)
@@ -63,21 +61,22 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
     def append(
         self,
-        scenario: Scenario[InputType, OutputType, Trace[Any, Any]]
-        | ScenarioBuilder[InputType, OutputType, Trace[Any, Any]],
-    ) -> None:
-        """Add a scenario or scenario builder to the suite.
+        scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
+    ) -> Self:
+        """Add a scenario to the suite.
 
         Parameters
         ----------
-        scenario : Scenario | ScenarioBuilder
-            The scenario or builder to add to the suite.
-        """
+        scenario : Scenario
+            The scenario to add to the suite.
 
-        if isinstance(scenario, ScenarioBuilder):
-            self.scenarios.append(scenario.build())
-        else:
-            self.scenarios.append(scenario)
+        Returns
+        -------
+        Suite
+            The suite itself, allowing fluent chaining.
+        """
+        self.scenarios.append(scenario)
+        return self
 
     async def run(
         self,
@@ -111,8 +110,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         from giskard.checks import Suite
 
         suite = Suite(name="my_suite", target=my_sut_v1)
-        suite.append(scenario_1)
-        suite.append(scenario_2)
+        suite.append(scenario_1).append(scenario_2)
         result_v1 = await suite.run()
         result_v2 = await suite.run(target=my_sut_v2)
         ```

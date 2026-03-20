@@ -35,6 +35,7 @@ repos:
     rev: v1.5.0
     hooks:
       - id: detect-secrets
+        language_version: python3.12
         args: ["--baseline", ".secrets.baseline", "--exclude-secrets", "YOUR_API_KEY"]
         exclude: |
           (?x)^(

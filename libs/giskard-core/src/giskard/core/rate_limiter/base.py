@@ -6,7 +6,6 @@ that control the frequency and concurrency of async operations (e.g. API calls).
 
 import operator
 import os
-import threading
 import uuid
 import warnings
 from abc import ABC, abstractmethod
@@ -35,11 +34,9 @@ class RateLimiterRegistry:
     throttling is consistent across serialization boundaries.
     """
 
-    _lock: threading.Lock
     _instances: dict[str, WeakSet["BaseRateLimiter[Any]"]]
 
     def __init__(self):
-        self._lock = threading.Lock()
         self._instances = {}
 
     def register_instance(self, rate_limiter: "BaseRateLimiter") -> None:
@@ -53,35 +50,36 @@ class RateLimiterRegistry:
         rate_limiter : BaseRateLimiter
             The rate limiter instance to register.
         """
-        with self._lock:
-            instances = self._instances.get(rate_limiter.id)
-            if instances is None:
-                instances = WeakSet["BaseRateLimiter"]()
-                self._instances[rate_limiter.id] = instances
+        instances = self._instances.get(rate_limiter.id)
+        if instances is None:
+            instances = WeakSet["BaseRateLimiter"]()
+            self._instances[rate_limiter.id] = instances
 
-            all_instances = list(instances)
-            matching_instances = [
-                instance for instance in all_instances if instance == rate_limiter
-            ]
+        all_instances = list(instances)
+        matching_instances = [
+            instance for instance in all_instances if instance == rate_limiter
+        ]
 
-            match = matching_instances[0] if matching_instances else None
-            rate_limiter.initialize_state(match)
+        match = matching_instances[0] if matching_instances else None
+        rate_limiter.initialize_state(match)
 
-            if (
-                not GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS
-                and not match
-                and all_instances
-            ):
-                warnings.warn(
+        if not match and all_instances:
+            if not GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS:
+                raise ValueError(
                     (
-                        f"Rate limiter with id '{rate_limiter.id}' already registered, "
-                        f"this will make BaseRateLimiter.from_id('{rate_limiter.id}') unreliable. "
-                        "Set GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS=1 to disable this warning"
-                    ),
-                    RuntimeWarning,
+                        f"Rate limiter with id '{rate_limiter.id}' already registered. "
+                        "Set GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS=1 to downgrade this error to a warning"
+                    )
                 )
+            warnings.warn(
+                (
+                    f"Rate limiter with id '{rate_limiter.id}' already registered, "
+                    f"this will make BaseRateLimiter.from_id('{rate_limiter.id}') unreliable. "
+                ),
+                RuntimeWarning,
+            )
 
-            instances.add(rate_limiter)
+        instances.add(rate_limiter)
 
     def get_instance(self, id: str) -> "BaseRateLimiter[Any]":
         """Retrieve a registered rate limiter by id.
@@ -101,12 +99,11 @@ class RateLimiterRegistry:
         ValueError
             If no rate limiter with the given id is registered.
         """
-        with self._lock:
-            instances = self._instances.get(id)
-            if not instances:
-                raise ValueError(f"Rate limiter with id '{id}' not found")
+        instances = self._instances.get(id)
+        if not instances:
+            raise ValueError(f"Rate limiter with id '{id}' not found")
 
-            return next(iter(instances))
+        return next(iter(instances))
 
 
 @discriminated_base

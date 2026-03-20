@@ -11,9 +11,9 @@ from giskard.checks import (
     Interact,
     Interaction,
     LLMJudge,
+    Scenario,
     Trace,
     WithSpy,
-    scenario,
 )
 from pydantic import BaseModel, Field, computed_field
 
@@ -119,7 +119,7 @@ async def test_single_message(
     ],
 ):
     result = await (
-        scenario("test_single_message", trace_type=ConversationTraces)
+        Scenario("test_single_message", trace_type=ConversationTraces)
         .add_interaction(
             WithSpy(
                 interaction_generator=Interact(
@@ -214,7 +214,7 @@ async def test_user_simulator(
             current_step += 1
 
     result = await (
-        scenario("test_single_message", trace_type=ConversationTraces)
+        Scenario("test_single_message", trace_type=ConversationTraces)
         .add_interaction(
             Interact(
                 inputs=partial(

@@ -169,14 +169,14 @@ class _StepRunner:
                 continue  # TODO: raise an error?
 
             tool = self._workflow.tools[tool_call.function.name]
-            tool_response = await tool.run(
+            tool_content = await tool.run(
                 json.loads(tool_call.function.arguments),
                 ctx=chat.context,
             )
             yield Message(
                 role="tool",
                 tool_call_id=tool_call.id,
-                content=json.dumps(tool_response),
+                content=tool_content,
             )
 
     async def _run_completion(self, chat: Chat[Any]) -> Message:

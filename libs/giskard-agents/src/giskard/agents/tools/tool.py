@@ -1,10 +1,11 @@
 """Core tool functionality for Giskard Agents."""
 
 import inspect
+import json
 from typing import Any, Callable, Literal, TypeVar
 
 import logfire_api as logfire
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, Field, PrivateAttr, TypeAdapter, create_model
 
 from ..context import RunContext
 from ..errors.serializable import Error
@@ -38,6 +39,8 @@ class Tool(BaseModel):
     catch: Callable[[Exception], Any] | None = Field(default=None)
 
     run_context_param: str | None = Field(default=None)
+    _params_model: type[BaseModel] | None = PrivateAttr(default=None)
+    _return_adapter: TypeAdapter[Any] | None = PrivateAttr(default=None)
 
     @classmethod
     def from_callable(
@@ -96,7 +99,9 @@ class Tool(BaseModel):
             **fields,
         )
 
-        return cls(
+        return_annotation = sig.return_annotation
+
+        tool_instance = cls(
             name=fn.__name__,
             description=description,
             parameters_schema=model.model_json_schema(),
@@ -104,6 +109,10 @@ class Tool(BaseModel):
             run_context_param=run_context_param,
             catch=catch,
         )
+        tool_instance._params_model = model
+        if return_annotation is not inspect.Parameter.empty:
+            tool_instance._return_adapter = TypeAdapter(return_annotation)
+        return tool_instance
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call the underlying function without modification.
@@ -131,11 +140,23 @@ class Tool(BaseModel):
     @logfire.instrument("tool.run")
     async def run(
         self, arguments: dict[str, Any], ctx: RunContext | None = None
-    ) -> Any:
-        """Run the tool's function asynchronously.
+    ) -> str:
+        """Run the tool's function and return a serialized string result.
 
-        This method handles both sync and async functions by awaiting async
-        functions. Errors are handled based on ``self.catch``.
+        Executes the underlying function (sync or async), handles errors via
+        ``self.catch``, and serializes the result to a string suitable for use
+        as ``Message.content``.
+
+        Input coercion: if a ``_params_model`` is available (set by
+        ``from_callable``), raw dict arguments are validated through the
+        Pydantic model so that e.g. nested dicts become typed ``BaseModel``
+        instances before the function is called.
+
+        Output serialization: if a ``_return_adapter`` is available, the result
+        is serialized to JSON-safe Python via ``TypeAdapter.dump_python`` (this
+        handles ``BaseModel``, ``datetime``, ``UUID``, ``list[BaseModel]``,
+        etc.). String results are returned as-is; everything else is
+        ``json.dumps``'d.
 
         Parameters
         ----------
@@ -146,16 +167,25 @@ class Tool(BaseModel):
 
         Returns
         -------
-        Any
-            The result of calling the function.
+        str
+            The serialized result of calling the function.
         """
 
-        # Inject the context if the tool expects it
-        if ctx and self.run_context_param:
-            arguments = arguments.copy()
-            arguments[self.run_context_param] = ctx
-
         try:
+            # Coerce dict arguments into typed objects via the Pydantic params model.
+            # Extra keys not in model_fields are dropped (Pydantic extra='ignore').
+            if self._params_model is not None:
+                validated = self._params_model.model_validate(arguments)
+                arguments = {
+                    name: getattr(validated, name)
+                    for name in self._params_model.model_fields
+                    if name in arguments
+                }
+
+            if ctx and self.run_context_param:
+                arguments = arguments.copy()
+                arguments[self.run_context_param] = ctx
+
             res = self.fn(**arguments)
             if inspect.isawaitable(res):
                 res = await res
@@ -169,27 +199,10 @@ class Tool(BaseModel):
             logfire.error("tool.run.error", error=res)
             return str(res)
 
-        if isinstance(res, BaseModel):
-            res = res.model_dump()
+        if self._return_adapter is not None:
+            res = self._return_adapter.dump_python(res, mode="json")
 
-        return res
-
-    def to_litellm_function(self) -> dict[str, Any]:
-        """Convert the tool to a LiteLLM function format.
-
-        Returns
-        -------
-        dict[str, Any]
-            A dictionary in the LiteLLM function format.
-        """
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters_schema,
-            },
-        }
+        return res if isinstance(res, str) else json.dumps(res)
 
 
 class ToolMethod:
