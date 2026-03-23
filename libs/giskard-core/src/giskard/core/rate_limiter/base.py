@@ -124,6 +124,12 @@ class BaseRateLimiter(Discriminated, ABC):
         self._registry.register_instance(self)
         super().model_post_init(context)
 
+    @override
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        """Return self so that deep-copying a generator doesn't duplicate
+        rate-limiter state (which contains unpicklable asyncio primitives)."""
+        return self
+
     @asynccontextmanager
     @abstractmethod
     async def throttle(self) -> AsyncGenerator[float]:
