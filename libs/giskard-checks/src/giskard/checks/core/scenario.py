@@ -283,7 +283,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             | NotProvided
         ) = NOT_PROVIDED,
         return_exception: bool = False,
-    ) -> ScenarioResult[InputType, OutputType]:
+    ) -> ScenarioResult[TraceType]:
         """Execute the scenario steps sequentially with shared trace.
 
         Each step is executed in order:

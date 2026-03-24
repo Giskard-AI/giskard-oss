@@ -88,7 +88,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             | NotProvided
         ) = NOT_PROVIDED,
         return_exception: bool = False,
-    ) -> SuiteResult:
+    ) -> SuiteResult[Trace[Any, Any]]:
         """Run all scenarios in the suite serially.
 
         Parameters
@@ -116,7 +116,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         ```
         """
         start_time = time.perf_counter()
-        results: list[ScenarioResult[InputType, OutputType]] = []
+        results: list[ScenarioResult[Trace[Any, Any]]] = []
 
         target = target if not isinstance(target, NotProvided) else self.target
 
