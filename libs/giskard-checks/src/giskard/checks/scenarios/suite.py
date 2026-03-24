@@ -88,7 +88,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             | NotProvided
         ) = NOT_PROVIDED,
         return_exception: bool = False,
-    ) -> SuiteResult[Trace[Any, Any]]:
+    ) -> SuiteResult:
         """Run all scenarios in the suite serially.
 
         Parameters

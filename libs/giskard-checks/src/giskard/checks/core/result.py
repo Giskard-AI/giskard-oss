@@ -470,7 +470,7 @@ class TestCaseResult(BaseResult, frozen=True):
         yield Rule(subtitle, style=f"{status['color']} bold")
 
 
-class SuiteResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ignore[reportMissingTypeArgument]
+class SuiteResult(BaseResult, frozen=True):
     """Aggregate result object for the suite.
 
     Attributes
@@ -491,7 +491,7 @@ class SuiteResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ignore
         Fraction of non-skipped scenarios that passed (1.0 when all scenarios are skipped).
     """
 
-    results: list[ScenarioResult[TraceType]] = Field(
+    results: list[ScenarioResult[Any]] = Field(
         ..., description="List of scenario results"
     )
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
@@ -530,7 +530,7 @@ class SuiteResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ignore
         return self.passed_count / denominator
 
     @property
-    def failures_and_errors(self) -> list[ScenarioResult[TraceType]]:
+    def failures_and_errors(self) -> list[ScenarioResult[Any]]:
         """Return a list of scenario results that failed or errored."""
         return [r for r in self.results if r.failed or r.errored]
 
