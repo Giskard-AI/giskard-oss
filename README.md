@@ -22,10 +22,10 @@
  </h3>
 <br />
 
-> [!NOTE]
-> **Giskard v3** is a fresh rewrite — modular, async-first, focused on LLM-based systems.
-> v2 is still available but no longer maintained.
-> [v3 Announcement](https://github.com/orgs/Giskard-AI/discussions/2250) · [Roadmap](https://github.com/Giskard-AI/giskard-oss/issues/2252) · Install v2: `pip install "giskard[llm]<3"` · [v2 Docs](https://legacy-docs.giskard.ai)
+> [!IMPORTANT]
+> **Giskard v3** is a fresh rewrite designed for dynamic, multi-turn testing of AI agents. This release drops heavy dependencies for better efficiency while introducing a more powerful AI vulnerability scanner and enhanced RAG evaluation capabilities. For now, the vulnerability scanner and RAG evaluation still rely on Giskard v2.
+> **Giskard v2 remains available but is no longer actively maintained.**
+> Follow progress → [Read the v3 Annoucement](https://github.com/orgs/Giskard-AI/discussions/2250) · [Roadmap](https://github.com/Giskard-AI/giskard-oss/issues/2252)
 
 ## Install
 
