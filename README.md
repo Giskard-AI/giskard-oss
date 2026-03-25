@@ -114,7 +114,7 @@ Wrap your model and run the scan:
 import giskard
 import pandas as pd
 
-# Replace this with your own model function
+# Replace my_llm_chain with your actual LLM chain or model inference logic
 def model_predict(df: pd.DataFrame):
     """The function takes a DataFrame and must return a list of outputs (one per row)."""
     return [my_llm_chain.run({"query": question}) for question in df["question"]]
