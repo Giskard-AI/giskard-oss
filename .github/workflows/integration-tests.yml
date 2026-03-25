@@ -1,11 +1,10 @@
 name: Integration Tests
 
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] guarded by authorize job, label gate for external PRs, and immutable head.sha checkout
     types: [opened, synchronize, reopened, labeled]
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -13,6 +12,7 @@ concurrency:
 
 jobs:
   authorize:
+    name: authorize
     runs-on: ubuntu-latest
     steps:
       - name: Check authorization
@@ -39,6 +39,9 @@ jobs:
   test-functional:
     needs: authorize
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout repository
+    environment: ci
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -55,6 +58,7 @@ jobs:
           # for the `labeled` event. For external contributors, we want to use
           # the SHA corresponding to the time the label was added.
           ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true

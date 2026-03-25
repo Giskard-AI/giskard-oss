@@ -6,6 +6,7 @@
         "dependencies"
     ],
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "minimumReleaseAge": "7 days",
     "extends": [
         "config:recommended",
         "helpers:pinGitHubActionDigests",
