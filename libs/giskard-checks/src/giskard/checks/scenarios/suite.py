@@ -116,7 +116,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         ```
         """
         start_time = time.perf_counter()
-        results: list[ScenarioResult[InputType, OutputType]] = []
+        results: list[ScenarioResult[Trace[Any, Any]]] = []
 
         target = target if not isinstance(target, NotProvided) else self.target
 

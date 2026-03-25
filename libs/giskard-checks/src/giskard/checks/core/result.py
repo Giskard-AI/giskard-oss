@@ -219,7 +219,7 @@ class ScenarioStatus(str, Enum):
     SKIP = "skip"
 
 
-class ScenarioResult[InputType, OutputType](BaseResult, frozen=True):
+class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ignore[reportMissingTypeArgument]
     """Result of executing an entire scenario.
 
     Attributes
@@ -230,7 +230,7 @@ class ScenarioResult[InputType, OutputType](BaseResult, frozen=True):
         Ordered list of test case results produced during execution.
     duration_ms : int
         Total execution time in milliseconds.
-    final_trace : Trace[InputType, OutputType]
+    final_trace : TraceType
         Trace state after execution, containing all interactions that occurred.
     status : ScenarioStatus
         Aggregated outcome of the scenario derived from its steps.
@@ -247,9 +247,7 @@ class ScenarioResult[InputType, OutputType](BaseResult, frozen=True):
     scenario_name: str = Field(..., description="Scenario name")
     steps: list["TestCaseResult"]  # TODO: rename to test_cases
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
-    final_trace: Trace[InputType, OutputType] = Field(
-        ..., description="Final trace state after execution"
-    )
+    final_trace: TraceType = Field(..., description="Final trace state after execution")
 
     @computed_field
     @property
@@ -493,7 +491,7 @@ class SuiteResult(BaseResult, frozen=True):
         Fraction of non-skipped scenarios that passed (1.0 when all scenarios are skipped).
     """
 
-    results: list[ScenarioResult[Any, Any]] = Field(
+    results: list[ScenarioResult[Any]] = Field(
         ..., description="List of scenario results"
     )
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
@@ -532,7 +530,7 @@ class SuiteResult(BaseResult, frozen=True):
         return self.passed_count / denominator
 
     @property
-    def failures_and_errors(self) -> list[ScenarioResult[Any, Any]]:
+    def failures_and_errors(self) -> list[ScenarioResult[Any]]:
         """Return a list of scenario results that failed or errored."""
         return [r for r in self.results if r.failed or r.errored]
 

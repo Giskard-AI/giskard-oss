@@ -87,7 +87,7 @@ class ScenarioRunner:
             | NotProvided
         ) = NOT_PROVIDED,
         return_exception: bool = False,
-    ) -> ScenarioResult[InputType, OutputType]:
+    ) -> ScenarioResult[TraceType]:
         """Execute a scenario's steps sequentially with shared Trace.
 
         Each step is executed in order:
