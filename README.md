@@ -2,8 +2,8 @@
   <img alt="giskardlogo" src="readme/logo_light.png#gh-light-mode-only">
   <img alt="giskardlogo" src="readme/logo_dark.png#gh-dark-mode-only">
 </p>
-<h1 align="center" weight='300' >🐢 Open-Source Evaluation & Testing library for AI Agents</h1>
-<h3 align="center" weight='300' >Lightweight, async-first testing for LLM-based systems</h3>
+<h1 align="center" weight='300' >Evaluation & Testing library for Agentic Systems</h1>
+<h3 align="center" weight='300' >Lightweight, async-first evals, red teaming, and test generation for LLM-based systems</h3>
 <div align="center">
 
   [![GitHub release](https://img.shields.io/github/v/release/Giskard-AI/giskard)](https://github.com/Giskard-AI/giskard/releases)
@@ -23,7 +23,7 @@
 <br />
 
 > [!NOTE]
-> **Giskard v3** is a fresh rewrite — modular, async-first, focused on AI agents and LLM systems.
+> **Giskard v3** is a fresh rewrite — modular, async-first, focused on LLM-based systems.
 > v2 is still available but no longer maintained.
 > [v3 Announcement](https://github.com/orgs/Giskard-AI/discussions/2250) · [Roadmap](https://github.com/Giskard-AI/giskard-oss/issues/2252) · Install v2: `pip install "giskard[llm]<3"` · [v2 Docs](https://legacy-docs.giskard.ai)
 
@@ -37,7 +37,7 @@ Requires Python 3.12+.
 
 ______________________________________________________________________
 
-Giskard is an open-source Python library for **testing and evaluating AI systems**. The v3 architecture is a modular set of focused packages — each carrying only the dependencies it needs — built from scratch to wrap anything: an LLM, a black-box agent, or a multi-step pipeline.
+Giskard is an open-source Python library for **testing and evaluating agentic systems**. The v3 architecture is a modular set of focused packages — each carrying only the dependencies it needs — built from scratch to wrap anything: an LLM, a black-box agent, or a multi-step pipeline.
 
 | Status | Package | Description |
 |--------|---------|-------------|
@@ -45,16 +45,16 @@ Giskard is an open-source Python library for **testing and evaluating AI systems
 | 🚧 In progress | `giskard-scan` | Agent vulnerability scanner — red teaming, prompt injection, data leakage (successor of [v2 Scan](https://legacy-docs.giskard.ai/en/stable/open_source/scan/index.html)) |
 | 📋 Planned | `giskard-rag` | RAG evaluation & synthetic data generation (successor of [v2 RAGET](https://legacy-docs.giskard.ai/en/stable/open_source/testset_generation/index.html)) |
 
-## Giskard Checks — create and apply evals for testing AI applications
+## Giskard Checks — create and apply evals for testing agents
 
 ```sh
 pip install giskard-checks
 ```
 
-**[Giskard Checks](https://docs.giskard.ai/oss/checks)** is a lightweight library for creating evaluations (evals) that test AI applications — from simple assertions to LLM-as-judge assessments. Unlike traditional unit tests, evals are designed for **non-deterministic outputs** where the same input can produce different valid responses.
+**[Giskard Checks](https://docs.giskard.ai/oss/checks)** is a lightweight library for creating evaluations (evals) that test LLM-based systems — from simple assertions to LLM-as-judge assessments. Unlike traditional unit tests, evals are designed for **non-deterministic outputs** where the same input can produce different valid responses.
 
 Use Giskard Checks to:
-- **Catch regressions** — verify your AI still behaves correctly after changes
+- **Catch regressions** — verify your system still behaves correctly after changes
 - **Validate RAG quality** — check if answers are grounded in retrieved context
 - **Enforce safety rules** — ensure outputs conform to your content policies
 - **Evaluate multi-turn agents** — test full conversations, not just single exchanges

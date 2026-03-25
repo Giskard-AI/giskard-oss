@@ -12,7 +12,7 @@ There are 5 ways you can contribute to Giskard:
 * Submitting issues related to bugs or desired new features.
 * Contributing to the examples or to the documentation;
 * Fixing outstanding issues with the existing code;
-* Implementing new checks or evaluation scenarios for AI agents;
+* Implementing new checks or evaluation scenarios for agents and LLM-based systems;
 * Implementing new features to Giskard
 
 ### Did you find a bug?

@@ -25,7 +25,6 @@ body:
       description: Which major version of Giskard are you using?
       options:
         - Giskard v3
-        - Giskard v2
     validations:
       required: true
   - type: dropdown
