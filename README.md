@@ -2,8 +2,8 @@
   <img alt="giskardlogo" src="readme/logo_light.png#gh-light-mode-only">
   <img alt="giskardlogo" src="readme/logo_dark.png#gh-dark-mode-only">
 </p>
-<h1 align="center" weight='300' >Evaluation & Testing library for Agentic Systems</h1>
-<h3 align="center" weight='300' >Lightweight, async-first evals, red teaming, and test generation for LLM-based systems</h3>
+<h1 align="center" weight='300' >Evals, Red Teaming and Test Generation for Agentic Systems</h1>
+<h3 align="center" weight='300' >Modular, Lightweight, Dynamic and Async-first </h3>
 <div align="center">
 
   [![GitHub release](https://img.shields.io/github/v/release/Giskard-AI/giskard)](https://github.com/Giskard-AI/giskard/releases)
