@@ -19,15 +19,6 @@ body:
       value: |
         Please make sure that this fits our [GitHub Issues Policy](https://github.com/Giskard-AI/giskard/blob/main/ISSUES.md) as we only address code/doc bugs, performance issues, feature requests and build/installation issues on GitHub.
   - type: dropdown
-    id: giskard-version
-    attributes:
-      label: Giskard Version
-      description: Which major version of Giskard are you using?
-      options:
-        - Giskard v3
-    validations:
-      required: true
-  - type: dropdown
     id: source
     attributes:
       label: Source
