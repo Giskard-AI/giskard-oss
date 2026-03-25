@@ -280,7 +280,7 @@ from giskard.checks import Scenario
 
 chat = ChatInteraction(session_id="session_123", messages=["hi", "hello"])
 check = AdvancedSecurityCheck(name="security_test", threshold=0.7)
-scenario = Scenario.from_sequence(chat, check, name="custom_test")
+scenario = Scenario(name="custom_test").extend(chat, check)
 
 serialized = scenario.model_dump()
 restored = Scenario.model_validate(serialized)
@@ -552,10 +552,9 @@ from giskard.checks import (
     Equals # Inherits from `Check`
 )
 
-scenario = Scenario.from_sequence(
+scenario = Scenario(name="programmatic_scenario").extend(
     Interact(inputs="Hello", outputs=lambda inputs: "Hi"),
     Equals(expected_value="Hi", key="trace.last.outputs"),
-    name="programmatic_scenario",
 )
 
 result = await scenario.run()

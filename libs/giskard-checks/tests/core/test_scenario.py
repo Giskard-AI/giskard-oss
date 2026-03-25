@@ -1016,11 +1016,11 @@ class TestScenarioErrorHandling:
         assert result.final_trace.interactions[0].outputs == "Received: Message #1"
 
 
-class TestScenarioFromSequenceAndSerialization:
-    """Test Scenario.from_sequence() and step-based serialization."""
+class TestScenarioExtendAndSerialization:
+    """Test Scenario.extend() and step-based serialization."""
 
-    async def test_from_sequence_equivalent_to_fluent_api(self):
-        """Scenario.from_sequence() produces same result as fluent API."""
+    async def test_extend_equivalent_to_fluent_api(self):
+        """Scenario(...).extend(...) produces same result as fluent API."""
         fluent = (
             Scenario("fluent")
             .interact("Hello", "Hi")
@@ -1028,12 +1028,11 @@ class TestScenarioFromSequenceAndSerialization:
             .interact("World", "Echo: World")
             .check(Equals(expected_value="Echo: World", key="trace.last.outputs"))
         )
-        from_seq = Scenario.from_sequence(
+        from_seq = Scenario(name="fluent").extend(
             Interact(inputs="Hello", outputs="Hi"),
             Equals(expected_value="Hi", key="trace.last.outputs"),
             Interact(inputs="World", outputs="Echo: World"),
             Equals(expected_value="Echo: World", key="trace.last.outputs"),
-            name="fluent",
         )
 
         result_fluent = await fluent.run()
@@ -1045,10 +1044,10 @@ class TestScenarioFromSequenceAndSerialization:
             result_from_seq.final_trace.interactions
         )
 
-    async def test_from_sequence_with_only_checks(self):
-        """from_sequence handles scenario starting with checks only."""
+    async def test_extend_with_only_checks(self):
+        """extend handles scenario starting with checks only."""
         check = MockCheck(result=CheckResult.success(message="OK"))
-        scenario = Scenario.from_sequence(check, name="checks_only")
+        scenario = Scenario(name="checks_only").extend(check)
         result = await scenario.run()
         assert result.passed
         assert len(result.steps) == 1

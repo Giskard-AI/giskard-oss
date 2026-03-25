@@ -48,7 +48,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         result = await scenario.run()
 
     For advanced usage you can instantiate with pre-filled steps or use
-    ``from_sequence()`` for a flat list of components:
+    ``extend()`` for a flat list of components:
 
         from giskard.checks import Scenario, Interact, Equals
         scenario = Scenario(
@@ -109,36 +109,6 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         if name is not None:
             kwargs["name"] = name
         super().__init__(**kwargs)
-
-    @classmethod
-    def from_sequence(
-        cls,
-        *components: (
-            InteractionSpec[InputType, OutputType, TraceType]
-            | Check[InputType, OutputType, TraceType]
-        ),
-        name: str = "Unnamed Scenario",
-        trace_type: type[TraceType] | None = None,
-        annotations: dict[str, Any] | None = None,
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ) = NOT_PROVIDED,
-    ) -> Self:
-        """Create a scenario from a flat sequence of components.
-
-        Components are grouped into steps: a new step is created whenever an
-        InteractionSpec follows a Check.
-        """
-        without_steps = cls(
-            name=name,
-            trace_type=trace_type,
-            annotations=annotations or {},
-            target=target,
-        )
-
-        return without_steps.extend(*components)
 
     def _append_step(self) -> Step[InputType, OutputType, TraceType]:
         """Append a new step."""
