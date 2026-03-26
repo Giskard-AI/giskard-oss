@@ -6,8 +6,7 @@ on:
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,10 +14,15 @@ concurrency:
 
 jobs:
   lint:
+    name: lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout repository
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
@@ -27,19 +31,23 @@ jobs:
       - run: make check
 
   test-unit:
+    name: test-unit / ${{ matrix.package }} / ${{ matrix.python-version }}
     needs: lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout repository
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.13", "3.14"]
         package: [giskard-core, giskard-agents, giskard-checks]
-    name: test-unit / ${{ matrix.package }} / ${{ matrix.python-version }}
     env:
       PACKAGE: ${{ matrix.package }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true

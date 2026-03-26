@@ -1,4 +1,5 @@
 name: Release
+
 on:
   workflow_dispatch:
     inputs:
@@ -36,15 +37,20 @@ on:
         type: boolean
         default: true
 
+permissions: {}
+
 concurrency:
   group: release-${{ github.event.inputs.package }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   release:
+    name: release
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # push commits, tags, and create releases
+      id-token: write # PyPI trusted publishing (OIDC)
+    environment: release
     env:
       PACKAGE: ${{ github.event.inputs.package }}
       BUMP_TYPE: ${{ github.event.inputs.bump_type }}
@@ -65,11 +71,12 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          token: ${{ secrets.RELEASE_PAT_TOKEN }} # Needed to trigger other actions
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
+          enable-cache: false
           python-version: "3.12"
 
       - name: Setup development environment
@@ -127,33 +134,39 @@ jobs:
 
       - name: Push to main
         if: ${{ github.event.inputs.dry_run == 'false' && github.ref_name == 'main' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
           git push origin main
 
       - name: Create tag
         if: ${{ github.event.inputs.dry_run == 'false' }}
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           TAG: ${{ steps.bump.outputs.tag }}
         run: |
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
           git tag "$TAG"
           git push origin "$TAG"
 
 
       - name: Create GitHub Release
         if: ${{ github.event.inputs.dry_run == 'false' }}
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
-        with:
-          tag_name: ${{ steps.bump.outputs.tag }}
-          name: "${{ env.PACKAGE }} v${{ steps.bump.outputs.new_version }}"
-          generate_release_notes: true
-          files: |
-            libs/${{ env.PACKAGE }}/dist/*.tar.gz
-            libs/${{ env.PACKAGE }}/dist/*.whl
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.bump.outputs.tag }}
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        run: |
+          gh release create "$TAG" \
+            --title "$PACKAGE v$NEW_VERSION" \
+            --generate-notes \
+            libs/"$PACKAGE"/dist/*.tar.gz \
+            libs/"$PACKAGE"/dist/*.whl
 
       - name: Push to PyPI
         if: ${{ github.event.inputs.dry_run == 'false' }}
         working-directory: libs/${{ env.PACKAGE }}
-        env:
-          PIPY_USERNAME: ${{ secrets.PIPY_USERNAME }}
-          PIPY_PASSWORD: ${{ secrets.PIPY_PASSWORD }}
-        run: uv publish --username "$PIPY_USERNAME" --password "$PIPY_PASSWORD"
+        run: uv publish

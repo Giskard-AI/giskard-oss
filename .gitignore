@@ -175,3 +175,4 @@ mlruns
 
 # VSCode
 .vscode/
+.github/CREDENTIALS.md
