@@ -12,7 +12,7 @@ There are 5 ways you can contribute to Giskard:
 * Submitting issues related to bugs or desired new features.
 * Contributing to the examples or to the documentation;
 * Fixing outstanding issues with the existing code;
-* Implementing new ML tests (performance tests, drifts, metamorphic, etc.);
+* Implementing new checks or evaluation scenarios for agents and LLM-based systems;
 * Implementing new features to Giskard
 
 ### Did you find a bug?
@@ -26,19 +26,15 @@ If you did not find it, please follow these steps to inform us:
 * A short, self-contained, code snippet that allows us to reproduce the bug in less than 30s;
 * Provide the *full* stack trace if an exception is raised.
 
-To get the logs of a given container, you can run
+### Do you want to implement a new check?
 
-```bash
-docker logs <NAME OF THE CONTAINER>
-```
+Custom and domain-based checks are welcome. If you have an idea, you can inform us by providing us a short description of the check and possibly a link to its documentation (paper, etc.).
 
-### Do you want to implement a new ML test?
+Checks can be built using the `@Check.register("kind")` decorator and the fluent Scenario API. See the [checks documentation](https://docs.giskard.ai/oss/checks) for details.
 
-Custom and domain-based tests are welcome. If you have an idea, you can inform us by providing us a short description of the test and possibly a link to its documentation (paper, etc.).
+If you are willing to contribute the check yourself, let us know so we can best guide you.
 
-If you are willing to contribute the model yourself, let us know so we can best guide you.
-
-### Do you want a new feature (that is not a test)?
+### Do you want a new feature (that is not a check)?
 
 An awesome feature request addresses the following points:
 
@@ -48,10 +44,13 @@ An awesome feature request addresses the following points:
 
 ## Style guide
 
-We use `black` to format the code and `isort` to sort the imports. You can automatically enforce this style using the
-pre-commit hooks. You can find the instructions to install the pre-commit
-hooks [here](https://docs.giskard.ai/en/stable/community/contribution_guidelines/dev-environment.html).
+We use `ruff` for both formatting and linting. You can run the following commands to ensure your code conforms:
 
-For documentation strings, Giskard follows the [numpydoc](https://numpydoc.readthedocs.io/en/latest/format.html#docstring-standard) style.
+```bash
+make setup     # Install dependencies + dev tools
+make format    # Auto-format code
+make lint      # Check for lint errors
+make test      # Run the test suite
+```
 
 **This guide was heavily inspired by the awesome [HuggingFace guide to contributing](https://github.com/huggingface/transformers/blob/main/CONTRIBUTING.md).**

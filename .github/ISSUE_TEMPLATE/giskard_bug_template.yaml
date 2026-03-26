@@ -24,8 +24,9 @@ body:
       label: Source
       description: Giskard installed from
       options:
+        - pip
+        - uv
         - source
-        - docker
     validations:
       required: true
   - type: input
@@ -33,7 +34,7 @@ body:
     attributes:
       label: Giskard Library Version
       description: You can  obtain the Giskard library version with `python -c "import giskard ; print(giskard.__version__)"`
-      placeholder: e.g., 1.3.0
+      placeholder: e.g., 3.0.0a1
     validations:
       required: true
   - type: input
@@ -49,7 +50,7 @@ body:
     attributes:
       label: Python version
       description:
-      placeholder: e.g., 3.9
+      placeholder: e.g., 3.12
     validations:
       required: false
   - type: textarea
