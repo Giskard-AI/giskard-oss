@@ -1,15 +1,22 @@
 name: Reset 'safe for build' label
 
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] no checkout, no code execution — only removes a label
     types: [synchronize]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   remove-safe-for-build-label:
+    name: remove-safe-for-build-label
     if: contains(github.event.pull_request.labels.*.name, 'safe for build')
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
+      pull-requests: write # remove label from PR
     steps:
       - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:

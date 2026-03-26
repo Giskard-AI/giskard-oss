@@ -2,10 +2,11 @@ import json
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from jinja2 import BaseLoader, Environment, StrictUndefined, nodes
+from jinja2 import BaseLoader, StrictUndefined, nodes
 from jinja2.exceptions import TemplateNotFound
 from jinja2.ext import Extension
 from jinja2.loaders import FileSystemLoader, PrefixLoader
+from jinja2.sandbox import SandboxedEnvironment
 from pydantic import BaseModel
 
 from ..chat import Message, Role
@@ -34,7 +35,7 @@ def _finalize_value(value: Any) -> Any:
     return value
 
 
-_inline_env = Environment(
+_inline_env = SandboxedEnvironment(
     trim_blocks=True,
     lstrip_blocks=True,
     keep_trailing_newline=True,
@@ -88,9 +89,9 @@ class PromptsLoader(PrefixLoader):
         return loader, name
 
 
-def create_message_environment(loader_mapping: dict[str, Path]) -> Environment:
+def create_message_environment(loader_mapping: dict[str, Path]) -> SandboxedEnvironment:
     """Create a Jinja2 environment with MessageExtension."""
-    return Environment(
+    return SandboxedEnvironment(
         loader=PromptsLoader(
             {
                 namespace: FileSystemLoader(path)

@@ -2,8 +2,8 @@
   <img alt="giskardlogo" src="readme/logo_light.png#gh-light-mode-only">
   <img alt="giskardlogo" src="readme/logo_dark.png#gh-dark-mode-only">
 </p>
-<h1 align="center" weight='300' >The Evaluation & Testing framework for AI systems</h1>
-<h3 align="center" weight='300' >Control risks of performance, bias and security issues in AI systems</h3>
+<h1 align="center" weight='300' >Evals, Red Teaming and Test Generation for Agentic Systems</h1>
+<h3 align="center" weight='300' >Modular, Lightweight, Dynamic and Async-first </h3>
 <div align="center">
 
   [![GitHub release](https://img.shields.io/github/v/release/Giskard-AI/giskard)](https://github.com/Giskard-AI/giskard/releases)
@@ -16,229 +16,157 @@
 
 </div>
 <h3 align="center">
-   <a href="https://docs.giskard.ai/en/stable/getting_started/index.html"><b>Docs</b></a> &bull;
+   <a href="https://docs.giskard.ai/oss"><b>Docs</b></a> &bull;
   <a href="https://www.giskard.ai/?utm_source=github&utm_medium=github&utm_campaign=github_readme&utm_id=readmeblog"><b>Website</b></a> &bull;
   <a href="https://gisk.ar/discord"><b>Community</b></a>
  </h3>
 <br />
 
 > [!IMPORTANT]
-> **We are working on Giskard 3!** Version 3 is a fresh rewrite designed for dynamic, multi-turn testing of AI agents. This release drops heavy dependencies for better efficiency while introducing a more powerful AI vulnerability scanner and enhanced RAG evaluation capabilities.
+> **Giskard v3** is a fresh rewrite designed for dynamic, multi-turn testing of AI agents. This release drops heavy dependencies for better efficiency while introducing a more powerful AI vulnerability scanner and enhanced RAG evaluation capabilities. For now, the vulnerability scanner and RAG evaluation still rely on Giskard v2.
 > **Giskard v2 remains available but is no longer actively maintained.**
 > Follow progress → [Read the v3 Annoucement](https://github.com/orgs/Giskard-AI/discussions/2250) · [Roadmap](https://github.com/Giskard-AI/giskard-oss/issues/2252)
 
-## Install Giskard 🐢
-Install the latest version of Giskard from PyPi using pip:
+## Install
+
 ```sh
-pip install "giskard[llm]" -U
+pip install giskard
 ```
-We officially support Python 3.9, 3.10 and 3.11.
-## Try in Colab 📙
-[Open Colab notebook](https://colab.research.google.com/github/giskard-ai/giskard/blob/main/docs/getting_started/quickstart/quickstart_llm.ipynb)
+
+Requires Python 3.12+.
 
 ______________________________________________________________________
 
-Giskard is an open-source Python library that **automatically detects performance, bias & security issues in AI applications**. The library covers LLM-based applications such as RAG agents, all the way to traditional ML models for tabular data.
+Giskard is an open-source Python library for **testing and evaluating agentic systems**. The v3 architecture is a modular set of focused packages — each carrying only the dependencies it needs — built from scratch to wrap anything: an LLM, a black-box agent, or a multi-step pipeline.
 
-## Scan: Automatically assess your LLM-based agents for performance, bias & security issues ⤵️
+| Status | Package | Description |
+|--------|---------|-------------|
+| ✅ Alpha | `giskard-checks` | Testing & evaluation — scenario API, built-in checks, LLM-as-judge |
+| 🚧 In progress | `giskard-scan` | Agent vulnerability scanner — red teaming, prompt injection, data leakage (successor of [v2 Scan](https://legacy-docs.giskard.ai/en/stable/open_source/scan/index.html)) |
+| 📋 Planned | `giskard-rag` | RAG evaluation & synthetic data generation (successor of [v2 RAGET](https://legacy-docs.giskard.ai/en/stable/open_source/testset_generation/index.html)) |
 
-Issues detected include:
-- Hallucinations
-- Harmful content generation
-- Prompt injection
-- Robustness issues
-- Sensitive information disclosure
-- Stereotypes & discrimination
-- many more...
+## Giskard Checks — create and apply evals for testing agents
 
-<p align="center">
-  <img src="readme/scan_updated.gif" alt="Scan Example" width="800">
-</p>
-
-## RAG Evaluation Toolkit (RAGET): Automatically generate evaluation datasets & evaluate RAG application answers ⤵️
-
-If you're testing a RAG application, you can get an even more in-depth assessment using **RAGET**, Giskard's RAG Evaluation Toolkit.
-
-- **RAGET** can generate automatically a list of `question`, `reference_answer` and `reference_context` from the knowledge base of the RAG. You can then use this generated test set to evaluate your RAG agent.
-- **RAGET** computes scores *for each component of the RAG agent*. The scores are computed by aggregating the correctness of the agent’s answers on different question types.
-
-  - Here is the list of components evaluated with **RAGET**:
-    - `Generator`: the LLM used inside the RAG to generate the answers
-    - `Retriever`: fetch relevant documents from the knowledge base according to a user query
-    - `Rewriter`: rewrite the user query to make it more relevant to the knowledge base or to account for chat history
-    - `Router`: filter the query of the user based on his intentions
-    - `Knowledge Base`: the set of documents given to the RAG to generate the answers
-
-<p align="center">
-  <img src="readme/RAGET_updated.gif" alt="Test Suite Example" width="800">
-</p>
-
-
-Giskard works with any model, in any environment and integrates seamlessly with your favorite tools ⤵️ <br/>
-
-<p align="center">
-  <img width='600' src="readme/tools_updated.png">
-</p>
-<br/>
-
-Looking for solutions to evaluate computer vision models? Check out [giskard-vision](https://github.com/Giskard-AI/giskard-vision), a library dedicated for computer vision tasks.
-
-# Contents
-
-- 🤸‍♀️ **[Quickstart](#quickstart)**
-    - **1**. 🏗️ [Build a LLM agent](#build-a-llm-agent)
-    - **2**. 🔎 [Scan your model for issues](#scan-your-model-for-issues)
-    - **3**. 🪄 [Automatically generate an evaluation dataset for your RAG applications](#automatically-generate-an-evaluation-dataset-for-your-rag-applications)
-- 👋 **[Community](#community)**
-
-<h1 id="quickstart">🤸‍♀️ Quickstart</h1>
-
-<h2 id="build-a-llm-agent">1. 🏗️ Build a LLM agent</h2>
-
-Let's build an agent that answers questions about climate change, based on the 2023 Climate Change Synthesis Report by the IPCC.
-
-Before starting let's install the required libraries:
 ```sh
-pip install langchain langchain-community langchain-openai tiktoken "pypdf<=3.17.0"
+pip install giskard-checks
 ```
 
+**[Giskard Checks](https://docs.giskard.ai/oss/checks)** is a lightweight library for creating evaluations (evals) that test LLM-based systems — from simple assertions to LLM-as-judge assessments. Unlike traditional unit tests, evals are designed for **non-deterministic outputs** where the same input can produce different valid responses.
+
+Use Giskard Checks to:
+- **Catch regressions** — verify your system still behaves correctly after changes
+- **Validate RAG quality** — check if answers are grounded in retrieved context
+- **Enforce safety rules** — ensure outputs conform to your content policies
+- **Evaluate multi-turn agents** — test full conversations, not just single exchanges
+
+Built-in evals include string matching, comparisons, regex, semantic similarity, and LLM-as-judge checks (`Groundedness`, `Conformity`, `LLMJudge`).
+
+### Quickstart
 
 ```python
-from langchain import FAISS, PromptTemplate
-from langchain_openai import OpenAIEmbeddings, OpenAI
-from langchain.document_loaders import PyPDFLoader
-from langchain.chains import RetrievalQA
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from openai import OpenAI
+from giskard.checks import Scenario, Groundedness
 
-# Prepare vector store (FAISS) with IPPC report
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100, add_start_index=True)
-loader = PyPDFLoader("https://www.ipcc.ch/report/ar6/syr/downloads/report/IPCC_AR6_SYR_LongerReport.pdf")
-db = FAISS.from_documents(loader.load_and_split(text_splitter), OpenAIEmbeddings())
+client = OpenAI()
 
-# Prepare QA chain
-PROMPT_TEMPLATE = """You are the Climate Assistant, a helpful AI assistant made by Giskard.
-Your task is to answer common questions on climate change.
-You will be given a question and relevant excerpts from the IPCC Climate Change Synthesis Report (2023).
-Please provide short and clear answers based on the provided context. Be polite and helpful.
+def get_answer(inputs: str) -> str:
+    response = client.chat.completions.create(
+        model="gpt-5-mini",
+        messages=[{"role": "user", "content": inputs}],
+    )
+    return response.choices[0].message.content
 
-Context:
-{context}
+scenario = (
+    Scenario("test_dynamic_output")
+    .interact(
+        inputs="What is the capital of France?",
+        outputs=get_answer,
+    )
+    .check(
+        Groundedness(
+            name="answer is grounded",
+            answer_key="trace.last.outputs",
+            context="France is a country in Western Europe. Its capital is Paris.",
+        )
+    )
+)
 
-Question:
-{question}
-
-Your answer:
-"""
-
-llm = OpenAI(model="gpt-3.5-turbo-instruct", temperature=0)
-prompt = PromptTemplate(template=PROMPT_TEMPLATE, input_variables=["question", "context"])
-climate_qa_chain = RetrievalQA.from_llm(llm=llm, retriever=db.as_retriever(), prompt=prompt)
+result = await scenario.run()
+result.print_report()
 ```
 
-<h2 id="scan-your-model-for-issues">2. 🔎 Scan your model for issues</h2>
+> The `run()` method is async. In a script, wrap it with `asyncio.run()`. See the [full docs](https://docs.giskard.ai/oss/checks) for `Suites`, `LLMJudge`, multi-turn scenarios, and more.
 
-Next, wrap your agent to prepare it for Giskard's scan:
+
+## Looking for Giskard v2?
+
+Giskard v2 included **Scan** (automatic vulnerability detection) and **RAGET** (RAG evaluation test set generation) for both ML models and LLM applications. These features are not available in v3.
+
+```sh
+pip install "giskard[llm]>2,<3"
+```
+
+### [Scan](https://legacy-docs.giskard.ai/en/stable/open_source/scan/index.html) — automatically detect performance, bias & security issues
+
+Wrap your model and run the scan:
 
 ```python
 import giskard
 import pandas as pd
 
+# Replace my_llm_chain with your actual LLM chain or model inference logic
 def model_predict(df: pd.DataFrame):
-    """Wraps the LLM call in a simple Python function.
+    """The function takes a DataFrame and must return a list of outputs (one per row)."""
+    return [my_llm_chain.run({"query": question}) for question in df["question"]]
 
-    The function takes a pandas.DataFrame containing the input variables needed
-    by your model, and must return a list of the outputs (one for each row).
-    """
-    return [climate_qa_chain.run({"query": question}) for question in df["question"]]
-
-# Don’t forget to fill the `name` and `description`: they are used by Giskard
-# to generate domain-specific tests.
 giskard_model = giskard.Model(
     model=model_predict,
     model_type="text_generation",
-    name="Climate Change Question Answering",
-    description="This model answers any question about climate change based on IPCC reports",
+    name="My LLM Application",
+    description="A question answering assistant",
     feature_names=["question"],
 )
-```
 
-✨✨✨Then run Giskard's magical scan✨✨✨
-```python
 scan_results = giskard.scan(giskard_model)
-```
-Once the scan completes, you can display the results directly in your notebook:
-
-```python
 display(scan_results)
-
-# Or save it to a file
-scan_results.to_html("scan_results.html")
 ```
 
-*If you're facing issues, check out our [docs](https://docs.giskard.ai/en/stable/open_source/scan/scan_llm/index.html) for more information.*
+<p align="center">
+  <img src="readme/scan_updated.gif" alt="Scan Example" width="800">
+</p>
 
-<h2 id="automatically-generate-an-evaluation-dataset-for-your-rag-applications">3. 🪄 Automatically generate an evaluation dataset for your RAG applications</h2>
+### [RAGET](https://legacy-docs.giskard.ai/en/stable/open_source/testset_generation/index.html) — generate evaluation datasets for RAG applications
 
-If the scan found issues in your model, you can automatically extract an evaluation dataset based on the issues found:
-
-```python
-test_suite = scan_results.generate_test_suite("My first test suite")
-```
-
-By default, RAGET automatically generates 6 different question types (these can be selected if needed, see advanced question generation). The total number of questions is divided equally between each question type. To make the question generation more relevant and accurate, you can also provide a description of your agent.
+Automatically generate questions, reference answers, and context from your knowledge base:
 
 ```python
-
+import pandas as pd
 from giskard.rag import generate_testset, KnowledgeBase
 
-# Load your data and initialize the KnowledgeBase
+# Load your knowledge base documents
 df = pd.read_csv("path/to/your/knowledge_base.csv")
-
 knowledge_base = KnowledgeBase.from_pandas(df, columns=["column_1", "column_2"])
 
-# Generate a testset with 10 questions & answers for each question types (this will take a while)
 testset = generate_testset(
     knowledge_base,
     num_questions=60,
-    language='en',  # optional, we'll auto detect if not provided
-    agent_description="A customer support chatbot for company X", # helps generating better questions
+    language='en',
+    agent_description="A customer support chatbot for company X",
 )
 ```
 
-Depending on how many questions you generate, this can take a while. Once you’re done, you can save this generated test set for future use:
+<p align="center">
+  <img src="readme/RAGET_updated.gif" alt="RAGET Example" width="800">
+</p>
 
-```python
-# Save the generated testset
-testset.save("my_testset.jsonl")
-```
-You can easily load it back
-
-```python
-from giskard.rag import QATestset
-
-loaded_testset = QATestset.load("my_testset.jsonl")
-
-# Convert it to a pandas dataframe
-df = loaded_testset.to_pandas()
-```
-
-Here’s an example of a generated question:
-
-| question                               | reference_context                                                                                                                                                     | reference_answer                                             | metadata                                               |
-|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|-------------------------------------------------------|
-| For which countries can I track my shipping? | Document 1: We offer free shipping on all orders over $50. For orders below $50, we charge a flat rate of $5.99. We offer shipping services to customers residing in all 50 states of the US, in addition to providing delivery options to Canada and Mexico. Document 2: Once your purchase has been successfully confirmed and shipped, you will receive a confirmation email containing your tracking number. You can simply click on the link provided in the email or visit our website’s order tracking page. | We ship to all 50 states in the US, as well as to Canada and Mexico. We offer tracking for all our shippings. | `{"question_type": "simple", "seed_document_id": 1, "topic": "Shipping policy"}` |
-
-Each row of the test set contains 5 columns:
-
-- `question`: the generated question
-- `reference_context`: the context that can be used to answer the question
-- `reference_answer`: the answer to the question (generated with GPT-4)
-- `conversation_history`: not shown in the table above, contain the history of the conversation with the agent as a list, only relevant for conversational question, otherwise it contains an empty list.
-- `metadata`: a dictionary with various metadata about the question, this includes the question_type, seed_document_id the id of the document used to generate the question and the topic of the question
+[Full v2 docs](https://legacy-docs.giskard.ai)
 
 <h1 id="community">👋 Community</h1>
 
 We welcome contributions from the AI community! Read this [guide](./CONTRIBUTING.md) to get started, and join our thriving community on [Discord](https://gisk.ar/discord).
+
+Follow the progress and share feedback:
+[v3 Announcement](https://github.com/orgs/Giskard-AI/discussions/2250) · [Roadmap](https://github.com/Giskard-AI/giskard-oss/issues/2252)
 
 🌟 [Leave us a star](https://github.com/Giskard-AI/giskard), it helps the project to get discovered by others and keeps us motivated to build awesome open-source tools! 🌟
 

@@ -22,15 +22,15 @@ For development, install with dev dependencies:
 uv add giskard-agents --dev
 ```
 
-# Docs
+## Core Concepts
 
 Three basic elements to keep in mind:
 
-- `Generator` corresponds to a conversational text generator. In short, it represents a model with certain params, and can run completions.
-- `ChatWorkflow` defines all what's needed to run a chat with the generator. It handles templates, parsing, and tools.
-- `Chat` is the result of a pipeline run. It contains the generated messages and everything you would expect.
+- `Generator` corresponds to a conversational text generator. It represents a model with certain params and can run completions.
+- `ChatWorkflow` defines everything needed to run a chat with the generator. It handles templates, parsing, and tools.
+- `Chat` is the result of a pipeline run. It contains the generated messages and metadata.
 
-Also important to keep in mind: everything is async.
+The API is async throughout — all run methods return coroutines.
 
 ## Basic usage
 
@@ -113,14 +113,25 @@ generator = generator.with_rate_limiter(MinIntervalRateLimiter.from_rpm(60, max_
 For advanced cross-cutting concerns (logging, caching, etc.), you can write custom middleware by subclassing `CompletionMiddleware` and adding it to the `middlewares` list:
 
 ```python
-from giskard.agents.generators.middleware import CompletionMiddleware
+import logging
+from typing import Any
+
+from giskard.agents import Message
+from giskard.agents.generators import GenerationParams, Response
+from giskard.agents.generators.middleware import CompletionMiddleware, NextFn
 
 @CompletionMiddleware.register("logging")
 class LoggingMiddleware(CompletionMiddleware):
-    async def call(self, messages, params, next_fn):
-        print(f"Sending {len(messages)} messages")
-        response = await next_fn(messages, params)
-        print(f"Got response: {response.finish_reason}")
+    async def call(
+        self,
+        messages: list[Message],
+        params: GenerationParams | None,
+        metadata: dict[str, Any] | None,
+        next_fn: NextFn,
+    ) -> Response:
+        logging.info(f"Sending {len(messages)} messages")
+        response = await next_fn(messages, params, metadata)
+        logging.info(f"Got response: {response.finish_reason}")
         return response
 
 generator = agents.Generator(
@@ -137,6 +148,8 @@ You can specify the output model for the workflow, and this will be passed to
 each completion call:
 
 ```python
+from pydantic import BaseModel
+
 class SimpleOutput(BaseModel):
     mood: str
     greeting: str
@@ -158,7 +171,6 @@ assert chat.output.mood == "happy"
 You can associate input variables to a workflow, and use them in the messages thanks to jinja2 templating. Here's an example:
 
 ```python
-
 # This will run a chat with the message "Hello Test Bot, how are you?"
 chat = await (
     generator.chat("Hello {{ name_of_the_bot }}, how are you?")
@@ -224,14 +236,13 @@ The universe is actually a giant simulation running on a quantum computer in a h
 You can then load the template as usual:
 
 ```python
-
 chat = await (
     generator.template("evaluators.scientific_theory")
     .with_inputs(theory="Normandy is actually the center of the universe because its perfect balance of rain, cheese, and cider creates a quantum field that bends space-time, making it the most harmonious place on Earth.")
     .run()
 )
 
-score = chat.last.parse(int)
+score = int(chat.last.content)
 assert score == 5
 ```
 
@@ -339,10 +350,12 @@ You can choose to:
 - Return the chat with the error (`ErrorPolicy.RETURN`). The chat will have a `failed` attribute set to `True`, and an `error` attribute with a serializable error message.
 - For multi-run methods (e.g. `run_many` or `run_batch`), you can discard the failed chats (`ErrorPolicy.SKIP`). You will then only get the successful chats (potentially an empty list).
 
-Note: when running a single chat (`workflow.run(...)`), error policy is `SKIP` will behave as `RETURN`, returning `Chat` object with the error.
+Note: when running a single chat (`workflow.run(...)`), error policy `SKIP` behaves as `RETURN`, returning a `Chat` object with the error.
 
 ```python
-# This may return less than 3 chats if some fail.
+from giskard.agents import ErrorPolicy
+
+# This may return fewer than 3 chats if some fail.
 chats = await generator.chat("Hello!", role="user").on_error(ErrorPolicy.SKIP).run_many(n=3)
 
 # This will return 3 chats, some may be in failed state.

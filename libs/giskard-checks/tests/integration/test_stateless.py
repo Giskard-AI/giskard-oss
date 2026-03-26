@@ -91,7 +91,10 @@ def adapter(
 async def test_single_message(
     adapter: Callable[[agents.Message, MessageTraces], Awaitable[agents.Message]],
 ):
-    scenario = Scenario[Any, Any, MessageTraces].from_sequence(
+    scenario = Scenario[Any, Any, MessageTraces](
+        name="test_single_message",
+        trace_type=MessageTraces,
+    ).extend(
         WithSpy(
             interaction_generator=Interact(
                 inputs=agents.Message(
@@ -122,8 +125,6 @@ async def test_single_message(
             expected_value="Hello, I want to apply for a job.",
             key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[1]",
         ),
-        name="test_single_message",
-        trace_type=MessageTraces,
     )
     result = await scenario.run()
     assert result.failed  # No tool call is made somehow
