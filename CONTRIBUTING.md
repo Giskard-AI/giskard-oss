@@ -46,7 +46,13 @@ An awesome feature request addresses the following points:
 
 ## Style guide
 
-The repo is a **uv** workspace (Python 3.12+). We use **Ruff** for formatting and linting, **basedpyright** for type checking, and **pre-commit** hooks (Ruff, basedpyright, and a few file checks) so issues are caught before push. `make setup` runs `uv sync`, installs those CLI tools, and enables the hooks.
+The repository is a **uv** workspace and requires Python 3.12+. We use several tools to ensure code quality:
+
+* **Ruff** for formatting and linting.
+* **basedpyright** for type checking.
+* **pre-commit** hooks (Ruff, basedpyright, and a few file checks) to catch issues before you push.
+
+`make setup` runs `uv sync`, installs these CLI tools, and enables the hooks.
 
 From the repository root:
 
