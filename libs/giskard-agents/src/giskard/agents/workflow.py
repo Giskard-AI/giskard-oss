@@ -263,8 +263,16 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
     ) -> Self:
         """Add a chat message to the workflow.
 
-        Plain strings are appended as literal text by default. Set ``as_template=True``
-        to parse a string as a Jinja2 template, or pass a :class:`~.templates.MessageTemplate`.
+        Parameters
+        ----------
+        message : str | Message | MessageTemplate
+            The message to add. Plain strings are appended as literal text by default.
+        role : Role, default "user"
+            The role for the message, used when ``message`` is a string.
+        as_template : bool, default False
+            When True, parse a string ``message`` as a Jinja2 template.
+            For other message types, this parameter is ignored.
+            Alternatively, you can pass a :class:`~.templates.MessageTemplate` instance.
         """
         if isinstance(message, str):
             if as_template:

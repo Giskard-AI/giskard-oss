@@ -196,6 +196,8 @@ class BaseGenerator(Discriminated, ABC):
         ----------
         message : str
             The initial message to start the chat with.
+        role : Role, default "user"
+            The role of the message sender.
         as_template : bool, default False
             When True, parse ``message`` as a Jinja2 template.
 
