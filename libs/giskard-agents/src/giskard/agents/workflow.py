@@ -255,11 +255,23 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
     error_policy: ErrorPolicy = Field(default=ErrorPolicy.RAISE)
 
     def chat(
-        self, message: str | Message | MessageTemplate, role: Role = "user"
+        self,
+        message: str | Message | MessageTemplate,
+        role: Role = "user",
+        *,
+        as_template: bool = False,
     ) -> Self:
-        """Add a chat message to the workflow."""
+        """Add a chat message to the workflow.
+
+        Plain strings are appended as literal text by default. Set ``as_template=True``
+        to parse a string as a Jinja2 template, or pass a :class:`~.templates.MessageTemplate`.
+        """
         if isinstance(message, str):
-            message = MessageTemplate(role=role, content_template=message)
+            if as_template:
+                message = MessageTemplate(role=role, content_template=message)
+            else:
+                message = Message(role=role, content=message)
+
         return self.model_copy(update={"messages": [*self.messages, message]})
 
     def template(self, template_name: str) -> Self:

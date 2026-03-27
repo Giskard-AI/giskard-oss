@@ -719,7 +719,7 @@ dev = [
 
 [[package]]
 name = "giskard-agents"
-version = "1.0.2a1"
+version = "1.0.2b1"
 source = { editable = "libs/giskard-agents" }
 dependencies = [
     { name = "giskard-core" },
@@ -748,7 +748,7 @@ requires-dist = [
 
 [[package]]
 name = "giskard-checks"
-version = "1.0.1a2"
+version = "1.0.1b1"
 source = { editable = "libs/giskard-checks" }
 dependencies = [
     { name = "giskard-agents" },
@@ -773,7 +773,7 @@ requires-dist = [
 
 [[package]]
 name = "giskard-core"
-version = "1.0.1a1"
+version = "1.0.1b2"
 source = { editable = "libs/giskard-core" }
 dependencies = [
     { name = "pydantic" },

@@ -183,13 +183,21 @@ class BaseGenerator(Discriminated, ABC):
         responses = await asyncio.gather(*completion_requests)
         return responses
 
-    def chat(self, message: str, role: Role = "user") -> "ChatWorkflow[Any]":
+    def chat(
+        self,
+        message: str,
+        role: Role = "user",
+        *,
+        as_template: bool = False,
+    ) -> "ChatWorkflow[Any]":
         """Create a new chat workflow with the given message.
 
         Parameters
         ----------
         message : str
             The initial message to start the chat with.
+        as_template : bool, default False
+            When True, parse ``message`` as a Jinja2 template.
 
         Returns
         -------
@@ -198,7 +206,7 @@ class BaseGenerator(Discriminated, ABC):
         """
         from ..workflow import ChatWorkflow
 
-        return ChatWorkflow(generator=self).chat(message, role)
+        return ChatWorkflow(generator=self).chat(message, role, as_template=as_template)
 
     def template(self, template_name: str) -> "ChatWorkflow[Any]":
         """Create a new chat workflow from a template.

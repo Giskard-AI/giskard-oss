@@ -165,7 +165,7 @@ async def test_user_simulator(
         instructions: str, max_steps: int, trace: MessageTraces
     ) -> AsyncGenerator[agents.Message, MessageTraces]:
         agent = generator.chat(
-            message=USER_SIMULATOR_PROMPT, role="system"
+            message=USER_SIMULATOR_PROMPT, role="system", as_template=True
         ).with_output(UserSimulatorOutput)
 
         current_step = 0
