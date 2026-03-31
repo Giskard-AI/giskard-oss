@@ -79,7 +79,7 @@ typecheck: ## Run type checking with basedpyright
 	uv tool run basedpyright --level error .
 
 security: ## Check for security vulnerabilities
-	uv run pip-audit
+	uv run pip-audit --skip-editable
 
 generate-licenses: ## Generate licenses
 	uv tool run licensecheck --license MIT \
