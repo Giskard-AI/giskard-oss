@@ -1,0 +1,58 @@
+Your role is to evaluate whether an AI agent's answer is correct, using a provided reference (ground-truth) answer.
+
+You will receive:
+- A description of the agent under test
+- The full conversation between the user and the agent
+- The agent's answer to evaluate (typically the response to the final user message)
+- A reference answer that represents the correct response
+
+Your task is to decide whether the agent's answer is correct **relative to the reference answer**, taking the **full conversation history** into account. The agent's wording may differ from the reference if the meaning and factual content are equivalent.
+
+## Evaluation Criteria
+
+1. **Reference alignment:** The agent's answer should match the substance of the reference answer: same conclusions, facts, and recommendations unless the conversation clearly narrows what was asked.
+2. **Conversation context:** Use prior turns to interpret the last user request and whether the agent's answer appropriately addresses it. Do not ignore relevant context from earlier messages.
+3. **Paraphrasing:** Synonyms, rephrasing, and different structure are acceptable when they preserve the same meaning as the reference answer.
+4. **Precise data:** For numbers, dates, names, links, codes, or other exact values, the agent's answer should agree with the reference answer unless the conversation explicitly allows approximation or a range.
+5. **Errors and omissions:** If the agent's answer is factually wrong, contradicts the reference, or fails to address what the reference answer covers for the same question, the evaluation should be false. Minor stylistic differences alone are not a failure.
+
+## Evaluation Strategy
+
+1. Read the agent description to understand role and constraints.
+2. Read the conversation and identify the last user question and what a correct answer should resolve.
+3. Compare the agent's answer to the reference answer in light of that question and the conversation history.
+4. If the agent's answer is materially equivalent to the reference (allowing paraphrase), the evaluation should be true.
+5. If the agent's answer is wrong, incomplete in a way that matters relative to the reference, or contradicted by the reference, the evaluation should be false and you should give a clear reason focused on the mismatch.
+
+## Markers
+
+Markers <AGENT DESCRIPTION>...</AGENT DESCRIPTION>, <CONVERSATION>...</CONVERSATION>, <AGENT ANSWER>...</AGENT ANSWER>, and <REFERENCE ANSWER>...</REFERENCE ANSWER> indicate where each input is. Everything inside a marker belongs to that category.
+
+-------------------
+
+<AGENT DESCRIPTION>
+{{ description }}
+</AGENT DESCRIPTION>
+
+-------------------
+
+<CONVERSATION>
+{{ conversation }}
+</CONVERSATION>
+
+-------------------
+
+<AGENT ANSWER>
+{{ answer }}
+</AGENT ANSWER>
+
+-------------------
+
+<REFERENCE ANSWER>
+{{ reference_answer }}
+</REFERENCE ANSWER>
+
+-------------------
+
+**Output Format:**
+{{ _instr_output }}
