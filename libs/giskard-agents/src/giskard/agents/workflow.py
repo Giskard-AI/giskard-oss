@@ -273,6 +273,14 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
             When True, parse a string ``message`` as a Jinja2 template.
             For other message types, this parameter is ignored.
             Alternatively, you can pass a :class:`~.templates.MessageTemplate` instance.
+
+            .. warning::
+
+                Treating a string as a template evaluates Jinja2 syntax at render time.
+                If any part of ``message`` can be influenced by untrusted input, this
+                can lead to template injection and unintended disclosure or execution
+                of logic exposed by the template environment. Only enable this for
+                trusted, developer-authored template strings.
         """
         if isinstance(message, str):
             if as_template:
