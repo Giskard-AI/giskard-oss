@@ -79,9 +79,7 @@ typecheck: ## Run type checking with basedpyright
 	uv tool run basedpyright --level error .
 
 security: ## Check for security vulnerabilities
-	# TODO: Remove --ignore-vuln CVE-2026-4539 flag when patch exists for pygments
-	# This is a low severity redos vulnerability: https://www.cve.org/CVERecord?id=CVE-2026-4539
-	uv run pip-audit --skip-editable --ignore-vuln CVE-2026-4539
+	uv run pip-audit --skip-editable
 
 generate-licenses: ## Generate licenses
 	uv tool run licensecheck --license MIT \
