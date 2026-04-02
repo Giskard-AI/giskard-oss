@@ -15,24 +15,26 @@ from .comparison import (
 
 # Import other builtin checks (staying in builtin)
 from .fn import FnCheck, from_fn
+from .nlp_metrics import Readability
 from .semantic_similarity import SemanticSimilarity
 from .text_matching import RegexMatching, StringMatching
 
 __all__ = [
-    "from_fn",
-    "FnCheck",
-    "StringMatching",
-    "RegexMatching",
-    "Equals",
-    "NotEquals",
-    "LesserThan",
-    "GreaterThan",
-    "LesserThanEquals",
-    "GreaterEquals",
-    "Groundedness",
-    "Conformity",
-    "LLMJudge",
-    "SemanticSimilarity",
-    "BaseLLMCheck",
-    "LLMCheckResult",
+        "from_fn",
+        "FnCheck",
+        "StringMatching",
+        "RegexMatching",
+        "Equals",
+        "NotEquals",
+        "LesserThan",
+        "GreaterThan",
+        "LesserThanEquals",
+        "GreaterEquals",
+        "Groundedness",
+        "Conformity",
+        "LLMJudge",
+        "SemanticSimilarity",
+        "BaseLLMCheck",
+        "LLMCheckResult",
+        "Readability",
 ]
