@@ -193,8 +193,7 @@ def test_suite_result_convenience_method_matches_function() -> None:
     assert root_from_method.tag == root_from_function.tag
     assert root_from_method.attrib["tests"] == root_from_function.attrib["tests"]
     assert (
-        root_from_method.attrib["assertions"]
-        == root_from_function.attrib["assertions"]
+        root_from_method.attrib["assertions"] == root_from_function.attrib["assertions"]
     )
 
 

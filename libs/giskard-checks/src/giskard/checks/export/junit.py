@@ -130,7 +130,9 @@ def _append_status_node(testcase_el: ET.Element, scenario: ScenarioResult[Any]) 
             "error",
             {
                 "type": _check_label(first, "error") if first else "error",
-                "message": first.message if first and first.message else "Scenario errored.",
+                "message": first.message
+                if first and first.message
+                else "Scenario errored.",
             },
         )
         node.text = _build_detail_text(scenario, matches)
@@ -144,7 +146,9 @@ def _append_status_node(testcase_el: ET.Element, scenario: ScenarioResult[Any]) 
             "failure",
             {
                 "type": _check_label(first, "failure") if first else "failure",
-                "message": first.message if first and first.message else "Scenario failed.",
+                "message": first.message
+                if first and first.message
+                else "Scenario failed.",
             },
         )
         node.text = _build_detail_text(scenario, matches)
