@@ -1,4 +1,5 @@
 from enum import Enum
+from pathlib import Path
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -533,6 +534,11 @@ class SuiteResult(BaseResult, frozen=True):
     def failures_and_errors(self) -> list[ScenarioResult[Any]]:
         """Return a list of scenario results that failed or errored."""
         return [r for r in self.results if r.failed or r.errored]
+
+    def to_junit_xml(self, path: str | Path | None = None) -> str:
+        from ..export.junit import to_junit_xml
+
+        return to_junit_xml(self, path=path)
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
