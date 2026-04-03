@@ -14,6 +14,7 @@ from giskard.checks.builtin.semantic_similarity import cosine_similarity
 from giskard.checks.core.extraction import NoMatch
 
 
+@BaseEmbeddingModel.register("mock")
 class MockEmbeddingModel(BaseEmbeddingModel):
     """Mock embedding model that returns predictable embeddings."""
 
@@ -333,6 +334,33 @@ async def test_empty_trace() -> None:
     assert isinstance(result.details["actual_answer"], NoMatch)
 
 
+async def test_custom_embedding_model_preserved_after_serialization_roundtrip() -> None:
+    """Custom embedding model is preserved across model_dump/model_validate (fixes #2292)."""
+    embedding_model = MockEmbeddingModel(
+        embeddings={
+            "Answer": [1.0, 0.9, 0.8],
+            "Reference": [0.95, 0.92, 0.85],
+        }
+    )
+    check = SemanticSimilarity(
+        embedding_model=embedding_model,
+        threshold=0.92,
+        reference_text="Reference",
+        actual_answer_key="trace.last.outputs.response",
+    )
+    roundtrip_check = serialization_roundtrip(check)
+
+    # Embedding model is preserved by roundtrip (no manual re-attachment needed)
+    assert roundtrip_check.embedding_model is not None
+    assert isinstance(roundtrip_check.embedding_model, MockEmbeddingModel)
+    assert roundtrip_check.embedding_model.embeddings == embedding_model.embeddings
+
+    interaction = Interaction(inputs={}, outputs={"response": "Answer"})
+    result = await roundtrip_check.run(Trace(interactions=[interaction]))
+    assert result.status == CheckStatus.PASS
+    assert result.details["threshold"] == 0.92
+
+
 async def test_serialization_roundtrip() -> None:
     """Test that check can be serialized and deserialized."""
     embedding_model = MockEmbeddingModel(
@@ -348,9 +376,7 @@ async def test_serialization_roundtrip() -> None:
         actual_answer_key="trace.last.outputs.response",
     )
 
-    # Serialize and deserialize
     roundtrip_check = serialization_roundtrip(check)
-    roundtrip_check.embedding_model = embedding_model
 
     interaction = Interaction(inputs={}, outputs={"response": "Answer"})
     result = await roundtrip_check.run(Trace(interactions=[interaction]))
