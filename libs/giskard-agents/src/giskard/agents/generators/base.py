@@ -183,13 +183,31 @@ class BaseGenerator(Discriminated, ABC):
         responses = await asyncio.gather(*completion_requests)
         return responses
 
-    def chat(self, message: str, role: Role = "user") -> "ChatWorkflow[Any]":
+    def chat(
+        self,
+        message: str,
+        role: Role = "user",
+        *,
+        as_template: bool = False,
+    ) -> "ChatWorkflow[Any]":
         """Create a new chat workflow with the given message.
 
         Parameters
         ----------
         message : str
             The initial message to start the chat with.
+        role : Role, default "user"
+            The role of the message sender.
+        as_template : bool, default False
+            When True, parse ``message`` as a Jinja2 template.
+
+            .. warning::
+
+                Treating a string as a template evaluates Jinja2 syntax at render time.
+                If any part of ``message`` can be influenced by untrusted input, this
+                can lead to template injection and unintended disclosure or execution
+                of logic exposed by the template environment. Only enable this for
+                trusted, developer-authored template strings.
 
         Returns
         -------
@@ -198,7 +216,7 @@ class BaseGenerator(Discriminated, ABC):
         """
         from ..workflow import ChatWorkflow
 
-        return ChatWorkflow(generator=self).chat(message, role)
+        return ChatWorkflow(generator=self).chat(message, role, as_template=as_template)
 
     def template(self, template_name: str) -> "ChatWorkflow[Any]":
         """Create a new chat workflow from a template.
