@@ -124,19 +124,21 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "tag=$PACKAGE/v$NEW_VERSION" >> $GITHUB_OUTPUT
 
+      - name: Update lockfile
+        run: uv lock
+
       - name: Build package
         working-directory: libs/${{ env.PACKAGE }}
         run: |
           uv build --out-dir dist
 
       - name: Commit version bump
-        working-directory: libs/${{ env.PACKAGE }}
         env:
           NEW_VERSION: ${{ steps.bump.outputs.new_version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "pyproject.toml"
+          git add "libs/${PACKAGE}/pyproject.toml" "uv.lock"
           git commit -m "chore($PACKAGE): bump version to $NEW_VERSION"
 
       - name: Push to main
