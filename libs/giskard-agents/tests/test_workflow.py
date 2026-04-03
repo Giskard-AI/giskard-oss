@@ -39,9 +39,9 @@ async def test_run_batch(generator):
 
     workflow = agents.ChatWorkflow(generator=generator)
 
-    chats = await workflow.chat("Hello {{ n }}!", role="user").run_batch(
-        inputs=[{"n": i} for i in range(3)]
-    )
+    chats = await workflow.chat(
+        "Hello {{ n }}!", role="user", as_template=True
+    ).run_batch(inputs=[{"n": i} for i in range(3)])
 
     assert chats[0].context.inputs["n"] == 0
     assert chats[1].context.inputs["n"] == 1
@@ -94,8 +94,8 @@ async def test_workflow_with_mixed_templates(generator: LiteLLMGenerator):
 
     chat = (
         await workflow.template("multi_message.j2")
-        .chat("{{ score }}!", role="assistant")
-        .chat("Well done {{ name }}!", role="user")
+        .chat("{{ score }}!", role="assistant", as_template=True)
+        .chat("Well done {{ name }}!", role="user", as_template=True)
         .with_inputs(
             name="TestBot",
             theory="Normandy is actually the center of the universe.",
@@ -145,3 +145,16 @@ async def test_output_format(generator):
     )
 
     assert isinstance(chat.output, SimpleOutput)
+
+
+def test_chat_plain_string_is_not_jinja_by_default():
+    """Regression for ENG-1488: user-controlled strings must not be Jinja source by default."""
+    workflow = agents.ChatWorkflow(
+        generator=agents.Generator(model="openai/gpt-4o-mini")
+    )
+    wf = workflow.chat("{{ 1 + 1 }}", role="user")
+    assert isinstance(wf.messages[0], agents.Message)
+    assert wf.messages[0].content == "{{ 1 + 1 }}"
+
+    wf_tpl = workflow.chat("{{ 1 + 1 }}", role="user", as_template=True)
+    assert isinstance(wf_tpl.messages[0], agents.MessageTemplate)

@@ -14,7 +14,6 @@ from giskard.agents.generators.litellm_generator import (
     LiteLLMGenerator,
 )
 from giskard.agents.generators.middleware import RetryPolicy
-from giskard.agents.templates import MessageTemplate
 from giskard.agents.tools import Tool
 from giskard.agents.workflow import ChatWorkflow, ErrorPolicy
 from giskard.core import MinIntervalRateLimiter
@@ -126,12 +125,12 @@ def test_chat_workflow_serialization():
     assert deserialized.generator.rate_limiter == rate_limiter
 
     assert len(deserialized.messages) == 2
-    assert isinstance(deserialized.messages[0], MessageTemplate)
+    assert isinstance(deserialized.messages[0], Message)
     assert deserialized.messages[0].role == "user"
-    assert deserialized.messages[0].content_template == "Hello, how are you?"
-    assert isinstance(deserialized.messages[1], MessageTemplate)
+    assert deserialized.messages[0].content == "Hello, how are you?"
+    assert isinstance(deserialized.messages[1], Message)
     assert deserialized.messages[1].role == "assistant"
-    assert deserialized.messages[1].content_template == "I'm doing well!"
+    assert deserialized.messages[1].content == "I'm doing well!"
 
     assert deserialized.inputs["name"] == "TestUser"
     assert deserialized.inputs["value"] == 42
@@ -182,8 +181,8 @@ async def test_chat_workflow_serialization_custom_generator():
     assert deserialized.generator.kind == f"custom_workflow_{generator_id}"
 
     assert len(deserialized.messages) == 1
-    assert isinstance(deserialized.messages[0], MessageTemplate)
-    assert deserialized.messages[0].content_template == "Test message"
+    assert isinstance(deserialized.messages[0], Message)
+    assert deserialized.messages[0].content == "Test message"
 
     assert deserialized.inputs["test_input"] == "test_value"
 
