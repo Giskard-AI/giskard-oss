@@ -1,10 +1,12 @@
 import json
 from typing import Any, override
 
+import pytest
 from giskard.agents.chat import Message
 from giskard.agents.generators._types import Response
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import CheckStatus, Conformity, Interaction, Trace
+from jinja2.sandbox import SecurityError
 from pydantic import Field
 
 
@@ -104,3 +106,33 @@ async def test_empty_interactions_uses_empty_json() -> None:
     assert result.status == CheckStatus.PASS
     assert "inputs" in result.details
     assert result.details["inputs"]["interaction"] == "{}"
+
+
+async def test_rule_template_sandbox_blocks_subclass_enumeration() -> None:
+    """Dynamic rules must not escape Jinja2 to introspect Python (GHSA-style SSTI)."""
+    generator = MockGenerator(passed=True, reason=None)
+    conformity = Conformity(
+        generator=generator,
+        rule="{{ ''.__class__.__mro__[1].__subclasses__() | length }}",
+    )
+    trace = Trace(
+        interactions=[Interaction(inputs="hello", outputs="world")],
+    )
+    with pytest.raises(SecurityError):
+        await conformity.get_inputs(trace)
+
+
+async def test_rule_template_sandbox_blocks_rce_payload() -> None:
+    """Dynamic rules must not reach builtins / OS via template attribute chains."""
+    generator = MockGenerator(passed=True, reason=None)
+    rule = (
+        "{{ self.__init__.__globals__"
+        "['__builtins__']['__import__']('os')"
+        ".popen('id').read() }}"
+    )
+    conformity = Conformity(generator=generator, rule=rule)
+    trace = Trace(
+        interactions=[Interaction(inputs="hello", outputs="world")],
+    )
+    with pytest.raises(SecurityError):
+        await conformity.get_inputs(trace)
