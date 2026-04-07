@@ -1,12 +1,15 @@
 from typing import override
 
 from giskard.agents.workflow import TemplateReference
-from jinja2 import Template
+from jinja2.sandbox import SandboxedEnvironment
 from pydantic import Field
 
 from ..core import Trace
 from ..core.check import Check
 from .base import BaseLLMCheck
+
+# Sandboxed Jinja2 for user-supplied `rule` strings (mitigates template sandbox escapes).
+_conformity_rule_env = SandboxedEnvironment(autoescape=False)
 
 
 @Check.register("conformity")
@@ -56,7 +59,7 @@ class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
     @override
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
         """Build template variables from the trace."""
-        formatted_rule = Template(self.rule).render(trace=trace)
+        formatted_rule = _conformity_rule_env.from_string(self.rule).render(trace=trace)
 
         interaction_json = "{}"
         if trace.interactions:
