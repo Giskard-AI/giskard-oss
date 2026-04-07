@@ -5,10 +5,10 @@ This module provides checks for text matching:
 - RegexMatching: Regular expression pattern matching
 """
 
-import re
 from abc import ABC, abstractmethod
 from typing import Any, Self, override
 
+import regex
 from giskard.core import provide_not_none
 from pydantic import Field, model_validator
 
@@ -326,14 +326,15 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
 ):
     r"""Check that validates if a regex pattern matches within text.
 
-    This check performs regex pattern matching using standard Python re module.
-    The pattern is matched against the raw text without any normalization,
-    giving users full control through regex syntax.
+    This check performs pattern matching with the PyPI :mod:`regex` engine
+    (``regex.search``), which is largely compatible with the :mod:`re` module
+    but supports a per-call timeout to mitigate ReDoS. Matching runs in a
+    worker thread so the async event loop is not blocked for the full
+    ``match_timeout_seconds`` budget.
 
     The matching process:
     1. Extracts text and pattern (from provided values or trace)
-    2. Compiles regex pattern
-    3. Checks if pattern matches anywhere in the text using re.search()
+    2. Compiles and searches with a bounded-time ``regex.search(..., timeout=...)``
 
     Attributes
     ----------
@@ -347,6 +348,9 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         The regex pattern to search for. Either this or pattern_key must be provided.
     pattern_key : JSONPathStr | None
         JSONPath expression to extract pattern from trace.
+    match_timeout_seconds : float
+        Maximum time allowed for compiling and searching (passed to
+        ``regex.search``). If exceeded, matching aborts and the check fails.
 
     Examples
     --------
@@ -402,6 +406,15 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         default=None,
         description="JSONPath expression to extract the pattern from the trace.",
     )
+    match_timeout_seconds: float = Field(
+        default=2.0,
+        gt=0,
+        description=(
+            "Maximum seconds for regex compilation and search (ReDoS mitigation), "
+            "enforced by the regex engine. Matching runs in a thread pool so the "
+            "event loop stays responsive."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_pattern_or_pattern_key(self) -> Self:
@@ -452,20 +465,29 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         # Extract successful values
         text, pattern, details = result[0], result[1], result[2]
 
-        # Try to compile and match
         try:
-            if re.search(pattern, text):
-                return CheckResult.success(
-                    message=f"Text matches the regex pattern '{pattern}'.",
-                    details=details,
-                )
-            else:
-                return CheckResult.failure(
-                    message=f"Text does not match the regex pattern '{pattern}'.",
-                    details=details,
-                )
-        except re.error as e:
+            matched = regex.search(pattern, text, timeout=self.match_timeout_seconds)
+        except TimeoutError:
+            return CheckResult.failure(
+                message=(
+                    f"Regex matching exceeded the time limit of "
+                    f"{self.match_timeout_seconds} second(s) "
+                    f"(possible ReDoS or very large input)."
+                ),
+                details=details,
+            )
+        except regex.error as e:
             return CheckResult.failure(
                 message=f"Invalid regex pattern '{pattern}': {str(e)}",
                 details=details,
             )
+
+        if matched:
+            return CheckResult.success(
+                message=f"Text matches the regex pattern '{pattern}'.",
+                details=details,
+            )
+        return CheckResult.failure(
+            message=f"Text does not match the regex pattern '{pattern}'.",
+            details=details,
+        )
