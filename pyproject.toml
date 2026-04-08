@@ -62,3 +62,6 @@ dev = [
     "pytest-cov>=6.1,<8",
     "pytest-timeout>=2.4.0",
 ]
+[tool.setuptools.packages.find]
+where = ["libs"]
+include = ["*"]
