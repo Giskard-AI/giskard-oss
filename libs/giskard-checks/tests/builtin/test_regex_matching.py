@@ -369,7 +369,7 @@ async def test_regex_redos_bounded_by_timeout() -> None:
         match_timeout_seconds=0.5,
     )
     result = await check.run(Trace())
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert result.message.startswith(
         "Regex matching exceeded the time limit of 0.5 second(s)"

@@ -326,15 +326,12 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
 ):
     r"""Check that validates if a regex pattern matches within text.
 
-    This check performs pattern matching with the PyPI :mod:`regex` engine
-    (``regex.search``), which is largely compatible with the :mod:`re` module
-    but supports a per-call timeout to mitigate ReDoS. Matching runs in a
-    worker thread so the async event loop is not blocked for the full
-    ``match_timeout_seconds`` budget.
+    Matching uses the PyPI :mod:`regex` package, which is largely compatible
+    with Python's standard :mod:`re` module.
 
     The matching process:
     1. Extracts text and pattern (from provided values or trace)
-    2. Compiles and searches with a bounded-time ``regex.search(..., timeout=...)``
+    2. Searches the text for the pattern
 
     Attributes
     ----------
@@ -349,8 +346,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     pattern_key : JSONPathStr | None
         JSONPath expression to extract pattern from trace.
     match_timeout_seconds : float
-        Maximum time allowed for compiling and searching (passed to
-        ``regex.search``). If exceeded, matching aborts and the check fails.
+        Upper bound on how long matching may take before the check raises an error.
 
     Examples
     --------
@@ -409,11 +405,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     match_timeout_seconds: float = Field(
         default=2.0,
         gt=0,
-        description=(
-            "Maximum seconds for regex compilation and search (ReDoS mitigation), "
-            "enforced by the regex engine. Matching runs in a thread pool so the "
-            "event loop stays responsive."
-        ),
+        description="Maximum time allowed for matching, in seconds.",
     )
 
     @model_validator(mode="after")
@@ -468,7 +460,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         try:
             matched = regex.search(pattern, text, timeout=self.match_timeout_seconds)
         except TimeoutError:
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=(
                     f"Regex matching exceeded the time limit of "
                     f"{self.match_timeout_seconds} second(s) "
