@@ -20,6 +20,8 @@ pip install giskard-checks
 
 Requires Python >= 3.12.
 
+**Telemetry:** This package depends on `giskard-core`, which may send **optional, aggregated usage analytics** when you run scenarios, suites, or test cases (no prompts, outputs, or scenario text). See **[Telemetry](../giskard-core/README.md#telemetry)** in the `giskard-core` README for what is collected and how to opt out (`DO_NOT_TRACK`, `GISKARD_TELEMETRY_DISABLED`, or `disable_telemetry()`).
+
 **Dependencies:**
 - `pydantic>=2.11.7` - Core data validation and serialization
 - `giskard-agents>=0.3` - LLM integration and workflow management

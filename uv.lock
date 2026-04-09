@@ -185,6 +185,15 @@ wheels = [
 ]
 
 [[package]]
+name = "backoff"
+version = "2.2.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/47/d7/5bbeb12c44d7c4f2fb5b56abce497eb5ed9f34d85701de869acedd602619/backoff-2.2.1.tar.gz", hash = "sha256:03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba", size = 17001, upload-time = "2022-10-05T19:19:32.061Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl", hash = "sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8", size = 15148, upload-time = "2022-10-05T19:19:30.546Z" },
+]
+
+[[package]]
 name = "boolean-py"
 version = "5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -776,11 +785,15 @@ name = "giskard-core"
 version = "1.0.1b2"
 source = { editable = "libs/giskard-core" }
 dependencies = [
+    { name = "posthog" },
     { name = "pydantic" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.11.0,<3" }]
+requires-dist = [
+    { name = "posthog", specifier = ">=7.10.3" },
+    { name = "pydantic", specifier = ">=2.11.0,<3" },
+]
 
 [[package]]
 name = "griffe"
@@ -1637,6 +1650,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e5/69/882ee5c9d017149285cab114ebeab373308ef0f874fcdac9beb90e0ac4da/ply-3.11.tar.gz", hash = "sha256:00c7c1aaa88358b9c765b6d3000c6eec0ba42abca5351b095321aef446081da3", size = 159130, upload-time = "2018-02-15T19:01:31.097Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a3/58/35da89ee790598a0700ea49b2a66594140f44dec458c07e8e3d4979137fc/ply-3.11-py2.py3-none-any.whl", hash = "sha256:096f9b8350b65ebd2fd1346b12452efe5b9607f7482813ffca50c22722a807ce", size = 49567, upload-time = "2018-02-15T19:01:27.172Z" },
+]
+
+[[package]]
+name = "posthog"
+version = "7.10.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "backoff" },
+    { name = "distro" },
+    { name = "python-dateutil" },
+    { name = "requests" },
+    { name = "six" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/10/48/dcb39417e903af8bc08e144a6adc594178ee42f276a858d570d3164c4262/posthog-7.10.3.tar.gz", hash = "sha256:dc624a07306dc2618dcfa9f9a706086db2efea33bb7ad0048625e5cf60e5401b", size = 187265, upload-time = "2026-04-08T17:43:10.931Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/ec/d0050e82b4be2126f4769612f0ef9734348cb736a23754ea238202285343/posthog-7.10.3-py3-none-any.whl", hash = "sha256:bbaeb45dbfd56143343cf93bf091eb500f9996b95b797f4bf99b42905da54fe7", size = 217019, upload-time = "2026-04-08T17:43:09.305Z" },
 ]
 
 [[package]]
