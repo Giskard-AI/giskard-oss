@@ -362,15 +362,11 @@ async def test_missing_text_in_trace() -> None:
 
 @pytest.mark.timeout(15)
 async def test_regex_redos_bounded_by_timeout() -> None:
-    """Pathological pattern + input must not block the check past match_timeout_seconds."""
+    """Pathological pattern + input must not run past match_timeout_seconds."""
     check = RegexMatching(
         text="x" * 80_000 + "b",
         pattern="(x+)+$",
         match_timeout_seconds=0.5,
     )
-    result = await check.run(Trace())
-    assert result.status == CheckStatus.ERROR
-    assert result.message is not None
-    assert result.message.startswith(
-        "Regex matching exceeded the time limit of 0.5 second(s)"
-    )
+    with pytest.raises(TimeoutError):
+        _ = await check.run(Trace())
