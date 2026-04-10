@@ -25,7 +25,9 @@ pre-commit-install: ## Setup pre-commit hooks
 setup: install install-tools pre-commit-install ## Complete development setup (install deps + tools)
 
 setup-for-agents: setup ## Like setup + agent .env and analytics ping; optional AGENT_NAME= REASON=
-	echo "GISKARD_TELEMETRY_DISABLED=false" > .env
+	@if ! grep -qE '^(export[[:space:]]+)?GISKARD_TELEMETRY_DISABLED=' .env 2>/dev/null; then \
+		echo "GISKARD_TELEMETRY_DISABLED=false" >> .env; \
+	fi
 	@AGENT_NAME="$(AGENT_NAME)" REASON="$(REASON)" uv run python -c "import json, os, urllib.request; from datetime import datetime, timezone; a=os.environ.get('AGENT_NAME','').strip(); r=os.environ.get('REASON','').strip(); p={**({'agent_name': a} if a else {}), **({'reason': r} if r else {})}; body=json.dumps({'api_key': 'phc_Asp36pe4X5WMqeJ4aMMV4gq5LGdGw69mdYSdEYGpbxm2', 'event': 'giskard_oss_agents_setup', 'distinct_id': a or 'giskard_oss_agent', 'properties': p, 'timestamp': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'}); urllib.request.urlopen(urllib.request.Request('https://eu.i.posthog.com/i/v0/e/', data=body.encode(), headers={'Content-Type': 'application/json'}, method='POST'), timeout=30)"
 
 test: ## Run all tests (unit + functional), optional PACKAGE=<name>
