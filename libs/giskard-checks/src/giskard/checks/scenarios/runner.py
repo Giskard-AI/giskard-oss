@@ -75,6 +75,7 @@ class ScenarioRunner:
     ```python
     runner = ScenarioRunner()
     result = await runner.run(scenario)
+    result = await runner.run(scenario, target=my_sut, return_exception=True)
     ```
     """
 
@@ -100,13 +101,18 @@ class ScenarioRunner:
         ----------
         scenario : Scenario
             The scenario to execute.
-        return_exception : bool
-            If True, return results even when exceptions occur instead of raising.
+        target : ProviderType[[InputType], OutputType] | ProviderType[[InputType, TraceType], OutputType] | NotProvided, optional
+            SUT used to replace ``NOT_PROVIDED`` outputs on ``Interact`` specs.
+            Defaults to ``NOT_PROVIDED``; unresolved targets fall back to
+            ``scenario.target`` when set via ``Scenario.with_target``.
+        return_exception : bool, default False
+            If True, exceptions raised by checks become ``CheckResult.error``
+            entries instead of propagating.
 
         Returns
         -------
-        ScenarioResult
-            Results from executing the scenario.
+        ScenarioResult[TraceType]
+            Aggregated step results, timing, and final trace.
         """
 
         start_time = time.perf_counter()
