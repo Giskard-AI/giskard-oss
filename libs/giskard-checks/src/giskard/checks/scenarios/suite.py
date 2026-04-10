@@ -126,12 +126,13 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             telemetry_tag("giskard_component", "suite")
             telemetry_tag("giskard_operation", "suite_run")
 
+            shape_props = suite_shape_properties(
+                scenario_count=len(self.scenarios),
+                has_target=has_target,
+            )
             _ = telemetry.capture(
                 "checks_suite_run_started",
-                properties=suite_shape_properties(
-                    scenario_count=len(self.scenarios),
-                    has_target=has_target,
-                ),
+                properties=shape_props,
             )
 
             start_time = time.perf_counter()
@@ -150,10 +151,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             _ = telemetry.capture(
                 "checks_suite_run_finished",
                 properties={
-                    **suite_shape_properties(
-                        scenario_count=len(self.scenarios),
-                        has_target=has_target,
-                    ),
+                    **shape_props,
                     "duration_ms": suite_result.duration_ms,
                     "passed_count": suite_result.passed_count,
                     "failed_count": suite_result.failed_count,

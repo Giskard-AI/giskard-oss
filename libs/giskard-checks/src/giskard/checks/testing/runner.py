@@ -70,15 +70,16 @@ class TestCaseRunner:
         check_kinds = check_kind_counts_from_sequence(checks_list)
         trace = test_case.trace
 
+        shape_props = test_case_shape_properties(
+            check_count=len(checks_list),
+            trace_interaction_count=len(trace.interactions),
+            has_trace_annotations=bool(trace.annotations),
+            has_test_case_name=test_case.name is not None,
+            check_kinds=check_kinds,
+        )
         _ = telemetry.capture(
             "checks_test_case_run_started",
-            properties=test_case_shape_properties(
-                check_count=len(checks_list),
-                trace_interaction_count=len(trace.interactions),
-                has_trace_annotations=bool(trace.annotations),
-                has_test_case_name=test_case.name is not None,
-                check_kinds=check_kinds,
-            ),
+            properties=shape_props,
         )
 
         check_results: list[CheckResult] = []
@@ -97,13 +98,7 @@ class TestCaseRunner:
         _ = telemetry.capture(
             "checks_test_case_run_finished",
             properties={
-                **test_case_shape_properties(
-                    check_count=len(checks_list),
-                    trace_interaction_count=len(trace.interactions),
-                    has_trace_annotations=bool(trace.annotations),
-                    has_test_case_name=test_case.name is not None,
-                    check_kinds=check_kinds,
-                ),
+                **shape_props,
                 "outcome_status": tc_result.status.value,
                 "duration_ms": total_duration_ms,
                 "return_exception_mode": return_exception,

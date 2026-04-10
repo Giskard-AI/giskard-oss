@@ -171,11 +171,12 @@ class ScenarioRunner:
                 steps_results.append(step_result)
 
         end_time = time.perf_counter()
+        duration_ms = int((end_time - start_time) * 1000)
 
         result = ScenarioResult(
             scenario_name=scenario.name,
             steps=steps_results,
-            duration_ms=int((end_time - start_time) * 1000),
+            duration_ms=duration_ms,
             final_trace=trace,
         )
 
@@ -184,7 +185,7 @@ class ScenarioRunner:
             properties={
                 **shape_props,
                 "outcome_status": result.status.value,
-                "duration_ms": int((end_time - start_time) * 1000),
+                "duration_ms": duration_ms,
             },
         )
 
