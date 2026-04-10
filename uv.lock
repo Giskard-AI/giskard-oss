@@ -686,6 +686,7 @@ dependencies = [
     { name = "giskard-agents" },
     { name = "giskard-checks" },
     { name = "giskard-core" },
+    { name = "regex" },
 ]
 
 [package.dev-dependencies]
@@ -704,6 +705,7 @@ requires-dist = [
     { name = "giskard-agents", editable = "libs/giskard-agents" },
     { name = "giskard-checks", editable = "libs/giskard-checks" },
     { name = "giskard-core", editable = "libs/giskard-core" },
+    { name = "regex", specifier = ">=2026.1.15" },
 ]
 
 [package.metadata.requires-dev]
@@ -748,7 +750,7 @@ requires-dist = [
 
 [[package]]
 name = "giskard-checks"
-version = "1.0.1b1"
+version = "1.0.2b1"
 source = { editable = "libs/giskard-checks" }
 dependencies = [
     { name = "giskard-agents" },

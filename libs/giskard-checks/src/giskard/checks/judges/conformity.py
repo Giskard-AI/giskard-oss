@@ -1,7 +1,6 @@
-from typing import override
+from typing import Any, override
 
 from giskard.agents.workflow import TemplateReference
-from jinja2 import Template
 from pydantic import Field
 
 from ..core import Trace
@@ -13,56 +12,46 @@ from .base import BaseLLMCheck
 class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     BaseLLMCheck[InputType, OutputType, TraceType]
 ):
-    """LLM-based check that validates interactions conform to a given rule.
+    """LLM-based check that validates a trace against a given rule.
 
-    This check supports **dynamic rules** by using Jinja2 templating on the `rule`
-    string. The entire `Trace` object is exposed to the rule template,
-    allowing users to inject trace fields like interactions, inputs, outputs, or metadata.
+    The `rule` is plain text: it is passed to the bundled prompt as-is (not
+    evaluated as its own template). The full `Trace` is supplied separately to
+    that prompt so the model can judge outputs and metadata against the rule.
 
-    Uses an LLM to determine if an interaction (inputs, outputs, and metadata)
-    conforms to a specified rule or requirement.
+    Uses an LLM to determine whether the trace's outputs and metadata conform
+    to the rule.
 
     Attributes
     ----------
     rule : str
-        The rule statement to evaluate against the interaction.
-        This string can contain Jinja2 placeholders (e.g., `{{ trace.last.outputs }}`).
+        The rule statement to evaluate against the trace (literal text).
 
-        Note: In Jinja2 templates and JSONPath expressions, prefer `trace.last` over
-        `trace.interactions[-1]` for better readability.
     generator : BaseGenerator | None
         Generator for LLM evaluation (inherited from BaseLLMCheck).
 
     Examples
     --------
     >>> from giskard.agents.generators import Generator
-    >>> from giskard.checks import Interaction, Trace, Conformity
-    >>> # Example of a dynamic rule accessing a field in the output object
+    >>> from giskard.checks import Conformity
     >>> check = Conformity(
-    ...     rule="The response should contain the keywords '{{ trace.last.inputs.keywords }}' and be polite.",
-    ...     generator=Generator(model="openai/gpt-4o")
+    ...     rule="The last response should be polite.",
+    ...     generator=Generator(model="openai/gpt-5-mini")
     ... )
     """
 
     rule: str = Field(
-        ..., description="The rule statement to evaluate against the interaction"
+        ..., description="The rule statement to evaluate against the trace (plain text)"
     )
 
     @override
     def get_prompt(self) -> TemplateReference:
-        """Return the Jinja2 template name for conformity evaluation."""
+        """Return the bundled prompt template for conformity evaluation."""
         return TemplateReference(template_name="giskard.checks::judges/conformity.j2")
 
     @override
-    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
+    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
         """Build template variables from the trace."""
-        formatted_rule = Template(self.rule).render(trace=trace)
-
-        interaction_json = "{}"
-        if trace.interactions:
-            interaction_json = trace.interactions[-1].model_dump_json()
-
         return {
-            "rule": formatted_rule,
-            "interaction": interaction_json,
+            "rule": self.rule,
+            "trace": trace,
         }

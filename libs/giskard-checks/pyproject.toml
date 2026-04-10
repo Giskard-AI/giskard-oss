@@ -1,6 +1,6 @@
 [project]
 name = "giskard-checks"
-version = "1.0.1b1"
+version = "1.0.2b1"
 description = "Add your description here"
 readme = "README.md"
 license = { text = "MIT" }

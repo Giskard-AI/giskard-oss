@@ -21,10 +21,9 @@ pip install giskard-checks
 Requires Python >= 3.12.
 
 **Dependencies:**
-- `pydantic>=2.11.7` - Core data validation and serialization
-- `giskard-agents>=0.3` - LLM integration and workflow management
+- `pydantic>=2.12` - Core data validation and serialization
+- `giskard-agents>=1.0.0a1` - LLM integration, workflows, and bundled prompt templates
 - `jsonpath-ng>=1.7.0` - JSONPath expressions for data extraction
-- `jinja2>=3.1.6` - Template engine for LLM prompts
 
 Quickstart
 ----------
