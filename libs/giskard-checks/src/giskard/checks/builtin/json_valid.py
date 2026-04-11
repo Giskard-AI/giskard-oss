@@ -9,35 +9,44 @@ class JsonValid(Check):
     key: Optional[str] = None
     schema: Optional[Dict[str, Any]] = None
 
-    async def run(self, trace: Trace) -> CheckResult:
-        try:
-            # ✅ Support both real Trace and DummyTrace
-            if hasattr(trace, "last"):
-                value = trace.last.outputs
-            else:
-                value = trace.outputs
+   async def run(self, trace: Trace) -> CheckResult:
+    try:
+        # Handle trace safely
+        if hasattr(trace, "last"):
+            if trace.last is None:
+                return CheckResult.failure(message="Trace is empty")
+            value = trace.last.outputs
+        else:
+            value = trace.outputs
 
-            # Parse JSON
-            parsed = json.loads(value)
+        if value is None:
+            return CheckResult.failure(message="Output is empty")
 
-            # Schema validation
-            if self.schema:
-                try:
-                    import jsonschema
-                    jsonschema.validate(instance=parsed, schema=self.schema)
-                except Exception as e:
-                    return CheckResult(
-                        status=CheckStatus.FAIL,
-                        message=f"Schema validation failed: {str(e)}",
-                    )
+        # Parse JSON only if string
+        parsed = json.loads(value) if isinstance(value, (str, bytes)) else value
 
-            return CheckResult(
-                status=CheckStatus.PASS,
-                message="Valid JSON",
-            )
+        # Schema validation
+        if self.schema:
+            try:
+                import jsonschema
+            except ImportError:
+                return CheckResult.error(
+                    message="The 'jsonschema' library is required for schema validation."
+                )
 
-        except Exception as e:
-            return CheckResult(
-                status=CheckStatus.FAIL,
-                message=f"Invalid JSON: {str(e)}",
-            )
+            try:
+                jsonschema.validate(instance=parsed, schema=self.schema)
+            except Exception as e:
+                return CheckResult.failure(
+                    message=f"Schema validation failed: {str(e)}"
+                )
+
+        return CheckResult.success(message="Valid JSON")
+
+    except json.JSONDecodeError as e:
+        return CheckResult.failure(message=f"Invalid JSON: {str(e)}")
+
+    except Exception as e:
+        return CheckResult.error(
+            message=f"Unexpected error: {str(e)}"
+        )
