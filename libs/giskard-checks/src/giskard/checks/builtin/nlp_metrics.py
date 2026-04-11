@@ -7,7 +7,7 @@ an LLM API call:
   expected label or a numeric score range, using the ``textblob`` library.
 """
 
-from typing import TYPE_CHECKING, Literal, override
+from typing import Literal, override
 
 from giskard.core import provide_not_none
 from pydantic import Field
@@ -17,9 +17,6 @@ from ..core.check import Check
 from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve
 from ..core.result import CheckResult, CheckStatus, Metric
 
-if TYPE_CHECKING:
-    pass
-
 _SENTIMENT_LABELS = Literal["positive", "negative", "neutral"]
 
 _TEXTBLOB_MISSING_MSG = (
@@ -28,7 +25,7 @@ _TEXTBLOB_MISSING_MSG = (
 )
 
 
-def _polarity_to_label(polarity: float) -> str:
+def _polarity_to_label(polarity: float) -> _SENTIMENT_LABELS:
     """Convert a TextBlob polarity score to a human-readable label.
 
     Parameters
@@ -38,7 +35,7 @@ def _polarity_to_label(polarity: float) -> str:
 
     Returns
     -------
-    str
+    _SENTIMENT_LABELS
         ``"positive"`` if polarity > 0.05, ``"negative"`` if polarity < -0.05,
         ``"neutral"`` otherwise.
     """
@@ -125,7 +122,7 @@ class Sentiment[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
         default="trace.last.outputs",
         description="JSONPath expression to extract the text from the trace.",
     )
-    expected: _SENTIMENT_LABELS | None = Field(  # type: ignore[valid-type]
+    expected: _SENTIMENT_LABELS | None = Field(
         default=None,
         description=(
             "Expected sentiment label: 'positive', 'negative', or 'neutral'. "
@@ -237,9 +234,10 @@ class Sentiment[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
         if self.expected is not None:
             success_parts.append(f"Expected label '{self.expected}' matched.")
         if self.min_score is not None or self.max_score is not None:
+            low = self.min_score if self.min_score is not None else -1.0
+            high = self.max_score if self.max_score is not None else 1.0
             success_parts.append(
-                f"Score {polarity:.4f} is within the required range "
-                f"[{self.min_score}, {self.max_score}]."
+                f"Score {polarity:.4f} is within the required range [{low}, {high}]."
             )
 
         return CheckResult(
