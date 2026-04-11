@@ -19,6 +19,7 @@ from .builtin import (
     NotEquals,
     RegexMatching,
     SemanticSimilarity,
+    Sentiment,
     StringMatching,
     from_fn,
 )
@@ -108,6 +109,8 @@ __all__ = [
     "Groundedness",
     "LLMJudge",
     "SemanticSimilarity",
+
+    "Sentiment",
     "Toxicity",
     "StringMatching",
     "RegexMatching",
