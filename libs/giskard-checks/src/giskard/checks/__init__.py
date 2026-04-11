@@ -19,6 +19,10 @@ from .builtin import (
     StringMatching,
     from_fn,
 )
+
+# ✅ ADD THIS IMPORT
+from .builtin.json_valid import JsonValid
+
 from .core import (
     Check,
     CheckResult,
@@ -68,6 +72,7 @@ __all__ = [
     # Modules
     "builtin",
     "judges",
+
     # Core classes
     "Check",
     "CheckResult",
@@ -84,6 +89,7 @@ __all__ = [
     "Interact",
     "Interaction",
     "InteractionSpec",
+
     # Builtin and LLM-based checks
     "BaseLLMCheck",
     "LLMCheckResult",
@@ -101,14 +107,21 @@ __all__ = [
     "SemanticSimilarity",
     "StringMatching",
     "RegexMatching",
+
+    # ✅ ADD THIS LINE
+    "JsonValid",
+
     # Generators
     "UserSimulator",
+
     # Testing
     "WithSpy",
     "TestCaseRunner",
+
     # Scenarios
     "Suite",
     "ScenarioRunner",
+
     # Settings
     "set_default_generator",
     "get_default_generator",

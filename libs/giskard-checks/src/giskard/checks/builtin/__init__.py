@@ -18,6 +18,10 @@ from .fn import FnCheck, from_fn
 from .semantic_similarity import SemanticSimilarity
 from .text_matching import RegexMatching, StringMatching
 
+# ✅ Import Json validation check
+from .json_valid import JsonValid
+
+
 __all__ = [
     "from_fn",
     "FnCheck",
@@ -35,4 +39,5 @@ __all__ = [
     "SemanticSimilarity",
     "BaseLLMCheck",
     "LLMCheckResult",
+    "JsonValid",
 ]
