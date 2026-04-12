@@ -25,6 +25,7 @@ from .comparison import (
 from .composition import AllOf, AnyOf, Not
 from .fn import FnCheck, from_fn
 from .json_valid import JsonValid
+from .latency import Latency
 from .nlp_metrics import Readability
 from .rego_policy import RegoPolicy
 from .semantic_similarity import SemanticSimilarity
@@ -37,6 +38,7 @@ __all__ = [
     "from_fn",
     "FnCheck",
     "JsonValid",
+    "Latency",
     "Readability",
     "RegoPolicy",
     "StringMatching",
