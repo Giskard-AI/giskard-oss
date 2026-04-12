@@ -12,32 +12,44 @@ Tests cover:
 import json
 from typing import Any, override
 
-from giskard.agents.chat import Message
-from giskard.agents.generators._types import Response
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import CheckStatus, Interaction, PromptInjection, Trace
+from giskard.llm.types import (
+    AssistantMessage,
+    ChatMessage,
+    Choice,
+    CompletionResponse,
+)
 from pydantic import Field
 
 
 class MockGenerator(BaseGenerator):
     passed: bool
     reason: str | None = None
-    calls: list[list[Message]] = Field(default_factory=list)
+    calls: list[list[ChatMessage]] = Field(default_factory=list)
 
     @override
     async def _call_model(
         self,
-        messages: list[Message],
+        messages: list[ChatMessage],
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
+    ) -> CompletionResponse:
         self.calls.append(messages)
-        return Response(
-            message=Message(
-                role="assistant",
-                content=json.dumps({"passed": self.passed, "reason": self.reason}),
-            ),
-            finish_reason="stop",
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(
+                        role="assistant",
+                        content=json.dumps(
+                            {"passed": self.passed, "reason": self.reason}
+                        ),
+                    ),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ],
+            model="mock",
         )
 
 
