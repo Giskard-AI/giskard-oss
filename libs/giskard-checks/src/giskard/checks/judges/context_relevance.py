@@ -117,25 +117,22 @@ class ContextRelevance[InputType, OutputType, TraceType: Trace](  # pyright: ign
                 value=provide_not_none(self.query),
             )
         )
-        context = str(
-            provided_or_resolve(
-                trace,
-                key=self.context_key,
-                value=provide_not_none(self.retrieved_context),
-            )
+        resolved_context = provided_or_resolve(
+            trace,
+            key=self.context_key,
+            value=provide_not_none(self.retrieved_context),
+        )
+        context = (
+            "\n\n".join(map(str, resolved_context))
+            if isinstance(resolved_context, list)
+            else str(resolved_context)
         )
 
         # Build plain-text history of prior turns for query disambiguation.
-        history_turns = trace.interactions[:-1] if trace.interactions else []
-        if history_turns:
-            history_lines: list[str] = []
-            for i, interaction in enumerate(history_turns, start=1):
-                history_lines.append(
-                    f"Turn {i}:\n  User: {interaction.inputs}\n  Assistant: {interaction.outputs}"
-                )
-            history = "\n\n".join(history_lines)
-        else:
-            history = ""
+        history = "\n\n".join(
+            f"Turn {i}:\n  User: {interaction.inputs}\n  Assistant: {interaction.outputs}"
+            for i, interaction in enumerate(trace.interactions[:-1], start=1)
+        )
 
         return {
             "query": query,
