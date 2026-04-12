@@ -19,7 +19,7 @@ class Latency[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repor
     reported as a ``Metric`` for observability.
 
     To use this check, store the response time in the interaction metadata under
-    the key referenced by ``key`` (default ``trace.interactions[-1].metadata.latency_ms``):
+    the key referenced by ``key`` (default ``trace.last.metadata.latency_ms``):
 
     .. code-block:: python
 
@@ -54,7 +54,7 @@ class Latency[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repor
         description="Maximum allowed response latency in seconds.",
     )
     key: JSONPathStr = Field(
-        default="trace.interactions[-1].metadata.latency_ms",
+        default="trace.last.metadata.latency_ms",
         description=(
             "JSONPath to extract the raw latency value (in milliseconds) from the trace. "
             "Defaults to the last interaction's metadata field 'latency_ms'."
