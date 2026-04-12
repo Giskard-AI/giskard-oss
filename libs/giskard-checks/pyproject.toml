@@ -15,6 +15,22 @@ dependencies = [
     "rich>=14.2.0,<15",
 ]
 
+[project.scripts]
+giskard = "giskard.checks.cli:main"
+
+[project.optional-dependencies]
+langfuse = [
+    "langfuse>=3,<4",
+]
+otel = [
+    "opentelemetry-api>=1.38.0,<2",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.38.0,<2",
+    "opentelemetry-sdk>=1.38.0,<2",
+]
+yaml = [
+    "pyyaml>=6.0.2,<7",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]
 addopts = "--doctest-modules"

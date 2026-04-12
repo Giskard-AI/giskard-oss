@@ -134,6 +134,106 @@ results = await suite.run()
 print(f"Aggregated pass rate: {results.pass_rate * 100}%")
 ```
 
+Observability export
+--------------------
+
+`SuiteResult` can be exported to observability backends after a suite run.
+Install the exporter dependencies you need:
+
+```bash
+pip install "giskard-checks[otel]"
+pip install "giskard-checks[langfuse]"
+```
+
+### OpenTelemetry
+
+Use `OTelExporter` when you already run an OpenTelemetry Collector or another
+OTLP-compatible backend.
+
+```python
+from giskard.checks.export import OTelExporter
+
+result = await suite.run(target=my_model)
+
+exporter = OTelExporter(endpoint="http://localhost:4317")
+exporter.export(result)
+exporter.force_flush()
+```
+
+The exporter creates a root `giskard.suite` span, one `giskard.scenario` span per
+scenario, `giskard.check` events for check results, and
+`giskard.trace.interaction` events for recorded interactions. It also records
+metrics for suite duration, suite pass rate, scenario duration, check counts, and
+numeric check metrics.
+
+By default, trace interaction events include `inputs` and `outputs`. Disable
+payload export for sensitive production traffic:
+
+```python
+exporter = OTelExporter(
+    endpoint="http://localhost:4317",
+    include_trace_payloads=False,
+)
+```
+
+### Langfuse
+
+Use `LangfuseExporter` to send Giskard runs to Langfuse as traces,
+observations, generations, and scores.
+
+```python
+from giskard.checks.export import LangfuseExporter
+
+result = await suite.run(target=my_model)
+
+exporter = LangfuseExporter(
+    public_key="pk-lf-...",
+    secret_key="sk-lf-...",
+    host="https://cloud.langfuse.com",
+)
+exporter.export(result)
+exporter.flush()
+```
+
+Mapping:
+
+- `SuiteResult` becomes a `giskard.suite` evaluator observation with a
+  `giskard.suite.pass_rate` score.
+- Each scenario becomes an evaluator observation.
+- Each recorded interaction becomes a generation observation.
+- Each check becomes an evaluator observation with a score. If a check has
+  numeric metrics, the first metric is used as the primary check score and all
+  metrics are exported as additional scores.
+
+Langfuse also accepts raw OpenTelemetry traces through its OTLP HTTP endpoint.
+Use that route through your collector when you need collector-level routing or
+filtering. Langfuse does not support OTLP/gRPC ingestion directly, so point
+collector exports at Langfuse's HTTP endpoint rather than passing a Langfuse URL
+to the generic gRPC `OTelExporter`.
+
+### Production samples and alerts
+
+`evaluate_production_sample` runs a suite for sampled production traffic,
+exports the result, and returns an alert object when pass rate falls below a
+threshold.
+
+```python
+from giskard.checks.export import OTelExporter, evaluate_production_sample
+
+exporter = OTelExporter(endpoint="http://localhost:4317")
+
+evaluation = await evaluate_production_sample(
+    suite,
+    target=my_model,
+    exporters=[exporter],
+    sample_rate=0.05,
+    min_pass_rate=0.95,
+)
+
+if evaluation.alert:
+    logger.warning(evaluation.alert.message)
+```
+
 Why this library?
 -----------------
 
