@@ -115,13 +115,22 @@ class AnyOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
             The first passing result, or a combined failure if none pass.
         """
         failure_messages: list[str] = []
+        all_skipped = True
 
         for check in self.checks:  # pyright: ignore[reportUnknownVariableType]
             result = await check.run(trace)  # pyright: ignore[reportUnknownMemberType]
-            if result.passed:
+            if result.passed or result.errored:
                 return result
+            if not result.skipped:
+                all_skipped = False
             if result.message:
                 failure_messages.append(result.message)
+
+        if all_skipped and self.checks:
+            return CheckResult.skip(
+                message="No checks passed and all were skipped."
+                + (f" Details: {'; '.join(failure_messages)}" if failure_messages else ""),
+            )
 
         return CheckResult.failure(
             message=(
