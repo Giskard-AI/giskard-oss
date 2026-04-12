@@ -106,7 +106,7 @@ def test_to_junit_xml_builds_valid_xml() -> None:
     xml_string = to_junit_xml(_sample_suite_result())
     root = ET.fromstring(xml_string)
 
-    assert root.tag == "testsuite"
+    assert root.tag == "testsuites"
     assert root.attrib["name"] == "Test run"
     assert root.attrib["tests"] == "4"
     assert root.attrib["failures"] == "1"
@@ -116,8 +116,28 @@ def test_to_junit_xml_builds_valid_xml() -> None:
     assert root.attrib["time"] == "0.420000"
     assert "timestamp" in root.attrib
 
-    testcases = root.findall("testcase")
+    testsuites = root.findall("testsuite")
+    assert [testsuite.attrib["name"] for testsuite in testsuites] == [
+        "scenario_pass",
+        "scenario_fail",
+        "scenario_error",
+        "scenario_skip",
+    ]
+    assert [testsuite.attrib["tests"] for testsuite in testsuites] == [
+        "1",
+        "1",
+        "1",
+        "1",
+    ]
+
+    testcases = root.findall("./testsuite/testcase")
     assert [testcase.attrib["name"] for testcase in testcases] == [
+        "step_1",
+        "step_1",
+        "step_1",
+        "step_1",
+    ]
+    assert [testcase.attrib["classname"] for testcase in testcases] == [
         "scenario_pass",
         "scenario_fail",
         "scenario_error",
@@ -129,10 +149,22 @@ def test_to_junit_xml_includes_properties_and_metrics() -> None:
     xml_string = to_junit_xml(_sample_suite_result())
     root = ET.fromstring(xml_string)
 
-    testcases = {
-        testcase.attrib["name"]: testcase for testcase in root.findall("testcase")
+    testsuites = {
+        testsuite.attrib["name"]: testsuite for testsuite in root.findall("testsuite")
     }
-    pass_case = testcases["scenario_pass"]
+    pass_suite = testsuites["scenario_pass"]
+
+    suite_properties = pass_suite.find("properties")
+    assert suite_properties is not None
+    suite_property_map = {
+        prop.attrib["name"]: prop.attrib["value"]
+        for prop in suite_properties.findall("property")
+    }
+    assert "final_trace" in suite_property_map
+    assert suite_property_map["status"] == "pass"
+
+    pass_case = pass_suite.find("testcase")
+    assert pass_case is not None
 
     properties = pass_case.find("properties")
     assert properties is not None
@@ -142,9 +174,11 @@ def test_to_junit_xml_includes_properties_and_metrics() -> None:
         for prop in properties.findall("property")
     }
 
-    assert "final_trace" in property_map
-    assert "step_1" in property_map
-    assert property_map["step_1.check_1.score"] == "0.95"
+    assert "result" in property_map
+    assert property_map["status"] == "pass"
+    assert property_map["check_1.name"] == "Groundedness"
+    assert property_map["check_1.status"] == "pass"
+    assert property_map["check_1.score"] == "0.95"
 
 
 def test_to_junit_xml_maps_failure_error_and_skip() -> None:
@@ -152,7 +186,8 @@ def test_to_junit_xml_maps_failure_error_and_skip() -> None:
     root = ET.fromstring(xml_string)
 
     testcases = {
-        testcase.attrib["name"]: testcase for testcase in root.findall("testcase")
+        testcase.attrib["classname"]: testcase
+        for testcase in root.findall("./testsuite/testcase")
     }
 
     failure = testcases["scenario_fail"].find("failure")
@@ -177,8 +212,8 @@ def test_to_junit_xml_writes_file(tmp_path: Path) -> None:
     xml_string = to_junit_xml(suite_result, path=output_path)
 
     assert output_path.exists()
-    assert ET.fromstring(xml_string).tag == "testsuite"
-    assert ET.parse(output_path).getroot().tag == "testsuite"
+    assert ET.fromstring(xml_string).tag == "testsuites"
+    assert ET.parse(output_path).getroot().tag == "testsuites"
 
 
 def test_suite_result_convenience_method_matches_function() -> None:
@@ -213,9 +248,14 @@ def test_failed_scenario_with_mixed_check_statuses_is_still_a_failure() -> None:
                                 details={"check_name": "CheckA"},
                             ),
                             CheckResult(
+                                status=CheckStatus.FAIL,
+                                message="second failure",
+                                details={"check_name": "CheckB"},
+                            ),
+                            CheckResult(
                                 status=CheckStatus.SKIP,
                                 message="skipped follow-up",
-                                details={"check_name": "CheckB"},
+                                details={"check_name": "CheckC"},
                             ),
                         ],
                         duration_ms=50,
@@ -229,15 +269,20 @@ def test_failed_scenario_with_mixed_check_statuses_is_still_a_failure() -> None:
     )
 
     root = ET.fromstring(to_junit_xml(suite_result))
-    testcase = root.find("testcase")
+    testcase = root.find("./testsuite/testcase")
 
     assert testcase is not None
-    assert testcase.find("failure") is not None
-    assert testcase.find("skipped") is None
+    failure = testcase.find("failure")
+    assert failure is not None
+    assert len(testcase.findall("failure")) == 1
+    assert len(testcase.findall("error")) == 0
+    assert len(testcase.findall("skipped")) == 0
+    assert "hard failure" in (failure.text or "")
+    assert "second failure" in (failure.text or "")
+    assert "skipped follow-up" in (failure.text or "")
 
-    system_out = testcase.find("system-out")
-    assert system_out is not None
-    assert system_out.text is not None
-    assert system_out.text.strip() != ""
-    assert "final_trace=" not in system_out.text
-    assert "step_1=" not in system_out.text
+    testsuite = root.find("testsuite")
+    assert testsuite is not None
+    assert testsuite.attrib["tests"] == "1"
+    assert testsuite.attrib["failures"] == "1"
+    assert testsuite.attrib["skipped"] == "0"
