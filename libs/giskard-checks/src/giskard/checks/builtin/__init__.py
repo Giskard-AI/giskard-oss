@@ -8,6 +8,7 @@ from ..judges import (
     Groundedness,
     LLMCheckResult,
     LLMJudge,
+    PromptInjection,
     Toxicity,
 )
 
@@ -48,6 +49,7 @@ __all__ = [
     "LesserThanEquals",
     "GreaterEquals",
     "AnswerRelevance",
+    "PromptInjection",
     "Groundedness",
     "Conformity",
     "LLMJudge",

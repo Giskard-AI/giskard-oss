@@ -59,6 +59,7 @@ from .judges import (
     Groundedness,
     LLMCheckResult,
     LLMJudge,
+    PromptInjection,
     Toxicity,
 )
 from .scenarios.runner import ScenarioRunner
@@ -118,6 +119,7 @@ __all__ = [
     "LLMCheckResult",
     "Conformity",
     "Contradiction",
+    "PromptInjection",
     "Equals",
     "NotEquals",
     "LesserThan",
