@@ -1,0 +1,14 @@
+{
+  "name": "broken_test",
+  "target": "python:missing_targets.missing",
+  "steps": [
+    {
+      "interacts": [
+        {
+          "kind": "interact",
+          "inputs": "hello"
+        }
+      ]
+    }
+  ]
+}

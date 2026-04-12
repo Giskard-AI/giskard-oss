@@ -1,9 +1,10 @@
 from typing import Any, Self
 
 from giskard.core.utils import NOT_PROVIDED, NotProvided
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 from .check import Check
+from .importing import resolve_python_reference, validation_reference_path
 from .input_generator import InputGenerator
 from .interaction import Interact, InteractionSpec, Trace
 from .result import ScenarioResult
@@ -98,6 +99,33 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         default=NOT_PROVIDED,
         description="Scenario-level target SUT that will be used to replace NOT_PROVIDED outputs.",
     )
+
+    @field_validator("target", mode="before")
+    @classmethod
+    def _load_target_reference(cls, value: Any, info: ValidationInfo) -> Any:
+        path = validation_reference_path(
+            info.context.get("path") if isinstance(info.context, dict) else None
+        )
+        target = resolve_python_reference(value, path=path)
+        if isinstance(target, NotProvided):
+            return target
+        if not callable(target):
+            raise ValueError("Scenario target must be callable.")
+        return target
+
+    @field_validator("trace_type", mode="before")
+    @classmethod
+    def _load_trace_type_reference(cls, value: Any, info: ValidationInfo) -> Any:
+        if value is None:
+            return value
+
+        path = validation_reference_path(
+            info.context.get("path") if isinstance(info.context, dict) else None
+        )
+        trace_type = resolve_python_reference(value, path=path)
+        if not isinstance(trace_type, type) or not issubclass(trace_type, Trace):
+            raise ValueError("Scenario trace_type must be a Trace subclass.")
+        return trace_type
 
     def __init__(
         self,

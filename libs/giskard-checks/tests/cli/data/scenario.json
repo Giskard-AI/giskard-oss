@@ -1,0 +1,20 @@
+{
+  "name": "basic_test",
+  "target": "python:targets.explain_python",
+  "steps": [
+    {
+      "interacts": [
+        {
+          "kind": "interact",
+          "inputs": "What is Python?"
+        }
+      ],
+      "checks": [
+        {
+          "kind": "string_matching",
+          "keyword": "programming language"
+        }
+      ]
+    }
+  ]
+}
