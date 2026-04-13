@@ -10,9 +10,9 @@ This is the `giskard-checks` library - lightweight primitives to define and run 
 
 ## Key Files
 
-- `Makefile` - Development workflow commands (use `make help` to see all)
-- `pyproject.toml` - Build configuration, dependencies, and tooling
-- `README.md` - End-user documentation and quickstart
+- Monorepo root `Makefile` — development workflow (run `make help` from repository root)
+- `pyproject.toml` — build configuration, dependencies, and tooling
+- `README.md` — end-user documentation and quickstart
 
 ## Development Workflow
 
@@ -28,6 +28,6 @@ Always use Makefile commands for development tasks. See [03-development.mdc](03-
 
 ## Testing
 
-- Use `make test` to run all tests
+- From the repository root: `make test-unit PACKAGE=giskard-checks` for unit tests (or `make test` for all tests including functional)
 - Tests are in `tests/` mirroring the package structure
-- Use `make ci` to run the same checks as CI
+- Static checks aligned with CI: `make check` (after `make install install-tools` if needed)

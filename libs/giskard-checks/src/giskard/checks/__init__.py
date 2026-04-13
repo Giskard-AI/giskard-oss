@@ -7,12 +7,15 @@ from giskard.agents import add_prompts_path
 
 from . import builtin, judges
 from .builtin import (
+    AllOf,
+    AnyOf,
     Equals,
     FnCheck,
     GreaterEquals,
     GreaterThan,
     LesserThan,
     LesserThanEquals,
+    Not,
     NotEquals,
     RegexMatching,
     SemanticSimilarity,
@@ -42,6 +45,7 @@ from .core import (
 )
 from .generators.user import UserSimulator
 from .judges import (
+    AnswerRelevance,
     BaseLLMCheck,
     Conformity,
     Groundedness,
@@ -91,6 +95,10 @@ __all__ = [
     "InteractionSpec",
 
     # Builtin and LLM-based checks
+    "AnswerRelevance",
+    "AllOf",
+    "AnyOf",
+    "Not",
     "BaseLLMCheck",
     "LLMCheckResult",
     "Conformity",
