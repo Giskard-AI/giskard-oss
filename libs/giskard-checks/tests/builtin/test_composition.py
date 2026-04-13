@@ -8,6 +8,8 @@ Tests cover:
 - Serialisation round-trip via model_dump / model_validate
 """
 
+from typing import Any
+
 from giskard.checks import (
     AllOf,
     AnyOf,
@@ -26,29 +28,29 @@ from giskard.checks.core.result import CheckStatus as CS
 # ---------------------------------------------------------------------------
 
 
-def _passing_fn_check(message: str = "passed") -> FnCheck:
-    async def _fn(trace: Trace) -> CheckResult:  # type: ignore[type-arg]
+def _passing_fn_check(message: str = "passed") -> FnCheck[Any, Any, Trace[Any, Any]]:
+    async def _fn(trace: Trace[Any, Any]) -> CheckResult:
         return CheckResult.success(message=message)
 
     return FnCheck(fn=_fn)
 
 
-def _failing_fn_check(message: str = "failed") -> FnCheck:
-    async def _fn(trace: Trace) -> CheckResult:  # type: ignore[type-arg]
+def _failing_fn_check(message: str = "failed") -> FnCheck[Any, Any, Trace[Any, Any]]:
+    async def _fn(trace: Trace[Any, Any]) -> CheckResult:
         return CheckResult.failure(message=message)
 
     return FnCheck(fn=_fn)
 
 
-def _error_fn_check(message: str = "error") -> FnCheck:
-    async def _fn(trace: Trace) -> CheckResult:  # type: ignore[type-arg]
+def _error_fn_check(message: str = "error") -> FnCheck[Any, Any, Trace[Any, Any]]:
+    async def _fn(trace: Trace[Any, Any]) -> CheckResult:
         return CheckResult.error(message=message)
 
     return FnCheck(fn=_fn)
 
 
-def _skip_fn_check(message: str = "skip") -> FnCheck:
-    async def _fn(trace: Trace) -> CheckResult:  # type: ignore[type-arg]
+def _skip_fn_check(message: str = "skip") -> FnCheck[Any, Any, Trace[Any, Any]]:
+    async def _fn(trace: Trace[Any, Any]) -> CheckResult:
         return CheckResult.skip(message=message)
 
     return FnCheck(fn=_fn)
@@ -74,11 +76,11 @@ class TestAllOf:
         """First failure stops evaluation; subsequent checks are not run."""
         call_log: list[str] = []
 
-        async def _fail(trace: Trace) -> CheckResult:  # type: ignore[type-arg]
+        async def _fail(trace: Trace[Any, Any]) -> CheckResult:
             call_log.append("fail")
             return CheckResult.failure(message="first failed")
 
-        async def _should_not_run(trace: Trace) -> CheckResult:  # type: ignore[type-arg]
+        async def _should_not_run(trace: Trace[Any, Any]) -> CheckResult:
             call_log.append("second")
             return CheckResult.success(message="second")
 
@@ -169,11 +171,11 @@ class TestAnyOf:
         """First success stops evaluation."""
         call_log: list[str] = []
 
-        async def _pass(trace: Trace) -> CheckResult:  # type: ignore[type-arg]
+        async def _pass(trace: Trace[Any, Any]) -> CheckResult:
             call_log.append("first")
             return CheckResult.success(message="first passed")
 
-        async def _should_not_run(trace: Trace) -> CheckResult:  # type: ignore[type-arg]
+        async def _should_not_run(trace: Trace[Any, Any]) -> CheckResult:
             call_log.append("second")
             return CheckResult.success(message="second")
 

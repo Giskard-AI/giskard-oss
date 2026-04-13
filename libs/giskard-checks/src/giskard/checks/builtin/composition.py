@@ -1,15 +1,10 @@
-from typing import Any, override
+from typing import override
 
 from pydantic import Field
 
 from ..core import Trace
 from ..core.check import Check
 from ..core.result import CheckResult, CheckStatus
-
-# Use the plain Check type — the Check base class already provides a custom
-# __get_pydantic_core_schema__ that builds a tagged union from the registered
-# subclasses. Adding a discriminator annotation on top would clash with it.
-_AnyCheck = Check[Any, Any, Any]  # pyright: ignore[reportMissingTypeArgument]
 
 
 @Check.register("all_of")
@@ -36,7 +31,7 @@ class AllOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     ... ])
     """
 
-    checks: list[_AnyCheck] = Field(  # pyright: ignore[reportUnknownVariableType]
+    checks: list[Check[InputType, OutputType, TraceType]] = Field(
         ...,
         description="Ordered list of checks to evaluate. All must pass.",
     )
@@ -57,8 +52,8 @@ class AllOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
         """
         passed_messages: list[str] = []
 
-        for check in self.checks:  # pyright: ignore[reportUnknownVariableType]
-            result = await check.run(trace)  # pyright: ignore[reportUnknownMemberType]
+        for check in self.checks:
+            result = await check.run(trace)
             if not result.passed:
                 return result
             if result.message:
@@ -95,7 +90,7 @@ class AnyOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     ... ])
     """
 
-    checks: list[_AnyCheck] = Field(  # pyright: ignore[reportUnknownVariableType]
+    checks: list[Check[InputType, OutputType, TraceType]] = Field(
         ...,
         description="Ordered list of checks to evaluate. At least one must pass.",
     )
@@ -117,8 +112,8 @@ class AnyOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
         failure_messages: list[str] = []
         all_skipped = True
 
-        for check in self.checks:  # pyright: ignore[reportUnknownVariableType]
-            result = await check.run(trace)  # pyright: ignore[reportUnknownMemberType]
+        for check in self.checks:
+            result = await check.run(trace)
             if result.passed or result.errored:
                 return result
             if not result.skipped:
@@ -129,7 +124,11 @@ class AnyOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
         if all_skipped and self.checks:
             return CheckResult.skip(
                 message="No checks passed and all were skipped."
-                + (f" Details: {'; '.join(failure_messages)}" if failure_messages else ""),
+                + (
+                    f" Details: {'; '.join(failure_messages)}"
+                    if failure_messages
+                    else ""
+                ),
             )
 
         return CheckResult.failure(
@@ -161,7 +160,7 @@ class Not[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMis
     >>> check = Not(check=StringMatching(keyword="forbidden", key="trace.last.outputs"))
     """
 
-    check: _AnyCheck = Field(  # pyright: ignore[reportUnknownVariableType]
+    check: Check[InputType, OutputType, TraceType] = Field(
         ...,
         description="The inner check whose result will be inverted.",
     )
@@ -182,7 +181,7 @@ class Not[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMis
         CheckResult
             Inverted result (pass→fail, fail→pass). Error/skip unchanged.
         """
-        result = await self.check.run(trace)  # pyright: ignore[reportUnknownMemberType]
+        result = await self.check.run(trace)
 
         if result.status in (CheckStatus.ERROR, CheckStatus.SKIP):
             return result
