@@ -1,7 +1,7 @@
 from typing import Any, Self
 
 from giskard.core.utils import NOT_PROVIDED, NotProvided
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .check import Check
 from .input_generator import InputGenerator
@@ -72,6 +72,8 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         Optional custom trace type to use. If not provided, the trace type will be
         inferred from the components. Useful when using custom trace subclasses
         with additional computed fields or methods.
+    multiple_runs : int
+        Default number of times to run the scenario before reporting success.
     """
 
     name: str = Field(
@@ -98,6 +100,19 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         default=NOT_PROVIDED,
         description="Scenario-level target SUT that will be used to replace NOT_PROVIDED outputs.",
     )
+    multiple_runs: int = Field(
+        default=1,
+        description="Default number of times to run this scenario before reporting success.",
+    )
+
+    @field_validator("multiple_runs", mode="before")
+    @classmethod
+    def _validate_multiple_runs(cls, value: object) -> int:
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ValueError("multiple_runs must be an integer greater than or equal to 1")
+        if value < 1:
+            raise ValueError("multiple_runs must be greater than or equal to 1")
+        return value
 
     def __init__(
         self,
@@ -253,12 +268,23 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             | NotProvided
         ) = NOT_PROVIDED,
         return_exception: bool = False,
+        multiple_runs: int | None = None,
     ) -> ScenarioResult[TraceType]:
         """Execute the scenario steps sequentially with shared trace.
 
         Each step is executed in order:
         - Interaction specs update the shared trace
         - Checks validate the current trace and stop execution on failure
+
+        Parameters
+        ----------
+        target : ProviderType | NotProvided
+            Optional target override used to replace `NOT_PROVIDED` interaction outputs.
+        return_exception : bool
+            If True, return results even when exceptions occur instead of raising.
+        multiple_runs : int | None
+            Optional run-level repeat count. When provided, it overrides the
+            scenario-level `multiple_runs` value.
 
         Returns
         -------
@@ -269,4 +295,9 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         from ..scenarios.runner import get_runner
 
         runner = get_runner()
-        return await runner.run(self, target=target, return_exception=return_exception)
+        return await runner.run(
+            self,
+            target=target,
+            return_exception=return_exception,
+            multiple_runs=multiple_runs,
+        )

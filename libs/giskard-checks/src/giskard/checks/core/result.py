@@ -233,6 +233,12 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
         Total execution time in milliseconds.
     final_trace : TraceType
         Trace state after execution, containing all interactions that occurred.
+    multiple_runs : int
+        Configured number of attempts for this scenario execution.
+    attempts_executed : int
+        Number of attempts that actually ran.
+    failed_attempt : int or None
+        One-based attempt number that failed, if execution stopped early.
     status : ScenarioStatus
         Aggregated outcome of the scenario derived from its steps.
     passed : bool
@@ -249,6 +255,18 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
     steps: list["TestCaseResult"]  # TODO: rename to test_cases
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
     final_trace: TraceType = Field(..., description="Final trace state after execution")
+    multiple_runs: int = Field(
+        default=1,
+        description="Configured number of scenario execution attempts.",
+    )
+    attempts_executed: int = Field(
+        default=1,
+        description="Number of scenario execution attempts that actually ran.",
+    )
+    failed_attempt: int | None = Field(
+        default=None,
+        description="One-based attempt number that failed, if any.",
+    )
 
     @computed_field
     @property
@@ -311,7 +329,8 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
             yield repr(self.final_trace)
 
         yield Rule(
-            f"{_pluralize(len(self.steps), 'step')} in {self.duration_ms}ms",
+            f"{_pluralize(len(self.steps), 'step')} in {self.duration_ms}ms"
+            f" | attempts: {self.attempts_executed}/{self.multiple_runs}",
             style=f"{status['color']} bold",
         )
 
