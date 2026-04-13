@@ -63,15 +63,13 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     @field_validator("target", mode="before")
     @classmethod
     def _load_target_reference(cls, value: Any, info: ValidationInfo) -> Any:
+        if not isinstance(value, str):
+            return value
+
         path = validation_reference_path(
             info.context.get("path") if isinstance(info.context, dict) else None
         )
-        target = resolve_python_reference(value, path=path)
-        if isinstance(target, NotProvided):
-            return target
-        if not callable(target):
-            raise ValueError("Suite target must be callable.")
-        return target
+        return resolve_python_reference(value, path=path)
 
     def append(
         self,

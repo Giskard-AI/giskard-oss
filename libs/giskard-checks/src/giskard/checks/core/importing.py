@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import importlib
 import sys
 from collections.abc import Iterator
@@ -7,8 +5,6 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
-
-from giskard.core.utils import NOT_PROVIDED, NotProvided
 
 _REFERENCE_PATH: ContextVar[Path | None] = ContextVar(
     "giskard_checks_reference_path", default=None
@@ -66,15 +62,7 @@ def _module_exists_in_search_path(module_name: str, search_path: str) -> bool:
     )
 
 
-def resolve_python_reference(value: Any, *, path: Path | None = None) -> Any:
-    if value is None:
-        return NOT_PROVIDED
-    if isinstance(value, NotProvided):
-        return value
-    if value == {}:
-        return NOT_PROVIDED
-    if not isinstance(value, str):
-        return value
+def resolve_python_reference(value: str, *, path: Path | None = None) -> Any:
     if not value.startswith("python:"):
         raise ValueError(
             f"Unsupported Python reference '{value}'. Expected 'python:module.symbol'."

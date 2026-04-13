@@ -103,29 +103,24 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
     @field_validator("target", mode="before")
     @classmethod
     def _load_target_reference(cls, value: Any, info: ValidationInfo) -> Any:
-        path = validation_reference_path(
-            info.context.get("path") if isinstance(info.context, dict) else None
-        )
-        target = resolve_python_reference(value, path=path)
-        if isinstance(target, NotProvided):
-            return target
-        if not callable(target):
-            raise ValueError("Scenario target must be callable.")
-        return target
-
-    @field_validator("trace_type", mode="before")
-    @classmethod
-    def _load_trace_type_reference(cls, value: Any, info: ValidationInfo) -> Any:
-        if value is None:
+        if not isinstance(value, str):
             return value
 
         path = validation_reference_path(
             info.context.get("path") if isinstance(info.context, dict) else None
         )
-        trace_type = resolve_python_reference(value, path=path)
-        if not isinstance(trace_type, type) or not issubclass(trace_type, Trace):
-            raise ValueError("Scenario trace_type must be a Trace subclass.")
-        return trace_type
+        return resolve_python_reference(value, path=path)
+
+    @field_validator("trace_type", mode="before")
+    @classmethod
+    def _load_trace_type_reference(cls, value: Any, info: ValidationInfo) -> Any:
+        if not isinstance(value, str):
+            return value
+
+        path = validation_reference_path(
+            info.context.get("path") if isinstance(info.context, dict) else None
+        )
+        return resolve_python_reference(value, path=path)
 
     def __init__(
         self,
