@@ -9,7 +9,8 @@ Tests cover:
 - Direct question/answer values take priority over trace extraction
 - Custom key paths
 - Domain context forwarded to template inputs
-- Empty trace (no history) handled gracefully
+- Full trace passed as template ``history`` (conversation context for the judge)
+- Empty trace handled gracefully (NoMatch when resolving last turn)
 """
 
 import json
@@ -18,8 +19,20 @@ from typing import Any, override
 from giskard.agents.chat import Message
 from giskard.agents.generators._types import Response
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
-from giskard.checks import AnswerRelevance, CheckStatus, Interaction, Trace
+from giskard.checks import AnswerRelevance, CheckResult, CheckStatus, Interaction, Trace
+from giskard.checks.core.extraction import NoMatch
 from pydantic import Field
+
+_EXPECTED_INPUT_KEYS = frozenset({"question", "answer", "history", "context"})
+
+
+def _assert_answer_relevance_inputs(result: CheckResult) -> dict[str, Any]:
+    """Assert every AnswerRelevance run records full template inputs."""
+    assert "inputs" in result.details
+    inputs = result.details["inputs"]
+    assert isinstance(inputs, dict)
+    assert set(inputs.keys()) == _EXPECTED_INPUT_KEYS
+    return inputs
 
 
 class MockGenerator(BaseGenerator):
@@ -62,6 +75,11 @@ class TestAnswerRelevanceBasic:
         assert result.status == CheckStatus.PASS
         assert result.passed
         assert result.details["reason"] == "Answer directly addresses the question."
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["question"] == "What is the capital of France?"
+        assert inputs["answer"] == "The capital of France is Paris."
+        assert inputs["history"] == Trace()
+        assert inputs["context"] == ""
 
     async def test_off_topic_answer_fails(self):
         """Completely off-topic answer should fail."""
@@ -78,6 +96,11 @@ class TestAnswerRelevanceBasic:
         assert result.status == CheckStatus.FAIL
         assert result.failed
         assert result.details["reason"] == "Answer is about food, not geography."
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["question"] == "What is the capital of France?"
+        assert inputs["answer"] == "Lasagna is a delicious Italian dish."
+        assert inputs["history"] == Trace()
+        assert inputs["context"] == ""
 
     async def test_llm_called_once(self):
         """Exactly one LLM call should be made per check run."""
@@ -87,9 +110,14 @@ class TestAnswerRelevanceBasic:
             question="What is 2 + 2?",
             answer="4.",
         )
-        await check.run(Trace())
+        result = await check.run(Trace())
 
         assert len(generator.calls) == 1
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["question"] == "What is 2 + 2?"
+        assert inputs["answer"] == "4."
+        assert inputs["history"] == Trace()
+        assert inputs["context"] == ""
 
 
 class TestAnswerRelevanceMultiTurn:
@@ -119,6 +147,11 @@ class TestAnswerRelevanceMultiTurn:
 
         assert result.status == CheckStatus.FAIL
         assert result.failed
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["history"] == trace
+        assert inputs["question"] == "What's Python?"
+        assert inputs["answer"] == "A snake."
+        assert inputs["context"] == ""
 
     async def test_multi_turn_relevant_programming_answer_passes(self):
         """A correct programming answer in a programming conversation should pass."""
@@ -139,6 +172,14 @@ class TestAnswerRelevanceMultiTurn:
 
         assert result.status == CheckStatus.PASS
         assert result.passed
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["history"] == trace
+        assert inputs["question"] == "What's Python?"
+        assert (
+            inputs["answer"]
+            == "Python is a high-level programming language known for its readability."
+        )
+        assert inputs["context"] == ""
 
     async def test_second_turn_irrelevant_does_not_affect_third_turn_score(self):
         """A prior irrelevant answer must not cause the current relevant answer to fail.
@@ -165,9 +206,17 @@ class TestAnswerRelevanceMultiTurn:
 
         assert result.status == CheckStatus.PASS
         assert result.passed
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["history"] == trace
+        assert inputs["question"] == "Is Python a language or an animal?"
+        assert (
+            inputs["answer"]
+            == "It's both — Python is a programming language and also a type of snake."
+        )
+        assert inputs["context"] == ""
 
-    async def test_history_included_in_inputs(self):
-        """Template inputs must include a non-empty history for multi-turn traces."""
+    async def test_history_in_inputs_is_full_trace(self):
+        """Template inputs pass the full trace as history for the judge."""
         generator = MockGenerator(passed=True, reason=None)
         check = AnswerRelevance(generator=generator)
         trace = await Trace.from_interactions(
@@ -178,14 +227,17 @@ class TestAnswerRelevanceMultiTurn:
         result = await check.run(trace)
 
         assert result.passed
-        history = result.details["inputs"]["history"]
-        assert "Turn 1 question" in history
-        assert "Turn 1 answer" in history
-        # Current turn should NOT appear in history
-        assert "Turn 2 question" not in history
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["history"] == trace
+        assert len(inputs["history"].interactions) == 2
+        assert inputs["history"].interactions[0].inputs == "Turn 1 question"
+        assert inputs["history"].interactions[0].outputs == "Turn 1 answer"
+        assert inputs["question"] == "Turn 2 question"
+        assert inputs["answer"] == "Turn 2 answer"
+        assert inputs["context"] == ""
 
-    async def test_single_turn_history_is_empty(self):
-        """With only one interaction, history should be empty string."""
+    async def test_single_turn_history_is_the_trace(self):
+        """With one interaction, history is the trace containing that turn."""
         generator = MockGenerator(passed=True, reason=None)
         check = AnswerRelevance(generator=generator)
         trace = await Trace.from_interactions(
@@ -195,7 +247,10 @@ class TestAnswerRelevanceMultiTurn:
         result = await check.run(trace)
 
         assert result.passed
-        assert result.details["inputs"]["history"] == ""
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["history"] == trace
+        assert len(trace.interactions) == 1
+        assert inputs["context"] == ""
 
 
 class TestAnswerRelevanceInputResolution:
@@ -216,8 +271,11 @@ class TestAnswerRelevanceInputResolution:
         result = await check.run(trace)
 
         assert result.passed
-        assert result.details["inputs"]["question"] == "Direct question"
-        assert result.details["inputs"]["answer"] == "Direct answer"
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["question"] == "Direct question"
+        assert inputs["answer"] == "Direct answer"
+        assert inputs["history"] == trace
+        assert inputs["context"] == ""
 
     async def test_question_and_answer_extracted_from_trace(self):
         """When no direct values given, question/answer extracted from trace."""
@@ -230,8 +288,11 @@ class TestAnswerRelevanceInputResolution:
         result = await check.run(trace)
 
         assert result.passed
-        assert result.details["inputs"]["question"] == "What is AI?"
-        assert result.details["inputs"]["answer"] == "AI is artificial intelligence."
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["question"] == "What is AI?"
+        assert inputs["answer"] == "AI is artificial intelligence."
+        assert inputs["history"] == trace
+        assert inputs["context"] == ""
 
     async def test_custom_keys(self):
         """Custom JSONPath keys should resolve correctly."""
@@ -251,8 +312,11 @@ class TestAnswerRelevanceInputResolution:
         result = await check.run(trace)
 
         assert result.passed
-        assert result.details["inputs"]["question"] == "Custom question"
-        assert result.details["inputs"]["answer"] == "Custom answer"
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["question"] == "Custom question"
+        assert inputs["answer"] == "Custom answer"
+        assert inputs["history"] == trace
+        assert inputs["context"] == ""
 
     async def test_empty_trace_no_crash(self):
         """Empty trace should not raise — NoMatch values are stringified gracefully."""
@@ -262,8 +326,13 @@ class TestAnswerRelevanceInputResolution:
         result = await check.run(Trace())
 
         assert result.passed
-        assert "No match for key" in result.details["inputs"]["question"]
-        assert "No match for key" in result.details["inputs"]["answer"]
+        inputs = _assert_answer_relevance_inputs(result)
+        assert isinstance(inputs["question"], NoMatch)
+        assert inputs["question"].key == "trace.last.inputs"
+        assert isinstance(inputs["answer"], NoMatch)
+        assert inputs["answer"].key == "trace.last.outputs"
+        assert inputs["history"] == Trace()
+        assert inputs["context"] == ""
 
 
 class TestAnswerRelevanceDomainContext:
@@ -282,7 +351,11 @@ class TestAnswerRelevanceDomainContext:
         result = await check.run(Trace())
 
         assert result.passed
-        assert result.details["inputs"]["context"] == (
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["question"] == "What is Flask?"
+        assert inputs["answer"] == "Flask is a lightweight Python web framework."
+        assert inputs["history"] == Trace()
+        assert inputs["context"] == (
             "This is a chatbot that answers questions about Python programming."
         )
 
@@ -298,4 +371,8 @@ class TestAnswerRelevanceDomainContext:
         result = await check.run(Trace())
 
         assert result.passed
-        assert result.details["inputs"]["context"] == ""
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["question"] == "What is Flask?"
+        assert inputs["answer"] == "Flask is a web framework."
+        assert inputs["history"] == Trace()
+        assert inputs["context"] == ""

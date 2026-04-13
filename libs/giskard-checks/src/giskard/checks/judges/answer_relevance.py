@@ -1,4 +1,4 @@
-from typing import override
+from typing import Any, override
 
 from giskard.agents.workflow import TemplateReference
 from giskard.core import provide_not_none
@@ -85,7 +85,7 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         )
 
     @override
-    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
+    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
         """Build template variables from resolved inputs.
 
         Parameters
@@ -99,37 +99,20 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
             Template variables with ``question``, ``answer``, ``history``, and
             ``context`` keys.
         """
-        question = str(
-            provided_or_resolve(
-                trace,
-                key=self.question_key,
-                value=provide_not_none(self.question),
-            )
+        question = provided_or_resolve(
+            trace,
+            key=self.question_key,
+            value=provide_not_none(self.question),
         )
-        answer = str(
-            provided_or_resolve(
-                trace,
-                key=self.answer_key,
-                value=provide_not_none(self.answer),
-            )
+        answer = provided_or_resolve(
+            trace,
+            key=self.answer_key,
+            value=provide_not_none(self.answer),
         )
-
-        # Build a plain-text summary of prior turns so the judge understands
-        # user intent without being penalised for earlier irrelevant exchanges.
-        history_turns = trace.interactions[:-1] if trace.interactions else []
-        if history_turns:
-            history_lines: list[str] = []
-            for i, interaction in enumerate(history_turns, start=1):
-                history_lines.append(
-                    f"Turn {i}:\n  User: {interaction.inputs}\n  Assistant: {interaction.outputs}"
-                )
-            history = "\n\n".join(history_lines)
-        else:
-            history = ""
 
         return {
             "question": question,
             "answer": answer,
-            "history": history,
+            "history": trace,
             "context": self.context or "",
         }
