@@ -358,3 +358,15 @@ async def test_missing_text_in_trace() -> None:
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
     assert "no value found for text" in result.message.lower()
+
+
+@pytest.mark.timeout(15)
+async def test_regex_redos_bounded_by_timeout() -> None:
+    """Pathological pattern + input must not run past match_timeout_seconds."""
+    check = RegexMatching(
+        text="x" * 80_000 + "b",
+        pattern="(x+)+$",
+        match_timeout_seconds=0.5,
+    )
+    with pytest.raises(TimeoutError):
+        _ = await check.run(Trace())

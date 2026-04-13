@@ -4,13 +4,13 @@ alwaysApply: false
 ---
 # Development Workflow
 
-This project uses a Makefile for common development tasks. Always prefer using Makefile commands over direct tool invocations.
+The monorepo **repository root** defines the `Makefile`. Run all targets from that directory (`giskard-oss/`). Prefer `make` over ad hoc `uv` or tool invocations.
 
 ## Quick Start
 
 ```bash
 make setup    # Complete development setup (install deps + tools)
-make all      # Format, check, and test
+make format && make check && make test-unit PACKAGE=giskard-checks
 ```
 
 ## Common Commands
@@ -19,14 +19,13 @@ make all      # Format, check, and test
 - `make setup` - Complete development setup (install deps + tools)
 - `make install` - Install project dependencies
 - `make install-tools` - Install development tools (ruff, vermin, pre-commit)
-- `make test` - Run all tests
+- `make test` - Run all tests (unit + functional) for all libs or `PACKAGE=<name>`
+- `make test-unit` - Unit tests only; use `PACKAGE=giskard-checks` to scope this library
 - `make lint` - Run linting checks
 - `make format` - Format code with ruff
 - `make check-format` - Check if code is formatted correctly
 - `make check-compat` - Check Python 3.12 compatibility
-- `make check` - Run all checks (lint, format, compatibility)
-- `make all` - Format, check, and test
-- `make ci` - Run the same checks as CI
+- `make check` - Run all static checks (lint, format, compat, typecheck, security, licenses)—matches the CI `lint` job (with tools installed)
 - `make clean` - Clean up build artifacts and caches
 
 ## Pre-commit
@@ -37,12 +36,11 @@ make all      # Format, check, and test
 ## Guidelines
 
 1. Always use `make` commands instead of direct `uv` or tool invocations
-2. Run `make ci` before pushing to ensure CI will pass
-3. Use `make all` for a complete development cycle (format, check, test)
-4. Use `make setup` for initial project setup
-5. Use `make clean` to clean up build artifacts when needed
+2. Before pushing, run `make format`, `make check`, and `make test-unit PACKAGE=giskard-checks` (or omit `PACKAGE` to run unit tests for every lib)—this aligns with `.github/workflows/ci.yml`
+3. Use `make setup` for initial project setup
+4. Use `make clean` to clean up build artifacts when needed
 
 ## See Also
 
-- [Makefile](../Makefile) - Full command definitions and help
-- [README.md](../README.md) - Project overview and quickstart
+- [Makefile](../../../../Makefile) at repository root — full command definitions and help
+- [README.md](../../README.md) — package overview and quickstart
