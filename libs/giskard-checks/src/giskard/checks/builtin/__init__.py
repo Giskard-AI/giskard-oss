@@ -14,7 +14,7 @@ from .comparison import (
 )
 
 # Import other builtin checks (staying in builtin)
-from .composition import AllOf, AnyOf, Not
+from .composition import AllOf, AnyOf, Not, all_of, any_of, expect_fails
 from .fn import FnCheck, from_fn
 from .semantic_similarity import SemanticSimilarity
 from .text_matching import RegexMatching, StringMatching
@@ -23,6 +23,9 @@ __all__ = [
     "AllOf",
     "AnyOf",
     "Not",
+    "all_of",
+    "any_of",
+    "expect_fails",
     "from_fn",
     "FnCheck",
     "StringMatching",

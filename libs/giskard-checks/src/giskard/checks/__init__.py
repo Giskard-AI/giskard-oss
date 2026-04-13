@@ -20,6 +20,9 @@ from .builtin import (
     RegexMatching,
     SemanticSimilarity,
     StringMatching,
+    all_of,
+    any_of,
+    expect_fails,
     from_fn,
 )
 from .core import (
@@ -107,6 +110,10 @@ __all__ = [
     "SemanticSimilarity",
     "StringMatching",
     "RegexMatching",
+    # Composition utilities
+    "all_of",
+    "any_of",
+    "expect_fails",
     # Generators
     "UserSimulator",
     # Testing

@@ -37,3 +37,48 @@ class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
             The result of the check evaluation.
         """
         raise NotImplementedError
+
+    def __and__(self, other: "Check") -> "Check":
+        """Combine two checks with AND semantics (all must pass).
+
+        Example
+        -------
+        >>> combined = check_a & check_b
+        """
+        from ..builtin.composition import AllOf
+
+        my_checks: list[Check] = (
+            list(self.checks) if hasattr(self, "checks") and self.__class__.__name__ == "AllOf" else [self]
+        )
+        other_checks: list[Check] = (
+            list(other.checks) if hasattr(other, "checks") and other.__class__.__name__ == "AllOf" else [other]
+        )
+        return AllOf(checks=my_checks + other_checks)
+
+    def __or__(self, other: "Check") -> "Check":
+        """Combine two checks with OR semantics (at least one must pass).
+
+        Example
+        -------
+        >>> combined = check_a | check_b
+        """
+        from ..builtin.composition import AnyOf
+
+        my_checks: list[Check] = (
+            list(self.checks) if hasattr(self, "checks") and self.__class__.__name__ == "AnyOf" else [self]
+        )
+        other_checks: list[Check] = (
+            list(other.checks) if hasattr(other, "checks") and other.__class__.__name__ == "AnyOf" else [other]
+        )
+        return AnyOf(checks=my_checks + other_checks)
+
+    def __invert__(self) -> "Check":
+        """Invert the check result (pass becomes fail, fail becomes pass).
+
+        Example
+        -------
+        >>> inverted = ~check_a
+        """
+        from ..builtin.composition import Not
+
+        return Not(check=self)

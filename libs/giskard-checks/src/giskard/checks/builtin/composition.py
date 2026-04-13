@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import override
 
 from pydantic import Field
@@ -5,6 +7,45 @@ from pydantic import Field
 from ..core import Trace
 from ..core.check import Check
 from ..core.result import CheckResult, CheckStatus
+
+
+def all_of(*checks: Check) -> AllOf:
+    """Create an AllOf check from positional arguments.
+
+    Example
+    -------
+    >>> from giskard.checks import all_of, Equals, LesserThan
+    >>> check = all_of(
+    ...     LesserThan(expected_value=10, key="trace.last.outputs"),
+    ...     Equals(expected_value=5, key="trace.last.outputs"),
+    ... )
+    """
+    return AllOf(checks=list(checks))
+
+
+def any_of(*checks: Check) -> AnyOf:
+    """Create an AnyOf check from positional arguments.
+
+    Example
+    -------
+    >>> from giskard.checks import any_of, StringMatching
+    >>> check = any_of(
+    ...     StringMatching(keyword="yes", key="trace.last.outputs"),
+    ...     StringMatching(keyword="approved", key="trace.last.outputs"),
+    ... )
+    """
+    return AnyOf(checks=list(checks))
+
+
+def expect_fails(check: Check) -> Not:
+    """Invert a check so that failure is the expected outcome.
+
+    Example
+    -------
+    >>> from giskard.checks import expect_fails, Equals
+    >>> check = expect_fails(Equals(expected_value="bad", key="trace.last.outputs"))
+    """
+    return Not(check=check)
 
 
 @Check.register("all_of")
