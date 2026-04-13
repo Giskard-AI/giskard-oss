@@ -2,40 +2,43 @@ Your role is to evaluate whether an interaction conforms to a given rule or requ
 
 You will receive:
 - A rule statement to evaluate against
-- An interaction containing inputs, outputs, and optionally metadata
+- A trace containing inputs, outputs, and optionally metadata
 
-Your task is to determine if the interaction conforms to the specified rule. The interaction should be evaluated holistically, considering all available information (inputs, outputs, and metadata if present).
+**What to evaluate:** Judge **only** the **outputs** and **metadata** in the trace against the rule. **Inputs** are provided **for reference** so you can interpret what was asked and evaluate whether the outputs (and metadata, if present) satisfy the rule. Do not treat inputs as something to pass or fail for conformity.
+
+Your task is to determine if the outputs and metadata conform to the specified rule, using inputs solely as supporting context.
 
 ## Evaluation Criteria
 
-1. **Rule Compliance:** The interaction should demonstrate adherence to the stated rule. This includes:
+1. **Rule Compliance:** Assess outputs and metadata against the stated rule:
    - The outputs should align with the rule requirements
-   - The inputs should be appropriate for the rule context
    - Any metadata should support or be consistent with the rule
+   - Use inputs only to understand the request and ground your judgment of outputs and metadata
 
-2. **Contextual Understanding:** Consider the full context of the interaction:
-   - How the inputs relate to the rule
-   - Whether the outputs appropriately address the rule
+2. **Contextual Understanding:** Use the full trace for context, but keep the verdict focused on outputs and metadata:
+   - How the inputs clarify what was expected (reference only)
+   - Whether the outputs appropriately satisfy the rule
    - If metadata provides relevant context for rule evaluation
 
-3. **Completeness:** The interaction should provide sufficient information to evaluate rule compliance:
-   - Missing critical information may indicate non-conformity
+3. **Completeness:** Outputs and metadata should provide sufficient information to evaluate rule compliance:
+   - Missing or unusable outputs may indicate non-conformity
    - Incomplete responses that don't address the rule should be flagged
 
-4. **Consistency:** All parts of the interaction should work together to support rule compliance:
-   - No contradictions between inputs, outputs, and metadata
-   - Coherent behavior throughout the interaction
+4. **Consistency:** Outputs and metadata should be coherent with the rule:
+   - No contradictions between outputs and metadata where both apply
+   - Coherent behavior in what you are evaluating (outputs and metadata)
 
 ## Evaluation Strategy
 
 1. Carefully read the rule statement and understand what it requires.
-2. Examine the interaction components (inputs, outputs, metadata if present).
-3. Determine if the interaction as a whole demonstrates compliance with the rule.
-4. Consider both explicit and implicit requirements of the rule.
-5. Provide a clear reason for your evaluation decision.
+2. Read the inputs for reference to understand the scenario and expectations.
+3. Examine **outputs** and **metadata** (if present) as the objects of evaluation.
+4. Determine whether those outputs and metadata demonstrate compliance with the rule.
+5. Consider both explicit and implicit requirements of the rule.
+6. Provide a clear reason for your evaluation decision.
 
 ## Markers
-Markers <INTERACTION>...</INTERACTION> indicate the interaction. Everything inside a marker belongs to that category.
+Markers <TRACE>...</TRACE> indicate the trace. Everything inside a marker belongs to that category.
 
 -------------------
 
@@ -44,9 +47,9 @@ Markers <INTERACTION>...</INTERACTION> indicate the interaction. Everything insi
 
 -------------------
 
-< INTERACTION >
-{{ interaction }}
-</ INTERACTION >
+< TRACE >
+{{ trace }}
+</ TRACE >
 
 -------------------
 

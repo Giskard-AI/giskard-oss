@@ -52,55 +52,32 @@ async def test_run_returns_failure() -> None:
     assert len(generator.calls) == 1
 
 
-async def test_rule_templating() -> None:
-    generator = MockGenerator(passed=True, reason=None)
-    conformity = Conformity(
-        generator=generator,
-        rule="The response should contain '{{ trace.interactions[-1].outputs.response }}'",
-    )
-    result = await conformity.run(
-        Trace(
-            interactions=[
-                Interaction(inputs={"query": "Hello"}, outputs={"response": "Hello"})
-            ]
-        )
-    )
-
-    assert result.status == CheckStatus.PASS
-    assert result.details["reason"] is None
-
-    assert len(generator.calls) == 1
-    # Verify that the rule was templated correctly in the inputs
-    # The formatted rule should contain "Hello" instead of the template placeholder
-    assert "rule" in result.details["inputs"]
-    assert "Hello" in result.details["inputs"]["rule"]
-
-
-async def test_interaction_json_in_inputs() -> None:
+async def test_trace_in_result_details_inputs() -> None:
     generator = MockGenerator(passed=True, reason=None)
     conformity = Conformity(generator=generator, rule="Test rule")
     interaction = Interaction(
         inputs={"query": "What is AI?"}, outputs={"response": "AI is..."}
     )
-    result = await conformity.run(Trace(interactions=[interaction]))
+    trace = Trace(interactions=[interaction])
+    result = await conformity.run(trace)
 
     assert result.status == CheckStatus.PASS
     assert "inputs" in result.details
-    assert "interaction" in result.details["inputs"]
+    assert result.details["inputs"]["rule"] == "Test rule"
+    assert "trace" in result.details["inputs"]
 
-    # Verify interaction is serialized as JSON
-    interaction_json = result.details["inputs"]["interaction"]
-    assert isinstance(interaction_json, str)
-    parsed = json.loads(interaction_json)
-    assert parsed["inputs"]["query"] == "What is AI?"
-    assert parsed["outputs"]["response"] == "AI is..."
+    stored_trace = result.details["inputs"]["trace"]
+    assert stored_trace is trace
 
 
-async def test_empty_interactions_uses_empty_json() -> None:
+async def test_empty_trace_in_result_details_inputs() -> None:
     generator = MockGenerator(passed=True, reason=None)
     conformity = Conformity(generator=generator, rule="Test rule")
-    result = await conformity.run(Trace())
+    trace = Trace()
+    result = await conformity.run(trace)
 
     assert result.status == CheckStatus.PASS
     assert "inputs" in result.details
-    assert result.details["inputs"]["interaction"] == "{}"
+    assert result.details["inputs"]["rule"] == "Test rule"
+    stored_trace = result.details["inputs"]["trace"]
+    assert stored_trace is trace
