@@ -2,6 +2,7 @@
 
 # Import judge checks from new location and re-export for backward compatibility
 from ..judges import (
+    AnswerRelevance,
     BaseLLMCheck,
     Conformity,
     Groundedness,
@@ -21,11 +22,15 @@ from .comparison import (
 )
 
 # Import other builtin checks (staying in builtin)
+from .composition import AllOf, AnyOf, Not
 from .fn import FnCheck, from_fn
 from .semantic_similarity import SemanticSimilarity
 from .text_matching import RegexMatching, StringMatching
 
 __all__ = [
+    "AllOf",
+    "AnyOf",
+    "Not",
     "from_fn",
     "FnCheck",
     "StringMatching",
@@ -36,6 +41,7 @@ __all__ = [
     "GreaterThan",
     "LesserThanEquals",
     "GreaterEquals",
+    "AnswerRelevance",
     "Groundedness",
     "Conformity",
     "LLMJudge",

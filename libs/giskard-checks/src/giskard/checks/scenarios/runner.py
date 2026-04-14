@@ -8,8 +8,15 @@ updated Trace objects via the async generator protocol.
 import time
 from typing import Any, cast
 
-from giskard.core.utils import NOT_PROVIDED, NotProvided
+from giskard.core import (
+    NOT_PROVIDED,
+    NotProvided,
+    scoped_telemetry,
+    telemetry,
+    telemetry_tag,
+)
 
+from .._telemetry_props import scenario_shape_properties
 from ..core import Trace
 from ..core.interaction import Interact
 from ..core.result import CheckResult, ScenarioResult, TestCaseResult
@@ -78,6 +85,7 @@ class ScenarioRunner:
     ```
     """
 
+    @scoped_telemetry
     async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
@@ -110,6 +118,9 @@ class ScenarioRunner:
         """
 
         start_time = time.perf_counter()
+        telemetry_tag("giskard_component", "scenario_runner")
+        telemetry_tag("giskard_operation", "scenario_run")
+
         trace = (
             scenario.trace_type(annotations=scenario.annotations)
             if scenario.trace_type is not None
@@ -121,6 +132,16 @@ class ScenarioRunner:
 
         steps = _build_steps(scenario, target)
         steps_results: list[TestCaseResult] = []
+        has_target = target is not NOT_PROVIDED
+        shape_props = scenario_shape_properties(
+            scenario,
+            has_target=has_target,
+        )
+
+        _ = telemetry.capture(
+            "checks_scenario_run_started",
+            properties=shape_props,
+        )
 
         for step in steps:
             trace = await trace.with_interactions(*step.interacts)
@@ -150,12 +171,25 @@ class ScenarioRunner:
                 steps_results.append(step_result)
 
         end_time = time.perf_counter()
-        return ScenarioResult(
+        duration_ms = int((end_time - start_time) * 1000)
+
+        result = ScenarioResult(
             scenario_name=scenario.name,
             steps=steps_results,
-            duration_ms=int((end_time - start_time) * 1000),
+            duration_ms=duration_ms,
             final_trace=trace,
         )
+
+        _ = telemetry.capture(
+            "checks_scenario_run_finished",
+            properties={
+                **shape_props,
+                "outcome_status": result.status.value,
+                "duration_ms": duration_ms,
+            },
+        )
+
+        return result
 
 
 _default_runner = ScenarioRunner()

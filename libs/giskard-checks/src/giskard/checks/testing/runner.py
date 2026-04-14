@@ -1,6 +1,12 @@
 import time
 import traceback
 
+from giskard.core import scoped_telemetry, telemetry, telemetry_tag
+
+from .._telemetry_props import (
+    check_kind_counts_from_sequence,
+    test_case_shape_properties,
+)
 from ..core import Trace
 from ..core.check import Check
 from ..core.result import CheckResult, TestCaseResult
@@ -50,25 +56,56 @@ class TestCaseRunner:
     def __init__(self):
         pass
 
+    @scoped_telemetry
     async def run[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
         self,
         test_case: TestCase[InputType, OutputType, TraceType],
         return_exception: bool = False,
     ) -> TestCaseResult:
+        telemetry_tag("giskard_component", "test_case_runner")
+        telemetry_tag("giskard_operation", "test_case_run")
+
         start_time = time.perf_counter()
+        checks_list = list(test_case.checks)
+        check_kinds = check_kind_counts_from_sequence(checks_list)
+        trace = test_case.trace
+
+        shape_props = test_case_shape_properties(
+            check_count=len(checks_list),
+            trace_interaction_count=len(trace.interactions),
+            has_trace_annotations=bool(trace.annotations),
+            has_test_case_name=test_case.name is not None,
+            check_kinds=check_kinds,
+        )
+        _ = telemetry.capture(
+            "checks_test_case_run_started",
+            properties=shape_props,
+        )
 
         check_results: list[CheckResult] = []
-        for check in test_case.checks:
+        for check in checks_list:
             result = await _run_check(test_case.trace, check, return_exception)
             check_results.append(result)
 
         end_time = time.perf_counter()
         total_duration_ms = int((end_time - start_time) * 1000)
 
-        return TestCaseResult(
+        tc_result = TestCaseResult(
             results=check_results,
             duration_ms=total_duration_ms,
         )
+
+        _ = telemetry.capture(
+            "checks_test_case_run_finished",
+            properties={
+                **shape_props,
+                "outcome_status": tc_result.status.value,
+                "duration_ms": total_duration_ms,
+                "return_exception_mode": return_exception,
+            },
+        )
+
+        return tc_result
 
 
 _default_runner = TestCaseRunner()
