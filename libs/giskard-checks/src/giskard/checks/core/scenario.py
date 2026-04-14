@@ -103,16 +103,8 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
     multiple_runs: int = Field(
         default=1,
         description="Default number of times to run this scenario before reporting success.",
+        ge=1,
     )
-
-    @field_validator("multiple_runs", mode="before")
-    @classmethod
-    def _validate_multiple_runs(cls, value: object) -> int:
-        if not isinstance(value, int) or isinstance(value, bool):
-            raise ValueError("multiple_runs must be an integer greater than or equal to 1")
-        if value < 1:
-            raise ValueError("multiple_runs must be greater than or equal to 1")
-        return value
 
     def __init__(
         self,
