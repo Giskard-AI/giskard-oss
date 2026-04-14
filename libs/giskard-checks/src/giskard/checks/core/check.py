@@ -47,12 +47,8 @@ class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
         """
         from ..builtin.composition import AllOf
 
-        my_checks: list[Check] = (
-            list(self.checks) if hasattr(self, "checks") and self.__class__.__name__ == "AllOf" else [self]
-        )
-        other_checks: list[Check] = (
-            list(other.checks) if hasattr(other, "checks") and other.__class__.__name__ == "AllOf" else [other]
-        )
+        my_checks: list[Check] = list(self.checks) if isinstance(self, AllOf) else [self]
+        other_checks: list[Check] = list(other.checks) if isinstance(other, AllOf) else [other]
         return AllOf(checks=my_checks + other_checks)
 
     def __or__(self, other: "Check") -> "Check":
@@ -64,12 +60,8 @@ class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
         """
         from ..builtin.composition import AnyOf
 
-        my_checks: list[Check] = (
-            list(self.checks) if hasattr(self, "checks") and self.__class__.__name__ == "AnyOf" else [self]
-        )
-        other_checks: list[Check] = (
-            list(other.checks) if hasattr(other, "checks") and other.__class__.__name__ == "AnyOf" else [other]
-        )
+        my_checks: list[Check] = list(self.checks) if isinstance(self, AnyOf) else [self]
+        other_checks: list[Check] = list(other.checks) if isinstance(other, AnyOf) else [other]
         return AnyOf(checks=my_checks + other_checks)
 
     def __invert__(self) -> "Check":
