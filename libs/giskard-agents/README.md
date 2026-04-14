@@ -22,6 +22,10 @@ For development, install with dev dependencies:
 uv add giskard-agents --dev
 ```
 
+## Telemetry
+
+This package depends on `giskard-core`, which may send **optional usage analytics** when imported or when downstream libraries record events. See **[Telemetry](../giskard-core/README.md#telemetry)** in the `giskard-core` README for details and how to opt out.
+
 ## Core Concepts
 
 Three basic elements to keep in mind:
