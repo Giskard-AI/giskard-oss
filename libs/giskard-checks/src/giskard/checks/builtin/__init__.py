@@ -8,6 +8,7 @@ from ..judges import (
     Groundedness,
     LLMCheckResult,
     LLMJudge,
+    Toxicity,
 )
 
 # Import comparison checks (staying in builtin)
@@ -45,6 +46,7 @@ __all__ = [
     "Conformity",
     "LLMJudge",
     "SemanticSimilarity",
+    "Toxicity",
     "BaseLLMCheck",
     "LLMCheckResult",
 ]
