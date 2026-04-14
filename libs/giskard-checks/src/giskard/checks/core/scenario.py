@@ -1,7 +1,7 @@
 from typing import Any, Self
 
 from giskard.core.utils import NOT_PROVIDED, NotProvided
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from .check import Check
 from .input_generator import InputGenerator
@@ -104,6 +104,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         default=1,
         description="Default number of times to run this scenario before reporting success.",
         ge=1,
+        strict=True,
     )
 
     def __init__(

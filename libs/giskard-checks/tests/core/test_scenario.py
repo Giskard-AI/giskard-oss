@@ -423,8 +423,7 @@ class TestScenarioEdgeCases:
         assert calls == 3
         assert result.passed
         assert result.multiple_runs == 3
-        assert result.attempts_executed == 3
-        assert result.failed_attempt is None
+        assert result.runs_executed == 3
         assert result.steps[0].results[0].message == "attempt 3 passed"
 
     async def test_run_level_multiple_runs_overrides_scenario_default(self):
@@ -445,8 +444,7 @@ class TestScenarioEdgeCases:
         assert calls == 2
         assert result.passed
         assert result.multiple_runs == 2
-        assert result.attempts_executed == 2
-        assert result.failed_attempt is None
+        assert result.runs_executed == 2
 
     async def test_scenario_runner_multiple_runs_override(self):
         """ScenarioRunner.run accepts a run-level multiple_runs override."""
@@ -463,8 +461,7 @@ class TestScenarioEdgeCases:
         assert calls == 2
         assert result.passed
         assert result.multiple_runs == 2
-        assert result.attempts_executed == 2
-        assert result.failed_attempt is None
+        assert result.runs_executed == 2
 
     async def test_multiple_runs_stops_on_first_failure(self):
         """Repeated execution short-circuits on the first failed attempt."""
@@ -484,8 +481,7 @@ class TestScenarioEdgeCases:
         assert calls == 2
         assert result.failed
         assert result.multiple_runs == 5
-        assert result.attempts_executed == 2
-        assert result.failed_attempt == 2
+        assert result.runs_executed == 2
         assert result.steps[0].results[0].message == "attempt 2 failed"
 
     async def test_multiple_runs_uses_independent_trace_per_attempt(self):
