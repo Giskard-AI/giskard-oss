@@ -81,13 +81,17 @@ def _set_tags() -> None:
         tag(key, value)
 
 
-def _get_or_create_anonymous_id() -> str:
+def _get_or_create_anonymous_id() -> str | None:
     if _should_disable():
-        return "disabled"
+        return None
 
     config_path = Path.home() / ".giskard" / "id"
     if config_path.exists():
-        return config_path.read_text(encoding="utf-8").strip()
+        try:
+            return config_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            # Unreadable path (permissions, race with deletion, etc.): mint ephemeral below.
+            pass
 
     # Generate new persistent ID
     new_id = str(uuid.uuid4())
@@ -135,7 +139,8 @@ def telemetry_run_context() -> Iterator[None]:
     depth_token = _telemetry_run_depth.set(_telemetry_run_depth.get() + 1)
     try:
         with telemetry.new_context(capture_exceptions=False):
-            identify_context(_anonymous_id)
+            if _anonymous_id is not None:
+                identify_context(_anonymous_id)
             _set_tags()
             try:
                 yield
