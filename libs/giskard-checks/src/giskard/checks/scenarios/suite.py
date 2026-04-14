@@ -1,9 +1,11 @@
 import time
 from typing import Any, Generic, Self, TypeVar
 
+from giskard.core import telemetry, telemetry_run_context, telemetry_tag
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
 
+from .._telemetry_props import suite_shape_properties
 from ..core.interaction import Trace
 from ..core.result import ScenarioResult, SuiteResult
 from ..core.scenario import Scenario
@@ -115,20 +117,47 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         result_v2 = await suite.run(target=my_sut_v2)
         ```
         """
-        start_time = time.perf_counter()
         results: list[ScenarioResult[Trace[Any, Any]]] = []
 
         target = target if not isinstance(target, NotProvided) else self.target
+        has_target = not isinstance(target, NotProvided)
 
-        for scenario in self.scenarios:
-            result = await scenario.run(
-                target=target, return_exception=return_exception
+        with telemetry_run_context():
+            telemetry_tag("giskard_component", "suite")
+            telemetry_tag("giskard_operation", "suite_run")
+
+            shape_props = suite_shape_properties(
+                scenario_count=len(self.scenarios),
+                has_target=has_target,
             )
-            results.append(result)
+            _ = telemetry.capture(
+                "checks_suite_run_started",
+                properties=shape_props,
+            )
 
-        end_time = time.perf_counter()
+            start_time = time.perf_counter()
+            for scenario in self.scenarios:
+                result = await scenario.run(
+                    target=target, return_exception=return_exception
+                )
+                results.append(result)
+            end_time = time.perf_counter()
 
-        return SuiteResult(
-            results=results,
-            duration_ms=int((end_time - start_time) * 1000),
-        )
+            suite_result = SuiteResult(
+                results=results,
+                duration_ms=int((end_time - start_time) * 1000),
+            )
+
+            _ = telemetry.capture(
+                "checks_suite_run_finished",
+                properties={
+                    **shape_props,
+                    "duration_ms": suite_result.duration_ms,
+                    "passed_count": suite_result.passed_count,
+                    "failed_count": suite_result.failed_count,
+                    "errored_count": suite_result.errored_count,
+                    "skipped_count": suite_result.skipped_count,
+                },
+            )
+
+        return suite_result

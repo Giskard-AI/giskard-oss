@@ -4,6 +4,12 @@ import pytest
 from giskard.agents.embeddings import EmbeddingModel
 from giskard.agents.embeddings.base import EmbeddingParams
 from giskard.agents.generators import Generator
+from giskard.core import disable_telemetry
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Disable telemetry for tests."""
+    disable_telemetry()
 
 
 @pytest.fixture
