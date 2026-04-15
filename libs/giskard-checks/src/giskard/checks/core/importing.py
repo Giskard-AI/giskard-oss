@@ -90,8 +90,6 @@ def resolve_python_reference(value: str, *, path: Path | None = None) -> Any:
                     cached_module, preferred_search_path
                 ):
                     sys.modules.pop(module_name, None)
-            elif not _module_belongs_to_search_paths(cached_module, search_paths):
-                sys.modules.pop(module_name, None)
 
         importlib.invalidate_caches()
         module = importlib.import_module(module_name)

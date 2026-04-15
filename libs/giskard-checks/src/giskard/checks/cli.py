@@ -145,6 +145,8 @@ def _run_command(args: argparse.Namespace) -> int:
     elif args.format == "json":
         _write_text_output(_render_json(execution), output_path)
     elif args.format == "junit":
+        if output_path:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
         xml = _build_suite_result(execution).to_junit_xml(path=output_path)
         if output_path is None:
             print(xml)
