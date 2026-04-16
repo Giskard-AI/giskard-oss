@@ -51,6 +51,7 @@ from .judges import (
     Groundedness,
     LLMCheckResult,
     LLMJudge,
+    Toxicity,
 )
 from .scenarios.runner import ScenarioRunner
 from .scenarios.suite import Suite
@@ -113,6 +114,7 @@ __all__ = [
     "Groundedness",
     "LLMJudge",
     "SemanticSimilarity",
+    "Toxicity",
     "StringMatching",
     "RegexMatching",
 

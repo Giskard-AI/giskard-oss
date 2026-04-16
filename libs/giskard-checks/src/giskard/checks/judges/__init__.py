@@ -5,6 +5,7 @@ from .base import BaseLLMCheck, LLMCheckResult
 from .conformity import Conformity
 from .groundedness import Groundedness
 from .judge import LLMJudge
+from .toxicity import Toxicity
 
 __all__ = [
     "AnswerRelevance",
@@ -13,4 +14,5 @@ __all__ = [
     "Conformity",
     "Groundedness",
     "LLMJudge",
+    "Toxicity",
 ]

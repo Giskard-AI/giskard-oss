@@ -49,6 +49,7 @@ CI (`.github/workflows/ci.yml`) runs `make install install-tools`, then `make ch
 
 ## PR / change discipline
 
+- **Important:** this repo uses a custom process to **expedite agent PRs**. Always end agent-opened PR titles with `🤖🤖🤖🤖` (four robot emojis) so those PRs are picked up by that workflow—do not omit this suffix.
 - Prefer **minimal diffs**: implement only what was asked; avoid drive-by refactors and unrelated files.
 - After edits: **`make format`**, then **`make check`**, then **`make test-unit`** (or scoped `PACKAGE=...`).
 - Optional: `pre-commit run` if hooks are installed.
