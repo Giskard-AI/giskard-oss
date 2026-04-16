@@ -10,7 +10,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import cast
 
-from posthog import Posthog, identify_context, tag
+from posthog import Posthog, identify_context, set_context_session, tag
 
 _DISABLING_ENV_VARS = [
     "DO_NOT_TRACK",
@@ -93,18 +93,32 @@ def _get_or_create_anonymous_id() -> str | None:
             # Unreadable path (permissions, race with deletion, etc.): mint ephemeral below.
             pass
 
-    # Generate new persistent ID
+    # Atomically create the file so concurrent first-run processes converge on one ID
+    # rather than each persisting a different UUID.
     new_id = str(uuid.uuid4())
     try:
-        _ = config_path.parent.mkdir(parents=True, exist_ok=True)
-        _ = config_path.write_text(new_id, encoding="utf-8")
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(config_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        # Lost the race; another process just wrote its ID. Read theirs.
+        try:
+            return config_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return f"anon-{uuid.uuid4()}"
     except OSError:
-        # Fallback for read-only systems
+        # Read-only system, etc.
         return f"anon-{uuid.uuid4()}"
+    try:
+        _ = os.write(fd, new_id.encode("utf-8"))
+    finally:
+        os.close(fd)
     return new_id
 
 
 _anonymous_id = _get_or_create_anonymous_id()
+# Distinguishes events from different invocations on the same machine in PostHog
+# dashboards, while _anonymous_id keeps them all linked to the same user.
+_process_session_id = str(uuid.uuid4())
 
 telemetry = Posthog(
     project_api_key="phc_Asp36pe4X5WMqeJ4aMMV4gq5LGdGw69mdYSdEYGpbxm2",  # pragma: allowlist secret
@@ -120,42 +134,65 @@ def disable_telemetry() -> None:
     telemetry.disabled = True
 
 
-# Nested ``telemetry_run_context`` / ``scoped_telemetry``: only the outermost
-# scope emits ``giskard_uncaught_exception`` (one event per logical failure).
-_telemetry_run_depth: contextvars.ContextVar[int] = contextvars.ContextVar(
-    "_telemetry_run_depth", default=0
+# Tracks whether we are currently inside any telemetry scope.
+# Used so that nested telemetry_run_context / scoped_telemetry emit
+# giskard_uncaught_exception only once per logical failure, and so
+# telemetry_capture can drop events that would otherwise be "personless".
+_in_telemetry_scope: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "_in_telemetry_scope", default=False
 )
+
+
+def telemetry_capture(
+    event: str, *, properties: dict[str, object] | None = None
+) -> None:
+    """Capture a telemetry event, dropping it if no telemetry_run_context is active.
+
+    Outside a context, PostHog assigns a random per-event UUID and marks the event
+    "personless" — disconnecting it from the persistent anonymous ID and inflating
+    user counts in the dashboard. Drop those events instead so future regressions
+    don't pollute analytics.
+
+    Parameters
+    ----------
+    event : str
+        The event name to capture.
+    properties : dict[str, object] or None
+        Optional event properties, passed through to PostHog unchanged.
+    """
+    if not _in_telemetry_scope.get():
+        return
+    _ = telemetry.capture(event, properties=properties)
 
 
 @contextmanager
 def telemetry_run_context() -> Iterator[None]:
     """Open a PostHog context scope for a logical operation (sync or async body).
 
-    Use inside ``async def`` with ``with telemetry_run_context():`` so nested
-    ``scoped_telemetry`` calls get a consistent parent scope. Pair with
-    ``telemetry_tag`` (see ``giskard.core``) to attach non-PII dimensions to
-    child captures.
+    Use as a with-statement inside an async def so nested scoped_telemetry calls
+    share a consistent parent scope. Pair with telemetry_tag (from giskard.core)
+    to attach non-PII dimensions to child captures.
     """
-    depth_token = _telemetry_run_depth.set(_telemetry_run_depth.get() + 1)
+    is_outermost = not _in_telemetry_scope.get()
+    token = _in_telemetry_scope.set(True)
     try:
         with telemetry.new_context(capture_exceptions=False):
             if _anonymous_id is not None:
                 identify_context(_anonymous_id)
+            set_context_session(_process_session_id)
             _set_tags()
             try:
                 yield
             except Exception as e:
                 # Do not send exception text: it may contain user content, secrets, or paths.
-                if _telemetry_run_depth.get() == 1:
-                    _ = telemetry.capture(
+                if is_outermost:
+                    telemetry_capture(
                         "giskard_uncaught_exception",
-                        properties={
-                            "exception_type": type(e).__name__,
-                        },
+                        properties={"exception_type": type(e).__name__},
                     )
                 raise
     finally:
-        _telemetry_run_depth.reset(depth_token)
+        _in_telemetry_scope.reset(token)
 
 
 def scoped_telemetry[F: Callable[..., object]](func: F) -> F:
