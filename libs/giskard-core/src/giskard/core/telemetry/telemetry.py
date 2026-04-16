@@ -102,7 +102,8 @@ def _get_or_create_anonymous_id() -> str | None:
     except FileExistsError:
         # Lost the race; another process just wrote its ID. Read theirs.
         try:
-            return config_path.read_text(encoding="utf-8").strip()
+            content = config_path.read_text(encoding="utf-8").strip()
+            return content if content else f"anon-{uuid.uuid4()}"
         except OSError:
             return f"anon-{uuid.uuid4()}"
     except OSError:
