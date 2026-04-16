@@ -1,70 +1,71 @@
-import asyncio
-import pytest
+from typing import Optional, Dict, Any
+import json
 
-from giskard.checks import JsonValid
-from giskard.core.core import Trace
+from giskard.checks.core.check import Check
+from giskard.checks.core.result import CheckResult
+from giskard.checks.core import Trace, resolve
 
-
-def test_valid_json():
-    trace = Trace(outputs={"result": '{"name": "John"}'})
-
-    check = JsonValid(key="result")
-    result = asyncio.run(check.run(trace))
-
-    assert result.passed
-    assert "Valid JSON" in result.message
+from pydantic import field_validator
 
 
-def test_invalid_json():
-    trace = Trace(outputs={"result": '{"name": John}'})  # invalid JSON
+@Check.register("json_valid")
+class JsonValid(Check):
+    key: Optional[str] = None
+    expected_schema: Optional[Dict[str, Any]] = None
+    schema: Optional[Dict[str, Any]] = None  # ✅ FAST FIX (compatibility)
 
-    check = JsonValid(key="result")
-    result = asyncio.run(check.run(trace))
+    @field_validator("expected_schema", "schema")
+    @classmethod
+    def validate_schema(cls, v):
+        if v is None:
+            return v
+        try:
+            import jsonschema
+            jsonschema.Draft7Validator.check_schema(v)
+        except ImportError:
+            raise ImportError("The 'jsonschema' library is required.")
+        except Exception as e:
+            raise ValueError(f"Invalid JSON schema: {str(e)}")
+        return v
 
-    assert not result.passed
-    assert "Invalid JSON" in result.message
+    async def run(self, trace: Trace) -> CheckResult:
+        try:
+            # Handle key-based extraction
+            if self.key:
+                try:
+                    value = resolve(trace, self.key)
+                except Exception:
+                    return CheckResult.failure(message="Key not found in trace")
+            else:
+                # Support DummyTrace + real Trace
+                if hasattr(trace, "last") and trace.last is not None:
+                    value = trace.last.output
+                elif hasattr(trace, "outputs"):
+                    value = trace.outputs
+                else:
+                    value = trace
 
+            if value is None:
+                return CheckResult.failure(message="Output is empty")
 
-def test_schema_validation_success():
-    trace = Trace(outputs={"result": '{"age": 25}'})
+            parsed = json.loads(value) if isinstance(value, str) else value
 
-    schema = {
-        "type": "object",
-        "properties": {
-            "age": {"type": "number"}
-        },
-        "required": ["age"]
-    }
+            #  FIX: support both expected_schema and schema
+            schema = self.expected_schema or self.schema
 
-    check = JsonValid(key="result", expected_schema=schema)
-    result = asyncio.run(check.run(trace))
+            if schema:
+                import jsonschema
+                try:
+                    jsonschema.validate(instance=parsed, schema=schema)
+                except Exception as e:
+                    return CheckResult.failure(
+                        message=f"Schema validation failed: {str(e)}"
+                    )
 
-    assert result.passed
+            return CheckResult.success(message="Valid JSON")
 
+        except json.JSONDecodeError as e:
+            return CheckResult.failure(message=f"Invalid JSON: {str(e)}")
 
-def test_schema_validation_failure():
-    trace = Trace(outputs={"result": '{"age": "twenty"}'})
-
-    schema = {
-        "type": "object",
-        "properties": {
-            "age": {"type": "number"}
-        },
-        "required": ["age"]
-    }
-
-    check = JsonValid(key="result", expected_schema=schema)
-    result = asyncio.run(check.run(trace))
-
-    assert not result.passed
-    assert "Schema validation failed" in result.message
-
-
-def test_key_not_found():
-    trace = Trace(outputs={"data": '{"name": "John"}'})
-
-    check = JsonValid(key="missing")
-    result = asyncio.run(check.run(trace))
-
-    assert not result.passed
-    assert "Key not found" in result.message
+        except Exception as e:
+            return CheckResult.error(message=f"Unexpected error: {str(e)}")
