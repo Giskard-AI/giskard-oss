@@ -124,6 +124,7 @@ telemetry = Posthog(
     project_api_key="phc_Asp36pe4X5WMqeJ4aMMV4gq5LGdGw69mdYSdEYGpbxm2",  # pragma: allowlist secret
     host="https://eu.i.posthog.com",
     disabled=_should_disable(),
+    disable_geoip=_should_disable(),
 )
 
 
