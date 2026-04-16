@@ -37,6 +37,10 @@ def set_default_embedding_model(embedding_model: "BaseEmbeddingModel") -> None:
     ----------
     embedding_model : BaseEmbeddingModel
         The embedding model to use as default for all embedding checks.
+        This can be the built-in default OpenAI-compatible model, the local
+        ``SentenceTransformerEmbedding`` provider from
+        ``giskard.checks.utils.embeddings``, or any custom implementation of
+        ``BaseEmbeddingModel``.
     """
     global _default_embedding_model
     _default_embedding_model = embedding_model

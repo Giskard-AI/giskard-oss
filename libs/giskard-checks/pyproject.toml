@@ -15,6 +15,9 @@ dependencies = [
     "rich>=14.2.0,<15",
 ]
 
+[project.optional-dependencies]
+local-embeddings = ["sentence-transformers>=2.0,<4"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]
 addopts = "--doctest-modules"

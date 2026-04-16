@@ -187,6 +187,7 @@ API Overview
 
 **Settings**
 - `giskard.checks.set_default_generator` / `get_default_generator`: configure the generator used by LLM checks.
+- `giskard.checks.set_default_embedding_model` / `get_default_embedding_model`: configure the embedding model used by embedding-based checks such as `SemanticSimilarity`.
 
 Testing
 -------
@@ -527,6 +528,36 @@ Notes
 - `Trace` captures every interaction; JSONPath keys like `trace.last.outputs` resolve against that structure.
 - Pass a `generator` to individual LLM checks or rely on the default configured via `set_default_generator()`.
 - Built-in LLM checks rely on templates bundled in `giskard.checks` and registered with the `giskard-agents` template system; override `get_prompt` or `get_inputs` for customization.
+
+Local embeddings for SemanticSimilarity
+--------------------------------------
+
+`SemanticSimilarity` uses an embedding model under the hood. By default it uses the
+global embedding model from `set_default_embedding_model()`, which defaults to an
+OpenAI-compatible provider. For local or offline usage, install the optional
+sentence-transformers dependency:
+
+```bash
+pip install "giskard-checks[local-embeddings]"
+```
+
+Then configure the built-in local provider:
+
+```python
+from giskard.checks import SemanticSimilarity, set_default_embedding_model
+from giskard.checks.utils.embeddings import SentenceTransformerEmbedding
+
+set_default_embedding_model(
+    SentenceTransformerEmbedding(model_name="all-MiniLM-L6-v2")
+)
+
+check = SemanticSimilarity(reference_text="Hello world", threshold=0.8)
+```
+
+You can also plug in your own provider by subclassing
+`giskard.agents.embeddings.BaseEmbeddingModel` and passing it either directly to
+`SemanticSimilarity(embedding_model=...)` or globally via
+`set_default_embedding_model(...)`.
 
 Advanced Usage
 --------------
