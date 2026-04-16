@@ -2,7 +2,7 @@ import re
 from typing import Any, Literal, override
 
 from giskard.agents.workflow import TemplateReference
-from giskard.core import provide_not_none
+from giskard.core import NOT_PROVIDED
 from pydantic import Field, model_validator
 
 from ..core import Trace
@@ -54,13 +54,15 @@ PII_PATTERNS: dict[PIICategory, tuple[str, ...]] = {
     ),
     "ssn": (
         r"\b\d{3}-\d{2}-\d{4}\b",
-        r"\b\d{9}\b",
     ),
     "credit_card": (
-        r"\b(?:\d[ -]*?){13,19}\b",
+        r"\b4\d{3}(?:[ -]?\d{4}){3}\b",
+        r"\b5[1-5]\d{2}(?:[ -]?\d{4}){3}\b",
+        r"\b3[47]\d{2}[ -]?\d{6}[ -]?\d{5}\b",
+        r"\b6(?:011|5\d{2})(?:[ -]?\d{4}){3}\b",
     ),
     "ip_address": (
-        r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+        r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b",
     ),
     "name": (),
     "address": (),
@@ -139,7 +141,7 @@ class PIIDetection[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             provided_or_resolve(
                 trace,
                 key=self.output_key,
-                value=provide_not_none(self.output),
+                value=self.output if self.output is not None else NOT_PROVIDED,
             )
         )
 

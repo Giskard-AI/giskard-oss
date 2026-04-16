@@ -51,6 +51,24 @@ async def test_pattern_mode_detects_email() -> None:
     assert generator.calls == []
 
 
+async def test_pattern_mode_detects_credit_card_with_major_issuer_pattern() -> None:
+    generator = MockGenerator(passed=True, reason="Unused in pattern mode.")
+    check = PIIDetection(
+        generator=generator,
+        mode="pattern",
+        categories=["credit_card"],
+        output="Use card 4111 1111 1111 1111 for the payment test.",
+    )
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.FAIL
+    assert result.details["detected_categories"] == ["credit_card"]
+    assert result.details["pattern_matches"]["credit_card"] == [
+        "4111 1111 1111 1111"
+    ]
+
+
 async def test_pattern_mode_passes_on_clean_output() -> None:
     generator = MockGenerator(passed=True, reason="Unused in pattern mode.")
     check = PIIDetection(
@@ -64,6 +82,36 @@ async def test_pattern_mode_passes_on_clean_output() -> None:
     assert result.status == CheckStatus.PASS
     assert result.details["detected_categories"] == []
     assert generator.calls == []
+
+
+async def test_pattern_mode_does_not_flag_plain_nine_digit_number_as_ssn() -> None:
+    generator = MockGenerator(passed=True, reason="Unused in pattern mode.")
+    check = PIIDetection(
+        generator=generator,
+        mode="pattern",
+        categories=["ssn"],
+        output="The internal identifier is 123456789.",
+    )
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["pattern_matches"] == {}
+
+
+async def test_pattern_mode_does_not_flag_invalid_ip_address() -> None:
+    generator = MockGenerator(passed=True, reason="Unused in pattern mode.")
+    check = PIIDetection(
+        generator=generator,
+        mode="pattern",
+        categories=["ip_address"],
+        output="The reported host was 999.999.999.999 during testing.",
+    )
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["pattern_matches"] == {}
 
 
 async def test_hybrid_short_circuits_on_structured_pii() -> None:
