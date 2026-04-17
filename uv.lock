@@ -695,7 +695,6 @@ dependencies = [
     { name = "giskard-agents" },
     { name = "giskard-checks" },
     { name = "giskard-core" },
-    { name = "regex" },
 ]
 
 [package.dev-dependencies]
@@ -714,7 +713,6 @@ requires-dist = [
     { name = "giskard-agents", editable = "libs/giskard-agents" },
     { name = "giskard-checks", editable = "libs/giskard-checks" },
     { name = "giskard-core", editable = "libs/giskard-core" },
-    { name = "regex", specifier = ">=2026.1.15" },
 ]
 
 [package.metadata.requires-dev]
@@ -768,6 +766,7 @@ dependencies = [
     { name = "jsonpath-ng" },
     { name = "numpy" },
     { name = "pydantic" },
+    { name = "regex" },
     { name = "rich" },
 ]
 
@@ -779,6 +778,7 @@ requires-dist = [
     { name = "jsonpath-ng", specifier = ">=1.7.0,<2" },
     { name = "numpy", specifier = ">=2.4.1,<3" },
     { name = "pydantic", specifier = ">=2.12,<3" },
+    { name = "regex", specifier = ">=2026.1.15" },
     { name = "rich", specifier = ">=14.2.0,<15" },
 ]
 

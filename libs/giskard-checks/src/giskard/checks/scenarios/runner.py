@@ -12,7 +12,7 @@ from giskard.core import (
     NOT_PROVIDED,
     NotProvided,
     scoped_telemetry,
-    telemetry,
+    telemetry_capture,
     telemetry_tag,
 )
 
@@ -127,7 +127,7 @@ class ScenarioRunner:
             has_target=has_target,
         )
 
-        _ = telemetry.capture(
+        telemetry_capture(
             "checks_scenario_run_started",
             properties=shape_props,
         )
@@ -169,7 +169,7 @@ class ScenarioRunner:
             final_trace=trace,
         )
 
-        _ = telemetry.capture(
+        telemetry_capture(
             "checks_scenario_run_finished",
             properties={
                 **shape_props,
