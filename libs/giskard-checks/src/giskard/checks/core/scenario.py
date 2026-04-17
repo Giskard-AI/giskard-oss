@@ -73,7 +73,10 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         inferred from the components. Useful when using custom trace subclasses
         with additional computed fields or methods.
     multiple_runs : int
-        Default number of times to run the scenario before reporting success.
+        Default upper bound on how many times to execute the full scenario (each
+        execution uses a fresh trace). Each run must pass for the next to run;
+        execution stops on the first non-passing run (FAIL, ERROR, or SKIP). This
+        is not a "retry until one success" mode.
     """
 
     name: str = Field(
@@ -102,7 +105,11 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
     )
     multiple_runs: int = Field(
         default=1,
-        description="Default number of times to run this scenario before reporting success.",
+        description=(
+            "Default maximum number of full scenario executions (fresh trace per run). "
+            "Each run must pass overall for another to run; stops on first non-passing run. "
+            "Not a retry-until-success loop."
+        ),
         ge=1,
         strict=True,
     )
@@ -267,9 +274,11 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
 
         Each run executes all steps in order with a trace shared across those
         steps: interaction specs update the trace, then checks validate it and
-        stop that run on failure. When more than one run is configured, each run
-        uses a fresh trace. Execution stops early on the first non-passing run
-        (FAIL, ERROR, or SKIP).
+        stop that run on failure. When more than one run is configured, the
+        scenario is executed up to that many times, with a fresh trace each time.
+        Each run must pass overall for the next to run. Execution stops early on
+        the first non-passing run (FAIL, ERROR, or SKIP). Multi-run is not
+        equivalent to retrying until a single passing outcome.
 
         Parameters
         ----------
@@ -278,8 +287,8 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         return_exception : bool
             If True, return results even when exceptions occur instead of raising.
         multiple_runs : int | None
-            Optional run-level repeat count. When provided, it overrides the
-            scenario-level `multiple_runs` value.
+            Optional cap on full scenario executions. When provided, it overrides
+            the scenario-level `multiple_runs` value.
 
         Returns
         -------

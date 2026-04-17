@@ -234,9 +234,9 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
     final_trace : TraceType
         Trace state after execution, containing all interactions that occurred.
     multiple_runs : int
-        Configured number of runs for this scenario execution.
+        Configured upper bound on full scenario executions for this invocation.
     runs_executed : int
-        Number of runs that actually executed.
+        How many full scenario executions ran before stopping (≤ ``multiple_runs``).
     status : ScenarioStatus
         Aggregated outcome of the scenario derived from its steps.
     passed : bool
@@ -255,11 +255,11 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
     final_trace: TraceType = Field(..., description="Final trace state after execution")
     multiple_runs: int = Field(
         default=1,
-        description="Configured number of runs for this scenario execution.",
+        description="Configured maximum full scenario executions for this invocation.",
     )
     runs_executed: int = Field(
         default=1,
-        description="Number of scenario runs that actually executed.",
+        description="Full scenario executions that ran before stopping (at most multiple_runs).",
     )
 
     @computed_field

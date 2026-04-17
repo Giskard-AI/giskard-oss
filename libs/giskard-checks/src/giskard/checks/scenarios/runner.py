@@ -87,6 +87,10 @@ class ScenarioRunner:
     The runner handles exceptions from checks by converting them into
     `CheckResult.error` objects and stopping execution.
 
+    For a `multiple_runs` setting greater than 1, the full scenario is executed
+    at most that many times (fresh trace per attempt); each attempt must pass
+    for the next to run, otherwise execution stops with that attempt's result.
+
     Examples
     --------
     ```python
@@ -191,10 +195,12 @@ class ScenarioRunner:
         return_exception: bool = False,
         multiple_runs: int | None = None,
     ) -> ScenarioResult[TraceType]:
-        """Execute a scenario multiple times until success or failure.
+        """Execute a scenario up to N times, stopping on the first non-passing run.
 
-        Each run is executed independently with a fresh trace. Execution stops
-        early on the first non-passing run (FAIL, ERROR, or SKIP).
+        Each run is executed independently with a fresh trace. The scenario is
+        run at most ``multiple_runs`` times when every run passes; otherwise
+        execution stops on the first run whose outcome is not PASS (FAIL, ERROR,
+        or SKIP). This is not a "retry until success" strategy.
 
         Parameters
         ----------
@@ -205,13 +211,13 @@ class ScenarioRunner:
         return_exception : bool
             If True, return results even when exceptions occur instead of raising.
         multiple_runs : int | None
-            Optional run-level repeat count. When provided, it overrides the
-            scenario-level `multiple_runs` value.
+            Optional cap on full scenario executions. When provided, it overrides
+            the scenario-level `multiple_runs` value.
 
         Returns
         -------
         ScenarioResult
-            Results from the final run executed, updated with multi-run metadata.
+            Results from the last run executed, updated with multi-run metadata.
         """
 
         configured_runs = (

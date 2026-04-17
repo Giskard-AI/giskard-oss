@@ -407,8 +407,8 @@ class TestScenarioNormalCases:
 class TestScenarioEdgeCases:
     """Test edge cases for scenarios."""
 
-    async def test_scenario_level_multiple_runs_repeats_until_all_pass(self):
-        """Scenario-level multiple_runs controls the number of attempts."""
+    async def test_scenario_level_multiple_runs_executes_all_when_each_passes(self):
+        """When each run passes, scenario-level multiple_runs runs that many full executions."""
         calls = 0
 
         def check_fn(trace: Trace[str, str]) -> CheckResult:
