@@ -214,7 +214,9 @@ class ScenarioRunner:
             Results from the final run executed, updated with multi-run metadata.
         """
 
-        configured_runs = _validate_multiple_runs(multiple_runs) or scenario.multiple_runs
+        configured_runs = (
+            _validate_multiple_runs(multiple_runs) or scenario.multiple_runs
+        )
         start_time = time.perf_counter()
         last_result: ScenarioResult[TraceType] | None = None
 
@@ -237,7 +239,7 @@ class ScenarioRunner:
                 )
 
         if last_result is None:  # Defensive: configured_runs validation prevents this.
-            raise RuntimeError("Scenario did not execute any attempts")
+            raise RuntimeError("Scenario did not execute any runs")
 
         end_time = time.perf_counter()
         return last_result.model_copy(

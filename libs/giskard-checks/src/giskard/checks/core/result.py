@@ -234,7 +234,7 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
     final_trace : TraceType
         Trace state after execution, containing all interactions that occurred.
     multiple_runs : int
-        Configured number of attempts for this scenario execution.
+        Configured number of runs for this scenario execution.
     runs_executed : int
         Number of runs that actually executed.
     status : ScenarioStatus
@@ -255,7 +255,7 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
     final_trace: TraceType = Field(..., description="Final trace state after execution")
     multiple_runs: int = Field(
         default=1,
-        description="Configured number of scenario execution attempts.",
+        description="Configured number of runs for this scenario execution.",
     )
     runs_executed: int = Field(
         default=1,

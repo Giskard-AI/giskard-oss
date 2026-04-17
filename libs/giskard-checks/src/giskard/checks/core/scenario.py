@@ -263,11 +263,13 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         return_exception: bool = False,
         multiple_runs: int | None = None,
     ) -> ScenarioResult[TraceType]:
-        """Execute the scenario steps sequentially with shared trace.
+        """Execute the scenario via the default runner, with optional multiple runs.
 
-        Each step is executed in order:
-        - Interaction specs update the shared trace
-        - Checks validate the current trace and stop execution on failure
+        Each run executes all steps in order with a trace shared across those
+        steps: interaction specs update the trace, then checks validate it and
+        stop that run on failure. When more than one run is configured, each run
+        uses a fresh trace. Execution stops early on the first non-passing run
+        (FAIL, ERROR, or SKIP).
 
         Parameters
         ----------
@@ -282,7 +284,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         Returns
         -------
         ScenarioResult
-            Results from executing the scenario.
+            Results from the last run executed, including multi-run metadata.
         """
         # Lazy import to avoid circular dependency
         from ..scenarios.runner import get_runner
