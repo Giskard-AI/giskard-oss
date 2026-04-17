@@ -44,6 +44,14 @@ from giskard.core import disable_telemetry
 disable_telemetry()
 ```
 
+### GeoIP
+
+When telemetry is **enabled**, PostHog may apply **GeoIP** enrichment to events (server-side location metadata used in dashboards). That enrichment is **off** whenever telemetry is fully disabled (see above) or when you call `disable_telemetry()`.
+
+To **keep usage analytics** but **disable GeoIP only**, set this environment variable to a truthy value **before** importing Giskard packages (same matching rules as in [How to disable telemetry](#how-to-disable-telemetry)):
+
+- `GISKARD_TELEMETRY_DISABLE_GEOIP`
+
 ### For library authors
 
 The client and helpers are exported from `giskard.core`: `telemetry`, `telemetry_tag`, `telemetry_run_context`, `scoped_telemetry`, and `disable_telemetry`. New events should follow the same rules: **no user strings, secrets, file paths, or model I/O** in analytics payloads.

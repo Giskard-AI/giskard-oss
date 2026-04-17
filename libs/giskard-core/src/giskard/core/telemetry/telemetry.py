@@ -16,6 +16,9 @@ _DISABLING_ENV_VARS = [
     "DO_NOT_TRACK",
     "GISKARD_TELEMETRY_DISABLED",
 ]
+_DISABLE_GEOIP_ENV_VARS = [
+    "GISKARD_TELEMETRY_DISABLE_GEOIP",
+]
 # Common truthy values used in CLI tools and web frameworks
 _TRUTHY_VALUES = {"1", "true", "yes", "on", "t", "y"}
 
@@ -31,6 +34,12 @@ def _is_true_str(value: str | None) -> bool:
 
 def _should_disable() -> bool:
     return any(_is_true_str(os.getenv(var)) for var in _DISABLING_ENV_VARS)
+
+
+def _should_disable_geoip() -> bool:
+    return _should_disable() or any(
+        _is_true_str(os.getenv(var)) for var in _DISABLE_GEOIP_ENV_VARS
+    )
 
 
 def _get_lib_version(lib: str) -> str:
@@ -125,7 +134,7 @@ telemetry = Posthog(
     project_api_key="phc_Asp36pe4X5WMqeJ4aMMV4gq5LGdGw69mdYSdEYGpbxm2",  # pragma: allowlist secret
     host="https://eu.i.posthog.com",
     disabled=_should_disable(),
-    disable_geoip=_should_disable(),
+    disable_geoip=_should_disable_geoip(),
 )
 
 
@@ -134,6 +143,7 @@ def disable_telemetry() -> None:
     Disable telemetry. Overrides the environment variable settings.
     """
     telemetry.disabled = True
+    telemetry.disable_geoip = True
 
 
 # Tracks whether we are currently inside any telemetry scope.
