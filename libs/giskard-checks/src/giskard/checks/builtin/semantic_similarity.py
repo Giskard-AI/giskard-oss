@@ -1,14 +1,23 @@
-from typing import override
+from typing import Any, Generic, override
 
 import numpy as np
 from giskard.core import provide_not_none
 from pydantic import Field
+from typing_extensions import TypeVar
 
 from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve, resolve
 from ..core.mixin import WithEmbeddingMixin
 from ..core.result import CheckResult
+
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
@@ -44,8 +53,10 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 
 @Check.register("semantic_similarity")
-class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Check[InputType, OutputType, TraceType], WithEmbeddingMixin
+class SemanticSimilarity(
+    Check[InputType, OutputType, TraceType],
+    WithEmbeddingMixin,
+    Generic[InputType, OutputType, TraceType],
 ):
     """Check that validates semantic similarity between outputs and reference text.
 

@@ -15,8 +15,15 @@ from jsonpath_ng import (
 )
 from jsonpath_ng.exceptions import JsonPathLexerError, JsonPathParserError
 from pydantic import AfterValidator, BaseModel, Field
+from typing_extensions import TypeVar
 
 from .interaction import Trace
+
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[Any, Any],
+)
 
 
 class _JSONPathStrMarker:
@@ -78,7 +85,7 @@ def _is_list_expression(expression: JSONPath) -> bool:
     return False
 
 
-def resolve[TraceType: Trace](trace: TraceType, key: str) -> Any:  # pyright: ignore[reportMissingTypeArgument]
+def resolve(trace: TraceType, key: str) -> Any:
     expression: JSONPath = parse(key)
     matches: list[DatumInContext] = expression.find({"trace": trace.model_dump()})
 
@@ -88,7 +95,7 @@ def resolve[TraceType: Trace](trace: TraceType, key: str) -> Any:  # pyright: ig
     return matches[0].value if matches else NoMatch(key=key)
 
 
-def provided_or_resolve[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+def provided_or_resolve(
     trace: TraceType,
     key: str | NotProvided = NOT_PROVIDED,
     value: Any = NOT_PROVIDED,

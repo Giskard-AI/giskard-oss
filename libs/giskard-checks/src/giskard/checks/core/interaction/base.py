@@ -1,15 +1,23 @@
 from collections.abc import AsyncGenerator
+from typing import Any, Generic
 
 from giskard.core import Discriminated, discriminated_base
+from typing_extensions import TypeVar
 
 from .interaction import Interaction
 from .trace import Trace
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
+
 
 @discriminated_base
-class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Discriminated
-):
+class InteractionSpec(Discriminated, Generic[InputType, OutputType, TraceType]):
     """Base class for interaction specifications that generate interactions.
 
     An interaction spec produces one or more `Interaction` objects by yielding

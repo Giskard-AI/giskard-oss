@@ -1,15 +1,25 @@
-from typing import override
+from typing import Any, Generic, override
 
 from pydantic import Field
+from typing_extensions import TypeVar
 
 from ..core import Trace
 from ..core.check import Check
 from ..core.result import CheckResult, CheckStatus
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
+
 
 @Check.register("all_of")
-class AllOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Check[InputType, OutputType, TraceType]
+class AllOf(
+    Check[InputType, OutputType, TraceType],
+    Generic[InputType, OutputType, TraceType],
 ):
     """Passes only when **all** inner checks pass (short-circuits on first failure).
 
@@ -67,8 +77,9 @@ class AllOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
 
 
 @Check.register("any_of")
-class AnyOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Check[InputType, OutputType, TraceType]
+class AnyOf(
+    Check[InputType, OutputType, TraceType],
+    Generic[InputType, OutputType, TraceType],
 ):
     """Passes when **at least one** inner check passes (short-circuits on first pass).
 
@@ -141,8 +152,9 @@ class AnyOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
 
 
 @Check.register("not")
-class Not[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Check[InputType, OutputType, TraceType]
+class Not(
+    Check[InputType, OutputType, TraceType],
+    Generic[InputType, OutputType, TraceType],
 ):
     """Inverts the result of an inner check.
 

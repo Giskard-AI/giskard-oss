@@ -1,6 +1,8 @@
 from collections.abc import AsyncGenerator
+from typing import Any, Generic
 
 from pydantic import BaseModel, Field
+from typing_extensions import TypeVar
 
 from ..core import Trace
 from ..core.input_generator import InputGenerator
@@ -18,9 +20,18 @@ class UserSimulatorOutput(BaseModel):
     )
 
 
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[Any, Any],
+)
+
+
 @InputGenerator.register("user_simulator")
-class UserSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    InputGenerator[str, TraceType], WithGeneratorMixin
+class UserSimulator(
+    InputGenerator[str, TraceType],
+    WithGeneratorMixin,
+    Generic[TraceType],
 ):
     """User simulation with predefined or custom personas.
 

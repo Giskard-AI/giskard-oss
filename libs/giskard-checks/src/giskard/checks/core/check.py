@@ -1,14 +1,23 @@
+from typing import Any, Generic
+
 from giskard.core import Discriminated, discriminated_base
 from pydantic import Field
+from typing_extensions import TypeVar
 
 from .interaction import Trace
 from .result import CheckResult
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
+
 
 @discriminated_base
-class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Discriminated
-):
+class Check(Discriminated, Generic[InputType, OutputType, TraceType]):
     """Base class for checks.
 
     Subclasses should be registered using the @Check.register("kind") decorator

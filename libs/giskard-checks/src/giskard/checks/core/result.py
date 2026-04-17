@@ -1,14 +1,21 @@
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Generic
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.panel import Panel
 from rich.rule import Rule
+from typing_extensions import TypeVar
 
 from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
+
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[Any, Any],
+)
 
 STATUS_MAPPING = {
     "total": {
@@ -220,7 +227,7 @@ class ScenarioStatus(str, Enum):
     SKIP = "skip"
 
 
-class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ignore[reportMissingTypeArgument]
+class ScenarioResult(BaseResult, Generic[TraceType], frozen=True):
     """Result of executing an entire scenario.
 
     Attributes

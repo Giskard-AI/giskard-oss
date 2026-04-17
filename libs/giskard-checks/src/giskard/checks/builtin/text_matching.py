@@ -6,11 +6,12 @@ This module provides checks for text matching:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Self, override
+from typing import Any, Generic, Self, override
 
 import regex
 from giskard.core import provide_not_none
 from pydantic import Field, model_validator
+from typing_extensions import TypeVar
 
 from ..core import Trace
 from ..core.check import Check
@@ -18,9 +19,19 @@ from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve
 from ..core.result import CheckResult
 from ..utils.normalization import NormalizationForm, normalize_string
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
 
-class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Check[InputType, OutputType, TraceType], ABC
+
+class TextBasedCheck(
+    Check[InputType, OutputType, TraceType],
+    ABC,
+    Generic[InputType, OutputType, TraceType],
 ):
     """Base class for checks that validate text against a target value.
 
@@ -137,8 +148,9 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
 
 
 @Check.register("string_matching")
-class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    TextBasedCheck[InputType, OutputType, TraceType]
+class StringMatching(
+    TextBasedCheck[InputType, OutputType, TraceType],
+    Generic[InputType, OutputType, TraceType],
 ):
     """Check that validates if a keyword appears within a text string.
 
@@ -321,8 +333,9 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
 
 
 @Check.register("regex_matching")
-class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    TextBasedCheck[InputType, OutputType, TraceType]
+class RegexMatching(
+    TextBasedCheck[InputType, OutputType, TraceType],
+    Generic[InputType, OutputType, TraceType],
 ):
     r"""Check that validates if a regex pattern matches within text.
 

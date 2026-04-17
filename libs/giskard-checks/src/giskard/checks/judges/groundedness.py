@@ -1,18 +1,28 @@
-from typing import override
+from typing import Any, Generic, override
 
 from giskard.agents.workflow import TemplateReference
 from giskard.core import provide_not_none
 from pydantic import Field
+from typing_extensions import TypeVar
 
 from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
 from .base import BaseLLMCheck
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
+
 
 @Check.register("groundedness")
-class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    BaseLLMCheck[InputType, OutputType, TraceType]
+class Groundedness(
+    BaseLLMCheck[InputType, OutputType, TraceType],
+    Generic[InputType, OutputType, TraceType],
 ):
     """LLM-based check that validates answers are grounded in context.
 

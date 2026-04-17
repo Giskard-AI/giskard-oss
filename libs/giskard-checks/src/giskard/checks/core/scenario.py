@@ -1,7 +1,8 @@
-from typing import Any, Self
+from typing import Any, Generic, Self
 
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
+from typing_extensions import TypeVar
 
 from .check import Check
 from .input_generator import InputGenerator
@@ -9,8 +10,16 @@ from .interaction import Interact, InteractionSpec, Trace
 from .result import ScenarioResult
 from .types import GeneratorType, ProviderType
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
 
-class Step[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
+
+class Step(BaseModel, Generic[InputType, OutputType, TraceType]):
     """A scenario step: a sequence of interactions followed by checks.
 
     Each step corresponds to one TestCase at runtime: interactions are applied
@@ -27,7 +36,7 @@ class Step[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: igno
     )
 
 
-class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
+class Scenario(BaseModel, Generic[InputType, OutputType, TraceType]):
     """A scenario composed of steps, each containing interacts and checks.
 
     A scenario executes steps sequentially, maintaining a shared trace that
@@ -112,7 +121,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
 
     def _append_step(self) -> Step[InputType, OutputType, TraceType]:
         """Append a new step."""
-        step = Step(interacts=[], checks=[])
+        step: Step[InputType, OutputType, TraceType] = Step(interacts=[], checks=[])
         self.steps.append(step)
         return step
 
@@ -165,7 +174,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         Scenario
             Self for method chaining.
         """
-        interaction = Interact(
+        interaction: Interact[InputType, OutputType, TraceType] = Interact(
             inputs=inputs,
             outputs=outputs,
             metadata=metadata or {},

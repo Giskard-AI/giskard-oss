@@ -1,18 +1,28 @@
-from typing import Any, override
+from typing import Any, Generic, override
 
 from giskard.agents.workflow import TemplateReference
 from giskard.core import provide_not_none
 from pydantic import Field
+from typing_extensions import TypeVar
 
 from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
 from .base import BaseLLMCheck
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
+
 
 @Check.register("answer_relevance")
-class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    BaseLLMCheck[InputType, OutputType, TraceType]
+class AnswerRelevance(
+    BaseLLMCheck[InputType, OutputType, TraceType],
+    Generic[InputType, OutputType, TraceType],
 ):
     """LLM-based check that evaluates whether the model's answer is relevant to the question.
 

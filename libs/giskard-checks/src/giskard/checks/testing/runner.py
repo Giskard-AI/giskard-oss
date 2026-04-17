@@ -1,7 +1,9 @@
 import time
 import traceback
+from typing import Any
 
 from giskard.core import scoped_telemetry, telemetry, telemetry_tag
+from typing_extensions import TypeVar
 
 from .._telemetry_props import (
     check_kind_counts_from_sequence,
@@ -12,12 +14,12 @@ from ..core.check import Check
 from ..core.result import CheckResult, TestCaseResult
 from ..core.testcase import TestCase
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar("TraceType", bound=Trace[Any, Any])
 
-async def _run_check[
-    InputType,
-    OutputType,
-    TraceType: Trace,  # pyright: ignore[reportMissingTypeArgument]
-](
+
+async def _run_check(
     trace: TraceType,
     check: Check[InputType, OutputType, TraceType],
     return_exception: bool = False,
@@ -57,7 +59,7 @@ class TestCaseRunner:
         pass
 
     @scoped_telemetry
-    async def run[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    async def run(
         self,
         test_case: TestCase[InputType, OutputType, TraceType],
         return_exception: bool = False,

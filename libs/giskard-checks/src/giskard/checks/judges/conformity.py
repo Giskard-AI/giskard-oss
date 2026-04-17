@@ -1,16 +1,26 @@
-from typing import Any, override
+from typing import Any, Generic, override
 
 from giskard.agents.workflow import TemplateReference
 from pydantic import Field
+from typing_extensions import TypeVar
 
 from ..core import Trace
 from ..core.check import Check
 from .base import BaseLLMCheck
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
+
 
 @Check.register("conformity")
-class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    BaseLLMCheck[InputType, OutputType, TraceType]
+class Conformity(
+    BaseLLMCheck[InputType, OutputType, TraceType],
+    Generic[InputType, OutputType, TraceType],
 ):
     """LLM-based check that validates a trace against a given rule.
 

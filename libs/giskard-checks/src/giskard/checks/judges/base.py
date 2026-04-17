@@ -1,9 +1,10 @@
-from typing import Any, override
+from typing import Any, Generic, override
 
 from giskard.agents.chat import Message
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow, TemplateReference
 from pydantic import BaseModel, Field
+from typing_extensions import TypeVar
 
 from ..core import Trace
 from ..core.check import Check
@@ -20,8 +21,19 @@ class LLMCheckResult(BaseModel):
     passed: bool = Field(..., description="Whether the check passed or failed")
 
 
-class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Check[InputType, OutputType, TraceType], WithGeneratorMixin
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
+
+
+class BaseLLMCheck(
+    Check[InputType, OutputType, TraceType],
+    WithGeneratorMixin,
+    Generic[InputType, OutputType, TraceType],
 ):
     """Abstract base class for LLM-based checks.
 

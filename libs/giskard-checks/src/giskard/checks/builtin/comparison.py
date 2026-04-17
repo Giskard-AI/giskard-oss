@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any, Self, override
+from typing import Any, Generic, Self, override
 
 from giskard.core import NOT_PROVIDED, NotProvided, provide_not_none
 from pydantic import Field, model_validator
+from typing_extensions import TypeVar
 
 from ..core import Trace
 from ..core.check import Check
@@ -10,9 +11,20 @@ from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve, resolve
 from ..core.result import CheckResult
 from ..utils.normalization import NormalizationForm, normalize_data
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
+ExpectedType = TypeVar("ExpectedType", default=InputType | OutputType)
 
-class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
-    ABC, Check[InputType, OutputType, TraceType]
+
+class ComparisonCheck(
+    ABC,
+    Check[InputType, OutputType, TraceType],
+    Generic[InputType, OutputType, TraceType, ExpectedType],
 ):
     """Base class for comparison checks.
 
@@ -126,8 +138,9 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
 
 
 @Check.register("lesser_than")
-class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
-    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
+class LesserThan(
+    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType],
+    Generic[InputType, OutputType, TraceType, ExpectedType],
 ):
     """Check that validates if extracted values are less than an expected value.
 
@@ -169,8 +182,9 @@ class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyri
 
 
 @Check.register("greater_than")
-class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
-    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
+class GreaterThan(
+    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType],
+    Generic[InputType, OutputType, TraceType, ExpectedType],
 ):
     """Check that validates if extracted values are greater than an expected value.
 
@@ -212,8 +226,9 @@ class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyr
 
 
 @Check.register("lesser_than_equals")
-class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
-    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
+class LesserThanEquals(
+    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType],
+    Generic[InputType, OutputType, TraceType, ExpectedType],
 ):
     """Check that validates if extracted values are less than or equal to an expected value.
 
@@ -255,8 +270,9 @@ class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  
 
 
 @Check.register("greater_than_equals")
-class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
-    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
+class GreaterEquals(
+    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType],
+    Generic[InputType, OutputType, TraceType, ExpectedType],
 ):
     """Check that validates if extracted values are greater than or equal to an expected value.
 
@@ -298,8 +314,9 @@ class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # p
 
 
 @Check.register("equals")
-class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
-    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
+class Equals(
+    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType],
+    Generic[InputType, OutputType, TraceType, ExpectedType],
 ):
     """Check that validates if extracted values equal an expected value.
 
@@ -341,8 +358,9 @@ class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright:
 
 
 @Check.register("not_equals")
-class NotEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
-    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
+class NotEquals(
+    ComparisonCheck[InputType, OutputType, TraceType, ExpectedType],
+    Generic[InputType, OutputType, TraceType, ExpectedType],
 ):
     """Check that validates if extracted values do not equal an expected value.
 

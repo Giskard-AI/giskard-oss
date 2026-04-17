@@ -1,8 +1,9 @@
-from typing import Any, Literal, override
+from typing import Any, Generic, Literal, override
 
 from giskard.agents.workflow import TemplateReference
 from giskard.core import provide_not_none
 from pydantic import Field
+from typing_extensions import TypeVar
 
 from ..core import Trace
 from ..core.check import Check
@@ -27,10 +28,19 @@ DEFAULT_TOXICITY_CATEGORIES: tuple[ToxicityCategory, ...] = (
     "violence",
 )
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
+
 
 @Check.register("toxicity")
-class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    BaseLLMCheck[InputType, OutputType, TraceType]
+class Toxicity(
+    BaseLLMCheck[InputType, OutputType, TraceType],
+    Generic[InputType, OutputType, TraceType],
 ):
     """LLM-based check that detects toxic, harmful, or offensive content.
 

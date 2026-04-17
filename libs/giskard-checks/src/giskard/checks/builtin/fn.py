@@ -1,8 +1,9 @@
 import inspect
 from collections.abc import Awaitable
-from typing import Any, Callable, override
+from typing import Any, Callable, Generic, override
 
 from pydantic import Field
+from typing_extensions import TypeVar
 
 from ..core import Trace
 from ..core.check import Check
@@ -19,11 +20,21 @@ The callable can be synchronous or asynchronous and must return either:
 - a `CheckResult`: used as-is
 """
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+TraceType = TypeVar(
+    "TraceType",
+    bound=Trace[Any, Any],
+    default=Trace[InputType, OutputType],
+)
+FnTraceType = TypeVar("FnTraceType", bound=Trace[Any, Any], default=Trace[Any, Any])
+
 
 @Check.register("fn")
-class FnCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]@
-    Check[InputType, OutputType, TraceType]
-):  # pyright: ignore[reportMissingTypeArgument]
+class FnCheck(
+    Check[InputType, OutputType, TraceType],
+    Generic[InputType, OutputType, TraceType],
+):
     """A `Check` whose logic is a Python callable.
 
     Parameters are modeled as pydantic fields. At runtime, the `run` method will
@@ -75,9 +86,9 @@ class FnCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repor
         )
 
 
-def from_fn[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+def from_fn(
     fn: Callable[
-        [TraceType],
+        [FnTraceType],
         Awaitable[bool | CheckResult] | bool | CheckResult,
     ],
     *,
@@ -86,7 +97,7 @@ def from_fn[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     success_message: str | None = None,
     failure_message: str | None = None,
     details: dict[str, Any] | None = None,
-) -> Check[InputType, OutputType, TraceType]:
+) -> Check[Any, Any, FnTraceType]:
     """Create an `FnCheck` from a callable.
 
     Example
