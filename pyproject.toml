@@ -23,7 +23,6 @@ dependencies = [
     "giskard-core>=1.0.0a1",
     "giskard-agents>=1.0.0a1",
     "giskard-checks>=1.0.0a1",
-    "regex>=2026.1.15",
 ]
 requires-python = ">=3.12"
 

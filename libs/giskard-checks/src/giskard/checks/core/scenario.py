@@ -72,6 +72,11 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         Optional custom trace type to use. If not provided, the trace type will be
         inferred from the components. Useful when using custom trace subclasses
         with additional computed fields or methods.
+    multiple_runs : int
+        Default upper bound on how many times to execute the full scenario (each
+        execution uses a fresh trace). Each run must pass for the next to run;
+        execution stops on the first non-passing run (FAIL, ERROR, or SKIP). This
+        is not a "retry until one success" mode.
     """
 
     name: str = Field(
@@ -97,6 +102,16 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
     ) = Field(
         default=NOT_PROVIDED,
         description="Scenario-level target SUT that will be used to replace NOT_PROVIDED outputs.",
+    )
+    multiple_runs: int = Field(
+        default=1,
+        description=(
+            "Default maximum number of full scenario executions (fresh trace per run). "
+            "Each run must pass overall for another to run; stops on first non-passing run. "
+            "Not a retry-until-success loop."
+        ),
+        ge=1,
+        strict=True,
     )
 
     def __init__(
@@ -253,20 +268,40 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             | NotProvided
         ) = NOT_PROVIDED,
         return_exception: bool = False,
+        multiple_runs: int | None = None,
     ) -> ScenarioResult[TraceType]:
-        """Execute the scenario steps sequentially with shared trace.
+        """Execute the scenario via the default runner, with optional multiple runs.
 
-        Each step is executed in order:
-        - Interaction specs update the shared trace
-        - Checks validate the current trace and stop execution on failure
+        Each run executes all steps in order with a trace shared across those
+        steps: interaction specs update the trace, then checks validate it and
+        stop that run on failure. When more than one run is configured, the
+        scenario is executed up to that many times, with a fresh trace each time.
+        Each run must pass overall for the next to run. Execution stops early on
+        the first non-passing run (FAIL, ERROR, or SKIP). Multi-run is not
+        equivalent to retrying until a single passing outcome.
+
+        Parameters
+        ----------
+        target : ProviderType | NotProvided
+            Optional target override used to replace `NOT_PROVIDED` interaction outputs.
+        return_exception : bool
+            If True, return results even when exceptions occur instead of raising.
+        multiple_runs : int | None
+            Optional cap on full scenario executions. When provided, it overrides
+            the scenario-level `multiple_runs` value.
 
         Returns
         -------
         ScenarioResult
-            Results from executing the scenario.
+            Results from the last run executed, including multi-run metadata.
         """
         # Lazy import to avoid circular dependency
         from ..scenarios.runner import get_runner
 
         runner = get_runner()
-        return await runner.run(self, target=target, return_exception=return_exception)
+        return await runner.run(
+            self,
+            target=target,
+            return_exception=return_exception,
+            multiple_runs=multiple_runs,
+        )

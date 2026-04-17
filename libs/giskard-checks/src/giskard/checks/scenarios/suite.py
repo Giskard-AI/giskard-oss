@@ -1,7 +1,7 @@
 import time
 from typing import Any, Generic, Self, TypeVar
 
-from giskard.core import telemetry, telemetry_run_context, telemetry_tag
+from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
 
@@ -130,7 +130,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
                 scenario_count=len(self.scenarios),
                 has_target=has_target,
             )
-            _ = telemetry.capture(
+            telemetry_capture(
                 "checks_suite_run_started",
                 properties=shape_props,
             )
@@ -148,7 +148,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
                 duration_ms=int((end_time - start_time) * 1000),
             )
 
-            _ = telemetry.capture(
+            telemetry_capture(
                 "checks_suite_run_finished",
                 properties={
                     **shape_props,
