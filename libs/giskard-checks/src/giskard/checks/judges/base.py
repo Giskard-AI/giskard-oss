@@ -4,12 +4,11 @@ from giskard.agents.chat import Message
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow, TemplateReference
 from pydantic import BaseModel, Field
-from typing_extensions import TypeVar
 
-from ..core import Trace
 from ..core.check import Check
 from ..core.mixin import WithGeneratorMixin
 from ..core.result import CheckResult
+from ..core.typevars import InputType, OutputType, TraceType
 
 
 class LLMCheckResult(BaseModel):
@@ -19,15 +18,6 @@ class LLMCheckResult(BaseModel):
         default=None, description="Optional explanation for the result"
     )
     passed: bool = Field(..., description="Whether the check passed or failed")
-
-
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[InputType, OutputType],
-)
 
 
 class BaseLLMCheck(

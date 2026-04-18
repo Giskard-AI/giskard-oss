@@ -1,12 +1,11 @@
 from collections.abc import AsyncGenerator
-from typing import Any, Generic
+from typing import Generic
 
 from pydantic import BaseModel, Field
-from typing_extensions import TypeVar
 
-from ..core import Trace
 from ..core.input_generator import InputGenerator
 from ..core.mixin import WithGeneratorMixin
+from ..core.typevars import TraceType
 
 
 class UserSimulatorOutput(BaseModel):
@@ -18,13 +17,6 @@ class UserSimulatorOutput(BaseModel):
         default=None,
         description="The message that the user would send. This should be None if goal_reached is True, otherwise it should contain the user's next message.",
     )
-
-
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[Any, Any],
-)
 
 
 @InputGenerator.register("user_simulator")

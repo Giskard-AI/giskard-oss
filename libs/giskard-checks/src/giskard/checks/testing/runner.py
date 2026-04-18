@@ -1,22 +1,13 @@
 import time
 import traceback
-from typing import Any
 
 from giskard.core import scoped_telemetry, telemetry_capture, telemetry_tag
-from typing_extensions import TypeVar
 
-from .._telemetry_props import (
-    check_kind_counts_from_sequence,
-    test_case_shape_properties,
-)
-from ..core import Trace
+from .._telemetry_props import check_kind_counts_from_sequence, test_case_shape_properties
 from ..core.check import Check
 from ..core.result import CheckResult, TestCaseResult
 from ..core.testcase import TestCase
-
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
-TraceType = TypeVar("TraceType", bound=Trace[Any, Any])
+from ..core.typevars import InputType, OutputType, TraceType
 
 
 async def _run_check(

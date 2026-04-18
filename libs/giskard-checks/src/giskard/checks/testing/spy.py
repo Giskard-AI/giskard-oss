@@ -1,19 +1,9 @@
 from collections.abc import AsyncGenerator
-from typing import Any, Generic, override
+from typing import Generic, override
 from unittest.mock import MagicMock, patch
 
-from typing_extensions import TypeVar
-
-from ..core import Trace
 from ..core.interaction import Interaction, InteractionSpec
-
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[InputType, OutputType],
-)
+from ..core.typevars import InputType, OutputType, TraceType
 
 
 @InteractionSpec.register("with_spy")

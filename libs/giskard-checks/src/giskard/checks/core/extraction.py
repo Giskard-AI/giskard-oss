@@ -15,15 +15,8 @@ from jsonpath_ng import (
 )
 from jsonpath_ng.exceptions import JsonPathLexerError, JsonPathParserError
 from pydantic import AfterValidator, BaseModel, Field
-from typing_extensions import TypeVar
 
-from .interaction import Trace
-
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[Any, Any],
-)
+from .typevars import TraceType
 
 
 class _JSONPathStrMarker:

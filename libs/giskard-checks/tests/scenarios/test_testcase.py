@@ -28,11 +28,11 @@ class TestTestCaseNormalCases:
         trace = await Trace.from_interactions(
             Interaction(inputs="test_input", outputs="test_output")
         )
-        check = Equals(
+        check: Equals[str, str, Trace[str, str]] = Equals(
             expected_value="test_output",
             key="trace.interactions[-1].outputs",
         )
-        test_case = TestCase(
+        test_case: TestCase[str, str, Trace[str, str]] = TestCase(
             name="single_check",
             trace=trace,
             checks=[check],

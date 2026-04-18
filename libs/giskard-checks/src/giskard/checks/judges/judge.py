@@ -1,22 +1,13 @@
-from typing import Any, Generic, Self, override
+from typing import Generic, Self, override
 
 from giskard.agents.chat import Message
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import TemplateReference
 from pydantic import Field, model_validator
-from typing_extensions import TypeVar
 
-from ..core import Trace
 from ..core.check import Check
+from ..core.typevars import InputType, OutputType, TraceType
 from .base import BaseLLMCheck
-
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[InputType, OutputType],
-)
 
 
 @Check.register("llm_judge")

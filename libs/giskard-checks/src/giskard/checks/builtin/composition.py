@@ -1,19 +1,10 @@
-from typing import Any, Generic, override
+from typing import Generic, override
 
 from pydantic import Field
-from typing_extensions import TypeVar
 
-from ..core import Trace
 from ..core.check import Check
 from ..core.result import CheckResult, CheckStatus
-
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[InputType, OutputType],
-)
+from ..core.typevars import InputType, OutputType, TraceType
 
 
 @Check.register("all_of")

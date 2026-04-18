@@ -6,16 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.panel import Panel
 from rich.rule import Rule
-from typing_extensions import TypeVar
-
-from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
-
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[Any, Any],
-)
+from .typevars import TraceType
 
 STATUS_MAPPING = {
     "total": {

@@ -2,21 +2,13 @@ from typing import Any, Generic, Self
 
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
-from typing_extensions import TypeVar
 
 from .check import Check
 from .input_generator import InputGenerator
 from .interaction import Interact, InteractionSpec, Trace
 from .result import ScenarioResult
+from .typevars import InputType, OutputType, TraceType
 from .types import GeneratorType, ProviderType
-
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[InputType, OutputType],
-)
 
 
 class Step(BaseModel, Generic[InputType, OutputType, TraceType]):

@@ -4,21 +4,12 @@ from typing import Any, Generic, cast, override
 from giskard.checks.utils.injectable import ValueGenerator, ValueProvider
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import Field, PrivateAttr, model_validator
-from typing_extensions import TypeVar
 
 from ..input_generator import InputGenerator
+from ..typevars import InputType, OutputType, TraceType
 from ..types import GeneratorType, ProviderType
 from .base import InteractionSpec
 from .interaction import Interaction
-from .trace import Trace
-
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[InputType, OutputType],
-)
 
 
 @InteractionSpec.register("interact")

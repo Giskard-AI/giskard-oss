@@ -8,6 +8,7 @@ from typing_extensions import TypeVar
 from ..core import Trace
 from ..core.check import Check
 from ..core.result import CheckResult
+from ..core.typevars import InputType, OutputType, TraceType
 
 """Function-backed check implementation.
 
@@ -20,13 +21,6 @@ The callable can be synchronous or asynchronous and must return either:
 - a `CheckResult`: used as-is
 """
 
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[InputType, OutputType],
-)
 FnTraceType = TypeVar("FnTraceType", bound=Trace[Any, Any], default=Trace[Any, Any])
 
 

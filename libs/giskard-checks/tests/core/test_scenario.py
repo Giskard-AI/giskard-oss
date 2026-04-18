@@ -1180,12 +1180,17 @@ class TestScenarioExtendAndSerialization:
 
     async def test_scenario_with_steps_constructor(self):
         """Scenario can be built with explicit Step objects."""
-        scenario = Scenario(
+        scenario: Scenario[str, str, Trace[str, str]] = Scenario(
             name="steps_constructor",
             steps=[
-                Step(
+                Step[str, str, Trace[str, str]](
                     interacts=[Interact(inputs="Hello", outputs="Hi")],
-                    checks=[Equals(expected_value="Hi", key="trace.last.outputs")],
+                    checks=[
+                        Equals[str, str, Trace[str, str]](
+                            expected_value="Hi",
+                            key="trace.last.outputs",
+                        )
+                    ],
                 ),
             ],
         )

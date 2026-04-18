@@ -5,19 +5,12 @@ from giskard.core import NOT_PROVIDED, NotProvided, provide_not_none
 from pydantic import Field, model_validator
 from typing_extensions import TypeVar
 
-from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve, resolve
 from ..core.result import CheckResult
+from ..core.typevars import InputType, OutputType, TraceType
 from ..utils.normalization import NormalizationForm, normalize_data
 
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[InputType, OutputType],
-)
 ExpectedType = TypeVar("ExpectedType", default=InputType | OutputType)
 
 

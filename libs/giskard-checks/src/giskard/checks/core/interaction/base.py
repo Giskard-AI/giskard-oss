@@ -1,19 +1,10 @@
 from collections.abc import AsyncGenerator
-from typing import Any, Generic
+from typing import Generic
 
 from giskard.core import Discriminated, discriminated_base
-from typing_extensions import TypeVar
 
 from .interaction import Interaction
-from .trace import Trace
-
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[InputType, OutputType],
-)
+from ..typevars import InputType, OutputType, TraceType
 
 
 @discriminated_base

@@ -6,22 +6,13 @@ execution to a `TestCaseRunner`. It offers a single `run()` method that returns 
 """
 
 from collections.abc import Sequence
-from typing import Any, Generic
+from typing import Generic
 
 from pydantic import BaseModel, Field
-from typing_extensions import TypeVar
 
 from .check import Check
-from .interaction import Trace
 from .result import TestCaseResult
-
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
-TraceType = TypeVar(
-    "TraceType",
-    bound=Trace[Any, Any],
-    default=Trace[InputType, OutputType],
-)
+from .typevars import InputType, OutputType, TraceType
 
 
 class TestCase(BaseModel, Generic[InputType, OutputType, TraceType]):
