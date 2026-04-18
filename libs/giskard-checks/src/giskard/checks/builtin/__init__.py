@@ -24,6 +24,7 @@ from .comparison import (
 # Import other builtin checks (staying in builtin)
 from .composition import AllOf, AnyOf, Not
 from .fn import FnCheck, from_fn
+from .nlp_metrics import Readability
 from .semantic_similarity import SemanticSimilarity
 from .text_matching import RegexMatching, StringMatching
 
@@ -33,6 +34,7 @@ __all__ = [
     "Not",
     "from_fn",
     "FnCheck",
+    "Readability",
     "StringMatching",
     "RegexMatching",
     "Equals",
