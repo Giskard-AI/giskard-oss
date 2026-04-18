@@ -117,7 +117,25 @@ async def test_readability_fails_for_non_string_value(fake_textstat: None) -> No
     assert result.status == CheckStatus.FAIL
     assert result.message is not None
     assert "must be a string" in result.message
-    assert result.details["value"] == {"text": "x"}
+    assert result.details["value"] == "{'text': 'x'}"
+
+
+async def test_readability_returns_error_when_metric_computation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = SimpleNamespace(
+        flesch_reading_ease=lambda text: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    monkeypatch.setitem(__import__("sys").modules, "textstat", module)
+
+    check = Readability(metric="flesch_reading_ease")
+    trace = Trace(interactions=[Interaction(inputs="Prompt", outputs="Simple text.")])
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "Failed to compute readability score" in result.message
+    assert result.details["error"] == "boom"
 
 
 async def test_readability_errors_when_textstat_is_missing(

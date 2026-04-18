@@ -14,6 +14,9 @@ ReadabilityMetric = Literal[
     "flesch_reading_ease",
     "flesch_kincaid_grade",
     "gunning_fog",
+    "automated_readability_index",
+    "coleman_liau_index",
+    "dale_chall_readability_score",
 ]
 
 
@@ -91,11 +94,18 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
                     f"Value for key '{self.key}' must be a string, but found "
                     f"{type(text).__name__}."
                 ),
-                details={**details, "value": text},
+                details={**details, "value": str(text)},
             )
 
-        score_fn = getattr(textstat, self.metric)
-        score = float(score_fn(text))
+        try:
+            score_fn = getattr(textstat, self.metric)
+            score = float(score_fn(text))
+        except Exception as exc:
+            return CheckResult(
+                status=CheckStatus.ERROR,
+                message=f"Failed to compute readability score ({self.metric}): {exc}",
+                details={**details, "error": str(exc)},
+            )
         metrics = [Metric(name=self.metric, value=score)]
         details = {**details, "text": text, "score": score}
 
