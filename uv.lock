@@ -745,7 +745,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "giskard-core", editable = "libs/giskard-core" },
-    { name = "griffe", specifier = ">=1.7.0,<2" },
+    { name = "griffe", specifier = ">=1.7.0,<3" },
     { name = "jinja2", specifier = ">=3.1.6,<4" },
     { name = "litellm", specifier = ">=1.72.0,<2" },
     { name = "logfire-api", specifier = ">=3.22.0,<5" },
@@ -779,7 +779,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.4.1,<3" },
     { name = "pydantic", specifier = ">=2.12,<3" },
     { name = "regex", specifier = ">=2026.1.15" },
-    { name = "rich", specifier = ">=14.2.0,<15" },
+    { name = "rich", specifier = ">=14.2.0,<16" },
 ]
 
 [[package]]
@@ -799,14 +799,37 @@ requires-dist = [
 
 [[package]]
 name = "griffe"
-version = "1.15.0"
+version = "2.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "griffecli" },
+    { name = "griffelib" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4a/49/eb6d2935e27883af92c930ed40cc4c69bcd32c402be43b8ca4ab20510f67/griffe-2.0.2.tar.gz", hash = "sha256:c5d56326d159f274492e9bf93a9895cec101155d944caa66d0fc4e0c13751b92", size = 293757, upload-time = "2026-03-27T11:34:52.205Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/94/c0/2bb018eecf9a83c68db9cd9fffd9dab25f102ad30ed869451046e46d1187/griffe-2.0.2-py3-none-any.whl", hash = "sha256:2b31816460aee1996af26050a1fc6927a2e5936486856707f55508e4c9b5960b", size = 5141, upload-time = "2026-03-27T11:34:47.721Z" },
+]
+
+[[package]]
+name = "griffecli"
+version = "2.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama" },
+    { name = "griffelib" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0d/0c/3a471b6e31951dce2360477420d0a8d1e00dea6cf33b70f3e8c3ab6e28e1/griffe-1.15.0.tar.gz", hash = "sha256:7726e3afd6f298fbc3696e67958803e7ac843c1cfe59734b6251a40cdbfb5eea", size = 424112, upload-time = "2025-11-10T15:03:15.52Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/e0/6a7d661d71bb043656a109b91d84a42b5342752542074ec83b16a6eb97f0/griffecli-2.0.2.tar.gz", hash = "sha256:40a1ad4181fc39685d025e119ae2c5b669acdc1f19b705fb9bf971f4e6f6dffb", size = 56281, upload-time = "2026-03-27T11:34:50.087Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9c/83/3b1d03d36f224edded98e9affd0467630fc09d766c0e56fb1498cbb04a9b/griffe-1.15.0-py3-none-any.whl", hash = "sha256:6f6762661949411031f5fcda9593f586e6ce8340f0ba88921a0f2ef7a81eb9a3", size = 150705, upload-time = "2025-11-10T15:03:13.549Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/e8/90d93356c88ac34c20cb5edffca68138df55ca9bbd1a06eccfbcec8fdbe5/griffecli-2.0.2-py3-none-any.whl", hash = "sha256:0d44d39e59afa81e288a3e1c3bf352cc4fa537483326ac06b8bb6a51fd8303a0", size = 9500, upload-time = "2026-03-27T11:34:48.81Z" },
+]
+
+[[package]]
+name = "griffelib"
+version = "2.0.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9d/82/74f4a3310cdabfbb10da554c3a672847f1ed33c6f61dd472681ce7f1fe67/griffelib-2.0.2.tar.gz", hash = "sha256:3cf20b3bc470e83763ffbf236e0076b1211bac1bc67de13daf494640f2de707e", size = 166461, upload-time = "2026-03-27T11:34:51.091Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/11/8c/c9138d881c79aa0ea9ed83cbd58d5ca75624378b38cee225dcf5c42cc91f/griffelib-2.0.2-py3-none-any.whl", hash = "sha256:925c857658fb1ba40c0772c37acbc2ab650bd794d9c1b9726922e36ea4117ea1", size = 142357, upload-time = "2026-03-27T11:34:46.275Z" },
 ]
 
 [[package]]
@@ -2265,15 +2288,15 @@ wheels = [
 
 [[package]]
 name = "rich"
-version = "14.3.2"
+version = "15.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdown-it-py" },
     { name = "pygments" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/74/99/a4cab2acbb884f80e558b0771e97e21e939c5dfb460f488d19df485e8298/rich-14.3.2.tar.gz", hash = "sha256:e712f11c1a562a11843306f5ed999475f09ac31ffb64281f73ab29ffdda8b3b8", size = 230143, upload-time = "2026-02-01T16:20:47.908Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz", hash = "sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36", size = 230680, upload-time = "2026-04-12T08:24:00.75Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ef/45/615f5babd880b4bd7d405cc0dc348234c5ffb6ed1ea33e152ede08b2072d/rich-14.3.2-py3-none-any.whl", hash = "sha256:08e67c3e90884651da3239ea668222d19bea7b589149d8014a21c633420dbb69", size = 309963, upload-time = "2026-02-01T16:20:46.078Z" },
+    { url = "https://files.pythonhosted.org/packages/82/3b/64d4899d73f91ba49a8c18a8ff3f0ea8f1c1d75481760df8c68ef5235bf5/rich-15.0.0-py3-none-any.whl", hash = "sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb", size = 310654, upload-time = "2026-04-12T08:24:02.83Z" },
 ]
 
 [[package]]
