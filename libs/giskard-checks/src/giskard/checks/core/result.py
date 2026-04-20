@@ -509,6 +509,14 @@ class SuiteResult(BaseResult, frozen=True):
         ..., description="List of scenario results"
     )
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
+    max_reported_failures: int | None = Field(
+        default=20,
+        description=(
+            "Maximum number of failed or errored scenarios to show in the rich "
+            "report. Use None to show all."
+        ),
+        ge=1,
+    )
 
     @computed_field
     @property
@@ -568,22 +576,27 @@ class SuiteResult(BaseResult, frozen=True):
         failures_and_errors = self.failures_and_errors
 
         if failures_and_errors:
-            n_loggable_failures = 20  # TODO: make this configurable
+            max_reported_failures = self.max_reported_failures
+            reported_failures = (
+                failures_and_errors
+                if max_reported_failures is None
+                else failures_and_errors[:max_reported_failures]
+            )
 
             # Details
             yield Rule("FAILURES", characters="=", style="grey")
-            for f in failures_and_errors[:n_loggable_failures]:
+            for f in reported_failures:
                 yield Panel(
                     f,
                     title=f.scenario_name,
                     border_style=f"{STATUS_MAPPING[f.status]['color']} bold",
                 )
-            if len(failures_and_errors) > n_loggable_failures:
-                yield f"  ... and {len(failures_and_errors) - n_loggable_failures} more"
+            if len(failures_and_errors) > len(reported_failures):
+                yield f"  ... and {len(failures_and_errors) - len(reported_failures)} more"
 
             # Summary
             yield Rule("SUMMARY", characters="=", style="grey")
-            for f in failures_and_errors[:n_loggable_failures]:
+            for f in reported_failures:
                 status = STATUS_MAPPING[f.status]
                 yield f"[{status['color']} bold]{f.scenario_name}[/{status['color']} bold]\t[{status['color']}]{f.status.value.upper()}[/{status['color']}]"
                 for tc in f.failures_and_errors:
@@ -591,8 +604,8 @@ class SuiteResult(BaseResult, frozen=True):
                         yield from (
                             f"\t{line}" for line in c.__rich_console__(console, options)
                         )
-            if len(failures_and_errors) > n_loggable_failures:
-                yield f"  ... and {len(failures_and_errors) - n_loggable_failures} more"
+            if len(failures_and_errors) > len(reported_failures):
+                yield f"  ... and {len(failures_and_errors) - len(reported_failures)} more"
 
         yield Rule(style="bold blue")
 

@@ -1,5 +1,15 @@
 import pytest
 from giskard.checks import Equals, Scenario, Suite
+from giskard.checks.core.interaction import Trace
+from giskard.checks.core.result import (
+    CheckResult,
+    ScenarioResult,
+    SuiteResult,
+)
+from giskard.checks.core.result import (
+    TestCaseResult as CheckTestCaseResult,
+)
+from rich.console import Console
 
 
 @pytest.fixture
@@ -150,3 +160,89 @@ async def test_suite_append_chaining():
     assert len(result.results) == 2
     assert result.results[0].scenario_name == "a"
     assert result.results[1].scenario_name == "b"
+
+
+@pytest.mark.asyncio
+async def test_suite_run_propagates_max_reported_failures():
+    scenario = (
+        Scenario("s1")
+        .interact("b", "c")
+        .check(Equals(expected_value="b", key="trace.last.outputs"))
+    )
+
+    suite = Suite(name="agg_suite", max_reported_failures=3)
+    suite.append(scenario)
+
+    result = await suite.run()
+
+    assert result.max_reported_failures == 3
+
+
+def test_suite_result_rich_console_respects_max_reported_failures():
+    def failed_scenario(name: str) -> ScenarioResult[Trace]:
+        return ScenarioResult(
+            scenario_name=name,
+            steps=[
+                CheckTestCaseResult(
+                    results=[
+                        CheckResult.failure(
+                            message=f"{name} failed",
+                            details={"check_name": "ExampleCheck"},
+                        )
+                    ],
+                    duration_ms=1,
+                )
+            ],
+            duration_ms=1,
+            final_trace=Trace(interactions=[]),
+        )
+
+    result = SuiteResult(
+        results=[failed_scenario("s1"), failed_scenario("s2"), failed_scenario("s3")],
+        duration_ms=3,
+        max_reported_failures=2,
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "s1" in output
+    assert "s2" in output
+    assert "s3" not in output
+    assert "... and 1 more" in output
+
+
+def test_suite_result_rich_console_shows_all_failures_when_unbounded():
+    def failed_scenario(name: str) -> ScenarioResult[Trace]:
+        return ScenarioResult(
+            scenario_name=name,
+            steps=[
+                CheckTestCaseResult(
+                    results=[
+                        CheckResult.failure(
+                            message=f"{name} failed",
+                            details={"check_name": "ExampleCheck"},
+                        )
+                    ],
+                    duration_ms=1,
+                )
+            ],
+            duration_ms=1,
+            final_trace=Trace(interactions=[]),
+        )
+
+    result = SuiteResult(
+        results=[failed_scenario("s1"), failed_scenario("s2"), failed_scenario("s3")],
+        duration_ms=3,
+        max_reported_failures=None,
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "s1" in output
+    assert "s2" in output
+    assert "s3" in output
+    assert "... and" not in output
