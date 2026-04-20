@@ -66,7 +66,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             "Maximum number of failed or errored scenarios to show in suite "
             "reports. Use None to show all."
         ),
-        ge=1,
+        ge=0,
     )
 
     def append(

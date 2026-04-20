@@ -515,7 +515,7 @@ class SuiteResult(BaseResult, frozen=True):
             "Maximum number of failed or errored scenarios to show in the rich "
             "report. Use None to show all."
         ),
-        ge=1,
+        ge=0,
     )
 
     @computed_field
@@ -582,6 +582,7 @@ class SuiteResult(BaseResult, frozen=True):
                 if max_reported_failures is None
                 else failures_and_errors[:max_reported_failures]
             )
+            n_hidden = len(failures_and_errors) - len(reported_failures)
 
             # Details
             yield Rule("FAILURES", characters="=", style="grey")
@@ -591,8 +592,8 @@ class SuiteResult(BaseResult, frozen=True):
                     title=f.scenario_name,
                     border_style=f"{STATUS_MAPPING[f.status]['color']} bold",
                 )
-            if len(failures_and_errors) > len(reported_failures):
-                yield f"  ... and {len(failures_and_errors) - len(reported_failures)} more"
+            if n_hidden > 0:
+                yield f"  ... and {n_hidden} more"
 
             # Summary
             yield Rule("SUMMARY", characters="=", style="grey")
@@ -604,8 +605,8 @@ class SuiteResult(BaseResult, frozen=True):
                         yield from (
                             f"\t{line}" for line in c.__rich_console__(console, options)
                         )
-            if len(failures_and_errors) > len(reported_failures):
-                yield f"  ... and {len(failures_and_errors) - len(reported_failures)} more"
+            if n_hidden > 0:
+                yield f"  ... and {n_hidden} more"
 
         yield Rule(style="bold blue")
 

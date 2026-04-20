@@ -246,3 +246,38 @@ def test_suite_result_rich_console_shows_all_failures_when_unbounded():
     assert "s2" in output
     assert "s3" in output
     assert "... and" not in output
+
+
+def test_suite_result_rich_console_can_hide_all_failure_details():
+    def failed_scenario(name: str) -> ScenarioResult[Trace]:
+        return ScenarioResult(
+            scenario_name=name,
+            steps=[
+                CheckTestCaseResult(
+                    results=[
+                        CheckResult.failure(
+                            message=f"{name} failed",
+                            details={"check_name": "ExampleCheck"},
+                        )
+                    ],
+                    duration_ms=1,
+                )
+            ],
+            duration_ms=1,
+            final_trace=Trace(interactions=[]),
+        )
+
+    result = SuiteResult(
+        results=[failed_scenario("s1"), failed_scenario("s2"), failed_scenario("s3")],
+        duration_ms=3,
+        max_reported_failures=0,
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "s1" not in output
+    assert "s2" not in output
+    assert "s3" not in output
+    assert "... and 3 more" in output
