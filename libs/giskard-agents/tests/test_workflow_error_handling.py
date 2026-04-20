@@ -4,6 +4,7 @@ import pytest
 from giskard import agents
 from giskard.agents.errors import WorkflowError
 from giskard.agents.generators.base import Response
+from giskard.agents.tools import Function, ToolCall
 from giskard.agents.workflow import ErrorPolicy
 from pydantic import Field, PrivateAttr
 
@@ -26,6 +27,41 @@ class FailingGenerator(agents.generators.BaseGenerator):
             message=agents.chat.Message(
                 role="assistant",
                 content=f"Test response {self._num_calls}",
+            ),
+            finish_reason="stop",
+        )
+
+
+class UnknownToolCallGenerator(agents.generators.BaseGenerator):
+    _num_calls: int = PrivateAttr(default=0)
+
+    @override
+    async def _call_model(
+        self,
+        messages: list[agents.chat.Message],
+        params: agents.generators.GenerationParams,
+        metadata: dict[str, Any] | None = None,
+    ) -> Response:
+        self._num_calls += 1
+
+        if self._num_calls == 1:
+            return Response(
+                message=agents.chat.Message(
+                    role="assistant",
+                    tool_calls=[
+                        ToolCall(
+                            id="call_unknown_1",
+                            function=Function(name="missing_tool", arguments="{}"),
+                        )
+                    ],
+                ),
+                finish_reason="tool_calls",
+            )
+
+        return Response(
+            message=agents.chat.Message(
+                role="assistant",
+                content="unexpected second completion",
             ),
             finish_reason="stop",
         )
@@ -57,6 +93,35 @@ async def test_run_skips_error():
     assert chat.last.content == "Hello!"
     assert chat.last.role == "user"
     assert chat.failed
+
+
+async def test_unknown_tool_call_raises_error():
+    generator = UnknownToolCallGenerator()
+    workflow = agents.ChatWorkflow(generator=generator)
+
+    with pytest.raises(WorkflowError) as exc_info:
+        _ = await workflow.chat("Hello!", role="user").run()
+
+    assert generator._num_calls == 1
+    assert exc_info.value.exception is not None
+    assert "Unknown tool call 'missing_tool'" in str(exc_info.value.exception)
+    assert "Registered tools: <none>" in str(exc_info.value.exception)
+
+
+async def test_unknown_tool_call_returns_failed_chat():
+    generator = UnknownToolCallGenerator()
+    workflow = agents.ChatWorkflow(generator=generator)
+
+    chat = await workflow.chat("Hello!", role="user").on_error(ErrorPolicy.RETURN).run()
+
+    assert generator._num_calls == 1
+    assert chat.failed
+    assert chat.error is not None
+    assert "Unknown tool call 'missing_tool'" in chat.error.message
+    assert len(chat.messages) == 2
+    assert chat.last.role == "assistant"
+    assert chat.last.tool_calls is not None
+    assert chat.last.tool_calls[0].function.name == "missing_tool"
 
 
 async def test_run_many_raises_error():
