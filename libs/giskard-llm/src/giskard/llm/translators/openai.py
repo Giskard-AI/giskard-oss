@@ -96,8 +96,6 @@ class OpenAIChatTranslator:
                 "name": message["name"],
             }
 
-        raise ValueError(f"Unknown message role: {message['role']}")
-
     @staticmethod
     def _messages_to_openai(
         messages: Sequence["ChatMessage"],
