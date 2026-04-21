@@ -23,16 +23,16 @@ class _BaseModel(BaseModel):
 class FunctionDef(TypedDict):
     """Schema for a function tool definition."""
 
-    name: str
+    name: Required[str]
     description: str
-    parameters: dict[str, Any]
+    parameters: dict[str, object]
 
 
 class ToolDef(TypedDict):
     """OpenAI-format tool definition accepted by all providers."""
 
-    type: Literal["function"]
-    function: FunctionDef
+    type: Required[Literal["function"]]
+    function: Required[FunctionDef]
 
 
 class FunctionCallOutput(TypedDict):
@@ -144,10 +144,55 @@ class ResponseResult(_BaseModel):
 # -- Message types -------------------------------------------------------------
 
 
-class ChatMessage(TypedDict, total=False):
-    """Canonical input message format (OpenAI-shaped)."""
+class ToolCallFunctionDict(TypedDict, total=False):
+    name: Required[str]
+    arguments: Required[str]
 
-    role: Required[str]
-    content: str | None
-    tool_calls: list[ToolCall]
-    tool_call_id: str
+
+class ToolCallDict(TypedDict, total=False):
+    id: Required[str]
+    type: Required[Literal["function"]]
+    function: Required[ToolCallFunctionDict]
+
+
+class SystemMessage(TypedDict, total=False):
+    role: Required[Literal["system"]]
+    content: Required[str]
+
+
+class DeveloperMessage(TypedDict, total=False):
+    role: Required[Literal["developer"]]
+    content: Required[str]
+
+
+class UserMessage(TypedDict, total=False):
+    role: Required[Literal["user"]]
+    content: Required[str]
+
+
+class AssistantMessage(TypedDict, total=False):
+    role: Required[Literal["assistant"]]
+    content: str
+    tool_calls: list[ToolCallDict]
+
+
+class ToolMessage(TypedDict, total=False):
+    content: Required[str]
+    role: Required[Literal["tool"]]
+    tool_call_id: Required[str]
+
+
+class FunctionMessage(TypedDict, total=False):
+    content: Required[str | None]
+    name: Required[str]
+    role: Required[Literal["function"]]
+
+
+ChatMessage = (
+    SystemMessage
+    | DeveloperMessage
+    | UserMessage
+    | AssistantMessage
+    | ToolMessage
+    | FunctionMessage
+)
