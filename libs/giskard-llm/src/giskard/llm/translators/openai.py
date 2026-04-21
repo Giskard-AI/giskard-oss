@@ -71,12 +71,10 @@ class OpenAIChatTranslator:
             }
 
         if message["role"] == "assistant":
-            chat_completion_message: "ChatCompletionAssistantMessageParam" = (
-                ChatCompletionAssistantMessageParam(
-                    role="assistant",
-                    content=message.get("content"),
-                )
-            )
+            chat_completion_message: "ChatCompletionAssistantMessageParam" = {
+                "role": "assistant",
+                "content": message.get("content"),
+            }
 
             tool_calls = message.get("tool_calls")
             if tool_calls:
