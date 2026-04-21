@@ -36,7 +36,7 @@ Provider-specific kwargs:
     - ``timeout``: request timeout in seconds
 """
 
-# pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false
+# pyright: reportAttributeAccessIssue=false
 
 import json
 import logging
