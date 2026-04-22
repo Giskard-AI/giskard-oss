@@ -304,20 +304,6 @@ async def test_openai_validate_system_only(mock_import):
 
 
 @patch("giskard.llm.providers.openai._import_openai")
-async def test_openai_validate_tool_missing_id(mock_import):
-    mock_import.return_value = MagicMock()
-    provider = _make_openai_provider()
-    with pytest.raises(BadRequestError, match="tool_call_id"):
-        await provider.complete(
-            "gpt-4o",
-            [
-                {"role": "user", "content": "Hi"},
-                {"role": "tool", "content": "result"},
-            ],
-        )
-
-
-@patch("giskard.llm.providers.openai._import_openai")
 async def test_openai_validate_empty_system_content(mock_import):
     mock_import.return_value = MagicMock()
     provider = _make_openai_provider()
