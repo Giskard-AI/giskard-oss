@@ -45,12 +45,9 @@ Provider-specific kwargs (configure-time):
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false
 
-import json
 import logging
 from collections.abc import Sequence
 from typing import Any, Literal, NoReturn, TypedDict
-
-from pydantic import BaseModel
 
 from ..errors import (
     AuthenticationError,
@@ -61,15 +58,11 @@ from ..errors import (
     RateLimitError,
     ServerError,
 )
+from ..translators.anthropic import AnthropicChatTranslator
 from ..types import (
     ChatMessage,
-    Choice,
-    ChoiceMessage,
     CompletionResponse,
-    ToolCall,
-    ToolCallFunction,
     ToolDef,
-    Usage,
 )
 from ..utils import compact
 
@@ -167,16 +160,16 @@ class AnthropicProvider:
     ) -> CompletionResponse:
         anthropic = _import_anthropic()
         self._validate_messages(messages)
-        if tools is not None:
-            params["tools"] = tools
-        kwargs = self._build_completion_kwargs(model, messages, params)
+        kwargs = AnthropicChatTranslator.to_anthropic(
+            model, messages, tools=tools, **params
+        )
 
         try:
             raw = await self._client.messages.create(**kwargs)
         except anthropic.APIError as e:
             self._map_error(e)
 
-        return self._to_completion_response(raw)
+        return AnthropicChatTranslator.from_anthropic(raw)
 
     # -- validation ------------------------------------------------------------
 
@@ -224,177 +217,3 @@ class AnthropicProvider:
                 raise BadRequestError(
                     400, "System messages must have non-empty content.", PROVIDER
                 )
-
-    # -- helpers ---------------------------------------------------------------
-
-    def _build_completion_kwargs(
-        self,
-        model: str,
-        messages: Sequence[ChatMessage],
-        params: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Build kwargs dict for the Anthropic Messages API."""
-        unknown = set(params) - KNOWN_COMPLETION_PARAMS
-        if unknown:
-            logger.warning(
-                "%s provider: ignoring unknown completion params: %s",
-                PROVIDER,
-                sorted(unknown),
-            )
-
-        system_parts, user_messages = self._split_system_messages(messages)
-        converted = self._convert_messages(user_messages)
-
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "messages": converted,
-            "max_tokens": params.get("max_tokens") or 4096,
-        }
-
-        if system_parts:
-            kwargs["system"] = "\n".join(system_parts)
-        if params.get("temperature") is not None:
-            kwargs["temperature"] = params["temperature"]
-        if params.get("timeout") is not None:
-            kwargs["timeout"] = params["timeout"]
-
-        if tools := params.get("tools"):
-            kwargs["tools"] = [self._convert_tool(t) for t in tools]
-
-        response_format = params.get("response_format")
-        if (
-            response_format is not None
-            and isinstance(response_format, type)
-            and issubclass(response_format, BaseModel)
-        ):
-            schema = response_format.model_json_schema()
-            schema["additionalProperties"] = False
-            kwargs["output_config"] = {
-                "format": {
-                    "type": "json_schema",
-                    "schema": schema,
-                }
-            }
-
-        return kwargs
-
-    def _split_system_messages(
-        self, messages: Sequence[ChatMessage]
-    ) -> tuple[list[str], list[ChatMessage]]:
-        """Separate system messages from conversation messages."""
-        system: list[str] = []
-        rest: list[ChatMessage] = []
-        for m in messages:
-            if m.get("role") == "system":
-                system.append(m.get("content", "") or "")
-            else:
-                rest.append(m)
-        return system, rest
-
-    def _convert_messages(
-        self, messages: Sequence[ChatMessage]
-    ) -> list[_AnthropicMessage]:
-        """Convert OpenAI-format messages to Anthropic format."""
-        result: list[_AnthropicMessage] = []
-        for msg in messages:
-            role = msg.get("role", "user")
-
-            if role == "tool":
-                block: _ToolResultContent = {
-                    "type": "tool_result",
-                    "tool_use_id": msg.get("tool_call_id", ""),
-                    "content": msg.get("content", "") or "",
-                }
-                # Merge consecutive tool messages into a single user message
-                prev = result[-1] if result else None
-                if (
-                    prev
-                    and prev["role"] == "user"
-                    and isinstance(prev["content"], list)
-                ):
-                    prev["content"].append(block)  # type: ignore[union-attr]
-                else:
-                    result.append({"role": "user", "content": [block]})
-            elif role == "assistant" and msg.get("tool_calls"):
-                content: list[_ToolUseContent | _TextContent] = []
-                if msg.get("content"):
-                    content.append({"type": "text", "text": msg.get("content") or ""})
-                for tc in msg.get("tool_calls", []):
-                    tc_func = tc if isinstance(tc, dict) else tc.model_dump()
-                    func = tc_func.get("function", tc_func)
-                    content.append(
-                        {
-                            "type": "tool_use",
-                            "id": tc_func.get("id", ""),
-                            "name": func.get("name", ""),
-                            "input": json.loads(func.get("arguments", "{}")),
-                        }
-                    )
-                result.append({"role": "assistant", "content": content})  # pyright: ignore[reportArgumentType]
-            else:
-                result.append(
-                    {
-                        "role": role,
-                        "content": msg.get("content", "") or "",
-                    }
-                )
-        return result
-
-    def _convert_tool(self, tool: dict[str, Any]) -> dict[str, Any]:
-        """Convert an OpenAI-format tool to Anthropic format."""
-        func = tool.get("function", {})
-        return {
-            "name": func.get("name", ""),
-            "description": func.get("description", ""),
-            "input_schema": func.get("parameters", {}),
-        }
-
-    def _to_completion_response(self, raw: Any) -> CompletionResponse:
-        """Convert raw SDK response to CompletionResponse."""
-        content_text: list[str] = []
-        tool_calls: list[ToolCall] = []
-
-        for block in raw.content:
-            if block.type == "text":
-                content_text.append(block.text)
-            elif block.type == "tool_use":
-                tool_calls.append(
-                    ToolCall(
-                        id=block.id,
-                        type="function",
-                        function=ToolCallFunction(
-                            name=block.name,
-                            arguments=json.dumps(block.input)
-                            if isinstance(block.input, dict)
-                            else block.input,
-                        ),
-                    )
-                )
-
-        finish_reason_map = {
-            "end_turn": "stop",
-            "max_tokens": "length",
-            "tool_use": "tool_calls",
-            "stop_sequence": "stop",
-        }
-        finish_reason = finish_reason_map.get(raw.stop_reason, "stop")
-
-        message = ChoiceMessage(
-            role="assistant",
-            content="\n".join(content_text) if content_text else None,
-            tool_calls=tool_calls or None,
-        )
-
-        usage = None
-        if raw.usage:
-            usage = Usage(
-                prompt_tokens=raw.usage.input_tokens,
-                completion_tokens=raw.usage.output_tokens,
-                total_tokens=raw.usage.input_tokens + raw.usage.output_tokens,
-            )
-
-        return CompletionResponse(
-            choices=[Choice(message=message, finish_reason=finish_reason, index=0)],
-            model=raw.model,
-            usage=usage,
-        )

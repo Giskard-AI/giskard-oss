@@ -41,7 +41,7 @@ class FunctionCallOutput(TypedDict):
     type: Literal["function_call_output"]
     call_id: str
     name: str
-    output: str
+    output: dict[str, Any]
 
 
 # -- Tool call types (output side) --------------------------------------------
@@ -49,7 +49,7 @@ class FunctionCallOutput(TypedDict):
 
 class ToolCallFunction(_BaseModel):
     name: str
-    arguments: str
+    arguments: dict[str, Any]
 
 
 class ToolCall(_BaseModel):
@@ -141,12 +141,12 @@ class ResponseResult(_BaseModel):
         return [o for o in self.outputs if isinstance(o, ResponseOutputFunctionCall)]
 
 
-# -- Message types -------------------------------------------------------------
+# -- Chat Message types -------------------------------------------------------------
 
 
 class ToolCallFunctionDict(TypedDict, total=False):
     name: Required[str]
-    arguments: Required[str]
+    arguments: Required[dict[str, Any]]
 
 
 class ToolCallDict(TypedDict, total=False):
@@ -196,3 +196,23 @@ ChatMessage = (
     | ToolMessage
     | FunctionMessage
 )
+
+# -- Response Input types -------------------------------------------------------------
+
+
+class ResponseFunctionCallOutput(TypedDict, total=False):
+    type: Required[Literal["function_call_output"]]
+    call_id: Required[str]
+    output: Required[str]
+    id: str | None
+
+
+class ResponseFunctionToolCall(TypedDict, total=False):
+    type: Required[Literal["function_call"]]
+    arguments: Required[dict[str, Any]]
+    call_id: Required[str]
+    name: Required[str]
+    id: str | None
+
+
+ResponseInputItem = ResponseFunctionCallOutput | ResponseFunctionToolCall

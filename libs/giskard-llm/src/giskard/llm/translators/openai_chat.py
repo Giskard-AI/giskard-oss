@@ -1,3 +1,4 @@
+import json
 import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
@@ -8,6 +9,7 @@ from giskard.llm.types import (
     ChoiceMessage,
     CompletionResponse,
     ToolCall,
+    ToolCallDict,
     ToolCallFunction,
     ToolDef,
     Usage,
@@ -25,20 +27,26 @@ if TYPE_CHECKING:
     from openai.types.chat.chat_completion_message_tool_call import (
         ChatCompletionMessageToolCallUnion,
     )
+    from openai.types.chat.chat_completion_message_tool_call_union_param import (
+        ChatCompletionMessageToolCallUnionParam,
+    )
     from openai.types.chat.chat_completion_tool_union_param import (
         ChatCompletionToolUnionParam,
     )
     from openai.types.chat.completion_create_params import (
-        CompletionCreateParamsBase,
+        CompletionCreateParamsNonStreaming,
         ResponseFormat,
     )
 
-    class CompletionCreateParamsWithTimeout(CompletionCreateParamsBase, total=False):
+    class CompletionCreateParamsWithTimeout(
+        CompletionCreateParamsNonStreaming, total=False
+    ):
         timeout: float | int | None
 
 
 logger = logging.getLogger(__name__)
 
+PROVIDER = "openai"
 
 KNOWN_COMPLETION_PARAMS = frozenset(
     {"temperature", "max_tokens", "timeout", "tools", "response_format", "metadata"}
@@ -55,6 +63,19 @@ class OpenAIChatTranslator:
         tools: Sequence["ToolDef"],
     ) -> Sequence["ChatCompletionToolUnionParam"]:
         return [OpenAIChatTranslator._tool_def_to_openai(tool) for tool in tools]
+
+    @staticmethod
+    def _tool_call_to_openai(
+        tool_call: "ToolCallDict",
+    ) -> "ChatCompletionMessageToolCallUnionParam":
+        return {
+            "type": "function",
+            "id": tool_call["id"],
+            "function": {
+                "name": tool_call["function"]["name"],
+                "arguments": json.dumps(tool_call["function"]["arguments"]),
+            },
+        }
 
     @staticmethod
     def _message_to_openai(message: "ChatMessage") -> "ChatCompletionMessageParam":
@@ -78,7 +99,10 @@ class OpenAIChatTranslator:
 
             tool_calls = message.get("tool_calls")
             if tool_calls:
-                chat_completion_message["tool_calls"] = tool_calls
+                chat_completion_message["tool_calls"] = [
+                    OpenAIChatTranslator._tool_call_to_openai(tool_call)
+                    for tool_call in tool_calls
+                ]
 
             return chat_completion_message
 
@@ -108,7 +132,6 @@ class OpenAIChatTranslator:
     def to_openai(
         model: str,
         messages: Sequence["ChatMessage"],
-        provider: str,
         *,
         tools: Sequence["ToolDef"] | None = None,
         **params: Any,
@@ -117,7 +140,7 @@ class OpenAIChatTranslator:
         if unknown:
             logger.warning(
                 "%s provider: ignoring unknown completion params: %s",
-                provider,
+                PROVIDER,
                 sorted(unknown),
             )
 
@@ -169,7 +192,8 @@ class OpenAIChatTranslator:
                 id=tool_call.id,
                 type=tool_call.type,
                 function=ToolCallFunction(
-                    name=tool_call.function.name, arguments=tool_call.function.arguments
+                    name=tool_call.function.name,
+                    arguments=json.loads(tool_call.function.arguments),
                 ),
             )
 

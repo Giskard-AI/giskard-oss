@@ -39,7 +39,7 @@ def test_choice_message_includes_typed_tool_calls():
             ToolCall(
                 id="call_1",
                 type="function",
-                function=ToolCallFunction(name="add", arguments='{"a": 1, "b": 2}'),
+                function=ToolCallFunction(name="add", arguments={"a": 1, "b": 2}),
             )
         ],
     )
@@ -52,7 +52,7 @@ def test_choice_message_includes_typed_tool_calls():
 def test_tool_call_model():
     tc = ToolCall(
         id="call_1",
-        function=ToolCallFunction(name="get_weather", arguments='{"city": "Paris"}'),
+        function=ToolCallFunction(name="get_weather", arguments={"city": "Paris"}),
     )
     assert tc.id == "call_1"
     assert tc.type == "function"

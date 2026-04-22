@@ -38,7 +38,6 @@ Provider-specific kwargs:
 
 # pyright: reportAttributeAccessIssue=false
 
-import json
 import logging
 from collections.abc import Sequence
 from typing import Any, NoReturn
@@ -52,18 +51,17 @@ from ..errors import (
     RateLimitError,
     ServerError,
 )
-from ..translators.openai import OpenAIChatTranslator
+from ..translators.openai_chat import OpenAIChatTranslator
+from ..translators.openai_response import OpenAIResponseTranslator
 from ..types import (
     ChatMessage,
     CompletionResponse,
     EmbeddingData,
     EmbeddingResponse,
     EmbeddingUsage,
-    ResponseOutputFunctionCall,
-    ResponseOutputText,
+    ResponseInputItem,
     ResponseResult,
     ToolDef,
-    Usage,
 )
 from ..utils import compact
 
@@ -72,7 +70,6 @@ logger = logging.getLogger(__name__)
 PROVIDER = "openai"
 
 KNOWN_EMBEDDING_PARAMS = frozenset({"dimensions"})
-KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "max_tokens"})
 
 
 def _import_openai() -> Any:
@@ -133,9 +130,7 @@ class OpenAIProvider:
         openai = _import_openai()
 
         self._validate_messages(messages)
-        kwargs = OpenAIChatTranslator.to_openai(
-            model, messages, PROVIDER, tools=tools, **params
-        )
+        kwargs = OpenAIChatTranslator.to_openai(model, messages, tools=tools, **params)
 
         try:
             raw = await self._client.chat.completions.create(**kwargs)
@@ -212,85 +207,26 @@ class OpenAIProvider:
     async def respond(
         self,
         model: str,
-        input: str | list[dict[str, Any]],
+        input: str | list[ResponseInputItem],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
         tools: list[ToolDef] | None = None,
         **params: Any,
     ) -> ResponseResult:
-        unknown = set(params) - KNOWN_RESPONSE_PARAMS
-        if unknown:
-            logger.warning(
-                "%s provider: ignoring unknown response params: %s",
-                self._PROVIDER,
-                sorted(unknown),
-            )
-
         openai = _import_openai()
-        if isinstance(input, list):
-            input = [self._normalize_input_item(item) for item in input]
-        kwargs: dict[str, Any] = {"model": model, "input": input}
-        if instructions is not None:
-            kwargs["instructions"] = instructions
-        if previous_id is not None:
-            kwargs["previous_response_id"] = previous_id
-        if tools is not None:
-            kwargs["tools"] = [{"type": "function", **t["function"]} for t in tools]
-        if params.get("temperature") is not None:
-            kwargs["temperature"] = params["temperature"]
-        if params.get("max_tokens") is not None:
-            kwargs["max_output_tokens"] = params["max_tokens"]
+        kwargs = OpenAIResponseTranslator.to_openai(
+            model,
+            input,
+            instructions=instructions,
+            previous_id=previous_id,
+            tools=tools,
+            **params,
+        )
 
         try:
             raw = await self._client.responses.create(**kwargs)
         except openai.APIError as e:
             self._map_error(e)
 
-        return self._to_response_result(raw)
-
-    def _normalize_input_item(self, item: dict[str, Any]) -> dict[str, Any]:
-        """Normalize an input item for the OpenAI Responses API.
-
-        Ensures ``function_call`` items have ``arguments`` as a JSON string
-        (OpenAI rejects dict values).
-        """
-        if item.get("type") == "function_call" and isinstance(
-            item.get("arguments"), dict
-        ):
-            return {**item, "arguments": json.dumps(item["arguments"])}
-        return item
-
-    def _to_response_result(self, raw: Any) -> ResponseResult:
-        """Convert raw Responses API output to ResponseResult."""
-        outputs: list[ResponseOutputText | ResponseOutputFunctionCall] = []
-        for item in raw.output:
-            item_type = getattr(item, "type", None)
-            if item_type == "message":
-                for content_block in getattr(item, "content", []):
-                    if getattr(content_block, "type", None) == "output_text":
-                        outputs.append(ResponseOutputText(text=content_block.text))
-            elif item_type == "function_call":
-                args = getattr(item, "arguments", "{}")
-                outputs.append(
-                    ResponseOutputFunctionCall(
-                        call_id=getattr(item, "call_id", None),
-                        name=item.name,
-                        arguments=json.loads(args) if isinstance(args, str) else args,
-                    )
-                )
-
-        usage = None
-        if raw.usage:
-            usage = Usage(
-                prompt_tokens=getattr(raw.usage, "input_tokens", 0),
-                completion_tokens=getattr(raw.usage, "output_tokens", 0),
-                total_tokens=getattr(raw.usage, "total_tokens", 0),
-            )
-
-        return ResponseResult(
-            id=raw.id,
-            outputs=outputs,
-            model=getattr(raw, "model", None),
-            usage=usage,
-        )
+        return OpenAIResponseTranslator.from_openai(raw)
