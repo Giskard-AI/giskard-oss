@@ -67,7 +67,7 @@ class GoogleResponseTranslator:
                 "type": "function_call",
                 "id": id,
                 "name": input.get("name", ""),
-                "arguments": {},
+                "arguments": input["arguments"],
             }
 
     @staticmethod
