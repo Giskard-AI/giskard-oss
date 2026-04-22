@@ -105,7 +105,9 @@ class OpenAIResponseTranslator:
                     ResponseOutputFunctionCall(
                         call_id=item.call_id,
                         name=item.name,
-                        arguments=json.loads(item.arguments),
+                        arguments=json.loads(item.arguments)
+                        if isinstance(item.arguments, str)
+                        else item.arguments,
                     )
                 )
             else:
