@@ -170,7 +170,9 @@ class _StepRunner:
 
             tool = self._workflow.tools[tool_call.function.name]
             tool_content = await tool.run(
-                json.loads(tool_call.function.arguments),
+                json.loads(tool_call.function.arguments)
+                if isinstance(tool_call.function.arguments, str)
+                else tool_call.function.arguments,
                 ctx=chat.context,
             )
             yield Message(
