@@ -123,10 +123,12 @@ class GoogleChatTranslator:
             for tc in msg.get("tool_calls", []):
                 tc_id_to_name[tc["id"]] = tc["function"]["name"]
 
-        return [
+        converted = [
             GoogleChatTranslator._message_to_contents(msg, tc_id_to_name)
             for msg in messages
         ]
+
+        return [content for content in converted if content is not None]
 
     @staticmethod
     def to_google(
