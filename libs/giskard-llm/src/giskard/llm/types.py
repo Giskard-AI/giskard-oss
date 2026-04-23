@@ -273,7 +273,6 @@ class ResponseFunctionCallOutputParam(TypedDict, total=False):
     call_id: Required[str]
     output: Required[str]
     name: str
-    id: str | None
 
 
 class ResponseFunctionToolCallParam(TypedDict, total=False):
@@ -281,7 +280,6 @@ class ResponseFunctionToolCallParam(TypedDict, total=False):
     arguments: Required[dict[str, Any]]
     call_id: Required[str]
     name: Required[str]
-    id: str | None
 
 
 ResponseInputMessageContentParam = ResponseInputTextParam

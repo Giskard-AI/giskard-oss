@@ -107,13 +107,10 @@ class GoogleResponseTranslator:
             ]
 
         if input["type"] == "function_call":
-            id = input.get("id")
-            if id is None:
-                raise ValueError("function_call: id is required")
             return [
                 {
                     "type": "function_call",
-                    "id": id,
+                    "id": input["call_id"],
                     "name": input.get("name", ""),
                     "arguments": deserialize_arguments(input["arguments"]),
                 }
