@@ -11,6 +11,7 @@ from ..types import (
     ChatMessageParam,
     CompletionResponse,
     EmbeddingResponse,
+    ResponseInputItemParam,
     ResponseResult,
     ToolDefParam,
 )
@@ -53,12 +54,12 @@ class ResponseProvider(Protocol):
     async def respond(
         self,
         model: str,
-        input: str | list[dict[str, Any]],
+        input: str | list[ResponseInputItemParam],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
         tools: list[ToolDefParam] | None = None,
         **params: Any,
     ) -> ResponseResult:
-        """Send a stateful response request. ``input`` is a string or list of role/content dicts for multi-turn."""
+        """Send a stateful response request. ``input`` is a string or structured items for multi-turn."""
         ...

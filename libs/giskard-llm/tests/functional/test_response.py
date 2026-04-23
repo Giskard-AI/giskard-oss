@@ -130,12 +130,13 @@ async def test_respond_tool_roundtrip(provider: str):
             {
                 "type": "function_call",
                 "name": fc.name,
-                "call_id": fc.call_id,
+                "call_id": fc.call_id or fc.name,
                 "arguments": fc.arguments,
             },
             {
                 "type": "function_call_output",
-                "call_id": fc.call_id,
+                "call_id": fc.call_id or fc.name,
+                "name": fc.name,
                 "output": "4",
             },
         ],

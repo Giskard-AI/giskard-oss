@@ -11,6 +11,7 @@ from .types import (
     ChatMessageParam,
     CompletionResponse,
     EmbeddingResponse,
+    ResponseInputItemParam,
     ResponseResult,
     ToolDefParam,
 )
@@ -158,7 +159,7 @@ class LLMClient:
     async def aresponse(
         self,
         model: str,
-        input: str | list[dict[str, Any]],
+        input: str | list[ResponseInputItemParam],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
@@ -215,7 +216,7 @@ async def aembedding(
 
 async def aresponse(
     model: str,
-    input: str | list[dict[str, Any]],
+    input: str | list[ResponseInputItemParam],
     *,
     instructions: str | None = None,
     previous_id: str | None = None,

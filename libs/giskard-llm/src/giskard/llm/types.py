@@ -272,6 +272,7 @@ class ResponseFunctionCallOutputParam(TypedDict, total=False):
     type: Required[Literal["function_call_output"]]
     call_id: Required[str]
     output: Required[str]
+    name: str
     id: str | None
 
 
