@@ -99,7 +99,7 @@ class OpenAIResponseTranslator:
             response_params["previous_response_id"] = previous_id
         if tools is not None:
             response_params["tools"] = [
-                {"type": "function", **t["function"], "strict": True} for t in tools
+                {"type": "function", **t["function"], "strict": None} for t in tools
             ]
         if params.get("temperature") is not None:
             response_params["temperature"] = params["temperature"]
