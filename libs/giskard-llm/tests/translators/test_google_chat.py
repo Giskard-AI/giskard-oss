@@ -7,7 +7,14 @@ from typing import Literal
 
 import pytest
 from giskard.llm.translators.google_chat import GoogleChatTranslator
-from giskard.llm.types import ChatMessage, DeveloperMessage, SystemMessage, UserMessage
+from giskard.llm.types import (
+    ChatMessage,
+    DeveloperMessage,
+    RefusalContent,
+    SystemMessage,
+    TextContent,
+    UserMessage,
+)
 
 from .sdk_payload_validation import validate_google_contents
 from .tool_turn_fixtures import (
@@ -33,7 +40,7 @@ def test_single_user_message():
     payload = GoogleChatTranslator.to_google(_MODEL, [msg])
 
     assert payload["model"] == _MODEL
-    assert payload["contents"] == [{"role": "user", "parts": [{"text": "Hello."}]}]
+    assert payload["contents"] == [{"role": "user", "parts": {"text": "Hello."}}]
     assert payload.get("config", {}) == {}
     validate_google_contents(payload["contents"])
 
@@ -55,7 +62,7 @@ def test_instruction_then_user(instruction_role: Literal["system", "developer"])
     ]
     payload = GoogleChatTranslator.to_google(_MODEL, messages)
 
-    assert payload["contents"] == [{"role": "user", "parts": [{"text": "Hello."}]}]
+    assert payload["contents"] == [{"role": "user", "parts": {"text": "Hello."}}]
     assert "config" in payload
     cfg = payload["config"]
     assert cfg.get("system_instruction") == ["You are helpful."]
@@ -71,7 +78,7 @@ def test_system_then_developer_then_user():
     ]
     payload = GoogleChatTranslator.to_google(_MODEL, messages)
 
-    assert payload["contents"] == [{"role": "user", "parts": [{"text": "Hello."}]}]
+    assert payload["contents"] == [{"role": "user", "parts": {"text": "Hello."}}]
     assert "config" in payload
     cfg = payload["config"]
     assert cfg.get("system_instruction") == [
@@ -102,7 +109,7 @@ def test_two_instructions_then_user(instruction_role: Literal["system", "develop
         ]
     payload = GoogleChatTranslator.to_google(_MODEL, messages)
 
-    assert payload["contents"] == [{"role": "user", "parts": [{"text": "Hello."}]}]
+    assert payload["contents"] == [{"role": "user", "parts": {"text": "Hello."}}]
     assert "config" in payload
     cfg = payload["config"]
     assert cfg.get("system_instruction") == [
@@ -122,9 +129,44 @@ def test_user_assistant_user():
     payload = GoogleChatTranslator.to_google(_MODEL, messages)
 
     assert payload["contents"] == [
-        {"role": "user", "parts": [{"text": "First user."}]},
+        {"role": "user", "parts": {"text": "First user."}},
         {"role": "model", "parts": [{"text": "Assistant reply."}]},
-        {"role": "user", "parts": [{"text": "Second user."}]},
+        {"role": "user", "parts": {"text": "Second user."}},
+    ]
+    validate_google_contents(payload["contents"])
+
+
+def test_assistant_refusal_replayed_as_text_part():
+    """Gemini has no refusal part on input; ``refusal`` is sent as a ``text`` part."""
+    messages: list[ChatMessage] = [
+        {"role": "user", "content": "Unsafe ask."},
+        {"role": "assistant", "refusal": "I can't help with that."},
+    ]
+    payload = GoogleChatTranslator.to_google(_MODEL, messages)
+    assert payload["contents"] == [
+        {"role": "user", "parts": {"text": "Unsafe ask."}},
+        {"role": "model", "parts": [{"text": "I can't help with that."}]},
+    ]
+    validate_google_contents(payload["contents"])
+
+
+def test_assistant_structured_refusal_parts_as_text():
+    """Structured refusal parts map to plain ``text`` parts for Gemini."""
+    messages: list[ChatMessage] = [
+        {
+            "role": "assistant",
+            "content": [
+                TextContent(type="text", text="Ok."),
+                RefusalContent(type="refusal", refusal="Stopped."),
+            ],
+        },
+    ]
+    payload = GoogleChatTranslator.to_google(_MODEL, messages)
+    assert payload["contents"] == [
+        {
+            "role": "model",
+            "parts": [{"text": "Ok."}, {"text": "Stopped."}],
+        },
     ]
     validate_google_contents(payload["contents"])
 
@@ -148,7 +190,7 @@ def test_user_tool_call_and_result_with_tools():
         },
     ]
     assert payload["contents"] == [
-        {"role": "user", "parts": [{"text": "What's the weather in Paris?"}]},
+        {"role": "user", "parts": {"text": "What's the weather in Paris?"}},
         {
             "role": "model",
             "parts": [
@@ -203,7 +245,7 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
         },
     ]
     assert payload["contents"] == [
-        {"role": "user", "parts": [{"text": PARALLEL_USER_PROMPT}]},
+        {"role": "user", "parts": {"text": PARALLEL_USER_PROMPT}},
         {
             "role": "model",
             "parts": [
@@ -275,7 +317,7 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
         },
     ]
     assert payload["contents"] == [
-        {"role": "user", "parts": [{"text": PARALLEL_USER_PROMPT}]},
+        {"role": "user", "parts": {"text": PARALLEL_USER_PROMPT}},
         {
             "role": "model",
             "parts": [

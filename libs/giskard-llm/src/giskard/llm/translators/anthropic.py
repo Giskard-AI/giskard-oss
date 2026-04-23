@@ -7,6 +7,7 @@ from ..types import (
     ChatMessage,
     Choice,
     ChoiceMessage,
+    CompletionContent,
     CompletionResponse,
     ToolCall,
     ToolCallFunction,
@@ -56,13 +57,32 @@ class AnthropicChatTranslator:
         }
 
     @staticmethod
-    def _content_to_blocks[T](
-        content: "str | Iterable[T | TextBlockParam]",
-    ) -> "list[T | TextBlockParam]":
+    def _str_to_text_blocks[T](
+        content: "str | Iterable[T]",
+    ) -> "Iterable[TextBlockParam | T]":
         if isinstance(content, str):
             return [AnthropicChatTranslator._string_to_text_block(content)]
 
-        return list(content)
+        return content
+
+    @staticmethod
+    def _completion_content_to_block(content: CompletionContent) -> "TextBlockParam":
+        if content["type"] == "text":
+            return AnthropicChatTranslator._string_to_text_block(content["text"])
+
+        if content["type"] == "refusal":
+            return AnthropicChatTranslator._string_to_text_block(content["refusal"])
+
+    @staticmethod
+    def _completion_content_to_blocks(
+        content: str | Sequence[CompletionContent],
+    ) -> "Sequence[TextBlockParam]":
+        if isinstance(content, str):
+            return [AnthropicChatTranslator._string_to_text_block(content)]
+
+        return [
+            AnthropicChatTranslator._completion_content_to_block(p) for p in content
+        ]
 
     @staticmethod
     def _message_to_anthropic(
@@ -98,7 +118,11 @@ class AnthropicChatTranslator:
             content = message.get("content")
             blocks: list[TextBlockParam | ToolUseBlockParam] = []
             if content is not None:
-                blocks.extend(AnthropicChatTranslator._content_to_blocks(content))
+                blocks.extend(
+                    AnthropicChatTranslator._completion_content_to_blocks(content)
+                )
+            if (refusal := message.get("refusal")) is not None:
+                blocks.append(AnthropicChatTranslator._string_to_text_block(refusal))
 
             if tool_calls := message.get("tool_calls"):
                 for tool_call in tool_calls:
@@ -135,12 +159,15 @@ class AnthropicChatTranslator:
                 and anthropic_messages[-1]["role"] == converted["role"]
             ):
                 prev = anthropic_messages[-1]
+                prev_content = list(
+                    AnthropicChatTranslator._str_to_text_blocks(prev["content"])
+                )
+                curr_content = list(
+                    AnthropicChatTranslator._str_to_text_blocks(converted["content"])
+                )
                 anthropic_messages[-1] = {
                     **prev,
-                    "content": AnthropicChatTranslator._content_to_blocks(
-                        prev["content"]
-                    )
-                    + AnthropicChatTranslator._content_to_blocks(converted["content"]),
+                    "content": prev_content + curr_content,
                 }
             else:
                 anthropic_messages.append(converted)
@@ -245,14 +272,20 @@ class AnthropicChatTranslator:
             "max_tokens": "length",
             "tool_use": "tool_calls",
             "stop_sequence": "stop",
+            "refusal": "stop",
         }
         finish_reason = (
             finish_reason_map.get(raw.stop_reason, "stop") if raw.stop_reason else None
         )
 
+        refusal_out: str | None = None
+        if raw.stop_reason == "refusal" and raw.stop_details is not None:
+            refusal_out = raw.stop_details.explanation
+
         message = ChoiceMessage(
             role="assistant",
             content="\n".join(content_text) if content_text else None,
+            refusal=refusal_out,
             tool_calls=tool_calls or None,
         )
 

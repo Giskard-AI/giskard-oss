@@ -2,7 +2,7 @@
 
 import json
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Literal, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -47,36 +47,57 @@ def _make_anthropic_provider(merge_system: bool = False):
 
 def _make_openai_response(
     content: str | None = "Hello",
-    finish_reason: str = "stop",
+    finish_reason: Literal[
+        "stop", "length", "tool_calls", "content_filter", "function_call"
+    ] = "stop",
     tool_calls: list[dict[str, Any]] | None = None,
 ):
-    tc = None
+    """Build a :class:`openai.types.chat.chat_completion.ChatCompletion` for mocks."""
+    pytest.importorskip("openai")
+    from openai.types.chat.chat_completion import ChatCompletion, Choice
+    from openai.types.chat.chat_completion_message import ChatCompletionMessage
+    from openai.types.chat.chat_completion_message_function_tool_call import (
+        ChatCompletionMessageFunctionToolCall,
+        Function,
+    )
+    from openai.types.chat.chat_completion_message_tool_call import (
+        ChatCompletionMessageToolCallUnion,
+    )
+    from openai.types.completion_usage import CompletionUsage
+
+    tc_list: list[ChatCompletionMessageToolCallUnion] | None = None
     if tool_calls:
-        tc = [
-            SimpleNamespace(
-                id=tc["id"],
-                type="function",
-                function=SimpleNamespace(
-                    name=tc["function"]["name"],
-                    arguments=tc["function"]["arguments"],
-                ),
-            )
-            for tc in tool_calls
-        ]
-    return SimpleNamespace(
+        tc_list = cast(
+            list[ChatCompletionMessageToolCallUnion],
+            [
+                ChatCompletionMessageFunctionToolCall(
+                    id=tc["id"],
+                    type="function",
+                    function=Function(
+                        name=tc["function"]["name"],
+                        arguments=tc["function"]["arguments"],
+                    ),
+                )
+                for tc in tool_calls
+            ],
+        )
+    return ChatCompletion(
+        id="chatcmpl-test",
         choices=[
-            SimpleNamespace(
-                message=SimpleNamespace(
+            Choice(
+                index=0,
+                finish_reason=finish_reason,
+                message=ChatCompletionMessage(
                     role="assistant",
                     content=content,
-                    tool_calls=tc,
+                    tool_calls=tc_list,
                 ),
-                finish_reason=finish_reason,
-                index=0,
             )
         ],
+        created=0,
         model="gpt-4o",
-        usage=SimpleNamespace(
+        object="chat.completion",
+        usage=CompletionUsage(
             prompt_tokens=10,
             completion_tokens=5,
             total_tokens=15,
@@ -143,6 +164,7 @@ def _make_google_interaction_response(
 
 
 @patch("giskard.llm.providers.openai._import_openai")
+@pytest.mark.openai
 async def test_openai_completion(mock_import):
     mock_import.return_value = MagicMock()
     provider = _make_openai_provider()
@@ -161,6 +183,7 @@ async def test_openai_completion(mock_import):
 
 
 @patch("giskard.llm.providers.openai._import_openai")
+@pytest.mark.openai
 async def test_openai_completion_with_typed_tool_calls(mock_import):
     mock_import.return_value = MagicMock()
     tool_calls = [
@@ -318,6 +341,7 @@ async def test_openai_validate_empty_system_content(mock_import):
 
 
 @patch("giskard.llm.providers.openai._import_openai")
+@pytest.mark.openai
 async def test_openai_multiple_system_works(mock_import):
     """OpenAI supports multiple system messages natively."""
     mock_import.return_value = MagicMock()

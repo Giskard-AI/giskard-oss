@@ -7,7 +7,14 @@ from typing import Literal
 
 import pytest
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
-from giskard.llm.types import ChatMessage, DeveloperMessage, SystemMessage, UserMessage
+from giskard.llm.types import (
+    ChatMessage,
+    DeveloperMessage,
+    RefusalContent,
+    SystemMessage,
+    TextContent,
+    UserMessage,
+)
 
 from .sdk_payload_validation import validate_anthropic_message_create
 from .tool_turn_fixtures import (
@@ -126,6 +133,47 @@ def test_user_assistant_user():
             "content": [{"type": "text", "text": "Assistant reply."}],
         },
         {"role": "user", "content": "Second user."},
+    ]
+    validate_anthropic_message_create(payload)
+
+
+def test_assistant_refusal_replayed_as_text_block():
+    """Anthropic has no refusal part on input; we replay ``refusal`` as a normal text block."""
+    messages: list[ChatMessage] = [
+        {"role": "user", "content": "Unsafe ask."},
+        {"role": "assistant", "refusal": "I can't help with that."},
+    ]
+    payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
+    assert payload["messages"] == [
+        {"role": "user", "content": "Unsafe ask."},
+        {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "I can't help with that."}],
+        },
+    ]
+    validate_anthropic_message_create(payload)
+
+
+def test_assistant_structured_refusal_parts_as_text():
+    """``TextContent`` / ``RefusalContent`` lists become text blocks (no distinct refusal type)."""
+    messages: list[ChatMessage] = [
+        {
+            "role": "assistant",
+            "content": [
+                TextContent(type="text", text="Ok."),
+                RefusalContent(type="refusal", refusal="Stopped."),
+            ],
+        },
+    ]
+    payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
+    assert payload["messages"] == [
+        {
+            "role": "assistant",
+            "content": [
+                {"type": "text", "text": "Ok."},
+                {"type": "text", "text": "Stopped."},
+            ],
+        },
     ]
     validate_anthropic_message_create(payload)
 

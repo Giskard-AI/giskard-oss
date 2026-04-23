@@ -8,7 +8,14 @@ from typing import Literal
 
 import pytest
 from giskard.llm.translators.openai_chat import OpenAIChatTranslator
-from giskard.llm.types import ChatMessage, DeveloperMessage, SystemMessage, UserMessage
+from giskard.llm.types import (
+    ChatMessage,
+    DeveloperMessage,
+    RefusalContent,
+    SystemMessage,
+    TextContent,
+    UserMessage,
+)
 
 from .sdk_payload_validation import validate_openai_completion_params
 from .tool_turn_fixtures import (
@@ -128,6 +135,50 @@ def test_user_assistant_user():
     validate_openai_completion_params(payload)
 
 
+def test_assistant_refusal_string():
+    """Assistant turn may replay OpenAI ``refusal`` without normal ``content``."""
+    messages: list[ChatMessage] = [
+        {"role": "user", "content": "Do something unsafe."},
+        {
+            "role": "assistant",
+            "refusal": "I'm sorry, I can't help with that.",
+        },
+    ]
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
+    assert payload["messages"] == [
+        {"role": "user", "content": "Do something unsafe."},
+        {
+            "role": "assistant",
+            "refusal": "I'm sorry, I can't help with that.",
+        },
+    ]
+    validate_openai_completion_params(payload)
+
+
+def test_assistant_mixed_text_and_refusal_content_parts():
+    """Structured assistant ``content`` with text and refusal parts maps to OpenAI parts."""
+    messages: list[ChatMessage] = [
+        {
+            "role": "assistant",
+            "content": [
+                TextContent(type="text", text="Partial."),
+                RefusalContent(type="refusal", refusal="Declined."),
+            ],
+        },
+    ]
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
+    assert payload["messages"] == [
+        {
+            "role": "assistant",
+            "content": [
+                {"type": "text", "text": "Partial."},
+                {"type": "refusal", "refusal": "Declined."},
+            ],
+        },
+    ]
+    validate_openai_completion_params(payload)
+
+
 def test_user_tool_call_and_result_with_tools():
     """Tool definition plus [user, assistant w/ tool_calls, tool result] for Chat Completions."""
     messages = user_assistant_tool_then_tool_result()
@@ -147,7 +198,6 @@ def test_user_tool_call_and_result_with_tools():
         {"role": "user", "content": "What's the weather in Paris?"},
         {
             "role": "assistant",
-            "content": None,
             "tool_calls": [
                 {
                     "type": "function",
@@ -195,7 +245,6 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
         {"role": "user", "content": PARALLEL_USER_PROMPT},
         {
             "role": "assistant",
-            "content": None,
             "tool_calls": [
                 {
                     "type": "function",

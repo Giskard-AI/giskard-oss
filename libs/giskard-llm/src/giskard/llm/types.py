@@ -64,6 +64,7 @@ class ToolCall(_BaseModel):
 class ChoiceMessage(_BaseModel):
     role: str | None = None
     content: str | None = None
+    refusal: str | None = None
     tool_calls: list[ToolCall] | None = None
 
 
@@ -141,6 +142,21 @@ class ResponseResult(_BaseModel):
         return [o for o in self.outputs if isinstance(o, ResponseOutputFunctionCall)]
 
 
+# -- Chat content types -------------------------------------------------------------
+
+
+class TextContent(TypedDict, total=False):
+    type: Required[Literal["text"]]
+    text: Required[str]
+
+
+class RefusalContent(TypedDict, total=False):
+    type: Required[Literal["refusal"]]
+    refusal: Required[str]
+
+
+CompletionContent = TextContent | RefusalContent
+
 # -- Chat Message types -------------------------------------------------------------
 
 
@@ -172,7 +188,8 @@ class UserMessage(TypedDict, total=False):
 
 class AssistantMessage(TypedDict, total=False):
     role: Required[Literal["assistant"]]
-    content: str
+    content: str | list[CompletionContent]
+    refusal: str
     tool_calls: list[ToolCallDict]
 
 

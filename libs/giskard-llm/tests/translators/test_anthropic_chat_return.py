@@ -49,7 +49,27 @@ def test_from_anthropic_assistant_text():
     assert ch.finish_reason == "stop"
     assert ch.message.role == "assistant"
     assert ch.message.content == "Hello from Claude."
+    assert ch.message.refusal is None
     assert ch.message.tool_calls is None
+
+
+def test_from_anthropic_refusal_stop():
+    """``stop_reason`` ``refusal`` and ``stop_details.explanation`` map to ``message.refusal``."""
+    raw = _message(
+        {
+            "content": [],
+            "stop_reason": "refusal",
+            "stop_details": {
+                "type": "refusal",
+                "explanation": "Policy decline.",
+            },
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    ch = out.choices[0]
+    assert ch.finish_reason == "stop"
+    assert ch.message.content is None
+    assert ch.message.refusal == "Policy decline."
 
 
 def test_from_anthropic_multiple_text_blocks_joined():

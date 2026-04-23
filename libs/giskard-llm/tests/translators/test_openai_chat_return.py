@@ -62,6 +62,7 @@ def test_from_openai_assistant_text_message():
     assert ch.finish_reason == "stop"
     assert ch.message.role == "assistant"
     assert ch.message.content == "Hello, world."
+    assert ch.message.refusal is None
     assert ch.message.tool_calls is None
 
 
@@ -86,6 +87,31 @@ def test_from_openai_assistant_message_omit_usage():
     out = OpenAIChatTranslator.from_openai(raw)
     assert out.usage is None
     assert out.choices[0].message.content == "No usage."
+
+
+def test_from_openai_assistant_refusal():
+    """Maps ``message.refusal`` when the model returns a policy refusal (no ``content``)."""
+    raw = ChatCompletion(
+        id="chatcmpl-refusal",
+        choices=[
+            Choice(
+                index=0,
+                finish_reason="stop",
+                message=ChatCompletionMessage(
+                    role="assistant",
+                    content=None,
+                    refusal="I'm sorry, I can't assist with that.",
+                ),
+            )
+        ],
+        created=0,
+        model=_MODEL,
+        object="chat.completion",
+    )
+    out = OpenAIChatTranslator.from_openai(raw)
+    msg = out.choices[0].message
+    assert msg.content is None
+    assert msg.refusal == "I'm sorry, I can't assist with that."
 
 
 def test_from_openai_assistant_text_and_tool_calls():

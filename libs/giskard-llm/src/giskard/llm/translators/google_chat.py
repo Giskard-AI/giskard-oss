@@ -8,6 +8,7 @@ from ..types import (
     ChatMessage,
     Choice,
     ChoiceMessage,
+    CompletionContent,
     CompletionResponse,
     ToolCall,
     ToolCallFunction,
@@ -57,10 +58,25 @@ class GoogleChatTranslator:
         }
 
     @staticmethod
-    def _content_to_parts[T](
-        content: str,
-    ) -> "list[PartDict]":
-        return [{"text": content}]
+    def _content_to_parts(content: str) -> "PartDict":
+        return {"text": content}
+
+    @staticmethod
+    def _completion_content_to_parts(content: CompletionContent) -> "PartDict":
+        if content["type"] == "text":
+            return {"text": content["text"]}
+
+        if content["type"] == "refusal":
+            return {"text": content["refusal"]}
+
+    @staticmethod
+    def _assistant_content_to_parts(
+        content: str | list[CompletionContent],
+    ) -> "Sequence[PartDict]":
+        if isinstance(content, str):
+            return [GoogleChatTranslator._content_to_parts(content)]
+
+        return [GoogleChatTranslator._completion_content_to_parts(p) for p in content]
 
     @staticmethod
     def _message_to_contents(
@@ -82,8 +98,10 @@ class GoogleChatTranslator:
         if message["role"] == "assistant":
             parts = []
 
-            if content := message.get("content"):
-                parts.extend(GoogleChatTranslator._content_to_parts(content))
+            if (content := message.get("content")) is not None:
+                parts.extend(GoogleChatTranslator._assistant_content_to_parts(content))
+            if (refusal := message.get("refusal")) is not None:
+                parts.append({"text": refusal})
 
             if tool_calls := message.get("tool_calls"):
                 for tc in tool_calls:

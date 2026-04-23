@@ -99,19 +99,22 @@ class OpenAIChatTranslator:
             }
 
         if message["role"] == "assistant":
-            chat_completion_message: "ChatCompletionAssistantMessageParam" = {
+            assistant_msg: "ChatCompletionAssistantMessageParam" = {
                 "role": "assistant",
-                "content": message.get("content"),
             }
+            if (content := message.get("content")) is not None:
+                assistant_msg["content"] = content
+            if (refusal := message.get("refusal")) is not None:
+                assistant_msg["refusal"] = refusal
 
             tool_calls = message.get("tool_calls")
             if tool_calls:
-                chat_completion_message["tool_calls"] = [
+                assistant_msg["tool_calls"] = [
                     OpenAIChatTranslator._tool_call_to_openai(tool_call)
                     for tool_call in tool_calls
                 ]
 
-            return chat_completion_message
+            return cast("ChatCompletionMessageParam", cast(object, assistant_msg))
 
         if message["role"] == "tool":
             return {
@@ -225,6 +228,7 @@ class OpenAIChatTranslator:
                     message=ChoiceMessage(
                         role=c.message.role,
                         content=c.message.content,
+                        refusal=c.message.refusal,
                         tool_calls=[
                             OpenAIChatTranslator._tool_call_from_openai(tc)
                             for tc in c.message.tool_calls

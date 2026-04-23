@@ -22,7 +22,13 @@ def validate_google_contents(contents: object) -> None:
 
     assert isinstance(contents, list)
     for item in contents:
-        _ = Content.model_validate(item)
+        # ``ContentListUnionDict`` allows a single part dict for ``parts``; ``Content`` expects a list.
+        to_validate = item
+        if isinstance(item, dict):
+            parts = item.get("parts")
+            if isinstance(parts, dict):
+                to_validate = {**item, "parts": [parts]}
+        _ = Content.model_validate(to_validate)
 
 
 def validate_anthropic_message_create(payload: object) -> None:
