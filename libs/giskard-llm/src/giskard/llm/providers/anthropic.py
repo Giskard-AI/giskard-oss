@@ -7,7 +7,7 @@ Authentication:
     - Kwargs: ``api_key``, ``base_url``, ``timeout``
 
 Role mapping:
-    - ``system`` -> extracted to top-level ``system`` param (single string)
+    - ``system`` / ``developer`` -> extracted to top-level ``system`` param (text blocks)
     - ``user`` -> ``user``
     - ``assistant`` -> ``assistant``
     - ``tool`` -> wrapped as ``user`` with ``tool_result`` content block
@@ -17,7 +17,7 @@ Message constraints:
       Configure with ``merge_system=True`` to concatenate them.
     - Consecutive same-role messages: raises ``BadRequestError``
       (strict alternation required by the Anthropic API).
-    - System-only messages: raises ``BadRequestError``
+    - System- or developer-only messages: raises ``BadRequestError``
 
 Tool call format:
     - Tool definitions: converted to Anthropic ``{name, description, input_schema}``
@@ -73,6 +73,9 @@ PROVIDER = "anthropic"
 KNOWN_COMPLETION_PARAMS = frozenset(
     {"temperature", "max_tokens", "timeout", "tools", "response_format"}
 )
+
+# Roles that never appear in ``messages`` on the wire (folded into top-level ``system``).
+_ANTHROPIC_INSTRUCTION_ROLES = frozenset({"system", "developer"})
 
 
 # -- Private wire-format TypedDicts -------------------------------------------
@@ -178,10 +181,14 @@ class AnthropicProvider:
             raise BadRequestError(400, "Messages list must not be empty.", PROVIDER)
 
         system_count = sum(1 for m in messages if m.get("role") == "system")
-        has_non_system = any(m.get("role") != "system" for m in messages)
-        if not has_non_system:
+        has_conversation_message = any(
+            m.get("role") not in _ANTHROPIC_INSTRUCTION_ROLES for m in messages
+        )
+        if not has_conversation_message:
             raise BadRequestError(
-                400, "Messages must contain at least one non-system message.", PROVIDER
+                400,
+                "Messages must contain at least one user, assistant, or tool message.",
+                PROVIDER,
             )
 
         if system_count > 1 and not self._merge_system:
@@ -192,10 +199,12 @@ class AnthropicProvider:
                 PROVIDER,
             )
 
-        non_system = [m for m in messages if m.get("role") != "system"]
-        for i in range(1, len(non_system)):
-            prev_role = non_system[i - 1].get("role")
-            curr_role = non_system[i].get("role")
+        for_alternation = [
+            m for m in messages if m.get("role") not in _ANTHROPIC_INSTRUCTION_ROLES
+        ]
+        for i in range(1, len(for_alternation)):
+            prev_role = for_alternation[i - 1].get("role")
+            curr_role = for_alternation[i].get("role")
             # Skip: consecutive tool messages are valid (they merge into
             # a single user message with multiple tool_result blocks).
             if prev_role == "tool" or curr_role == "tool":
@@ -213,7 +222,12 @@ class AnthropicProvider:
                 raise BadRequestError(
                     400, "Tool messages must have a tool_call_id.", PROVIDER
                 )
-            if m.get("role") == "system" and not (m.get("content") or "").strip():
+            if (
+                m.get("role") in _ANTHROPIC_INSTRUCTION_ROLES
+                and not (m.get("content") or "").strip()
+            ):
                 raise BadRequestError(
-                    400, "System messages must have non-empty content.", PROVIDER
+                    400,
+                    "System and developer messages must have non-empty content.",
+                    PROVIDER,
                 )

@@ -381,6 +381,46 @@ async def test_anthropic_validate_multi_system_with_merge(mock_import):
 
 
 @patch("giskard.llm.providers.anthropic._import_anthropic")
+async def test_anthropic_validate_consecutive_developers_ok(mock_import):
+    """Developer turns are folded into ``system``; they must not affect user/assistant alternation."""
+    mock_anthropic = MagicMock()
+    mock_import.return_value = mock_anthropic
+
+    provider = _make_anthropic_provider()
+
+    mock_raw = MagicMock()
+    mock_raw.content = [SimpleNamespace(type="text", text="Hello")]
+    mock_raw.stop_reason = "end_turn"
+    mock_raw.model = "claude-3"
+    mock_raw.usage = SimpleNamespace(input_tokens=10, output_tokens=5)
+    provider._client.messages.create = AsyncMock(return_value=mock_raw)
+
+    resp = await provider.complete(
+        "claude-3",
+        [
+            {"role": "developer", "content": "First instruction."},
+            {"role": "developer", "content": "Second instruction."},
+            {"role": "user", "content": "Hi"},
+        ],
+    )
+    assert resp.choices[0].message.content == "Hello"
+
+
+@patch("giskard.llm.providers.anthropic._import_anthropic")
+async def test_anthropic_validate_empty_developer_content(mock_import):
+    mock_import.return_value = MagicMock()
+    provider = _make_anthropic_provider()
+    with pytest.raises(BadRequestError, match="non-empty content"):
+        await provider.complete(
+            "claude-3",
+            [
+                {"role": "developer", "content": ""},
+                {"role": "user", "content": "Hi"},
+            ],
+        )
+
+
+@patch("giskard.llm.providers.anthropic._import_anthropic")
 async def test_anthropic_validate_alternation(mock_import):
     mock_import.return_value = MagicMock()
     provider = _make_anthropic_provider()
