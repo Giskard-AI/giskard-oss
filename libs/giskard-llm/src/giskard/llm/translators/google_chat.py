@@ -14,6 +14,7 @@ from ..types import (
     ToolDef,
     Usage,
 )
+from ..utils import deserialize_arguments
 from .anthropic import AnthropicChatTranslator
 
 if TYPE_CHECKING:
@@ -91,7 +92,7 @@ class GoogleChatTranslator:
                         {
                             "function_call": {
                                 "name": func["name"],
-                                "args": func["arguments"],
+                                "args": deserialize_arguments(func["arguments"]),
                             }
                         }
                     )
@@ -211,13 +212,20 @@ class GoogleChatTranslator:
                         text_parts.append(part.text)
                     elif part.function_call is not None:
                         fc = part.function_call
+                        raw_args = fc.args
+                        if raw_args is None:
+                            tool_args: dict[str, Any] = {}
+                        elif isinstance(raw_args, (str, dict)):
+                            tool_args = deserialize_arguments(raw_args)
+                        else:
+                            tool_args = {}
                         fc_list.append(
                             ToolCall(
                                 id=f"call_{idx}",
                                 type="function",
                                 function=ToolCallFunction(
                                     name=fc.name or "",
-                                    arguments=fc.args or {},
+                                    arguments=tool_args,
                                 ),
                             )
                         )

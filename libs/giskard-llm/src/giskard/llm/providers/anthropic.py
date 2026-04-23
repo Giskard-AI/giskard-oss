@@ -64,7 +64,7 @@ from ..types import (
     CompletionResponse,
     ToolDef,
 )
-from ..utils import compact
+from ..utils._compact import compact
 
 logger = logging.getLogger(__name__)
 

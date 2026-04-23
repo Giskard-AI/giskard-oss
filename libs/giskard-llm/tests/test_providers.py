@@ -185,7 +185,7 @@ async def test_openai_completion_with_typed_tool_calls(mock_import):
     assert tcs is not None
     assert isinstance(tcs[0], ToolCall)
     assert tcs[0].function.name == "get_weather"
-    assert tcs[0].function.arguments == '{"city": "Paris"}'
+    assert tcs[0].function.arguments == {"city": "Paris"}
 
 
 @patch("giskard.llm.providers.openai._import_openai")

@@ -13,6 +13,7 @@ from ..types import (
     ToolDef,
     Usage,
 )
+from ..utils import deserialize_arguments
 
 if TYPE_CHECKING:
     import httpx
@@ -90,7 +91,7 @@ class GoogleResponseTranslator:
                     "type": "function_call",
                     "id": id,
                     "name": input.get("name", ""),
-                    "arguments": input["arguments"],
+                    "arguments": deserialize_arguments(input["arguments"]),
                 }
             ]
 
@@ -165,14 +166,20 @@ class GoogleResponseTranslator:
             if item_type == "text":
                 outputs.append(ResponseOutputText(text=item.text))
             elif item_type == "function_call":
-                args = getattr(item, "arguments", {})
+                raw_args = getattr(item, "arguments", None)
+                if raw_args is None:
+                    arguments: dict[str, Any] = {}
+                elif isinstance(raw_args, (str, dict)):
+                    arguments = deserialize_arguments(raw_args)
+                else:
+                    arguments = {}
                 # Google returns "id" on function_call outputs, not "call_id"
                 call_id = getattr(item, "id", None) or getattr(item, "call_id", None)
                 outputs.append(
                     ResponseOutputFunctionCall(
                         call_id=call_id,
                         name=item.name,
-                        arguments=args if isinstance(args, dict) else {},
+                        arguments=arguments,
                     )
                 )
 

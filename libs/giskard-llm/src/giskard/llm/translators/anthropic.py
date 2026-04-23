@@ -13,6 +13,7 @@ from ..types import (
     ToolDef,
     Usage,
 )
+from ..utils import deserialize_arguments
 
 if TYPE_CHECKING:
     import httpx
@@ -106,7 +107,9 @@ class AnthropicChatTranslator:
                             "type": "tool_use",
                             "id": tool_call["id"],
                             "name": tool_call["function"]["name"],
-                            "input": tool_call["function"]["arguments"],
+                            "input": deserialize_arguments(
+                                tool_call["function"]["arguments"]
+                            ),
                         }
                     )
 
@@ -232,7 +235,7 @@ class AnthropicChatTranslator:
                         type="function",
                         function=ToolCallFunction(
                             name=block.name,
-                            arguments=block.input,
+                            arguments=deserialize_arguments(block.input),
                         ),
                     )
                 )

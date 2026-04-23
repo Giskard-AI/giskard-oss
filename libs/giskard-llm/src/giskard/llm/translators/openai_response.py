@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -12,6 +11,8 @@ from giskard.llm.types import (
     ToolDef,
     Usage,
 )
+
+from ..utils import deserialize_arguments, serialize_arguments
 
 if TYPE_CHECKING:
     from openai.types.responses.response import Response
@@ -57,7 +58,7 @@ class OpenAIResponseTranslator:
         if input["type"] == "function_call":
             return {
                 **input,
-                "arguments": json.dumps(input["arguments"]),
+                "arguments": serialize_arguments(input["arguments"]),
             }
 
     @staticmethod
@@ -124,9 +125,7 @@ class OpenAIResponseTranslator:
                     ResponseOutputFunctionCall(
                         call_id=item.call_id,
                         name=item.name,
-                        arguments=json.loads(item.arguments)
-                        if isinstance(item.arguments, str)
-                        else item.arguments,
+                        arguments=deserialize_arguments(item.arguments),
                     )
                 )
             else:

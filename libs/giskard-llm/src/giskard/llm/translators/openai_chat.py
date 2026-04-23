@@ -1,4 +1,3 @@
-import json
 import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
@@ -15,6 +14,8 @@ from giskard.llm.types import (
     Usage,
 )
 from pydantic import BaseModel
+
+from ..utils import deserialize_arguments, serialize_arguments
 
 if TYPE_CHECKING:
     from openai.types.chat.chat_completion import ChatCompletion
@@ -73,7 +74,7 @@ class OpenAIChatTranslator:
             "id": tool_call["id"],
             "function": {
                 "name": tool_call["function"]["name"],
-                "arguments": json.dumps(tool_call["function"]["arguments"]),
+                "arguments": serialize_arguments(tool_call["function"]["arguments"]),
             },
         }
 
@@ -199,7 +200,7 @@ class OpenAIChatTranslator:
                 type=tool_call.type,
                 function=ToolCallFunction(
                     name=tool_call.function.name,
-                    arguments=json.loads(tool_call.function.arguments),
+                    arguments=deserialize_arguments(tool_call.function.arguments),
                 ),
             )
 

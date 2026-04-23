@@ -40,7 +40,7 @@ from typing import Any
 from urllib.parse import urlparse, urlunparse
 
 from ..errors import ProviderNotAvailableError
-from ..utils import compact
+from ..utils._compact import compact
 from .openai import OpenAIProvider
 
 logger = logging.getLogger(__name__)

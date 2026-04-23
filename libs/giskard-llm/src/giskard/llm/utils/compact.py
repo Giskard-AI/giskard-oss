@@ -1,5 +1,3 @@
-"""Shared utilities for giskard-llm providers."""
-
 from typing import Any
 
 
