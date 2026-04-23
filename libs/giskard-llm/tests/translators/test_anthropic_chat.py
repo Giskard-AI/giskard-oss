@@ -3,8 +3,11 @@
 Request shape: https://docs.anthropic.com/en/api/messages
 """
 
+from typing import Literal
+
+import pytest
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
-from giskard.llm.types import ChatMessage, UserMessage
+from giskard.llm.types import ChatMessage, DeveloperMessage, SystemMessage, UserMessage
 
 from .sdk_payload_validation import validate_anthropic_message_create
 from .tool_turn_fixtures import (
@@ -39,10 +42,19 @@ def test_single_user_message():
     validate_anthropic_message_create(payload)
 
 
-def test_system_then_user():
-    """System prompts map to top-level ``system`` blocks; user to ``messages``."""
+@pytest.mark.parametrize(
+    "instruction_role",
+    ["system", "developer"],
+)
+def test_instruction_then_user(instruction_role: Literal["system", "developer"]):
+    """System or developer text maps to top-level ``system`` blocks; user to ``messages``."""
+    first: SystemMessage | DeveloperMessage = (
+        {"role": "system", "content": "You are helpful."}
+        if instruction_role == "system"
+        else {"role": "developer", "content": "You are helpful."}
+    )
     messages: list[ChatMessage] = [
-        {"role": "system", "content": "You are helpful."},
+        first,
         {"role": "user", "content": "Hello."},
     ]
     payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
@@ -52,13 +64,42 @@ def test_system_then_user():
     validate_anthropic_message_create(payload)
 
 
-def test_two_system_then_user():
-    """Multiple system messages become several ``system`` text blocks in order."""
+def test_system_then_developer_then_user():
+    """System and developer preserve order in top-level ``system`` blocks."""
     messages: list[ChatMessage] = [
-        {"role": "system", "content": "First system instruction."},
-        {"role": "system", "content": "Second system instruction."},
+        {"role": "system", "content": "You are helpful."},
+        {"role": "developer", "content": "App version 2.0"},
         {"role": "user", "content": "Hello."},
     ]
+    payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
+
+    assert payload.get("system") == [
+        {"type": "text", "text": "You are helpful."},
+        {"type": "text", "text": "App version 2.0"},
+    ]
+    assert payload["messages"] == [{"role": "user", "content": "Hello."}]
+    validate_anthropic_message_create(payload)
+
+
+@pytest.mark.parametrize(
+    "instruction_role",
+    ["system", "developer"],
+)
+def test_two_instructions_then_user(instruction_role: Literal["system", "developer"]):
+    """Two system or developer messages become several ``system`` text blocks in order."""
+    messages: list[ChatMessage]
+    if instruction_role == "system":
+        messages = [
+            {"role": "system", "content": "First system instruction."},
+            {"role": "system", "content": "Second system instruction."},
+            {"role": "user", "content": "Hello."},
+        ]
+    else:
+        messages = [
+            {"role": "developer", "content": "First system instruction."},
+            {"role": "developer", "content": "Second system instruction."},
+            {"role": "user", "content": "Hello."},
+        ]
     payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
 
     assert payload.get("system") == [

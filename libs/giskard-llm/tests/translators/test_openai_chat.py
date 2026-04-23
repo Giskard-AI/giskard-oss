@@ -4,9 +4,11 @@ Request shape: https://platform.openai.com/docs/api-reference/chat/create
 """
 
 import json
+from typing import Literal
 
+import pytest
 from giskard.llm.translators.openai_chat import OpenAIChatTranslator
-from giskard.llm.types import ChatMessage, UserMessage
+from giskard.llm.types import ChatMessage, DeveloperMessage, SystemMessage, UserMessage
 
 from .sdk_payload_validation import validate_openai_completion_params
 from .tool_turn_fixtures import (
@@ -39,33 +41,71 @@ def test_single_user_message():
     validate_openai_completion_params(payload)
 
 
-def test_system_then_user():
-    """System prompt precedes the first user message."""
+@pytest.mark.parametrize(
+    "instruction_role",
+    ["system", "developer"],
+)
+def test_instruction_then_user(instruction_role: Literal["system", "developer"]):
+    """System or developer prompt precedes the first user message (distinct roles for OpenAI)."""
+    first: SystemMessage | DeveloperMessage = (
+        {"role": "system", "content": "You are helpful."}
+        if instruction_role == "system"
+        else {"role": "developer", "content": "You are helpful."}
+    )
     messages: list[ChatMessage] = [
-        {"role": "system", "content": "You are helpful."},
+        first,
         {"role": "user", "content": "Hello."},
     ]
     payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
 
     assert payload["messages"] == [
-        {"role": "system", "content": "You are helpful."},
+        {"role": instruction_role, "content": "You are helpful."},
         {"role": "user", "content": "Hello."},
     ]
     validate_openai_completion_params(payload)
 
 
-def test_two_system_then_user():
-    """Multiple system messages are kept as separate ``system`` turns."""
+def test_system_then_developer_then_user():
+    """System and developer are separate turns for OpenAI."""
     messages: list[ChatMessage] = [
-        {"role": "system", "content": "First system instruction."},
-        {"role": "system", "content": "Second system instruction."},
+        {"role": "system", "content": "You are helpful."},
+        {"role": "developer", "content": "App version 2.0"},
         {"role": "user", "content": "Hello."},
     ]
     payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
 
     assert payload["messages"] == [
-        {"role": "system", "content": "First system instruction."},
-        {"role": "system", "content": "Second system instruction."},
+        {"role": "system", "content": "You are helpful."},
+        {"role": "developer", "content": "App version 2.0"},
+        {"role": "user", "content": "Hello."},
+    ]
+    validate_openai_completion_params(payload)
+
+
+@pytest.mark.parametrize(
+    "instruction_role",
+    ["system", "developer"],
+)
+def test_two_instructions_then_user(instruction_role: Literal["system", "developer"]):
+    """Two consecutive system or developer turns stay separate in Chat Completions."""
+    messages: list[ChatMessage]
+    if instruction_role == "system":
+        messages = [
+            {"role": "system", "content": "First system instruction."},
+            {"role": "system", "content": "Second system instruction."},
+            {"role": "user", "content": "Hello."},
+        ]
+    else:
+        messages = [
+            {"role": "developer", "content": "First system instruction."},
+            {"role": "developer", "content": "Second system instruction."},
+            {"role": "user", "content": "Hello."},
+        ]
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
+
+    assert payload["messages"] == [
+        {"role": instruction_role, "content": "First system instruction."},
+        {"role": instruction_role, "content": "Second system instruction."},
         {"role": "user", "content": "Hello."},
     ]
     validate_openai_completion_params(payload)

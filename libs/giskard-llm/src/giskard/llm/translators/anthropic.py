@@ -68,11 +68,11 @@ class AnthropicChatTranslator:
         message: ChatMessage,
     ) -> "MessageParam | None":
         """Convert a chat message to an Anthropic message."""
-        if message["role"] == "system":
-            # Handled by system message extraction
+        if message["role"] == "system" or message["role"] == "developer":
+            # Folded into top-level ``system`` (Anthropic has no developer role on messages).
             return None
 
-        if message["role"] == "developer" or message["role"] == "function":
+        if message["role"] == "function":
             raise ValueError(f"Unsupported message role: {message['role']}")
 
         if message["role"] == "tool":
@@ -146,10 +146,12 @@ class AnthropicChatTranslator:
 
     @staticmethod
     def _extract_system_messages(messages: Sequence[ChatMessage]) -> list[str]:
-        """Extract system messages from a list of messages."""
-        system_messages = [m["content"] for m in messages if m["role"] == "system"]
-
-        return system_messages
+        """Extract system and developer messages in order (both map to ``system``)."""
+        return [
+            m["content"]
+            for m in messages
+            if m["role"] == "system" or m["role"] == "developer"
+        ]
 
     @staticmethod
     def _extract_system_messages_to_blocks(

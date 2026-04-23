@@ -3,8 +3,11 @@
 Content shape: https://ai.google.dev/api/generate-content#Content
 """
 
+from typing import Literal
+
+import pytest
 from giskard.llm.translators.google_chat import GoogleChatTranslator
-from giskard.llm.types import ChatMessage, UserMessage
+from giskard.llm.types import ChatMessage, DeveloperMessage, SystemMessage, UserMessage
 
 from .sdk_payload_validation import validate_google_contents
 from .tool_turn_fixtures import (
@@ -35,10 +38,19 @@ def test_single_user_message():
     validate_google_contents(payload["contents"])
 
 
-def test_system_then_user():
-    """System prompts become ``system_instruction``; user text stays in ``contents``."""
+@pytest.mark.parametrize(
+    "instruction_role",
+    ["system", "developer"],
+)
+def test_instruction_then_user(instruction_role: Literal["system", "developer"]):
+    """System or developer text becomes ``system_instruction``; user stays in ``contents``."""
+    first: SystemMessage | DeveloperMessage = (
+        {"role": "system", "content": "You are helpful."}
+        if instruction_role == "system"
+        else {"role": "developer", "content": "You are helpful."}
+    )
     messages: list[ChatMessage] = [
-        {"role": "system", "content": "You are helpful."},
+        first,
         {"role": "user", "content": "Hello."},
     ]
     payload = GoogleChatTranslator.to_google(_MODEL, messages)
@@ -50,13 +62,44 @@ def test_system_then_user():
     validate_google_contents(payload["contents"])
 
 
-def test_two_system_then_user():
-    """Several system messages are concatenated in order in ``system_instruction``."""
+def test_system_then_developer_then_user():
+    """System and developer preserve message order in ``system_instruction``."""
     messages: list[ChatMessage] = [
-        {"role": "system", "content": "First system instruction."},
-        {"role": "system", "content": "Second system instruction."},
+        {"role": "system", "content": "You are helpful."},
+        {"role": "developer", "content": "App version 2.0"},
         {"role": "user", "content": "Hello."},
     ]
+    payload = GoogleChatTranslator.to_google(_MODEL, messages)
+
+    assert payload["contents"] == [{"role": "user", "parts": [{"text": "Hello."}]}]
+    assert "config" in payload
+    cfg = payload["config"]
+    assert cfg.get("system_instruction") == [
+        "You are helpful.",
+        "App version 2.0",
+    ]
+    validate_google_contents(payload["contents"])
+
+
+@pytest.mark.parametrize(
+    "instruction_role",
+    ["system", "developer"],
+)
+def test_two_instructions_then_user(instruction_role: Literal["system", "developer"]):
+    """Two system or developer messages concatenate in order in ``system_instruction``."""
+    messages: list[ChatMessage]
+    if instruction_role == "system":
+        messages = [
+            {"role": "system", "content": "First system instruction."},
+            {"role": "system", "content": "Second system instruction."},
+            {"role": "user", "content": "Hello."},
+        ]
+    else:
+        messages = [
+            {"role": "developer", "content": "First system instruction."},
+            {"role": "developer", "content": "Second system instruction."},
+            {"role": "user", "content": "Hello."},
+        ]
     payload = GoogleChatTranslator.to_google(_MODEL, messages)
 
     assert payload["contents"] == [{"role": "user", "parts": [{"text": "Hello."}]}]

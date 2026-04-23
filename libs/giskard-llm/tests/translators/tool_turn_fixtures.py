@@ -1,4 +1,4 @@
-"""Shared tool definition and message list for [user, assistant tool call, tool result] tests."""
+"""Shared tool definitions and message lists for single- and parallel-tool-call translator tests."""
 
 from giskard.llm.types import ChatMessage, ToolDef
 

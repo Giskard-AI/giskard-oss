@@ -65,10 +65,11 @@ class GoogleChatTranslator:
     def _message_to_contents(
         message: ChatMessage, tc_id_to_name: dict[str, str]
     ) -> "ContentListUnionDict | None":
-        if message["role"] == "system":
+        if message["role"] == "system" or message["role"] == "developer":
+            # Folded into ``system_instruction`` (Gemini has no developer turn in ``contents``).
             return None
 
-        if message["role"] == "developer" or message["role"] == "function":
+        if message["role"] == "function":
             raise ValueError(f"Unsupported message role: {message['role']}")
 
         if message["role"] == "user":

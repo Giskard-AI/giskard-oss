@@ -79,9 +79,15 @@ class OpenAIChatTranslator:
 
     @staticmethod
     def _message_to_openai(message: "ChatMessage") -> "ChatCompletionMessageParam":
-        if message["role"] == "system" or message["role"] == "developer":
+        if message["role"] == "system":
             return {
                 "role": "system",
+                "content": message["content"],
+            }
+
+        if message["role"] == "developer":
+            return {
+                "role": "developer",
                 "content": message["content"],
             }
 
