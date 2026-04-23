@@ -123,9 +123,8 @@ class GoogleResponseTranslator:
                     )
                 ]
                 for item in input
-                if "type" not in item
-                or item["type"] == "message"
-                and (item["role"] == "system" or item["role"] == "developer")
+                if ("type" not in item or item["type"] == "message")
+                and item.get("role") in ("system", "developer")
             ]
         )
 
