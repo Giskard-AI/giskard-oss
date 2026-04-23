@@ -64,8 +64,9 @@ class GoogleResponseTranslator:
         input: ResponseInputItem,
     ) -> "Sequence[FunctionResultContentParam | FunctionCallContentParam | TextContentParam]":
         if "type" not in input or input["type"] == "message":
-            if input["role"] != "user":
-                raise ValueError(f"Unsupported message role: {input['role']}")
+            if input["role"] == "developer" or input["role"] == "system":
+                return []  # Those messages are folded into the system instruction
+
             return GoogleResponseTranslator._content_to_google(input["content"])
 
         if input["type"] == "function_call_output":
@@ -107,6 +108,30 @@ class GoogleResponseTranslator:
         return input
 
     @staticmethod
+    def _extract_system_instruction(
+        input: str | list[ResponseInputItem],
+    ) -> "str | None":
+        if isinstance(input, str):
+            return None
+
+        system_parts = _flatten(
+            [
+                [
+                    part["text"]
+                    for part in GoogleResponseTranslator._content_to_google(
+                        item["content"]
+                    )
+                ]
+                for item in input
+                if "type" not in item
+                or item["type"] == "message"
+                and (item["role"] == "system" or item["role"] == "developer")
+            ]
+        )
+
+        return "\n".join(system_parts) if system_parts else None
+
+    @staticmethod
     def to_google(
         model: str,
         input: str | list[ResponseInputItem],
@@ -129,8 +154,16 @@ class GoogleResponseTranslator:
             "input": GoogleResponseTranslator._inputs_to_google(input),
         }
 
-        if instructions is not None:
-            interaction_create_params["system_instruction"] = instructions
+        instructions_parts = [
+            instructions,
+            GoogleResponseTranslator._extract_system_instruction(input),
+        ]
+        instructions_parts = [part for part in instructions_parts if part is not None]
+
+        if instructions_parts:
+            interaction_create_params["system_instruction"] = "\n".join(
+                instructions_parts
+            )
         if previous_id is not None:
             interaction_create_params["previous_interaction_id"] = previous_id
         if tools is not None:
