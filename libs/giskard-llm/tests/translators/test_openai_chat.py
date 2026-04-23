@@ -1,0 +1,250 @@
+"""OpenAI Chat Completions translation tests.
+
+Request shape: https://platform.openai.com/docs/api-reference/chat/create
+"""
+
+import json
+
+from giskard.llm.translators.openai_chat import OpenAIChatTranslator
+from giskard.llm.types import ChatMessage, UserMessage
+
+from .sdk_payload_validation import validate_openai_completion_params
+from .tool_turn_fixtures import (
+    ASSISTANT_TEXT_WITH_PARALLEL_TOOLS,
+    GET_TIME_TOOL,
+    PARALLEL_TOOLS,
+    PARALLEL_USER_PROMPT,
+    TOOL_CALL_ID,
+    TOOL_CALL_ID_TIME_PARALLEL,
+    TOOL_CALL_ID_WEATHER_PARALLEL,
+    TOOL_RESULT_CONTENT,
+    TOOL_RESULT_TIME_PARALLEL,
+    TOOL_RESULT_WEATHER_PARALLEL,
+    WEATHER_TOOL,
+    user_assistant_tool_then_tool_result,
+    user_message_two_parallel_tool_calls_two_results,
+    user_two_parallel_tool_calls_two_results,
+)
+
+_MODEL = "gpt-4o-mini"
+
+
+def test_single_user_message():
+    """A lone user turn maps to one ``user`` message (typical conversation start)."""
+    msg: UserMessage = {"role": "user", "content": "Hello."}
+    payload = OpenAIChatTranslator.to_openai(_MODEL, [msg])
+
+    assert payload["model"] == _MODEL
+    assert payload["messages"] == [{"role": "user", "content": "Hello."}]
+    validate_openai_completion_params(payload)
+
+
+def test_system_then_user():
+    """System prompt precedes the first user message."""
+    messages: list[ChatMessage] = [
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hello."},
+    ]
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
+
+    assert payload["messages"] == [
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hello."},
+    ]
+    validate_openai_completion_params(payload)
+
+
+def test_two_system_then_user():
+    """Multiple system messages are kept as separate ``system`` turns."""
+    messages: list[ChatMessage] = [
+        {"role": "system", "content": "First system instruction."},
+        {"role": "system", "content": "Second system instruction."},
+        {"role": "user", "content": "Hello."},
+    ]
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
+
+    assert payload["messages"] == [
+        {"role": "system", "content": "First system instruction."},
+        {"role": "system", "content": "Second system instruction."},
+        {"role": "user", "content": "Hello."},
+    ]
+    validate_openai_completion_params(payload)
+
+
+def test_user_assistant_user():
+    """Multi-turn chat preserves alternating user / assistant / user."""
+    messages: list[ChatMessage] = [
+        {"role": "user", "content": "First user."},
+        {"role": "assistant", "content": "Assistant reply."},
+        {"role": "user", "content": "Second user."},
+    ]
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
+
+    assert payload["messages"] == [
+        {"role": "user", "content": "First user."},
+        {"role": "assistant", "content": "Assistant reply."},
+        {"role": "user", "content": "Second user."},
+    ]
+    validate_openai_completion_params(payload)
+
+
+def test_user_tool_call_and_result_with_tools():
+    """Tool definition plus [user, assistant w/ tool_calls, tool result] for Chat Completions."""
+    messages = user_assistant_tool_then_tool_result()
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages, tools=[WEATHER_TOOL])
+
+    assert payload.get("tools") == [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get weather for a city.",
+                "parameters": WEATHER_TOOL["function"]["parameters"],
+            },
+        },
+    ]
+    assert payload["messages"] == [
+        {"role": "user", "content": "What's the weather in Paris?"},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": TOOL_CALL_ID,
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": json.dumps({"city": "Paris"}),
+                    },
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "content": TOOL_RESULT_CONTENT,
+            "tool_call_id": TOOL_CALL_ID,
+        },
+    ]
+    validate_openai_completion_params(payload)
+
+
+def test_user_two_parallel_tool_calls_and_results_with_tools():
+    """Parallel tool_use: two ``tool_calls`` on one assistant turn, two ``tool`` results."""
+    messages = user_two_parallel_tool_calls_two_results()
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages, tools=PARALLEL_TOOLS)
+
+    assert payload.get("tools") == [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get weather for a city.",
+                "parameters": WEATHER_TOOL["function"]["parameters"],
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_local_time",
+                "description": "Get local time for an IANA timezone.",
+                "parameters": GET_TIME_TOOL["function"]["parameters"],
+            },
+        },
+    ]
+    assert payload["messages"] == [
+        {"role": "user", "content": PARALLEL_USER_PROMPT},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": TOOL_CALL_ID_WEATHER_PARALLEL,
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": json.dumps({"city": "Paris"}),
+                    },
+                },
+                {
+                    "type": "function",
+                    "id": TOOL_CALL_ID_TIME_PARALLEL,
+                    "function": {
+                        "name": "get_local_time",
+                        "arguments": json.dumps({"timezone": "Asia/Tokyo"}),
+                    },
+                },
+            ],
+        },
+        {
+            "role": "tool",
+            "content": TOOL_RESULT_WEATHER_PARALLEL,
+            "tool_call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+        },
+        {
+            "role": "tool",
+            "content": TOOL_RESULT_TIME_PARALLEL,
+            "tool_call_id": TOOL_CALL_ID_TIME_PARALLEL,
+        },
+    ]
+    validate_openai_completion_params(payload)
+
+
+def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
+    """Assistant turn with both user-visible text and two parallel ``tool_calls``."""
+    messages = user_message_two_parallel_tool_calls_two_results()
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages, tools=PARALLEL_TOOLS)
+
+    assert payload.get("tools") == [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get weather for a city.",
+                "parameters": WEATHER_TOOL["function"]["parameters"],
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_local_time",
+                "description": "Get local time for an IANA timezone.",
+                "parameters": GET_TIME_TOOL["function"]["parameters"],
+            },
+        },
+    ]
+    assert payload["messages"] == [
+        {"role": "user", "content": PARALLEL_USER_PROMPT},
+        {
+            "role": "assistant",
+            "content": ASSISTANT_TEXT_WITH_PARALLEL_TOOLS,
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": TOOL_CALL_ID_WEATHER_PARALLEL,
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": json.dumps({"city": "Paris"}),
+                    },
+                },
+                {
+                    "type": "function",
+                    "id": TOOL_CALL_ID_TIME_PARALLEL,
+                    "function": {
+                        "name": "get_local_time",
+                        "arguments": json.dumps({"timezone": "Asia/Tokyo"}),
+                    },
+                },
+            ],
+        },
+        {
+            "role": "tool",
+            "content": TOOL_RESULT_WEATHER_PARALLEL,
+            "tool_call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+        },
+        {
+            "role": "tool",
+            "content": TOOL_RESULT_TIME_PARALLEL,
+            "tool_call_id": TOOL_CALL_ID_TIME_PARALLEL,
+        },
+    ]
+    validate_openai_completion_params(payload)

@@ -19,7 +19,7 @@ from .anthropic import AnthropicChatTranslator
 if TYPE_CHECKING:
     from google.genai.types import (
         ContentListUnionDict,
-        GenerateContentConfigOrDict,
+        GenerateContentConfigDict,
         GenerateContentResponse,
         PartDict,
         ToolDict,
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     class GenerateContentParams(TypedDict, total=False):
         model: Required[str]
         contents: Required[ContentListUnionDict]
-        config: GenerateContentConfigOrDict
+        config: GenerateContentConfigDict
 
 
 PROVIDER = "google"
@@ -152,7 +152,7 @@ class GoogleChatTranslator:
             "config": {},
         }
 
-        config: "GenerateContentConfigOrDict" = {}
+        config: "GenerateContentConfigDict" = {}
 
         if tools is not None:
             config["tools"] = [GoogleChatTranslator._tool_to_google(t) for t in tools]

@@ -1,0 +1,33 @@
+"""Optional validation of translator payloads against provider SDK schemas (when installed)."""
+
+import importlib.util
+
+from pydantic import TypeAdapter
+
+
+def validate_openai_completion_params(payload: object) -> None:
+    if importlib.util.find_spec("openai") is None:
+        return
+    from openai.types.chat.completion_create_params import (
+        CompletionCreateParamsNonStreaming,
+    )
+
+    _ = TypeAdapter(CompletionCreateParamsNonStreaming).validate_python(payload)
+
+
+def validate_google_contents(contents: object) -> None:
+    if importlib.util.find_spec("google.genai") is None:
+        return
+    from google.genai.types import Content
+
+    assert isinstance(contents, list)
+    for item in contents:
+        _ = Content.model_validate(item)
+
+
+def validate_anthropic_message_create(payload: object) -> None:
+    if importlib.util.find_spec("anthropic") is None:
+        return
+    from anthropic.types.message_create_params import MessageCreateParams
+
+    _ = TypeAdapter(MessageCreateParams).validate_python(payload)
