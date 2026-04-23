@@ -9,12 +9,13 @@ from typing import Literal
 import pytest
 from giskard.llm.translators.openai_chat import OpenAIChatTranslator
 from giskard.llm.types import (
-    ChatMessageParam,
-    DeveloperMessageParam,
-    RefusalContentParam,
-    SystemMessageParam,
-    TextContentParam,
-    UserMessageParam,
+    AssistantMessage,
+    ChatMessage,
+    DeveloperMessage,
+    RefusalContent,
+    SystemMessage,
+    TextContent,
+    UserMessage,
 )
 
 from .sdk_payload_validation import validate_openai_completion_params
@@ -40,7 +41,7 @@ _MODEL = "gpt-4o-mini"
 
 def test_single_user_message():
     """A lone user turn maps to one ``user`` message (typical conversation start)."""
-    msg: UserMessageParam = {"role": "user", "content": "Hello."}
+    msg: UserMessage = UserMessage(content="Hello.")
     payload = OpenAIChatTranslator.to_openai(_MODEL, [msg])
 
     assert payload["model"] == _MODEL
@@ -54,14 +55,14 @@ def test_single_user_message():
 )
 def test_instruction_then_user(instruction_role: Literal["system", "developer"]):
     """System or developer prompt precedes the first user message (distinct roles for OpenAI)."""
-    first: SystemMessageParam | DeveloperMessageParam = (
-        {"role": "system", "content": "You are helpful."}
+    first: SystemMessage | DeveloperMessage = (
+        SystemMessage(content="You are helpful.")
         if instruction_role == "system"
-        else {"role": "developer", "content": "You are helpful."}
+        else DeveloperMessage(content="You are helpful.")
     )
-    messages: list[ChatMessageParam] = [
+    messages: list[ChatMessage] = [
         first,
-        {"role": "user", "content": "Hello."},
+        UserMessage(content="Hello."),
     ]
     payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
 
@@ -74,10 +75,10 @@ def test_instruction_then_user(instruction_role: Literal["system", "developer"])
 
 def test_system_then_developer_then_user():
     """System and developer are separate turns for OpenAI."""
-    messages: list[ChatMessageParam] = [
-        {"role": "system", "content": "You are helpful."},
-        {"role": "developer", "content": "App version 2.0"},
-        {"role": "user", "content": "Hello."},
+    messages: list[ChatMessage] = [
+        SystemMessage(content="You are helpful."),
+        DeveloperMessage(content="App version 2.0"),
+        UserMessage(content="Hello."),
     ]
     payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
 
@@ -95,18 +96,18 @@ def test_system_then_developer_then_user():
 )
 def test_two_instructions_then_user(instruction_role: Literal["system", "developer"]):
     """Two consecutive system or developer turns stay separate in Chat Completions."""
-    messages: list[ChatMessageParam]
+    messages: list[ChatMessage]
     if instruction_role == "system":
         messages = [
-            {"role": "system", "content": "First system instruction."},
-            {"role": "system", "content": "Second system instruction."},
-            {"role": "user", "content": "Hello."},
+            SystemMessage(content="First system instruction."),
+            SystemMessage(content="Second system instruction."),
+            UserMessage(content="Hello."),
         ]
     else:
         messages = [
-            {"role": "developer", "content": "First system instruction."},
-            {"role": "developer", "content": "Second system instruction."},
-            {"role": "user", "content": "Hello."},
+            DeveloperMessage(content="First system instruction."),
+            DeveloperMessage(content="Second system instruction."),
+            UserMessage(content="Hello."),
         ]
     payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
 
@@ -120,10 +121,10 @@ def test_two_instructions_then_user(instruction_role: Literal["system", "develop
 
 def test_user_assistant_user():
     """Multi-turn chat preserves alternating user / assistant / user."""
-    messages: list[ChatMessageParam] = [
-        {"role": "user", "content": "First user."},
-        {"role": "assistant", "content": "Assistant reply."},
-        {"role": "user", "content": "Second user."},
+    messages: list[ChatMessage] = [
+        UserMessage(content="First user."),
+        AssistantMessage(content="Assistant reply."),
+        UserMessage(content="Second user."),
     ]
     payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
 
@@ -137,12 +138,9 @@ def test_user_assistant_user():
 
 def test_assistant_refusal_string():
     """Assistant turn may replay OpenAI ``refusal`` without normal ``content``."""
-    messages: list[ChatMessageParam] = [
-        {"role": "user", "content": "Do something unsafe."},
-        {
-            "role": "assistant",
-            "refusal": "I'm sorry, I can't help with that.",
-        },
+    messages: list[ChatMessage] = [
+        UserMessage(content="Do something unsafe."),
+        AssistantMessage(refusal="I'm sorry, I can't help with that."),
     ]
     payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
     assert payload["messages"] == [
@@ -157,14 +155,13 @@ def test_assistant_refusal_string():
 
 def test_assistant_mixed_text_and_refusal_content_parts():
     """Structured assistant ``content`` with text and refusal parts maps to OpenAI parts."""
-    messages: list[ChatMessageParam] = [
-        {
-            "role": "assistant",
-            "content": [
-                TextContentParam(type="text", text="Partial."),
-                RefusalContentParam(type="refusal", refusal="Declined."),
+    messages: list[ChatMessage] = [
+        AssistantMessage(
+            content=[
+                TextContent(text="Partial."),
+                RefusalContent(refusal="Declined."),
             ],
-        },
+        ),
     ]
     payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
     assert payload["messages"] == [
@@ -190,7 +187,8 @@ def test_user_tool_call_and_result_with_tools():
             "function": {
                 "name": "get_weather",
                 "description": "Get weather for a city.",
-                "parameters": WEATHER_TOOL["function"]["parameters"],
+                "parameters": WEATHER_TOOL.function.parameters,
+                "strict": None,
             },
         },
     ]
@@ -229,7 +227,8 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
             "function": {
                 "name": "get_weather",
                 "description": "Get weather for a city.",
-                "parameters": WEATHER_TOOL["function"]["parameters"],
+                "parameters": WEATHER_TOOL.function.parameters,
+                "strict": None,
             },
         },
         {
@@ -237,7 +236,8 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
             "function": {
                 "name": "get_local_time",
                 "description": "Get local time for an IANA timezone.",
-                "parameters": GET_TIME_TOOL["function"]["parameters"],
+                "parameters": GET_TIME_TOOL.function.parameters,
+                "strict": None,
             },
         },
     ]
@@ -289,7 +289,8 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
             "function": {
                 "name": "get_weather",
                 "description": "Get weather for a city.",
-                "parameters": WEATHER_TOOL["function"]["parameters"],
+                "parameters": WEATHER_TOOL.function.parameters,
+                "strict": None,
             },
         },
         {
@@ -297,7 +298,8 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
             "function": {
                 "name": "get_local_time",
                 "description": "Get local time for an IANA timezone.",
-                "parameters": GET_TIME_TOOL["function"]["parameters"],
+                "parameters": GET_TIME_TOOL.function.parameters,
+                "strict": None,
             },
         },
     ]

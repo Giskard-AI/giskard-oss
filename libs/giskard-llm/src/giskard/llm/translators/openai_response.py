@@ -1,15 +1,16 @@
 import logging
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from giskard.llm.types import (
-    ResponseInputItemParam,
+    ResponseInputItem,
     ResponseOutputFunctionCall,
     ResponseOutputItem,
     ResponseOutputMessage,
     ResponseOutputRefusal,
     ResponseOutputText,
     ResponseResult,
-    ToolDefParam,
+    ToolDef,
     Usage,
 )
 
@@ -21,9 +22,7 @@ if TYPE_CHECKING:
         ResponseCreateParamsNonStreaming,
     )
     from openai.types.responses.response_input_param import (
-        ResponseInputItemParam as OpenAIResponseInputItemParam,
-    )
-    from openai.types.responses.response_input_param import (
+        ResponseInputItemParam,
         ResponseInputParam,
     )
 
@@ -36,37 +35,49 @@ PROVIDER = "openai"
 class OpenAIResponseTranslator:
     @staticmethod
     def _input_to_openai(
-        input: ResponseInputItemParam,
-    ) -> "OpenAIResponseInputItemParam":
-        if "type" not in input or input["type"] == "message":
-            return input  # pyright: ignore[reportReturnType]
-
-        if input["type"] == "function_call_output":
-            return {**input}
-
-        if input["type"] == "function_call":
+        input: ResponseInputItem,
+    ) -> "ResponseInputItemParam":
+        if input.type == "message":
             return {
-                **input,
-                "arguments": serialize_arguments(input["arguments"]),
+                "type": "message",
+                "content": input.content,
+                "role": input.role,
+            }  # pyright: ignore[reportReturnType]
+
+        if input.type == "function_call_output":
+            return {
+                "type": "function_call_output",
+                "call_id": input.call_id,
+                "output": input.output,
             }
+
+        if input.type == "function_call":
+            return {
+                "type": "function_call",
+                "call_id": input.call_id,
+                "name": input.name,
+                "arguments": serialize_arguments(input.arguments),
+            }
+
+        raise ValueError(f"Unsupported input type: {input.type!r}")
 
     @staticmethod
     def _inputs_to_openai(
-        input: str | list[ResponseInputItemParam],
+        input: str | Sequence[ResponseInputItem],
     ) -> "str | ResponseInputParam":
-        if isinstance(input, list):
-            return [OpenAIResponseTranslator._input_to_openai(item) for item in input]
+        if isinstance(input, str):
+            return input
 
-        return input
+        return [OpenAIResponseTranslator._input_to_openai(item) for item in input]
 
     @staticmethod
     def to_openai(
         model: str,
-        input: str | list[ResponseInputItemParam],
+        input: str | Sequence[ResponseInputItem],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDefParam] | None = None,
+        tools: Sequence[ToolDef] | None = None,
         **params: Any,
     ) -> "ResponseCreateParamsNonStreaming":
         unknown = set(params) - KNOWN_RESPONSE_PARAMS
@@ -88,7 +99,14 @@ class OpenAIResponseTranslator:
             response_params["previous_response_id"] = previous_id
         if tools is not None:
             response_params["tools"] = [
-                {"type": "function", **t["function"], "strict": None} for t in tools
+                {
+                    "type": "function",
+                    "name": t.function.name,
+                    "description": t.function.description or "",
+                    "parameters": t.function.parameters or {},
+                    "strict": None,
+                }
+                for t in tools
             ]
         if params.get("temperature") is not None:
             response_params["temperature"] = params["temperature"]

@@ -62,6 +62,7 @@ from .response_result import (
     ResponseOutputItem,
     ResponseResult,
 )
+from .tool import FunctionDef, ToolDef
 from .tool_param import FunctionDefParam, ToolDefParam
 from .usage import Usage
 
@@ -116,6 +117,8 @@ __all__ = [
     "ToolCall",
     "ToolCallFunction",
     "ToolCallFunctionParam",
+    "ToolDef",
+    "FunctionDef",
     "ToolCallParam",
     "ToolDefParam",
     "ToolMessage",

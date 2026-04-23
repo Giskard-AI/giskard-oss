@@ -42,6 +42,8 @@ import logging
 from collections.abc import Sequence
 from typing import Any, NoReturn
 
+from pydantic import TypeAdapter, ValidationError
+
 from ..errors import (
     AuthenticationError,
     BadRequestError,
@@ -54,13 +56,16 @@ from ..errors import (
 from ..translators.openai_chat import OpenAIChatTranslator
 from ..translators.openai_response import OpenAIResponseTranslator
 from ..types import (
+    ChatMessage,
     ChatMessageParam,
     CompletionResponse,
     EmbeddingData,
     EmbeddingResponse,
     EmbeddingUsage,
+    ResponseInputItem,
     ResponseInputItemParam,
     ResponseResult,
+    ToolDef,
     ToolDefParam,
 )
 from ..utils import compact
@@ -70,6 +75,10 @@ logger = logging.getLogger(__name__)
 PROVIDER = "openai"
 
 KNOWN_EMBEDDING_PARAMS = frozenset({"dimensions"})
+
+_CHAT_MESSAGES_TYPE_ADAPTER = TypeAdapter(Sequence[ChatMessage])
+_TOOL_DEFS_TYPE_ADAPTER = TypeAdapter(Sequence[ToolDef] | None)
+_RESPONSE_INPUT_ITEMS_TYPE_ADAPTER = TypeAdapter(str | Sequence[ResponseInputItem])
 
 
 def _import_openai() -> Any:
@@ -122,15 +131,23 @@ class OpenAIProvider:
     async def complete(
         self,
         model: str,
-        messages: Sequence[ChatMessageParam],
+        messages: Sequence[ChatMessageParam | ChatMessage],
         *,
-        tools: list[ToolDefParam] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> CompletionResponse:
         openai = _import_openai()
 
-        self._validate_messages(messages)
-        kwargs = OpenAIChatTranslator.to_openai(model, messages, tools=tools, **params)
+        try:
+            messages_models = _CHAT_MESSAGES_TYPE_ADAPTER.validate_python(messages)
+            tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
+        except ValidationError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
+
+        self._validate_messages(messages_models)
+        kwargs = OpenAIChatTranslator.to_openai(
+            model, messages_models, tools=tools_models, **params
+        )
 
         try:
             raw = await self._client.chat.completions.create(**kwargs)
@@ -166,12 +183,12 @@ class OpenAIProvider:
 
     # -- validation ------------------------------------------------------------
 
-    def _validate_messages(self, messages: Sequence[ChatMessageParam]) -> None:
+    def _validate_messages(self, messages: Sequence[ChatMessage]) -> None:
         if not messages:
             raise BadRequestError(
                 400, "Messages list must not be empty.", self._PROVIDER
             )
-        has_non_system = any(m.get("role") != "system" for m in messages)
+        has_non_system = any(m.role != "system" for m in messages)
         if not has_non_system:
             raise BadRequestError(
                 400,
@@ -179,11 +196,11 @@ class OpenAIProvider:
                 self._PROVIDER,
             )
         for m in messages:
-            if m.get("role") == "tool" and not m.get("tool_call_id"):
+            if m.role == "tool" and not m.tool_call_id:
                 raise BadRequestError(
                     400, "Tool messages must have a tool_call_id.", self._PROVIDER
                 )
-            if m.get("role") == "system" and not (m.get("content") or "").strip():
+            if m.role == "system" and not (m.content or "").strip():
                 raise BadRequestError(
                     400, "System messages must have non-empty content.", self._PROVIDER
                 )
@@ -207,20 +224,27 @@ class OpenAIProvider:
     async def respond(
         self,
         model: str,
-        input: str | list[ResponseInputItemParam],
+        input: str | Sequence[ResponseInputItemParam | ResponseInputItem],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDefParam] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> ResponseResult:
         openai = _import_openai()
+
+        try:
+            input_models = _RESPONSE_INPUT_ITEMS_TYPE_ADAPTER.validate_python(input)
+            tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
+        except ValidationError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
+
         kwargs = OpenAIResponseTranslator.to_openai(
             model,
-            input,
+            input_models,
             instructions=instructions,
             previous_id=previous_id,
-            tools=tools,
+            tools=tools_models,
             **params,
         )
 

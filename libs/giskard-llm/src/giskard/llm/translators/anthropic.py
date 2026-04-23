@@ -5,13 +5,13 @@ from pydantic import BaseModel
 
 from ..types import (
     AssistantMessage,
-    ChatMessageParam,
+    ChatMessage,
     Choice,
-    CompletionContentParam,
+    CompletionContent,
     CompletionResponse,
     ToolCall,
     ToolCallFunction,
-    ToolDefParam,
+    ToolDef,
     Usage,
 )
 from ..utils import deserialize_arguments
@@ -39,13 +39,13 @@ if TYPE_CHECKING:
 
 class AnthropicChatTranslator:
     @staticmethod
-    def _tool_to_anthropic(tool: ToolDefParam) -> "ToolUnionParam":
+    def _tool_to_anthropic(tool: ToolDef) -> "ToolUnionParam":
         """Convert an OpenAI-format tool to Anthropic format."""
-        func = tool.get("function", {})
+        func = tool.function
         return {
-            "name": func["name"],
-            "description": func["description"],
-            "input_schema": func["parameters"],
+            "name": func.name,
+            "description": func.description or "",
+            "input_schema": func.parameters or {},
         }
 
     @staticmethod
@@ -67,17 +67,17 @@ class AnthropicChatTranslator:
 
     @staticmethod
     def _completion_content_to_block(
-        content: CompletionContentParam,
+        content: CompletionContent,
     ) -> "TextBlockParam":
-        if content["type"] == "text":
-            return AnthropicChatTranslator._string_to_text_block(content["text"])
+        if content.type == "text":
+            return AnthropicChatTranslator._string_to_text_block(content.text)
 
-        if content["type"] == "refusal":
-            return AnthropicChatTranslator._string_to_text_block(content["refusal"])
+        if content.type == "refusal":
+            return AnthropicChatTranslator._string_to_text_block(content.refusal)
 
     @staticmethod
     def _completion_content_to_blocks(
-        content: str | Sequence[CompletionContentParam],
+        content: str | Sequence[CompletionContent],
     ) -> "Sequence[TextBlockParam]":
         if isinstance(content, str):
             return [AnthropicChatTranslator._string_to_text_block(content)]
@@ -88,53 +88,53 @@ class AnthropicChatTranslator:
 
     @staticmethod
     def _message_to_anthropic(
-        message: ChatMessageParam,
+        message: ChatMessage,
     ) -> "MessageParam | None":
         """Convert a chat message to an Anthropic message."""
-        if message["role"] == "system" or message["role"] == "developer":
+        if message.role == "system" or message.role == "developer":
             # Folded into top-level ``system`` (Anthropic has no developer role on messages).
             return None
 
-        if message["role"] == "function":
-            raise ValueError(f"Unsupported message role: {message['role']}")
+        if message.role == "function":
+            raise ValueError(f"Unsupported message role: {message.role}")
 
-        if message["role"] == "tool":
+        if message.role == "tool":
             return {
                 "role": "user",
                 "content": [
                     {
                         "type": "tool_result",
-                        "tool_use_id": message["tool_call_id"],
-                        "content": message["content"],
+                        "tool_use_id": message.tool_call_id,
+                        "content": message.content,
                     }
                 ],
             }
 
-        if message["role"] == "user":
+        if message.role == "user":
             return {
                 "role": "user",
-                "content": message["content"],
+                "content": message.content,
             }
 
-        if message["role"] == "assistant":
-            content = message.get("content")
+        if message.role == "assistant":
+            content = message.content
             blocks: list[TextBlockParam | ToolUseBlockParam] = []
             if content is not None:
                 blocks.extend(
                     AnthropicChatTranslator._completion_content_to_blocks(content)
                 )
-            if (refusal := message.get("refusal")) is not None:
+            if (refusal := message.refusal) is not None:
                 blocks.append(AnthropicChatTranslator._string_to_text_block(refusal))
 
-            if tool_calls := message.get("tool_calls"):
+            if tool_calls := message.tool_calls:
                 for tool_call in tool_calls:
                     blocks.append(
                         {
                             "type": "tool_use",
-                            "id": tool_call["id"],
-                            "name": tool_call["function"]["name"],
+                            "id": tool_call.id,
+                            "name": tool_call.function.name,
                             "input": deserialize_arguments(
-                                tool_call["function"]["arguments"]
+                                tool_call.function.arguments
                             ),
                         }
                     )
@@ -146,7 +146,7 @@ class AnthropicChatTranslator:
 
     @staticmethod
     def _messages_to_anthropic(
-        messages: Sequence[ChatMessageParam],
+        messages: Sequence[ChatMessage],
     ) -> "Sequence[MessageParam]":
         """Convert chat messages to Anthropic format, merging adjacent same-role turns."""
         anthropic_messages: list[MessageParam] = []
@@ -177,17 +177,15 @@ class AnthropicChatTranslator:
         return anthropic_messages
 
     @staticmethod
-    def _extract_system_messages(messages: Sequence[ChatMessageParam]) -> list[str]:
+    def _extract_system_messages(messages: Sequence[ChatMessage]) -> list[str]:
         """Extract system and developer messages in order (both map to ``system``)."""
         return [
-            m["content"]
-            for m in messages
-            if m["role"] == "system" or m["role"] == "developer"
+            m.content for m in messages if m.role == "system" or m.role == "developer"
         ]
 
     @staticmethod
     def _extract_system_messages_to_blocks(
-        messages: Sequence[ChatMessageParam],
+        messages: Sequence[ChatMessage],
     ) -> "list[TextBlockParam]":
         """Extract system messages from a list of messages and convert them to blocks."""
         system_messages = AnthropicChatTranslator._extract_system_messages(messages)
@@ -199,9 +197,9 @@ class AnthropicChatTranslator:
     @staticmethod
     def to_anthropic(
         model: str,
-        messages: Sequence[ChatMessageParam],
+        messages: Sequence[ChatMessage],
         *,
-        tools: list[ToolDefParam] | None = None,
+        tools: Sequence[ToolDef] | None = None,
         **params: Any,
     ) -> "CompletionCreateParams":
         completion_params: "CompletionCreateParams" = {

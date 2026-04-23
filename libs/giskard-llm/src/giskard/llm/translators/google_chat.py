@@ -6,13 +6,13 @@ from pydantic import BaseModel
 
 from ..types import (
     AssistantMessage,
-    ChatMessageParam,
+    ChatMessage,
     Choice,
-    CompletionContentParam,
+    CompletionContent,
     CompletionResponse,
     ToolCall,
     ToolCallFunction,
-    ToolDefParam,
+    ToolDef,
     Usage,
 )
 from ..utils import deserialize_arguments
@@ -44,15 +44,15 @@ logger = logging.getLogger(__name__)
 
 class GoogleChatTranslator:
     @staticmethod
-    def _tool_to_google(tool: ToolDefParam) -> "ToolDict":
+    def _tool_to_google(tool: ToolDef) -> "ToolDict":
         """Convert an OpenAI-format tool to Gemini FunctionDeclaration."""
-        func = tool["function"]
+        func = tool.function
         return {
             "function_declarations": [
                 {
-                    "name": func["name"],
-                    "description": func["description"],
-                    "parameters": func["parameters"],  # pyright: ignore[reportReturnType]
+                    "name": func.name,
+                    "description": func.description,
+                    "parameters": func.parameters,  # pyright: ignore[reportReturnType]
                 }
             ]
         }
@@ -62,16 +62,16 @@ class GoogleChatTranslator:
         return {"text": content}
 
     @staticmethod
-    def _completion_content_to_parts(content: CompletionContentParam) -> "PartDict":
-        if content["type"] == "text":
-            return {"text": content["text"]}
+    def _completion_content_to_parts(content: CompletionContent) -> "PartDict":
+        if content.type == "text":
+            return {"text": content.text}
 
-        if content["type"] == "refusal":
-            return {"text": content["refusal"]}
+        if content.type == "refusal":
+            return {"text": content.refusal}
 
     @staticmethod
     def _assistant_content_to_parts(
-        content: str | list[CompletionContentParam],
+        content: str | list[CompletionContent],
     ) -> "Sequence[PartDict]":
         if isinstance(content, str):
             return [GoogleChatTranslator._content_to_parts(content)]
@@ -80,37 +80,39 @@ class GoogleChatTranslator:
 
     @staticmethod
     def _message_to_contents(
-        message: ChatMessageParam, tc_id_to_name: dict[str, str]
+        message: ChatMessage, tc_id_to_name: dict[str, str]
     ) -> "ContentListUnionDict | None":
-        if message["role"] == "system" or message["role"] == "developer":
+        if message.role == "system" or message.role == "developer":
             # Folded into ``system_instruction`` (Gemini has no developer turn in ``contents``).
             return None
 
-        if message["role"] == "function":
-            raise ValueError(f"Unsupported message role: {message['role']}")
+        if message.role == "function":
+            raise ValueError(f"Unsupported message role: {message.role}")
 
-        if message["role"] == "user":
+        if message.role == "user":
             return {
                 "role": "user",
-                "parts": GoogleChatTranslator._content_to_parts(message["content"]),
+                "parts": GoogleChatTranslator._content_to_parts(message.content),
             }
 
-        if message["role"] == "assistant":
+        if message.role == "assistant":
             parts = []
 
-            if (content := message.get("content")) is not None:
-                parts.extend(GoogleChatTranslator._assistant_content_to_parts(content))
-            if (refusal := message.get("refusal")) is not None:
-                parts.append({"text": refusal})
+            if message.content is not None:
+                parts.extend(
+                    GoogleChatTranslator._assistant_content_to_parts(message.content)
+                )
+            if message.refusal is not None:
+                parts.append({"text": message.refusal})
 
-            if tool_calls := message.get("tool_calls"):
+            if tool_calls := message.tool_calls:
                 for tc in tool_calls:
-                    func = tc["function"]
+                    func = tc.function
                     parts.append(
                         {
                             "function_call": {
-                                "name": func["name"],
-                                "args": deserialize_arguments(func["arguments"]),
+                                "name": func.name,
+                                "args": deserialize_arguments(func.arguments),
                             }
                         }
                     )
@@ -120,15 +122,15 @@ class GoogleChatTranslator:
                 "parts": parts,
             }
 
-        if message["role"] == "tool":
-            tc_id = message["tool_call_id"]
+        if message.role == "tool":
+            tc_id = message.tool_call_id
             return {
                 "role": "user",
                 "parts": [
                     {
                         "function_response": {
                             "name": tc_id_to_name.get(tc_id, tc_id),
-                            "response": {"result": message["content"]},
+                            "response": {"result": message.content},
                         }
                     }
                 ],
@@ -136,12 +138,13 @@ class GoogleChatTranslator:
 
     @staticmethod
     def _messages_to_contents(
-        messages: Sequence[ChatMessageParam],
+        messages: Sequence[ChatMessage],
     ) -> "ContentListUnionDict":
         tc_id_to_name: dict[str, str] = {}
         for msg in messages:
-            for tc in msg.get("tool_calls") or []:
-                tc_id_to_name[tc["id"]] = tc["function"]["name"]
+            if isinstance(msg, AssistantMessage):
+                for tc in msg.tool_calls or []:
+                    tc_id_to_name[tc.id] = tc.function.name
 
         converted = [
             GoogleChatTranslator._message_to_contents(msg, tc_id_to_name)
@@ -153,9 +156,9 @@ class GoogleChatTranslator:
     @staticmethod
     def to_google(
         model: str,
-        messages: Sequence[ChatMessageParam],
+        messages: Sequence[ChatMessage],
         *,
-        tools: Sequence[ToolDefParam] | None = None,
+        tools: Sequence[ToolDef] | None = None,
         **params: Any,
     ) -> "GenerateContentParams":
         unknown = set(params) - KNOWN_COMPLETION_PARAMS

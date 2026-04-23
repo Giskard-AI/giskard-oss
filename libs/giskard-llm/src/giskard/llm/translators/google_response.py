@@ -5,15 +5,15 @@ from typing import TYPE_CHECKING, Any, Required, TypedDict
 from pydantic import BaseModel
 
 from ..types import (
-    ResponseInputItemParam,
-    ResponseInputMessageContentParam,
+    ResponseInputItem,
+    ResponseInputMessageContent,
     ResponseOutputFunctionCall,
     ResponseOutputItem,
     ResponseOutputMessage,
-    ResponseOutputMessageContentParam,
+    ResponseOutputMessageContent,
     ResponseOutputText,
     ResponseResult,
-    ToolDefParam,
+    ToolDef,
     Usage,
 )
 from ..utils import deserialize_arguments
@@ -57,23 +57,21 @@ def _flatten[T](items: Sequence[Sequence[T]]) -> list[T]:
 class GoogleResponseTranslator:
     @staticmethod
     def _output_content_to_google(
-        content: (ResponseInputMessageContentParam | ResponseOutputMessageContentParam),
+        content: (ResponseInputMessageContent | ResponseOutputMessageContent),
     ) -> "GoogleTextContentParam":
-        if content["type"] == "input_text":
-            return {"type": "text", "text": content["text"]}
-        if content["type"] == "output_text":
-            return {"type": "text", "text": content["text"]}
-        if content["type"] == "refusal":
-            return {"type": "text", "text": content["refusal"]}
+        if content.type == "input_text":
+            return {"type": "text", "text": content.text}
+        if content.type == "output_text":
+            return {"type": "text", "text": content.text}
+        if content.type == "refusal":
+            return {"type": "text", "text": content.refusal}
         # Runtime guard: inputs may not match TypedDict at runtime.
-        raise ValueError(f"Unsupported message content type: {content['type']!r}")  # pyright: ignore[reportUnreachable]
+        raise ValueError(f"Unsupported message content type: {content.type!r}")  # pyright: ignore[reportUnreachable]
 
     @staticmethod
     def _content_to_google(
         content: str
-        | Sequence[
-            ResponseInputMessageContentParam | ResponseOutputMessageContentParam
-        ],
+        | Sequence[ResponseInputMessageContent | ResponseOutputMessageContent],
     ) -> "list[GoogleTextContentParam]":
         if isinstance(content, str):
             return [{"type": "text", "text": content}]
@@ -84,52 +82,54 @@ class GoogleResponseTranslator:
 
     @staticmethod
     def _input_to_google(
-        input: ResponseInputItemParam,
+        input: ResponseInputItem,
     ) -> "Sequence[FunctionResultContentParam | FunctionCallContentParam | GoogleTextContentParam]":
-        if "type" not in input or input["type"] == "message":
-            if input["role"] == "developer" or input["role"] == "system":
+        if input.type == "message":
+            if input.role == "developer" or input.role == "system":
                 return []  # Those messages are folded into the system instruction
 
-            return GoogleResponseTranslator._content_to_google(input["content"])
+            return GoogleResponseTranslator._content_to_google(input.content)
 
-        if input["type"] == "function_call_output":
-            name = input.get("name")
+        if input.type == "function_call_output":
+            name = input.name
             if name is None:
                 raise ValueError("function_call_output: name is required")
 
             return [
                 {
                     "type": "function_result",
-                    "call_id": input["call_id"],
+                    "call_id": input.call_id,
                     "name": name,
-                    "result": input["output"],
+                    "result": input.output,
                 }
             ]
 
-        if input["type"] == "function_call":
+        if input.type == "function_call":
             return [
                 {
                     "type": "function_call",
-                    "id": input["call_id"],
-                    "name": input.get("name", ""),
-                    "arguments": deserialize_arguments(input["arguments"]),
+                    "id": input.call_id,
+                    "name": input.name,
+                    "arguments": deserialize_arguments(input.arguments),
                 }
             ]
 
+        raise ValueError(f"Unsupported input type: {input.type!r}")
+
     @staticmethod
     def _inputs_to_google(
-        input: str | list[ResponseInputItemParam],
+        input: str | Sequence[ResponseInputItem],
     ) -> "interaction_create_params.Input":
-        if isinstance(input, list):
-            return _flatten(
-                [GoogleResponseTranslator._input_to_google(item) for item in input]
-            )
+        if isinstance(input, str):
+            return input
 
-        return input
+        return _flatten(
+            [GoogleResponseTranslator._input_to_google(item) for item in input]
+        )
 
     @staticmethod
     def _extract_system_instruction(
-        input: str | list[ResponseInputItemParam],
+        input: str | Sequence[ResponseInputItem],
     ) -> "str | None":
         if isinstance(input, str):
             return None
@@ -139,12 +139,11 @@ class GoogleResponseTranslator:
                 [
                     part["text"]
                     for part in GoogleResponseTranslator._content_to_google(
-                        item["content"]
+                        item.content
                     )
                 ]
                 for item in input
-                if ("type" not in item or item["type"] == "message")
-                and item.get("role") in ("system", "developer")
+                if (item.type == "message") and item.role in ("system", "developer")
             ]
         )
 
@@ -153,11 +152,11 @@ class GoogleResponseTranslator:
     @staticmethod
     def to_google(
         model: str,
-        input: str | list[ResponseInputItemParam],
+        input: str | Sequence[ResponseInputItem],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDefParam] | None = None,
+        tools: Sequence[ToolDef] | None = None,
         **params: Any,
     ) -> "InteractionCreateParams":
         unknown = set(params) - KNOWN_RESPONSE_PARAMS
@@ -187,7 +186,13 @@ class GoogleResponseTranslator:
             interaction_create_params["previous_interaction_id"] = previous_id
         if tools is not None:
             interaction_create_params["tools"] = [
-                {"type": "function", **t["function"]} for t in tools
+                {
+                    "type": "function",
+                    "name": t.function.name,
+                    "description": t.function.description or "",
+                    "parameters": t.function.parameters or {},
+                }
+                for t in tools
             ]
         if params.get("temperature") is not None:
             interaction_create_params["generation_config"] = (

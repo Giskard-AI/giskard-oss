@@ -8,12 +8,13 @@ from typing import Literal
 import pytest
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
 from giskard.llm.types import (
-    ChatMessageParam,
-    DeveloperMessageParam,
-    RefusalContentParam,
-    SystemMessageParam,
-    TextContentParam,
-    UserMessageParam,
+    AssistantMessage,
+    ChatMessage,
+    DeveloperMessage,
+    RefusalContent,
+    SystemMessage,
+    TextContent,
+    UserMessage,
 )
 
 from .sdk_payload_validation import validate_anthropic_message_create
@@ -39,7 +40,7 @@ _MODEL = "claude-sonnet-4-20250514"
 
 def test_single_user_message():
     """A lone user turn maps to one ``messages`` entry (typical conversation start)."""
-    msg: UserMessageParam = {"role": "user", "content": "Hello."}
+    msg: UserMessage = UserMessage(content="Hello.")
     payload = AnthropicChatTranslator.to_anthropic(_MODEL, [msg])
 
     assert payload["model"] == _MODEL
@@ -55,14 +56,14 @@ def test_single_user_message():
 )
 def test_instruction_then_user(instruction_role: Literal["system", "developer"]):
     """System or developer text maps to top-level ``system`` blocks; user to ``messages``."""
-    first: SystemMessageParam | DeveloperMessageParam = (
-        {"role": "system", "content": "You are helpful."}
+    first: SystemMessage | DeveloperMessage = (
+        SystemMessage(content="You are helpful.")
         if instruction_role == "system"
-        else {"role": "developer", "content": "You are helpful."}
+        else DeveloperMessage(content="You are helpful.")
     )
-    messages: list[ChatMessageParam] = [
+    messages: list[ChatMessage] = [
         first,
-        {"role": "user", "content": "Hello."},
+        UserMessage(content="Hello."),
     ]
     payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
 
@@ -73,10 +74,10 @@ def test_instruction_then_user(instruction_role: Literal["system", "developer"])
 
 def test_system_then_developer_then_user():
     """System and developer preserve order in top-level ``system`` blocks."""
-    messages: list[ChatMessageParam] = [
-        {"role": "system", "content": "You are helpful."},
-        {"role": "developer", "content": "App version 2.0"},
-        {"role": "user", "content": "Hello."},
+    messages: list[ChatMessage] = [
+        SystemMessage(content="You are helpful."),
+        DeveloperMessage(content="App version 2.0"),
+        UserMessage(content="Hello."),
     ]
     payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
 
@@ -94,18 +95,18 @@ def test_system_then_developer_then_user():
 )
 def test_two_instructions_then_user(instruction_role: Literal["system", "developer"]):
     """Two system or developer messages become several ``system`` text blocks in order."""
-    messages: list[ChatMessageParam]
+    messages: list[ChatMessage]
     if instruction_role == "system":
         messages = [
-            {"role": "system", "content": "First system instruction."},
-            {"role": "system", "content": "Second system instruction."},
-            {"role": "user", "content": "Hello."},
+            SystemMessage(content="First system instruction."),
+            SystemMessage(content="Second system instruction."),
+            UserMessage(content="Hello."),
         ]
     else:
         messages = [
-            {"role": "developer", "content": "First system instruction."},
-            {"role": "developer", "content": "Second system instruction."},
-            {"role": "user", "content": "Hello."},
+            DeveloperMessage(content="First system instruction."),
+            DeveloperMessage(content="Second system instruction."),
+            UserMessage(content="Hello."),
         ]
     payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
 
@@ -119,10 +120,10 @@ def test_two_instructions_then_user(instruction_role: Literal["system", "develop
 
 def test_user_assistant_user():
     """Multi-turn chat: user string content vs assistant text blocks."""
-    messages: list[ChatMessageParam] = [
-        {"role": "user", "content": "First user."},
-        {"role": "assistant", "content": "Assistant reply."},
-        {"role": "user", "content": "Second user."},
+    messages: list[ChatMessage] = [
+        UserMessage(content="First user."),
+        AssistantMessage(content="Assistant reply."),
+        UserMessage(content="Second user."),
     ]
     payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
 
@@ -139,9 +140,9 @@ def test_user_assistant_user():
 
 def test_assistant_refusal_replayed_as_text_block():
     """Anthropic has no refusal part on input; we replay ``refusal`` as a normal text block."""
-    messages: list[ChatMessageParam] = [
-        {"role": "user", "content": "Unsafe ask."},
-        {"role": "assistant", "refusal": "I can't help with that."},
+    messages: list[ChatMessage] = [
+        UserMessage(content="Unsafe ask."),
+        AssistantMessage(refusal="I can't help with that."),
     ]
     payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
     assert payload["messages"] == [
@@ -156,14 +157,10 @@ def test_assistant_refusal_replayed_as_text_block():
 
 def test_assistant_structured_refusal_parts_as_text():
     """``TextContentParam`` / ``RefusalContentParam`` lists become text blocks (no distinct refusal type)."""
-    messages: list[ChatMessageParam] = [
-        {
-            "role": "assistant",
-            "content": [
-                TextContentParam(type="text", text="Ok."),
-                RefusalContentParam(type="refusal", refusal="Stopped."),
-            ],
-        },
+    messages: list[ChatMessage] = [
+        AssistantMessage(
+            content=[TextContent(text="Ok."), RefusalContent(refusal="Stopped.")],
+        ),
     ]
     payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
     assert payload["messages"] == [
@@ -189,7 +186,7 @@ def test_user_tool_call_and_result_with_tools():
         {
             "name": "get_weather",
             "description": "Get weather for a city.",
-            "input_schema": WEATHER_TOOL["function"]["parameters"],
+            "input_schema": WEATHER_TOOL.function.parameters,
         },
     ]
     assert payload["messages"] == [
@@ -230,12 +227,12 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
         {
             "name": "get_weather",
             "description": "Get weather for a city.",
-            "input_schema": WEATHER_TOOL["function"]["parameters"],
+            "input_schema": WEATHER_TOOL.function.parameters,
         },
         {
             "name": "get_local_time",
             "description": "Get local time for an IANA timezone.",
-            "input_schema": GET_TIME_TOOL["function"]["parameters"],
+            "input_schema": GET_TIME_TOOL.function.parameters,
         },
     ]
     assert payload["messages"] == [
@@ -287,12 +284,12 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
         {
             "name": "get_weather",
             "description": "Get weather for a city.",
-            "input_schema": WEATHER_TOOL["function"]["parameters"],
+            "input_schema": WEATHER_TOOL.function.parameters,
         },
         {
             "name": "get_local_time",
             "description": "Get local time for an IANA timezone.",
-            "input_schema": GET_TIME_TOOL["function"]["parameters"],
+            "input_schema": GET_TIME_TOOL.function.parameters,
         },
     ]
     assert payload["messages"] == [

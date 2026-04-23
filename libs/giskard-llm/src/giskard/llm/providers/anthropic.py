@@ -49,6 +49,8 @@ import logging
 from collections.abc import Sequence
 from typing import Any, Literal, NoReturn, TypedDict
 
+from pydantic import TypeAdapter, ValidationError
+
 from ..errors import (
     AuthenticationError,
     BadRequestError,
@@ -60,8 +62,10 @@ from ..errors import (
 )
 from ..translators.anthropic import AnthropicChatTranslator
 from ..types import (
+    ChatMessage,
     ChatMessageParam,
     CompletionResponse,
+    ToolDef,
     ToolDefParam,
 )
 from ..utils import compact
@@ -78,6 +82,8 @@ KNOWN_COMPLETION_PARAMS = frozenset(
 _ANTHROPIC_INSTRUCTION_ROLES = frozenset({"system", "developer"})
 
 
+_CHAT_MESSAGES_TYPE_ADAPTER = TypeAdapter(Sequence[ChatMessage])
+_TOOL_DEFS_TYPE_ADAPTER = TypeAdapter(Sequence[ToolDef] | None)
 # -- Private wire-format TypedDicts -------------------------------------------
 
 
@@ -156,15 +162,22 @@ class AnthropicProvider:
     async def complete(
         self,
         model: str,
-        messages: Sequence[ChatMessageParam],
+        messages: Sequence[ChatMessageParam | ChatMessage],
         *,
-        tools: list[ToolDefParam] | None = None,
+        tools: list[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> CompletionResponse:
         anthropic = _import_anthropic()
-        self._validate_messages(messages)
+
+        try:
+            messages_models = _CHAT_MESSAGES_TYPE_ADAPTER.validate_python(messages)
+            tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
+        except ValidationError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
+
+        self._validate_messages(messages_models)
         kwargs = AnthropicChatTranslator.to_anthropic(
-            model, messages, tools=tools, **params
+            model, messages_models, tools=tools_models, **params
         )
 
         try:
@@ -176,13 +189,13 @@ class AnthropicProvider:
 
     # -- validation ------------------------------------------------------------
 
-    def _validate_messages(self, messages: Sequence[ChatMessageParam]) -> None:
+    def _validate_messages(self, messages: Sequence[ChatMessage]) -> None:
         if not messages:
             raise BadRequestError(400, "Messages list must not be empty.", PROVIDER)
 
-        system_count = sum(1 for m in messages if m.get("role") == "system")
+        system_count = sum(1 for m in messages if m.role == "system")
         has_conversation_message = any(
-            m.get("role") not in _ANTHROPIC_INSTRUCTION_ROLES for m in messages
+            m.role not in _ANTHROPIC_INSTRUCTION_ROLES for m in messages
         )
         if not has_conversation_message:
             raise BadRequestError(
@@ -200,11 +213,11 @@ class AnthropicProvider:
             )
 
         for_alternation = [
-            m for m in messages if m.get("role") not in _ANTHROPIC_INSTRUCTION_ROLES
+            m for m in messages if m.role not in _ANTHROPIC_INSTRUCTION_ROLES
         ]
         for i in range(1, len(for_alternation)):
-            prev_role = for_alternation[i - 1].get("role")
-            curr_role = for_alternation[i].get("role")
+            prev_role = for_alternation[i - 1].role
+            curr_role = for_alternation[i].role
             # Skip: consecutive tool messages are valid (they merge into
             # a single user message with multiple tool_result blocks).
             if prev_role == "tool" or curr_role == "tool":
@@ -218,14 +231,11 @@ class AnthropicProvider:
                 )
 
         for m in messages:
-            if m.get("role") == "tool" and not m.get("tool_call_id"):
+            if m.role == "tool" and not m.tool_call_id:
                 raise BadRequestError(
                     400, "Tool messages must have a tool_call_id.", PROVIDER
                 )
-            if (
-                m.get("role") in _ANTHROPIC_INSTRUCTION_ROLES
-                and not (m.get("content") or "").strip()
-            ):
+            if m.role in _ANTHROPIC_INSTRUCTION_ROLES and not (m.content or "").strip():
                 raise BadRequestError(
                     400,
                     "System and developer messages must have non-empty content.",

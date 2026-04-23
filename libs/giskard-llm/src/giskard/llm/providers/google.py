@@ -53,6 +53,8 @@ import os
 from collections.abc import Sequence
 from typing import Any, NoReturn
 
+from pydantic import TypeAdapter, ValidationError
+
 from ..errors import (
     AuthenticationError,
     BadRequestError,
@@ -65,14 +67,21 @@ from ..errors import (
 from ..translators.google_chat import GoogleChatTranslator
 from ..translators.google_response import GoogleResponseTranslator
 from ..types import (
+    ChatMessage,
     ChatMessageParam,
     CompletionResponse,
     EmbeddingData,
     EmbeddingResponse,
+    ResponseInputItem,
     ResponseInputItemParam,
     ResponseResult,
+    ToolDef,
     ToolDefParam,
 )
+
+_CHAT_MESSAGES_TYPE_ADAPTER = TypeAdapter(Sequence[ChatMessage])
+_TOOL_DEFS_TYPE_ADAPTER = TypeAdapter(Sequence[ToolDef] | None)
+_RESPONSE_INPUT_ITEMS_TYPE_ADAPTER = TypeAdapter(str | Sequence[ResponseInputItem])
 
 logger = logging.getLogger(__name__)
 
@@ -186,13 +195,21 @@ class GoogleProvider:
     async def complete(
         self,
         model: str,
-        messages: Sequence[ChatMessageParam],
+        messages: Sequence[ChatMessageParam | ChatMessage],
         *,
-        tools: list[ToolDefParam] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> CompletionResponse:
-        self._validate_messages(messages)
-        kwargs = GoogleChatTranslator.to_google(model, messages, tools=tools, **params)
+        try:
+            messages_models = _CHAT_MESSAGES_TYPE_ADAPTER.validate_python(messages)
+            tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
+        except ValidationError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
+
+        self._validate_messages(messages_models)
+        kwargs = GoogleChatTranslator.to_google(
+            model, messages_models, tools=tools_models, **params
+        )
 
         try:
             raw = await self._client.aio.models.generate_content(**kwargs)
@@ -236,20 +253,20 @@ class GoogleProvider:
 
     # -- validation ------------------------------------------------------------
 
-    def _validate_messages(self, messages: Sequence[ChatMessageParam]) -> None:
+    def _validate_messages(self, messages: Sequence[ChatMessage]) -> None:
         if not messages:
             raise BadRequestError(400, "Messages list must not be empty.", PROVIDER)
-        has_non_system = any(m.get("role") != "system" for m in messages)
+        has_non_system = any(m.role != "system" for m in messages)
         if not has_non_system:
             raise BadRequestError(
                 400, "Messages must contain at least one non-system message.", PROVIDER
             )
         for m in messages:
-            if m.get("role") == "tool" and not m.get("tool_call_id"):
+            if m.role == "tool" and not m.tool_call_id:
                 raise BadRequestError(
                     400, "Tool messages must have a tool_call_id.", PROVIDER
                 )
-            if m.get("role") == "system" and not (m.get("content") or "").strip():
+            if m.role == "system" and not (m.content or "").strip():
                 raise BadRequestError(
                     400, "System messages must have non-empty content.", PROVIDER
                 )
@@ -268,19 +285,25 @@ class GoogleProvider:
     async def respond(
         self,
         model: str,
-        input: str | list[ResponseInputItemParam],
+        input: str | Sequence[ResponseInputItemParam | ResponseInputItem],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDefParam] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> ResponseResult:
+        try:
+            input_models = _RESPONSE_INPUT_ITEMS_TYPE_ADAPTER.validate_python(input)
+            tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
+        except ValidationError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
+
         kwargs = GoogleResponseTranslator.to_google(
             model,
-            input,
+            input_models,
             instructions=instructions,
             previous_id=previous_id,
-            tools=tools,
+            tools=tools_models,
             **params,
         )
 

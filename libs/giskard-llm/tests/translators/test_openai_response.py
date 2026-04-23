@@ -10,7 +10,10 @@ from typing import Literal
 
 import pytest
 from giskard.llm.translators.openai_response import OpenAIResponseTranslator
-from giskard.llm.types import ResponseEasyInputMessageParam, ResponseInputItemParam
+from giskard.llm.types import (
+    ResponseEasyInputMessage,
+    ResponseInputItem,
+)
 
 from .sdk_payload_validation import validate_openai_response_params
 from .tool_turn_fixtures import (
@@ -36,14 +39,12 @@ _MODEL = "gpt-4o-mini"
 def _message(
     role: Literal["user", "assistant", "system", "developer"],
     content: str,
-) -> ResponseInputItemParam:
+) -> ResponseInputItem:
     """Easy message items with an explicit ``type`` (mirrors API easy-input messages)."""
-    m: ResponseEasyInputMessageParam = {
-        "type": "message",
-        "role": role,
-        "content": content,
-    }
-    return m
+    return ResponseEasyInputMessage(
+        role=role,
+        content=content,
+    )
 
 
 def test_string_input():
@@ -80,13 +81,8 @@ def test_message_instruction_then_user(
     instruction_role: Literal["system", "developer"],
 ):
     """List input: system or developer, then user (structured ``input``, like chat)."""
-    first = (
-        _message("system", "You are helpful.")
-        if instruction_role == "system"
-        else _message("developer", "You are helpful.")
-    )
-    items: list[ResponseInputItemParam] = [
-        first,
+    items: list[ResponseInputItem] = [
+        _message(instruction_role, "You are helpful."),
         _message("user", "Hello."),
     ]
     payload = OpenAIResponseTranslator.to_openai(_MODEL, items)
@@ -101,7 +97,7 @@ def test_message_instruction_then_user(
 
 def test_message_system_then_developer_then_user():
     """System and developer are separate list items, then user (like chat)."""
-    items: list[ResponseInputItemParam] = [
+    items: list[ResponseInputItem] = [
         _message("system", "You are helpful."),
         _message("developer", "App version 2.0"),
         _message("user", "Hello."),
@@ -124,7 +120,7 @@ def test_message_two_instructions_then_user(
     instruction_role: Literal["system", "developer"],
 ):
     """Two consecutive system or developer messages, then user (like chat)."""
-    items: list[ResponseInputItemParam]
+    items: list[ResponseInputItem]
     if instruction_role == "system":
         items = [
             _message("system", "First system instruction."),
@@ -157,7 +153,7 @@ def test_message_two_instructions_then_user(
 
 def test_message_user_assistant_user():
     """Multi-turn: user, assistant, user in ``input`` (like chat)."""
-    items: list[ResponseInputItemParam] = [
+    items: list[ResponseInputItem] = [
         _message("user", "First user."),
         _message("assistant", "Assistant reply."),
         _message("user", "Second user."),
@@ -180,7 +176,7 @@ def test_user_tool_call_and_result_with_tools():
     assert payload.get("tools") == [
         {
             "type": "function",
-            **WEATHER_TOOL["function"],
+            **WEATHER_TOOL.function.model_dump(),
             "strict": None,
         },
     ]
@@ -213,12 +209,12 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
     assert payload.get("tools") == [
         {
             "type": "function",
-            **WEATHER_TOOL["function"],
+            **WEATHER_TOOL.function.model_dump(),
             "strict": None,
         },
         {
             "type": "function",
-            **GET_TIME_TOOL["function"],
+            **GET_TIME_TOOL.function.model_dump(),
             "strict": None,
         },
     ]
@@ -258,12 +254,12 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
     assert payload.get("tools") == [
         {
             "type": "function",
-            **WEATHER_TOOL["function"],
+            **WEATHER_TOOL.function.model_dump(),
             "strict": None,
         },
         {
             "type": "function",
-            **GET_TIME_TOOL["function"],
+            **GET_TIME_TOOL.function.model_dump(),
             "strict": None,
         },
     ]

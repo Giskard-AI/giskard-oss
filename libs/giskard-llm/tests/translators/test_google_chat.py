@@ -8,12 +8,13 @@ from typing import Literal
 import pytest
 from giskard.llm.translators.google_chat import GoogleChatTranslator
 from giskard.llm.types import (
-    ChatMessageParam,
-    DeveloperMessageParam,
-    RefusalContentParam,
-    SystemMessageParam,
-    TextContentParam,
-    UserMessageParam,
+    AssistantMessage,
+    ChatMessage,
+    DeveloperMessage,
+    RefusalContent,
+    SystemMessage,
+    TextContent,
+    UserMessage,
 )
 
 from .sdk_payload_validation import validate_google_contents
@@ -36,7 +37,7 @@ _MODEL = "gemini-2.0-flash"
 
 def test_single_user_message():
     """A lone user turn maps to one user ``contents`` entry."""
-    msg: UserMessageParam = {"role": "user", "content": "Hello."}
+    msg: UserMessage = UserMessage(content="Hello.")
     payload = GoogleChatTranslator.to_google(_MODEL, [msg])
 
     assert payload["model"] == _MODEL
@@ -51,14 +52,14 @@ def test_single_user_message():
 )
 def test_instruction_then_user(instruction_role: Literal["system", "developer"]):
     """System or developer text becomes ``system_instruction``; user stays in ``contents``."""
-    first: SystemMessageParam | DeveloperMessageParam = (
-        {"role": "system", "content": "You are helpful."}
+    first: SystemMessage | DeveloperMessage = (
+        SystemMessage(content="You are helpful.")
         if instruction_role == "system"
-        else {"role": "developer", "content": "You are helpful."}
+        else DeveloperMessage(content="You are helpful.")
     )
-    messages: list[ChatMessageParam] = [
+    messages: list[ChatMessage] = [
         first,
-        {"role": "user", "content": "Hello."},
+        UserMessage(content="Hello."),
     ]
     payload = GoogleChatTranslator.to_google(_MODEL, messages)
 
@@ -71,10 +72,10 @@ def test_instruction_then_user(instruction_role: Literal["system", "developer"])
 
 def test_system_then_developer_then_user():
     """System and developer preserve message order in ``system_instruction``."""
-    messages: list[ChatMessageParam] = [
-        {"role": "system", "content": "You are helpful."},
-        {"role": "developer", "content": "App version 2.0"},
-        {"role": "user", "content": "Hello."},
+    messages: list[ChatMessage] = [
+        SystemMessage(content="You are helpful."),
+        DeveloperMessage(content="App version 2.0"),
+        UserMessage(content="Hello."),
     ]
     payload = GoogleChatTranslator.to_google(_MODEL, messages)
 
@@ -94,18 +95,18 @@ def test_system_then_developer_then_user():
 )
 def test_two_instructions_then_user(instruction_role: Literal["system", "developer"]):
     """Two system or developer messages concatenate in order in ``system_instruction``."""
-    messages: list[ChatMessageParam]
+    messages: list[ChatMessage]
     if instruction_role == "system":
         messages = [
-            {"role": "system", "content": "First system instruction."},
-            {"role": "system", "content": "Second system instruction."},
-            {"role": "user", "content": "Hello."},
+            SystemMessage(content="First system instruction."),
+            SystemMessage(content="Second system instruction."),
+            UserMessage(content="Hello."),
         ]
     else:
         messages = [
-            {"role": "developer", "content": "First system instruction."},
-            {"role": "developer", "content": "Second system instruction."},
-            {"role": "user", "content": "Hello."},
+            DeveloperMessage(content="First system instruction."),
+            DeveloperMessage(content="Second system instruction."),
+            UserMessage(content="Hello."),
         ]
     payload = GoogleChatTranslator.to_google(_MODEL, messages)
 
@@ -121,10 +122,10 @@ def test_two_instructions_then_user(instruction_role: Literal["system", "develop
 
 def test_user_assistant_user():
     """User and model turns map to ``user`` / ``model`` content entries."""
-    messages: list[ChatMessageParam] = [
-        {"role": "user", "content": "First user."},
-        {"role": "assistant", "content": "Assistant reply."},
-        {"role": "user", "content": "Second user."},
+    messages: list[ChatMessage] = [
+        UserMessage(content="First user."),
+        AssistantMessage(content="Assistant reply."),
+        UserMessage(content="Second user."),
     ]
     payload = GoogleChatTranslator.to_google(_MODEL, messages)
 
@@ -138,9 +139,9 @@ def test_user_assistant_user():
 
 def test_assistant_refusal_replayed_as_text_part():
     """Gemini has no refusal part on input; ``refusal`` is sent as a ``text`` part."""
-    messages: list[ChatMessageParam] = [
-        {"role": "user", "content": "Unsafe ask."},
-        {"role": "assistant", "refusal": "I can't help with that."},
+    messages: list[ChatMessage] = [
+        UserMessage(content="Unsafe ask."),
+        AssistantMessage(refusal="I can't help with that."),
     ]
     payload = GoogleChatTranslator.to_google(_MODEL, messages)
     assert payload["contents"] == [
@@ -152,14 +153,13 @@ def test_assistant_refusal_replayed_as_text_part():
 
 def test_assistant_structured_refusal_parts_as_text():
     """Structured refusal parts map to plain ``text`` parts for Gemini."""
-    messages: list[ChatMessageParam] = [
-        {
-            "role": "assistant",
-            "content": [
-                TextContentParam(type="text", text="Ok."),
-                RefusalContentParam(type="refusal", refusal="Stopped."),
+    messages: list[ChatMessage] = [
+        AssistantMessage(
+            content=[
+                TextContent(text="Ok."),
+                RefusalContent(refusal="Stopped."),
             ],
-        },
+        ),
     ]
     payload = GoogleChatTranslator.to_google(_MODEL, messages)
     assert payload["contents"] == [
@@ -184,7 +184,7 @@ def test_user_tool_call_and_result_with_tools():
                 {
                     "name": "get_weather",
                     "description": "Get weather for a city.",
-                    "parameters": WEATHER_TOOL["function"]["parameters"],
+                    "parameters": WEATHER_TOOL.function.parameters,
                 }
             ],
         },
@@ -230,7 +230,7 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
                 {
                     "name": "get_weather",
                     "description": "Get weather for a city.",
-                    "parameters": WEATHER_TOOL["function"]["parameters"],
+                    "parameters": WEATHER_TOOL.function.parameters,
                 }
             ],
         },
@@ -239,7 +239,7 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
                 {
                     "name": "get_local_time",
                     "description": "Get local time for an IANA timezone.",
-                    "parameters": GET_TIME_TOOL["function"]["parameters"],
+                    "parameters": GET_TIME_TOOL.function.parameters,
                 }
             ],
         },
@@ -302,7 +302,7 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
                 {
                     "name": "get_weather",
                     "description": "Get weather for a city.",
-                    "parameters": WEATHER_TOOL["function"]["parameters"],
+                    "parameters": WEATHER_TOOL.function.parameters,
                 }
             ],
         },
@@ -311,7 +311,7 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
                 {
                     "name": "get_local_time",
                     "description": "Get local time for an IANA timezone.",
-                    "parameters": GET_TIME_TOOL["function"]["parameters"],
+                    "parameters": GET_TIME_TOOL.function.parameters,
                 }
             ],
         },
