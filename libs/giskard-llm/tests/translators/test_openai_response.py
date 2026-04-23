@@ -1,6 +1,7 @@
 """OpenAI Responses API translation tests.
 
 Request shape mirrors :meth:`giskard.llm.translators.openai_response.OpenAIResponseTranslator.to_openai`.
+For **Chat Completions** -> :class:`~giskard.llm.types.CompletionResponse`, see ``test_openai_chat_return.py``.
 """
 
 import json

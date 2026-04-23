@@ -1,6 +1,7 @@
 """Google Gemini Interactions (response API) translation tests.
 
 Request shape mirrors :meth:`giskard.llm.translators.google_response.GoogleResponseTranslator.to_google`.
+For **generateContent** -> :class:`~giskard.llm.types.CompletionResponse`, see ``test_google_chat_return.py``.
 """
 
 from typing import Literal
