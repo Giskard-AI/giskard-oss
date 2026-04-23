@@ -140,7 +140,7 @@ class GoogleChatTranslator:
     ) -> "ContentListUnionDict":
         tc_id_to_name: dict[str, str] = {}
         for msg in messages:
-            for tc in msg.get("tool_calls", []):
+            for tc in msg.get("tool_calls") or []:
                 tc_id_to_name[tc["id"]] = tc["function"]["name"]
 
         converted = [
