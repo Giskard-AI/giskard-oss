@@ -17,6 +17,7 @@ from giskard.llm.providers.google import GoogleProvider
 from giskard.llm.providers.openai import OpenAIProvider
 from giskard.llm.types import (
     ResponseOutputFunctionCall,
+    ResponseOutputMessage,
     ResponseOutputText,
     ToolCall,
 )
@@ -126,6 +127,7 @@ def _make_openai_response_api_response(
         output_items = [
             SimpleNamespace(
                 type="message",
+                role="assistant",
                 content=[SimpleNamespace(type="output_text", text="Hello world")],
             )
         ]
@@ -474,8 +476,9 @@ async def test_openai_respond_text(mock_import):
     resp = await provider.respond("gpt-4o", "Hello")
     assert resp.id == "resp_001"
     assert len(resp.outputs) == 1
-    assert isinstance(resp.outputs[0], ResponseOutputText)
-    assert resp.outputs[0].text == "Hello world"
+    assert isinstance(resp.outputs[0], ResponseOutputMessage)
+    assert isinstance(resp.outputs[0].content[0], ResponseOutputText)
+    assert resp.outputs[0].content[0].text == "Hello world"
     assert resp.output_text == "Hello world"
     assert resp.usage is not None
     assert resp.usage.prompt_tokens == 10
@@ -545,8 +548,9 @@ async def test_google_respond_text(mock_errors):
     resp = await provider.respond("gemini-2.0-flash", "Hello")
     assert resp.id == "int_001"
     assert len(resp.outputs) == 1
-    assert isinstance(resp.outputs[0], ResponseOutputText)
-    assert resp.outputs[0].text == "Bonjour"
+    assert isinstance(resp.outputs[0], ResponseOutputMessage)
+    assert isinstance(resp.outputs[0].content[0], ResponseOutputText)
+    assert resp.outputs[0].content[0].text == "Bonjour"
 
 
 @patch("giskard.llm.providers.google._import_genai_errors")

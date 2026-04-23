@@ -9,7 +9,7 @@ import os
 import pytest
 from giskard.llm import LLMClient
 from giskard.llm.errors import AuthenticationError, LLMError, UnsupportedOperationError
-from giskard.llm.types import ResponseOutputFunctionCall, ResponseOutputText, ToolDef
+from giskard.llm.types import ResponseOutputFunctionCall, ToolDef
 
 pytestmark = pytest.mark.functional
 
@@ -140,9 +140,8 @@ async def test_respond_tool_roundtrip(provider: str):
             },
         ],
     )
-    text_outputs = [o for o in resp2.outputs if isinstance(o, ResponseOutputText)]
-    assert len(text_outputs) > 0
-    assert text_outputs[0].text.strip()
+    assert resp2.output_text is not None
+    assert resp2.output_text.strip()
 
 
 # -- Stateful turn scenario ---------------------------------------------------

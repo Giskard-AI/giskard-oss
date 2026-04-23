@@ -15,7 +15,11 @@ import pytest
 pytest.importorskip("google.genai")
 
 from giskard.llm.translators.google_response import GoogleResponseTranslator
-from giskard.llm.types import ResponseOutputFunctionCall, ResponseOutputText
+from giskard.llm.types import (
+    ResponseOutputFunctionCall,
+    ResponseOutputMessage,
+    ResponseOutputText,
+)
 from google.genai._interactions.types import (
     FunctionCallContent,
     Interaction,
@@ -53,7 +57,7 @@ def _interaction(
 
 
 def test_from_google_text_output():
-    """``type: text`` outputs become :class:`ResponseOutputText` entries."""
+    """``type: text`` outputs become a :class:`ResponseOutputMessage` with ``ResponseOutputText``."""
     raw = _interaction(
         [TextContent(type="text", text="Hello from Interactions.")],
         usage=SimpleNamespace(input_tokens=3, output_tokens=4),
@@ -66,8 +70,12 @@ def test_from_google_text_output():
     assert out.usage.completion_tokens == 4
     assert out.usage.total_tokens == 7
     assert len(out.outputs) == 1
-    assert isinstance(out.outputs[0], ResponseOutputText)
-    assert out.outputs[0].text == "Hello from Interactions."
+    m = out.outputs[0]
+    assert isinstance(m, ResponseOutputMessage)
+    assert len(m.content) == 1
+    assert isinstance(m.content[0], ResponseOutputText)
+    assert m.content[0].text == "Hello from Interactions."
+    assert out.output_text == "Hello from Interactions."
 
 
 def test_from_google_omit_usage():
@@ -99,7 +107,7 @@ def test_from_google_function_call():
 
 
 def test_from_google_text_then_text_then_function():
-    """Multiple ``outputs`` list entries preserve order (text, text, function)."""
+    """Multiple ``outputs`` list entries preserve order; each text is a ``ResponseOutputMessage``."""
     raw = _interaction(
         [
             TextContent(type="text", text="A"),
@@ -114,9 +122,12 @@ def test_from_google_text_then_text_then_function():
     )
     out = GoogleResponseTranslator.from_google(raw, _MODEL)
     assert len(out.outputs) == 3
-    assert isinstance(out.outputs[0], ResponseOutputText)
-    assert out.outputs[0].text == "A"
-    assert isinstance(out.outputs[1], ResponseOutputText)
-    assert out.outputs[1].text == "B"
+    assert isinstance(out.outputs[0], ResponseOutputMessage)
+    assert isinstance(out.outputs[0].content[0], ResponseOutputText)
+    assert out.outputs[0].content[0].text == "A"
+    assert isinstance(out.outputs[1], ResponseOutputMessage)
+    assert isinstance(out.outputs[1].content[0], ResponseOutputText)
+    assert out.outputs[1].content[0].text == "B"
     assert isinstance(out.outputs[2], ResponseOutputFunctionCall)
     assert out.outputs[2].name == "f"
+    assert out.output_text == "A\nB"

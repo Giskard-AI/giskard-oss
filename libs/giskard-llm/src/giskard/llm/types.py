@@ -112,6 +112,40 @@ class ResponseOutputText(_BaseModel):
     type: Literal["text"] = "text"
     text: str
 
+    @property
+    def output_text(self) -> str:
+        """Return the text content, or None if there is no text."""
+        return self.text
+
+
+class ResponseOutputRefusal(_BaseModel):
+    type: Literal["refusal"] = "refusal"
+    refusal: str
+
+    @property
+    def output_text(self) -> str:
+        """Return the refusal content, or None if there is no refusal."""
+        return self.refusal
+
+
+class ResponseOutputMessage(_BaseModel):
+    type: Literal["message"] = "message"
+    content: list[ResponseOutputText | ResponseOutputRefusal]
+    role: Literal["assistant"]
+
+    @property
+    def output_text(self) -> str:
+        """Concatenate all text outputs, or None if there are none."""
+        return "\n".join([o.output_text for o in self.content])
+
+    @property
+    def refusal(self) -> str | None:
+        """Return joined refusal segments, or None if there are no refusal parts."""
+        refusals = [
+            c.refusal for c in self.content if isinstance(c, ResponseOutputRefusal)
+        ]
+        return "\n".join(refusals) if refusals else None
+
 
 class ResponseOutputFunctionCall(_BaseModel):
     type: Literal["function_call"] = "function_call"
@@ -121,7 +155,7 @@ class ResponseOutputFunctionCall(_BaseModel):
 
 
 # Plain assignment (not `type` statement) so isinstance(x, ResponseOutputItem) works at runtime.
-ResponseOutputItem = ResponseOutputText | ResponseOutputFunctionCall
+ResponseOutputItem = ResponseOutputMessage | ResponseOutputFunctionCall
 
 
 class ResponseResult(_BaseModel):
@@ -133,8 +167,10 @@ class ResponseResult(_BaseModel):
     @property
     def output_text(self) -> str | None:
         """Concatenate all text outputs, or None if there are none."""
-        texts = [o.text for o in self.outputs if isinstance(o, ResponseOutputText)]
-        return "\n".join(texts) if texts else None
+        content = [
+            o.output_text for o in self.outputs if isinstance(o, ResponseOutputMessage)
+        ]
+        return "\n".join(content) if content else None
 
     @property
     def function_calls(self) -> list[ResponseOutputFunctionCall]:
@@ -222,6 +258,16 @@ class ResponseInputTextParam(TypedDict, total=False):
     type: Required[Literal["input_text"]]
 
 
+class ResponseRefusalParam(TypedDict, total=False):
+    type: Required[Literal["refusal"]]
+    refusal: Required[str]
+
+
+class ResponseOutputTextBlockParam(TypedDict, total=False):
+    type: Required[Literal["output_text"]]
+    text: Required[str]
+
+
 class ResponseFunctionCallOutput(TypedDict, total=False):
     type: Required[Literal["function_call_output"]]
     call_id: Required[str]
@@ -238,15 +284,25 @@ class ResponseFunctionToolCall(TypedDict, total=False):
 
 
 ResponseInputMessageContent = ResponseInputTextParam
-ResponseInputMessageContentList = list[ResponseInputMessageContent]
+
+ResponseOutputMessageContent = ResponseRefusalParam | ResponseOutputTextBlockParam
 
 
 class ResponseEasyInputMessage(TypedDict, total=False):
     type: Literal["message"]
-    content: Required[str | ResponseInputMessageContentList]
+    content: Required[str | list[ResponseInputMessageContent]]
     role: Required[Literal["user", "assistant", "system", "developer"]]
 
 
+class ResponseOutputMessageParam(TypedDict, total=False):
+    type: Literal["message"]
+    content: Required[str | list[ResponseOutputMessageContent]]
+    role: Required[Literal["assistant"]]
+
+
 ResponseInputItem = (
-    ResponseFunctionCallOutput | ResponseFunctionToolCall | ResponseEasyInputMessage
+    ResponseFunctionCallOutput
+    | ResponseFunctionToolCall
+    | ResponseEasyInputMessage
+    | ResponseOutputMessageParam
 )

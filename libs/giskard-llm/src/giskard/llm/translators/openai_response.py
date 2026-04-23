@@ -3,9 +3,10 @@ from typing import TYPE_CHECKING, Any
 
 from giskard.llm.types import (
     ResponseInputItem,
-    ResponseInputMessageContentList,
     ResponseOutputFunctionCall,
     ResponseOutputItem,
+    ResponseOutputMessage,
+    ResponseOutputRefusal,
     ResponseOutputText,
     ResponseResult,
     ToolDef,
@@ -18,9 +19,6 @@ if TYPE_CHECKING:
     from openai.types.responses.response import Response
     from openai.types.responses.response_create_params import (
         ResponseCreateParamsNonStreaming,
-    )
-    from openai.types.responses.response_input_message_content_list_param import (
-        ResponseInputMessageContentListParam,
     )
     from openai.types.responses.response_input_param import (
         ResponseInputItemParam,
@@ -35,22 +33,9 @@ PROVIDER = "openai"
 
 class OpenAIResponseTranslator:
     @staticmethod
-    def _content_to_openai(
-        content: str | ResponseInputMessageContentList,
-    ) -> "str | ResponseInputMessageContentListParam":
-        if isinstance(content, str):
-            return content
-        return [item for item in content]
-
-    @staticmethod
     def _input_to_openai(input: ResponseInputItem) -> "ResponseInputItemParam":
         if "type" not in input or input["type"] == "message":
-            return {
-                **input,
-                "content": OpenAIResponseTranslator._content_to_openai(
-                    input["content"]
-                ),
-            }
+            return input  # pyright: ignore[reportReturnType]
 
         if input["type"] == "function_call_output":
             return {**input}
@@ -113,13 +98,19 @@ class OpenAIResponseTranslator:
         outputs: list[ResponseOutputItem] = []
         for item in raw.output:
             if item.type == "message":
+                contents = []
                 for content_block in item.content:
                     if content_block.type == "output_text":
-                        outputs.append(ResponseOutputText(text=content_block.text))
+                        contents.append(ResponseOutputText(text=content_block.text))
+                    elif content_block.type == "refusal":
+                        contents.append(
+                            ResponseOutputRefusal(refusal=content_block.refusal)
+                        )
                     else:
                         raise ValueError(
-                            f"Unsupported content block type: {content_block.type}"
+                            f"Unsupported message content block type: {content_block.type!r}"
                         )
+                outputs.append(ResponseOutputMessage(content=contents, role=item.role))
             elif item.type == "function_call":
                 outputs.append(
                     ResponseOutputFunctionCall(

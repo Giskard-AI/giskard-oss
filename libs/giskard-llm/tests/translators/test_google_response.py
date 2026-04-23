@@ -262,3 +262,23 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
         },
     ]
     validate_google_interaction_params(payload)
+
+
+def test_assistant_message_mixed_output_text_and_refusal_maps_to_text_parts():
+    """Structured assistant content with text + refusal maps to plain Gemini ``text`` parts."""
+    items: list[ResponseInputItem] = [
+        {
+            "type": "message",
+            "role": "assistant",
+            "content": [
+                {"type": "output_text", "text": "Partial."},
+                {"type": "refusal", "refusal": "Stopped."},
+            ],
+        },
+    ]
+    payload = GoogleResponseTranslator.to_google(_MODEL, items)
+    assert payload["input"] == [
+        {"type": "text", "text": "Partial."},
+        {"type": "text", "text": "Stopped."},
+    ]
+    validate_google_interaction_params(payload)

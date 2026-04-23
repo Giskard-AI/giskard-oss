@@ -14,11 +14,18 @@ import pytest
 pytest.importorskip("openai")
 
 from giskard.llm.translators.openai_response import OpenAIResponseTranslator
-from giskard.llm.types import ResponseOutputFunctionCall
-from giskard.llm.types import ResponseOutputText as ROT
+from giskard.llm.types import (
+    ResponseOutputFunctionCall,
+)
+from giskard.llm.types import (
+    ResponseOutputMessage as GiskardMessage,
+)
+from giskard.llm.types import ResponseOutputRefusal as GiskardRefusal
+from giskard.llm.types import ResponseOutputText as GiskardText
 from openai.types.responses.response import Response
 from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
 from openai.types.responses.response_output_message import ResponseOutputMessage
+from openai.types.responses.response_output_refusal import ResponseOutputRefusal
 from openai.types.responses.response_output_text import ResponseOutputText
 from openai.types.responses.response_usage import (
     InputTokensDetails,
@@ -42,7 +49,7 @@ def _usage(input_tokens: int, output_tokens: int, total_tokens: int) -> Response
 
 
 def test_from_openai_output_text():
-    """``message`` item with ``output_text`` becomes :class:`ResponseOutputText` entries."""
+    """``message`` item with ``output_text`` becomes one :class:`ResponseOutputMessage`."""
     msg = ResponseOutputMessage(
         id="msg_1",
         type="message",
@@ -70,8 +77,13 @@ def test_from_openai_output_text():
     assert out.usage.completion_tokens == 5
     assert out.usage.total_tokens == 15
     assert len(out.outputs) == 1
-    assert isinstance(out.outputs[0], ROT)
-    assert out.outputs[0].text == "Hello from Responses."
+    m = out.outputs[0]
+    assert isinstance(m, GiskardMessage)
+    assert len(m.content) == 1
+    assert isinstance(m.content[0], GiskardText)
+    assert m.content[0].text == "Hello from Responses."
+    assert m.refusal is None
+    assert out.output_text == "Hello from Responses."
 
 
 def test_from_openai_omit_usage():
@@ -95,7 +107,7 @@ def test_from_openai_omit_usage():
 
 
 def test_from_openai_two_output_text_blocks_in_one_message():
-    """A single message may contain several ``output_text`` blocks, each mapped separately."""
+    """A single message may contain several ``output_text`` blocks in one ``ResponseOutputMessage``."""
     msg = ResponseOutputMessage(
         id="m2",
         type="message",
@@ -108,11 +120,63 @@ def test_from_openai_two_output_text_blocks_in_one_message():
     )
     raw = Response.model_construct(id="resp_3", output=[msg], model=_MODEL)
     out = OpenAIResponseTranslator.from_openai(raw)
-    assert len(out.outputs) == 2
-    assert [o.text for o in out.outputs if isinstance(o, ROT)] == [
+    assert len(out.outputs) == 1
+    m = out.outputs[0]
+    assert isinstance(m, GiskardMessage)
+    assert [p.text for p in m.content if isinstance(p, GiskardText)] == [
         "First",
         "Second",
     ]
+    assert out.output_text == "First\nSecond"
+
+
+def test_from_openai_mixed_output_text_and_refusal_in_one_message():
+    """Partial output: ``output_text`` then ``refusal`` in the same assistant message."""
+    msg = ResponseOutputMessage(
+        id="m_ref",
+        type="message",
+        role="assistant",
+        status="completed",
+        content=[
+            ResponseOutputText(
+                type="output_text", text="Here is partial.", annotations=[]
+            ),
+            ResponseOutputRefusal(type="refusal", refusal="I cannot complete this."),
+        ],
+    )
+    raw = Response.model_construct(id="resp_mixed", output=[msg], model=_MODEL)
+    out = OpenAIResponseTranslator.from_openai(raw)
+    assert len(out.outputs) == 1
+    m = out.outputs[0]
+    assert isinstance(m, GiskardMessage)
+    assert len(m.content) == 2
+    assert isinstance(m.content[0], GiskardText)
+    assert isinstance(m.content[1], GiskardRefusal)
+    assert m.content[1].refusal == "I cannot complete this."
+    assert m.refusal == "I cannot complete this."
+    assert m.output_text == "Here is partial.\nI cannot complete this."
+    assert out.output_text == "Here is partial.\nI cannot complete this."
+
+
+def test_from_openai_refusal_only_in_message():
+    """Message may contain only a ``refusal`` block (no ``output_text``)."""
+    msg = ResponseOutputMessage(
+        id="m_only_ref",
+        type="message",
+        role="assistant",
+        status="completed",
+        content=[
+            ResponseOutputRefusal(type="refusal", refusal="Policy decline."),
+        ],
+    )
+    raw = Response.model_construct(id="resp_ref_only", output=[msg], model=_MODEL)
+    out = OpenAIResponseTranslator.from_openai(raw)
+    m = out.outputs[0]
+    assert isinstance(m, GiskardMessage)
+    assert len(m.content) == 1
+    assert isinstance(m.content[0], GiskardRefusal)
+    assert m.refusal == "Policy decline."
+    assert out.output_text == "Policy decline."
 
 
 def test_from_openai_function_call():
@@ -153,7 +217,8 @@ def test_from_openai_message_then_function():
     raw = Response.model_construct(id="resp_5", output=[msg, fc], model=_MODEL)
     out = OpenAIResponseTranslator.from_openai(raw)
     assert len(out.outputs) == 2
-    assert isinstance(out.outputs[0], ROT)
-    assert out.outputs[0].text == "Calling tool…"
+    assert isinstance(out.outputs[0], GiskardMessage)
+    assert isinstance(out.outputs[0].content[0], GiskardText)
+    assert out.outputs[0].content[0].text == "Calling tool…"
     assert isinstance(out.outputs[1], ResponseOutputFunctionCall)
     assert out.outputs[1].name == "f"

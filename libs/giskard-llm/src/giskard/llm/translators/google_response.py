@@ -6,8 +6,11 @@ from pydantic import BaseModel
 
 from ..types import (
     ResponseInputItem,
-    ResponseInputMessageContentList,
+    ResponseInputMessageContent,
     ResponseOutputFunctionCall,
+    ResponseOutputItem,
+    ResponseOutputMessage,
+    ResponseOutputMessageContent,
     ResponseOutputText,
     ResponseResult,
     ToolDef,
@@ -51,13 +54,29 @@ def _flatten[T](items: Sequence[Sequence[T]]) -> list[T]:
 
 class GoogleResponseTranslator:
     @staticmethod
+    def _output_content_to_google(
+        content: ResponseInputMessageContent | ResponseOutputMessageContent,
+    ) -> "TextContentParam":
+        if content["type"] == "input_text":
+            return {"type": "text", "text": content["text"]}
+        if content["type"] == "output_text":
+            return {"type": "text", "text": content["text"]}
+        if content["type"] == "refusal":
+            return {"type": "text", "text": content["refusal"]}
+        # Runtime guard: inputs may not match TypedDict at runtime.
+        raise ValueError(f"Unsupported message content type: {content['type']!r}")  # pyright: ignore[reportUnreachable]
+
+    @staticmethod
     def _content_to_google(
-        content: str | ResponseInputMessageContentList,
+        content: str
+        | Sequence[ResponseInputMessageContent | ResponseOutputMessageContent],
     ) -> "list[TextContentParam]":
         if isinstance(content, str):
             return [{"type": "text", "text": content}]
 
-        return [{"type": "text", "text": item["text"]} for item in content]
+        return [
+            GoogleResponseTranslator._output_content_to_google(item) for item in content
+        ]
 
     @staticmethod
     def _input_to_google(
@@ -192,11 +211,15 @@ class GoogleResponseTranslator:
 
     @staticmethod
     def from_google(raw: "Interaction", model: str) -> ResponseResult:
-        outputs: list[ResponseOutputText | ResponseOutputFunctionCall] = []
+        outputs: list[ResponseOutputItem] = []
         for item in getattr(raw, "outputs", []):
             item_type = getattr(item, "type", None)
             if item_type == "text":
-                outputs.append(ResponseOutputText(text=item.text))
+                outputs.append(
+                    ResponseOutputMessage(
+                        content=[ResponseOutputText(text=item.text)], role="assistant"
+                    )
+                )
             elif item_type == "function_call":
                 raw_args = getattr(item, "arguments", None)
                 if raw_args is None:
