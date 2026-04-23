@@ -1,11 +1,12 @@
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, Required, TypedDict
 
 from pydantic import BaseModel
 
 from ..types import (
     ResponseInputItem,
+    ResponseInputMessageContentList,
     ResponseOutputFunctionCall,
     ResponseOutputText,
     ResponseResult,
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
         FunctionResultContentParam,
         GenerationConfigParam,
         Interaction,
+        TextContentParam,
         ToolParam,
         interaction_create_params,
     )
@@ -42,40 +44,64 @@ KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "timeout", "response_format"})
 logger = logging.getLogger(__name__)
 
 
+def _flatten[T](items: Sequence[Sequence[T]]) -> list[T]:
+    return [item for sublist in items for item in sublist]
+
+
 class GoogleResponseTranslator:
+    @staticmethod
+    def _content_to_google(
+        content: str | ResponseInputMessageContentList,
+    ) -> "list[TextContentParam]":
+        if isinstance(content, str):
+            return [{"type": "text", "text": content}]
+
+        return [{"type": "text", "text": item["text"]} for item in content]
+
     @staticmethod
     def _input_to_google(
         input: ResponseInputItem,
-    ) -> "FunctionResultContentParam | FunctionCallContentParam":
+    ) -> "Sequence[FunctionResultContentParam | FunctionCallContentParam | TextContentParam]":
+        if "type" not in input or input["type"] == "message":
+            if input["role"] != "user":
+                raise ValueError(f"Unsupported message role: {input['role']}")
+            return GoogleResponseTranslator._content_to_google(input["content"])
+
         if input["type"] == "function_call_output":
             name = input.get("name")
             if name is None:
                 raise ValueError("function_call_output: name is required")
 
-            return {
-                "type": "function_result",
-                "call_id": input["call_id"],
-                "name": name,
-                "result": input["output"],
-            }
+            return [
+                {
+                    "type": "function_result",
+                    "call_id": input["call_id"],
+                    "name": name,
+                    "result": input["output"],
+                }
+            ]
 
         if input["type"] == "function_call":
             id = input.get("id")
             if id is None:
                 raise ValueError("function_call: id is required")
-            return {
-                "type": "function_call",
-                "id": id,
-                "name": input.get("name", ""),
-                "arguments": input["arguments"],
-            }
+            return [
+                {
+                    "type": "function_call",
+                    "id": id,
+                    "name": input.get("name", ""),
+                    "arguments": input["arguments"],
+                }
+            ]
 
     @staticmethod
     def _inputs_to_google(
         input: str | list[ResponseInputItem],
     ) -> "interaction_create_params.Input":
         if isinstance(input, list):
-            return [GoogleResponseTranslator._input_to_google(item) for item in input]
+            return _flatten(
+                [GoogleResponseTranslator._input_to_google(item) for item in input]
+            )
 
         return input
 

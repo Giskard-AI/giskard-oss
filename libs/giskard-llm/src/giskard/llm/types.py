@@ -200,6 +200,11 @@ ChatMessage = (
 # -- Response Input types -------------------------------------------------------------
 
 
+class ResponseInputTextParam(TypedDict, total=False):
+    text: Required[str]
+    type: Required[Literal["input_text"]]
+
+
 class ResponseFunctionCallOutput(TypedDict, total=False):
     type: Required[Literal["function_call_output"]]
     call_id: Required[str]
@@ -215,4 +220,16 @@ class ResponseFunctionToolCall(TypedDict, total=False):
     id: str | None
 
 
-ResponseInputItem = ResponseFunctionCallOutput | ResponseFunctionToolCall
+ResponseInputMessageContent = ResponseInputTextParam
+ResponseInputMessageContentList = list[ResponseInputMessageContent]
+
+
+class ResponseEasyInputMessage(TypedDict, total=False):
+    type: Literal["message"]
+    content: Required[str | ResponseInputMessageContentList]
+    role: Required[Literal["user", "assistant", "system", "developer"]]
+
+
+ResponseInputItem = (
+    ResponseFunctionCallOutput | ResponseFunctionToolCall | ResponseEasyInputMessage
+)

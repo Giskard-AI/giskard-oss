@@ -135,7 +135,7 @@ class GoogleChatTranslator:
         model: str,
         messages: Sequence[ChatMessage],
         *,
-        tools: list[ToolDef] | None = None,
+        tools: Sequence[ToolDef] | None = None,
         **params: Any,
     ) -> "GenerateContentParams":
         unknown = set(params) - KNOWN_COMPLETION_PARAMS

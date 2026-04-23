@@ -4,7 +4,9 @@ from typing import TYPE_CHECKING, Any
 
 from giskard.llm.types import (
     ResponseInputItem,
+    ResponseInputMessageContentList,
     ResponseOutputFunctionCall,
+    ResponseOutputItem,
     ResponseOutputText,
     ResponseResult,
     ToolDef,
@@ -15,6 +17,9 @@ if TYPE_CHECKING:
     from openai.types.responses.response import Response
     from openai.types.responses.response_create_params import (
         ResponseCreateParamsNonStreaming,
+    )
+    from openai.types.responses.response_input_message_content_list_param import (
+        ResponseInputMessageContentListParam,
     )
     from openai.types.responses.response_input_param import (
         ResponseInputItemParam,
@@ -29,11 +34,25 @@ PROVIDER = "openai"
 
 class OpenAIResponseTranslator:
     @staticmethod
+    def _content_to_openai(
+        content: str | ResponseInputMessageContentList,
+    ) -> "str | ResponseInputMessageContentListParam":
+        if isinstance(content, str):
+            return content
+        return [item for item in content]
+
+    @staticmethod
     def _input_to_openai(input: ResponseInputItem) -> "ResponseInputItemParam":
-        if input["type"] == "function_call_output":
+        if "type" not in input or input["type"] == "message":
             return {
                 **input,
+                "content": OpenAIResponseTranslator._content_to_openai(
+                    input["content"]
+                ),
             }
+
+        if input["type"] == "function_call_output":
+            return {**input}
 
         if input["type"] == "function_call":
             return {
@@ -90,7 +109,7 @@ class OpenAIResponseTranslator:
 
     @staticmethod
     def from_openai(raw: "Response") -> ResponseResult:
-        outputs: list[ResponseOutputText | ResponseOutputFunctionCall] = []
+        outputs: list[ResponseOutputItem] = []
         for item in raw.output:
             if item.type == "message":
                 for content_block in item.content:
