@@ -31,3 +31,23 @@ def validate_anthropic_message_create(payload: object) -> None:
     from anthropic.types.message_create_params import MessageCreateParams
 
     _ = TypeAdapter(MessageCreateParams).validate_python(payload)
+
+
+def validate_openai_response_params(payload: object) -> None:
+    if importlib.util.find_spec("openai") is None:
+        return
+    from openai.types.responses.response_create_params import (
+        ResponseCreateParamsNonStreaming,
+    )
+
+    _ = TypeAdapter(ResponseCreateParamsNonStreaming).validate_python(payload)
+
+
+def validate_google_interaction_params(payload: object) -> None:
+    if importlib.util.find_spec("google.genai._interactions") is None:
+        return
+    from google.genai._interactions.types.interaction_create_params import (
+        CreateModelInteractionParamsNonStreaming,
+    )
+
+    _ = TypeAdapter(CreateModelInteractionParamsNonStreaming).validate_python(payload)
