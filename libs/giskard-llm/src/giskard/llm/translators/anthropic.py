@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING, Any, Required, TypedDict
 from pydantic import BaseModel
 
 from ..types import (
+    AssistantMessage,
     ChatMessageParam,
     Choice,
-    ChoiceMessage,
     CompletionContentParam,
     CompletionResponse,
     ToolCall,
@@ -284,7 +284,7 @@ class AnthropicChatTranslator:
         if raw.stop_reason == "refusal" and raw.stop_details is not None:
             refusal_out = raw.stop_details.explanation
 
-        message = ChoiceMessage(
+        message = AssistantMessage(
             role="assistant",
             content="\n".join(content_text) if content_text else None,
             refusal=refusal_out,

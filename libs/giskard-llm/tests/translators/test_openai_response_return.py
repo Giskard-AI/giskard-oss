@@ -219,6 +219,6 @@ def test_from_openai_message_then_function():
     assert len(out.outputs) == 2
     assert isinstance(out.outputs[0], GiskardMessage)
     assert isinstance(out.outputs[0].content[0], GiskardText)
-    assert out.outputs[0].content[0].text == "Calling tool…"
+    assert out.outputs[0].output_text == "Calling tool…"
     assert isinstance(out.outputs[1], ResponseOutputFunctionCall)
     assert out.outputs[1].name == "f"

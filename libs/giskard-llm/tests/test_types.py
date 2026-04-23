@@ -1,6 +1,6 @@
 from giskard.llm.types import (
+    AssistantMessage,
     Choice,
-    ChoiceMessage,
     CompletionResponse,
     EmbeddingData,
     EmbeddingResponse,
@@ -13,7 +13,7 @@ def test_completion_response_model_dump():
     resp = CompletionResponse(
         choices=[
             Choice(
-                message=ChoiceMessage(role="assistant", content="Hello"),
+                message=AssistantMessage(content="Hello"),
                 finish_reason="stop",
             )
         ],
@@ -27,13 +27,13 @@ def test_completion_response_model_dump():
 
 
 def test_choice_message_excludes_none():
-    msg = ChoiceMessage(role="assistant", content="Hello")
+    msg = AssistantMessage(content="Hello")
     dump = msg.model_dump()
     assert "tool_calls" not in dump
 
 
 def test_choice_message_includes_typed_tool_calls():
-    msg = ChoiceMessage(
+    msg = AssistantMessage(
         role="assistant",
         tool_calls=[
             ToolCall(

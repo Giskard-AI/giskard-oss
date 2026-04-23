@@ -16,7 +16,6 @@ from .routing import LLMClient, acompletion, aembedding, aresponse, configure, r
 from .types import (
     ChatMessageParam,
     Choice,
-    ChoiceMessage,
     CompletionResponse,
     EmbeddingData,
     EmbeddingResponse,
@@ -50,7 +49,6 @@ __all__ = [
     # Types — Completion
     "CompletionResponse",
     "Choice",
-    "ChoiceMessage",
     "ChatMessageParam",
     "Usage",
     # Types — Tools

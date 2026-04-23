@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING, Any, Required, TypedDict
 from pydantic import BaseModel
 
 from ..types import (
+    AssistantMessage,
     ChatMessageParam,
     Choice,
-    ChoiceMessage,
     CompletionContentParam,
     CompletionResponse,
     ToolCall,
@@ -254,7 +254,7 @@ class GoogleChatTranslator:
 
             choices.append(
                 Choice(
-                    message=ChoiceMessage(
+                    message=AssistantMessage(
                         role="assistant",
                         content=content,
                         tool_calls=tool_calls,

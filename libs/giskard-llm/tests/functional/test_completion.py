@@ -90,6 +90,7 @@ async def test_user_only(provider: str):
     assert len(resp.choices) > 0
     assert resp.choices[0].message.role == "assistant"
     assert resp.choices[0].message.content
+    assert isinstance(resp.choices[0].message.content, str)
     assert len(resp.choices[0].message.content.strip()) > 0
 
 
@@ -116,6 +117,7 @@ async def test_system_user_keyword_injection(provider: str):
         ],
     )
     assert resp.choices[0].message.content
+    assert isinstance(resp.choices[0].message.content, str)
     assert "pineapple" in resp.choices[0].message.content.lower()
 
 
@@ -133,6 +135,7 @@ async def test_multi_turn(provider: str):
         ],
     )
     assert resp.choices[0].message.content
+    assert isinstance(resp.choices[0].message.content, str)
     assert len(resp.choices[0].message.content.strip()) > 0
 
 
@@ -334,6 +337,7 @@ async def test_response_format(provider: str):
     choice = resp.choices[0]
     assert choice.message.content
     raw_json = choice.message.content
+    assert isinstance(raw_json, str)
 
     parsed = json.loads(raw_json)
     assert "name" in parsed

@@ -3,9 +3,9 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from giskard.llm.types import (
+    AssistantMessage,
     ChatMessageParam,
     Choice,
-    ChoiceMessage,
     CompletionResponse,
     ToolCall,
     ToolCallFunction,
@@ -225,7 +225,7 @@ class OpenAIChatTranslator:
         return CompletionResponse(
             choices=[
                 Choice(
-                    message=ChoiceMessage(
+                    message=AssistantMessage(
                         role=c.message.role,
                         content=c.message.content,
                         refusal=c.message.refusal,

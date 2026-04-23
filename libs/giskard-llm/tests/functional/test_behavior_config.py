@@ -48,6 +48,7 @@ async def test_anthropic_relaxed_multi_system_merges():
         ],
     )
     content = resp.choices[0].message.content or ""
+    assert isinstance(content, str)
     assert "pineapple" in content.lower() and "mango" in content.lower()
 
 
