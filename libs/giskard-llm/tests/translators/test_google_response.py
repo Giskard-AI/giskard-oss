@@ -10,6 +10,22 @@ from giskard.llm.translators.google_response import GoogleResponseTranslator
 from giskard.llm.types import ResponseEasyInputMessage, ResponseInputItem
 
 from .sdk_payload_validation import validate_google_interaction_params
+from .tool_turn_fixtures import (
+    ASSISTANT_TEXT_WITH_PARALLEL_TOOLS,
+    GET_TIME_TOOL,
+    PARALLEL_TOOLS,
+    PARALLEL_USER_PROMPT,
+    TOOL_CALL_ID,
+    TOOL_CALL_ID_TIME_PARALLEL,
+    TOOL_CALL_ID_WEATHER_PARALLEL,
+    TOOL_RESULT_CONTENT,
+    TOOL_RESULT_TIME_PARALLEL,
+    TOOL_RESULT_WEATHER_PARALLEL,
+    WEATHER_TOOL,
+    google_response_user_assistant_text_two_parallel_tool_calls_and_results,
+    google_response_user_tool_call_then_result,
+    google_response_user_two_parallel_tool_calls_and_results,
+)
 
 _MODEL = "gemini-2.0-flash"
 
@@ -138,4 +154,109 @@ def test_message_user_assistant_user():
         {**_TEXT, "text": "Second user."},
     ]
     assert "system_instruction" not in payload
+    validate_google_interaction_params(payload)
+
+
+def test_user_tool_call_and_result_with_tools():
+    """Tool declaration plus [user, function_call, function_result] in ``input`` (like chat)."""
+    items = google_response_user_tool_call_then_result()
+    payload = GoogleResponseTranslator.to_google(_MODEL, items, tools=[WEATHER_TOOL])
+
+    assert payload.get("tools") == [
+        {"type": "function", **WEATHER_TOOL["function"]},
+    ]
+    assert payload.get("input") == [
+        {**_TEXT, "text": "What's the weather in Paris?"},
+        {
+            "type": "function_call",
+            "id": TOOL_CALL_ID,
+            "name": "get_weather",
+            "arguments": {"city": "Paris"},
+        },
+        {
+            "type": "function_result",
+            "call_id": TOOL_CALL_ID,
+            "name": "get_weather",
+            "result": TOOL_RESULT_CONTENT,
+        },
+    ]
+    validate_google_interaction_params(payload)
+
+
+def test_user_two_parallel_tool_calls_and_results_with_tools():
+    """Two function calls, then two function results, flat in ``input`` (like chat)."""
+    items = google_response_user_two_parallel_tool_calls_and_results()
+    payload = GoogleResponseTranslator.to_google(_MODEL, items, tools=PARALLEL_TOOLS)
+
+    assert payload.get("tools") == [
+        {"type": "function", **WEATHER_TOOL["function"]},
+        {"type": "function", **GET_TIME_TOOL["function"]},
+    ]
+    assert payload.get("input") == [
+        {**_TEXT, "text": PARALLEL_USER_PROMPT},
+        {
+            "type": "function_call",
+            "id": TOOL_CALL_ID_WEATHER_PARALLEL,
+            "name": "get_weather",
+            "arguments": {"city": "Paris"},
+        },
+        {
+            "type": "function_call",
+            "id": TOOL_CALL_ID_TIME_PARALLEL,
+            "name": "get_local_time",
+            "arguments": {"timezone": "Asia/Tokyo"},
+        },
+        {
+            "type": "function_result",
+            "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+            "name": "get_weather",
+            "result": TOOL_RESULT_WEATHER_PARALLEL,
+        },
+        {
+            "type": "function_result",
+            "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+            "name": "get_local_time",
+            "result": TOOL_RESULT_TIME_PARALLEL,
+        },
+    ]
+    validate_google_interaction_params(payload)
+
+
+def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
+    """Assistant text, then two calls and two results (like chat, parallel with preamble)."""
+    items = google_response_user_assistant_text_two_parallel_tool_calls_and_results()
+    payload = GoogleResponseTranslator.to_google(_MODEL, items, tools=PARALLEL_TOOLS)
+
+    assert payload.get("tools") == [
+        {"type": "function", **WEATHER_TOOL["function"]},
+        {"type": "function", **GET_TIME_TOOL["function"]},
+    ]
+    assert payload.get("input") == [
+        {**_TEXT, "text": PARALLEL_USER_PROMPT},
+        {**_TEXT, "text": ASSISTANT_TEXT_WITH_PARALLEL_TOOLS},
+        {
+            "type": "function_call",
+            "id": TOOL_CALL_ID_WEATHER_PARALLEL,
+            "name": "get_weather",
+            "arguments": {"city": "Paris"},
+        },
+        {
+            "type": "function_call",
+            "id": TOOL_CALL_ID_TIME_PARALLEL,
+            "name": "get_local_time",
+            "arguments": {"timezone": "Asia/Tokyo"},
+        },
+        {
+            "type": "function_result",
+            "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+            "name": "get_weather",
+            "result": TOOL_RESULT_WEATHER_PARALLEL,
+        },
+        {
+            "type": "function_result",
+            "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+            "name": "get_local_time",
+            "result": TOOL_RESULT_TIME_PARALLEL,
+        },
+    ]
     validate_google_interaction_params(payload)

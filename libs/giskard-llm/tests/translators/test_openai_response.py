@@ -3,6 +3,7 @@
 Request shape mirrors :meth:`giskard.llm.translators.openai_response.OpenAIResponseTranslator.to_openai`.
 """
 
+import json
 from typing import Literal
 
 import pytest
@@ -10,6 +11,22 @@ from giskard.llm.translators.openai_response import OpenAIResponseTranslator
 from giskard.llm.types import ResponseEasyInputMessage, ResponseInputItem
 
 from .sdk_payload_validation import validate_openai_response_params
+from .tool_turn_fixtures import (
+    ASSISTANT_TEXT_WITH_PARALLEL_TOOLS,
+    GET_TIME_TOOL,
+    PARALLEL_TOOLS,
+    PARALLEL_USER_PROMPT,
+    TOOL_CALL_ID,
+    TOOL_CALL_ID_TIME_PARALLEL,
+    TOOL_CALL_ID_WEATHER_PARALLEL,
+    TOOL_RESULT_CONTENT,
+    TOOL_RESULT_TIME_PARALLEL,
+    TOOL_RESULT_WEATHER_PARALLEL,
+    WEATHER_TOOL,
+    openai_response_user_assistant_text_two_parallel_tool_calls_and_results,
+    openai_response_user_tool_call_then_result,
+    openai_response_user_two_parallel_tool_calls_and_results,
+)
 
 _MODEL = "gpt-4o-mini"
 
@@ -145,5 +162,133 @@ def test_message_user_assistant_user():
         {"type": "message", "role": "user", "content": "First user."},
         {"type": "message", "role": "assistant", "content": "Assistant reply."},
         {"type": "message", "role": "user", "content": "Second user."},
+    ]
+    validate_openai_response_params(payload)
+
+
+def test_user_tool_call_and_result_with_tools():
+    """Tool definition plus [user, function_call, function_call_output] (like chat)."""
+    items = openai_response_user_tool_call_then_result()
+    payload = OpenAIResponseTranslator.to_openai(_MODEL, items, tools=[WEATHER_TOOL])
+
+    assert payload.get("tools") == [
+        {
+            "type": "function",
+            **WEATHER_TOOL["function"],
+            "strict": None,
+        },
+    ]
+    assert payload.get("input") == [
+        {
+            "type": "message",
+            "role": "user",
+            "content": "What's the weather in Paris?",
+        },
+        {
+            "type": "function_call",
+            "name": "get_weather",
+            "call_id": TOOL_CALL_ID,
+            "arguments": json.dumps({"city": "Paris"}),
+        },
+        {
+            "type": "function_call_output",
+            "call_id": TOOL_CALL_ID,
+            "output": TOOL_RESULT_CONTENT,
+        },
+    ]
+    validate_openai_response_params(payload)
+
+
+def test_user_two_parallel_tool_calls_and_results_with_tools():
+    """Two ``function_call`` items, then two ``function_call_output`` items (like chat)."""
+    items = openai_response_user_two_parallel_tool_calls_and_results()
+    payload = OpenAIResponseTranslator.to_openai(_MODEL, items, tools=PARALLEL_TOOLS)
+
+    assert payload.get("tools") == [
+        {
+            "type": "function",
+            **WEATHER_TOOL["function"],
+            "strict": None,
+        },
+        {
+            "type": "function",
+            **GET_TIME_TOOL["function"],
+            "strict": None,
+        },
+    ]
+    assert payload.get("input") == [
+        {"type": "message", "role": "user", "content": PARALLEL_USER_PROMPT},
+        {
+            "type": "function_call",
+            "name": "get_weather",
+            "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+            "arguments": json.dumps({"city": "Paris"}),
+        },
+        {
+            "type": "function_call",
+            "name": "get_local_time",
+            "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+            "arguments": json.dumps({"timezone": "Asia/Tokyo"}),
+        },
+        {
+            "type": "function_call_output",
+            "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+            "output": TOOL_RESULT_WEATHER_PARALLEL,
+        },
+        {
+            "type": "function_call_output",
+            "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+            "output": TOOL_RESULT_TIME_PARALLEL,
+        },
+    ]
+    validate_openai_response_params(payload)
+
+
+def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
+    """Assistant ``message`` with visible text, then two calls and two outputs (like chat)."""
+    items = openai_response_user_assistant_text_two_parallel_tool_calls_and_results()
+    payload = OpenAIResponseTranslator.to_openai(_MODEL, items, tools=PARALLEL_TOOLS)
+
+    assert payload.get("tools") == [
+        {
+            "type": "function",
+            **WEATHER_TOOL["function"],
+            "strict": None,
+        },
+        {
+            "type": "function",
+            **GET_TIME_TOOL["function"],
+            "strict": None,
+        },
+    ]
+    assert payload.get("input") == [
+        {"type": "message", "role": "user", "content": PARALLEL_USER_PROMPT},
+        {
+            "type": "message",
+            "role": "assistant",
+            "content": ASSISTANT_TEXT_WITH_PARALLEL_TOOLS,
+        },
+        {
+            "type": "function_call",
+            "name": "get_weather",
+            "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+            "arguments": json.dumps({"city": "Paris"}),
+        },
+        {
+            "type": "function_call",
+            "name": "get_local_time",
+            "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+            "arguments": json.dumps({"timezone": "Asia/Tokyo"}),
+        },
+        {
+            "type": "function_call_output",
+            "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+            "output": TOOL_RESULT_WEATHER_PARALLEL,
+        },
+        {
+            "type": "function_call_output",
+            "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+            "output": TOOL_RESULT_TIME_PARALLEL,
+        },
     ]
     validate_openai_response_params(payload)

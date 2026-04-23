@@ -1,6 +1,8 @@
 """Shared tool definitions and message lists for single- and parallel-tool-call translator tests."""
 
-from giskard.llm.types import ChatMessage, ToolDef
+from typing import cast
+
+from giskard.llm.types import ChatMessage, ResponseInputItem, ToolDef
 
 WEATHER_TOOL: ToolDef = {
     "type": "function",
@@ -135,3 +137,228 @@ def user_message_two_parallel_tool_calls_two_results() -> list[ChatMessage]:
         base[2],
         base[3],
     ]
+
+
+# -- Responses / Interactions API (flat ``ResponseInputItem`` lists) --------------
+
+
+def openai_response_user_tool_call_then_result() -> list[ResponseInputItem]:
+    """[user, function_call, function_call_output] for OpenAI Responses (no extra keys)."""
+    return cast(
+        list[ResponseInputItem],
+        [
+            {
+                "type": "message",
+                "role": "user",
+                "content": "What's the weather in Paris?",
+            },
+            {
+                "type": "function_call",
+                "name": "get_weather",
+                "call_id": TOOL_CALL_ID,
+                "arguments": {"city": "Paris"},
+            },
+            {
+                "type": "function_call_output",
+                "call_id": TOOL_CALL_ID,
+                "output": TOOL_RESULT_CONTENT,
+            },
+        ],
+    )
+
+
+def google_response_user_tool_call_then_result() -> list[ResponseInputItem]:
+    """Same conversation as :func:`openai_response_user_tool_call_then_result` with Google-required ids."""
+    return cast(
+        list[ResponseInputItem],
+        [
+            {
+                "type": "message",
+                "role": "user",
+                "content": "What's the weather in Paris?",
+            },
+            {
+                "type": "function_call",
+                "name": "get_weather",
+                "call_id": TOOL_CALL_ID,
+                "id": TOOL_CALL_ID,
+                "arguments": {"city": "Paris"},
+            },
+            {
+                "type": "function_call_output",
+                "name": "get_weather",
+                "call_id": TOOL_CALL_ID,
+                "output": TOOL_RESULT_CONTENT,
+            },
+        ],
+    )
+
+
+def openai_response_user_two_parallel_tool_calls_and_results() -> list[
+    ResponseInputItem
+]:
+    """[user, 2× function_call, 2× function_call_output] (parallel tool calls, no assistant text)."""
+    return cast(
+        list[ResponseInputItem],
+        [
+            {
+                "type": "message",
+                "role": "user",
+                "content": PARALLEL_USER_PROMPT,
+            },
+            {
+                "type": "function_call",
+                "name": "get_weather",
+                "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+                "arguments": {"city": "Paris"},
+            },
+            {
+                "type": "function_call",
+                "name": "get_local_time",
+                "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+                "arguments": {"timezone": "Asia/Tokyo"},
+            },
+            {
+                "type": "function_call_output",
+                "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+                "output": TOOL_RESULT_WEATHER_PARALLEL,
+            },
+            {
+                "type": "function_call_output",
+                "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+                "output": TOOL_RESULT_TIME_PARALLEL,
+            },
+        ],
+    )
+
+
+def google_response_user_two_parallel_tool_calls_and_results() -> list[
+    ResponseInputItem
+]:
+    """Parallel tool calls and outputs with per-call ``id`` / ``name`` for Gemini Interactions."""
+    return cast(
+        list[ResponseInputItem],
+        [
+            {
+                "type": "message",
+                "role": "user",
+                "content": PARALLEL_USER_PROMPT,
+            },
+            {
+                "type": "function_call",
+                "name": "get_weather",
+                "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+                "id": TOOL_CALL_ID_WEATHER_PARALLEL,
+                "arguments": {"city": "Paris"},
+            },
+            {
+                "type": "function_call",
+                "name": "get_local_time",
+                "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+                "id": TOOL_CALL_ID_TIME_PARALLEL,
+                "arguments": {"timezone": "Asia/Tokyo"},
+            },
+            {
+                "type": "function_call_output",
+                "name": "get_weather",
+                "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+                "output": TOOL_RESULT_WEATHER_PARALLEL,
+            },
+            {
+                "type": "function_call_output",
+                "name": "get_local_time",
+                "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+                "output": TOOL_RESULT_TIME_PARALLEL,
+            },
+        ],
+    )
+
+
+def openai_response_user_assistant_text_two_parallel_tool_calls_and_results() -> list[
+    ResponseInputItem
+]:
+    """Assistant text message, then two function calls, then two outputs (parallel with preamble)."""
+    return cast(
+        list[ResponseInputItem],
+        [
+            {
+                "type": "message",
+                "role": "user",
+                "content": PARALLEL_USER_PROMPT,
+            },
+            {
+                "type": "message",
+                "role": "assistant",
+                "content": ASSISTANT_TEXT_WITH_PARALLEL_TOOLS,
+            },
+            {
+                "type": "function_call",
+                "name": "get_weather",
+                "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+                "arguments": {"city": "Paris"},
+            },
+            {
+                "type": "function_call",
+                "name": "get_local_time",
+                "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+                "arguments": {"timezone": "Asia/Tokyo"},
+            },
+            {
+                "type": "function_call_output",
+                "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+                "output": TOOL_RESULT_WEATHER_PARALLEL,
+            },
+            {
+                "type": "function_call_output",
+                "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+                "output": TOOL_RESULT_TIME_PARALLEL,
+            },
+        ],
+    )
+
+
+def google_response_user_assistant_text_two_parallel_tool_calls_and_results() -> list[
+    ResponseInputItem
+]:
+    """Same as :func:`openai_response_user_assistant_text_two_parallel_tool_calls_and_results` for Google."""
+    return cast(
+        list[ResponseInputItem],
+        [
+            {
+                "type": "message",
+                "role": "user",
+                "content": PARALLEL_USER_PROMPT,
+            },
+            {
+                "type": "message",
+                "role": "assistant",
+                "content": ASSISTANT_TEXT_WITH_PARALLEL_TOOLS,
+            },
+            {
+                "type": "function_call",
+                "name": "get_weather",
+                "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+                "id": TOOL_CALL_ID_WEATHER_PARALLEL,
+                "arguments": {"city": "Paris"},
+            },
+            {
+                "type": "function_call",
+                "name": "get_local_time",
+                "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+                "id": TOOL_CALL_ID_TIME_PARALLEL,
+                "arguments": {"timezone": "Asia/Tokyo"},
+            },
+            {
+                "type": "function_call_output",
+                "name": "get_weather",
+                "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
+                "output": TOOL_RESULT_WEATHER_PARALLEL,
+            },
+            {
+                "type": "function_call_output",
+                "name": "get_local_time",
+                "call_id": TOOL_CALL_ID_TIME_PARALLEL,
+                "output": TOOL_RESULT_TIME_PARALLEL,
+            },
+        ],
+    )
