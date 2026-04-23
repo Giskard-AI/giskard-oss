@@ -1,7 +1,8 @@
 """Map OpenAI **Chat Completions** return values to :class:`CompletionResponse`.
 
-This is the ``acompletion`` / :class:`ChatCompletion` path. For the **Responses** API
-(``/responses``, ``ResponseResult``), use ``test_openai_response.py`` instead.
+This is the ``acompletion`` / :class:`ChatCompletion` path. For the **Responses** API: request
+``to_openai`` in ``test_openai_response.py``; return ``Response`` -> ``ResponseResult`` in
+``test_openai_response_return.py``.
 
 Assistant ``message`` fields: https://platform.openai.com/docs/api-reference/chat/object
 """

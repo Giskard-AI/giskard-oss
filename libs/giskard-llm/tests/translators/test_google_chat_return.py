@@ -1,7 +1,8 @@
 """Map Gemini **generateContent** return values to :class:`CompletionResponse`.
 
-This is the ``acompletion`` path. For the **Interactions** (response) API, see
-``test_google_response.py`` instead.
+This is the ``acompletion`` path. For the **Interactions** API: request ``to_google`` in
+``test_google_response.py``; return ``Interaction`` -> ``ResponseResult`` in
+``test_google_response_return.py``.
 
 ``candidates`` / ``content.parts``: https://ai.google.dev/api/generate-content#method:-models.generatecontent
 """
