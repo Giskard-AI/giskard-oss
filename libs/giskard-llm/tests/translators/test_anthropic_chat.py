@@ -8,12 +8,12 @@ from typing import Literal
 import pytest
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
 from giskard.llm.types import (
-    ChatMessage,
-    DeveloperMessage,
-    RefusalContent,
-    SystemMessage,
-    TextContent,
-    UserMessage,
+    ChatMessageParam,
+    DeveloperMessageParam,
+    RefusalContentParam,
+    SystemMessageParam,
+    TextContentParam,
+    UserMessageParam,
 )
 
 from .sdk_payload_validation import validate_anthropic_message_create
@@ -39,7 +39,7 @@ _MODEL = "claude-sonnet-4-20250514"
 
 def test_single_user_message():
     """A lone user turn maps to one ``messages`` entry (typical conversation start)."""
-    msg: UserMessage = {"role": "user", "content": "Hello."}
+    msg: UserMessageParam = {"role": "user", "content": "Hello."}
     payload = AnthropicChatTranslator.to_anthropic(_MODEL, [msg])
 
     assert payload["model"] == _MODEL
@@ -55,12 +55,12 @@ def test_single_user_message():
 )
 def test_instruction_then_user(instruction_role: Literal["system", "developer"]):
     """System or developer text maps to top-level ``system`` blocks; user to ``messages``."""
-    first: SystemMessage | DeveloperMessage = (
+    first: SystemMessageParam | DeveloperMessageParam = (
         {"role": "system", "content": "You are helpful."}
         if instruction_role == "system"
         else {"role": "developer", "content": "You are helpful."}
     )
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         first,
         {"role": "user", "content": "Hello."},
     ]
@@ -73,7 +73,7 @@ def test_instruction_then_user(instruction_role: Literal["system", "developer"])
 
 def test_system_then_developer_then_user():
     """System and developer preserve order in top-level ``system`` blocks."""
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         {"role": "system", "content": "You are helpful."},
         {"role": "developer", "content": "App version 2.0"},
         {"role": "user", "content": "Hello."},
@@ -94,7 +94,7 @@ def test_system_then_developer_then_user():
 )
 def test_two_instructions_then_user(instruction_role: Literal["system", "developer"]):
     """Two system or developer messages become several ``system`` text blocks in order."""
-    messages: list[ChatMessage]
+    messages: list[ChatMessageParam]
     if instruction_role == "system":
         messages = [
             {"role": "system", "content": "First system instruction."},
@@ -119,7 +119,7 @@ def test_two_instructions_then_user(instruction_role: Literal["system", "develop
 
 def test_user_assistant_user():
     """Multi-turn chat: user string content vs assistant text blocks."""
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         {"role": "user", "content": "First user."},
         {"role": "assistant", "content": "Assistant reply."},
         {"role": "user", "content": "Second user."},
@@ -139,7 +139,7 @@ def test_user_assistant_user():
 
 def test_assistant_refusal_replayed_as_text_block():
     """Anthropic has no refusal part on input; we replay ``refusal`` as a normal text block."""
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         {"role": "user", "content": "Unsafe ask."},
         {"role": "assistant", "refusal": "I can't help with that."},
     ]
@@ -155,13 +155,13 @@ def test_assistant_refusal_replayed_as_text_block():
 
 
 def test_assistant_structured_refusal_parts_as_text():
-    """``TextContent`` / ``RefusalContent`` lists become text blocks (no distinct refusal type)."""
-    messages: list[ChatMessage] = [
+    """``TextContentParam`` / ``RefusalContentParam`` lists become text blocks (no distinct refusal type)."""
+    messages: list[ChatMessageParam] = [
         {
             "role": "assistant",
             "content": [
-                TextContent(type="text", text="Ok."),
-                RefusalContent(type="refusal", refusal="Stopped."),
+                TextContentParam(type="text", text="Ok."),
+                RefusalContentParam(type="refusal", refusal="Stopped."),
             ],
         },
     ]

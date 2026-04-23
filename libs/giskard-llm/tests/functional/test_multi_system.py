@@ -3,13 +3,13 @@
 import os
 
 import pytest
-from giskard.llm import ChatMessage, LLMClient
+from giskard.llm import ChatMessageParam, LLMClient
 from giskard.llm.errors import BadRequestError
 
 pytestmark = pytest.mark.functional
 
 
-_MULTI_SYSTEM_MESSAGES: list[ChatMessage] = [
+_MULTI_SYSTEM_MESSAGES: list[ChatMessageParam] = [
     {"role": "system", "content": "Always include the word PINEAPPLE."},
     {"role": "system", "content": "Always include the word MANGO."},
     {"role": "user", "content": "Tell me something."},

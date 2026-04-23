@@ -5,14 +5,14 @@ from typing import TYPE_CHECKING, Any, Required, TypedDict
 from pydantic import BaseModel
 
 from ..types import (
-    ChatMessage,
+    ChatMessageParam,
     Choice,
     ChoiceMessage,
-    CompletionContent,
+    CompletionContentParam,
     CompletionResponse,
     ToolCall,
     ToolCallFunction,
-    ToolDef,
+    ToolDefParam,
     Usage,
 )
 from ..utils import deserialize_arguments
@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 class GoogleChatTranslator:
     @staticmethod
-    def _tool_to_google(tool: ToolDef) -> "ToolDict":
+    def _tool_to_google(tool: ToolDefParam) -> "ToolDict":
         """Convert an OpenAI-format tool to Gemini FunctionDeclaration."""
         func = tool["function"]
         return {
@@ -62,7 +62,7 @@ class GoogleChatTranslator:
         return {"text": content}
 
     @staticmethod
-    def _completion_content_to_parts(content: CompletionContent) -> "PartDict":
+    def _completion_content_to_parts(content: CompletionContentParam) -> "PartDict":
         if content["type"] == "text":
             return {"text": content["text"]}
 
@@ -71,7 +71,7 @@ class GoogleChatTranslator:
 
     @staticmethod
     def _assistant_content_to_parts(
-        content: str | list[CompletionContent],
+        content: str | list[CompletionContentParam],
     ) -> "Sequence[PartDict]":
         if isinstance(content, str):
             return [GoogleChatTranslator._content_to_parts(content)]
@@ -80,7 +80,7 @@ class GoogleChatTranslator:
 
     @staticmethod
     def _message_to_contents(
-        message: ChatMessage, tc_id_to_name: dict[str, str]
+        message: ChatMessageParam, tc_id_to_name: dict[str, str]
     ) -> "ContentListUnionDict | None":
         if message["role"] == "system" or message["role"] == "developer":
             # Folded into ``system_instruction`` (Gemini has no developer turn in ``contents``).
@@ -136,7 +136,7 @@ class GoogleChatTranslator:
 
     @staticmethod
     def _messages_to_contents(
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam],
     ) -> "ContentListUnionDict":
         tc_id_to_name: dict[str, str] = {}
         for msg in messages:
@@ -153,9 +153,9 @@ class GoogleChatTranslator:
     @staticmethod
     def to_google(
         model: str,
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam],
         *,
-        tools: Sequence[ToolDef] | None = None,
+        tools: Sequence[ToolDefParam] | None = None,
         **params: Any,
     ) -> "GenerateContentParams":
         unknown = set(params) - KNOWN_COMPLETION_PARAMS

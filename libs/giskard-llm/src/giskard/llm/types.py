@@ -20,7 +20,7 @@ class _BaseModel(BaseModel):
 # -- Tool definition types (input side) ---------------------------------------
 
 
-class FunctionDef(TypedDict):
+class FunctionDefParam(TypedDict):
     """Schema for a function tool definition."""
 
     name: Required[str]
@@ -28,14 +28,14 @@ class FunctionDef(TypedDict):
     parameters: dict[str, object]
 
 
-class ToolDef(TypedDict):
+class ToolDefParam(TypedDict):
     """OpenAI-format tool definition accepted by all providers."""
 
     type: Required[Literal["function"]]
-    function: Required[FunctionDef]
+    function: Required[FunctionDefParam]
 
 
-class FunctionCallOutput(TypedDict):
+class FunctionCallOutputParam(TypedDict):
     """Canonical format for feeding back a tool result to respond()."""
 
     type: Literal["function_call_output"]
@@ -181,73 +181,73 @@ class ResponseResult(_BaseModel):
 # -- Chat content types -------------------------------------------------------------
 
 
-class TextContent(TypedDict, total=False):
+class TextContentParam(TypedDict, total=False):
     type: Required[Literal["text"]]
     text: Required[str]
 
 
-class RefusalContent(TypedDict, total=False):
+class RefusalContentParam(TypedDict, total=False):
     type: Required[Literal["refusal"]]
     refusal: Required[str]
 
 
-CompletionContent = TextContent | RefusalContent
+CompletionContentParam = TextContentParam | RefusalContentParam
 
 # -- Chat Message types -------------------------------------------------------------
 
 
-class ToolCallFunctionDict(TypedDict, total=False):
+class ToolCallFunctionParam(TypedDict, total=False):
     name: Required[str]
     arguments: Required[dict[str, Any]]
 
 
-class ToolCallDict(TypedDict, total=False):
+class ToolCallParam(TypedDict, total=False):
     id: Required[str]
     type: Required[Literal["function"]]
-    function: Required[ToolCallFunctionDict]
+    function: Required[ToolCallFunctionParam]
 
 
-class SystemMessage(TypedDict, total=False):
+class SystemMessageParam(TypedDict, total=False):
     role: Required[Literal["system"]]
     content: Required[str]
 
 
-class DeveloperMessage(TypedDict, total=False):
+class DeveloperMessageParam(TypedDict, total=False):
     role: Required[Literal["developer"]]
     content: Required[str]
 
 
-class UserMessage(TypedDict, total=False):
+class UserMessageParam(TypedDict, total=False):
     role: Required[Literal["user"]]
     content: Required[str]
 
 
-class AssistantMessage(TypedDict, total=False):
+class AssistantMessageParam(TypedDict, total=False):
     role: Required[Literal["assistant"]]
-    content: str | list[CompletionContent]
+    content: str | list[CompletionContentParam]
     refusal: str
-    tool_calls: list[ToolCallDict]
+    tool_calls: list[ToolCallParam]
 
 
-class ToolMessage(TypedDict, total=False):
+class ToolMessageParam(TypedDict, total=False):
     content: Required[str]
     role: Required[Literal["tool"]]
     tool_call_id: Required[str]
 
 
-class FunctionMessage(TypedDict, total=False):
+class FunctionMessageParam(TypedDict, total=False):
     content: Required[str | None]
     name: Required[str]
     role: Required[Literal["function"]]
 
 
-ChatMessage = (
-    SystemMessage
-    | DeveloperMessage
-    | UserMessage
-    | AssistantMessage
-    | ToolMessage
-    | FunctionMessage
+ChatMessageParam = (
+    SystemMessageParam
+    | DeveloperMessageParam
+    | UserMessageParam
+    | AssistantMessageParam
+    | ToolMessageParam
+    | FunctionMessageParam
 )
 
 # -- Response Input types -------------------------------------------------------------
@@ -268,14 +268,14 @@ class ResponseOutputTextBlockParam(TypedDict, total=False):
     text: Required[str]
 
 
-class ResponseFunctionCallOutput(TypedDict, total=False):
+class ResponseFunctionCallOutputParam(TypedDict, total=False):
     type: Required[Literal["function_call_output"]]
     call_id: Required[str]
     output: Required[str]
     id: str | None
 
 
-class ResponseFunctionToolCall(TypedDict, total=False):
+class ResponseFunctionToolCallParam(TypedDict, total=False):
     type: Required[Literal["function_call"]]
     arguments: Required[dict[str, Any]]
     call_id: Required[str]
@@ -283,26 +283,26 @@ class ResponseFunctionToolCall(TypedDict, total=False):
     id: str | None
 
 
-ResponseInputMessageContent = ResponseInputTextParam
+ResponseInputMessageContentParam = ResponseInputTextParam
 
-ResponseOutputMessageContent = ResponseRefusalParam | ResponseOutputTextBlockParam
+ResponseOutputMessageContentParam = ResponseRefusalParam | ResponseOutputTextBlockParam
 
 
-class ResponseEasyInputMessage(TypedDict, total=False):
+class ResponseEasyInputMessageParam(TypedDict, total=False):
     type: Literal["message"]
-    content: Required[str | list[ResponseInputMessageContent]]
+    content: Required[str | list[ResponseInputMessageContentParam]]
     role: Required[Literal["user", "assistant", "system", "developer"]]
 
 
 class ResponseOutputMessageParam(TypedDict, total=False):
     type: Literal["message"]
-    content: Required[str | list[ResponseOutputMessageContent]]
+    content: Required[str | list[ResponseOutputMessageContentParam]]
     role: Required[Literal["assistant"]]
 
 
-ResponseInputItem = (
-    ResponseFunctionCallOutput
-    | ResponseFunctionToolCall
-    | ResponseEasyInputMessage
+ResponseInputItemParam = (
+    ResponseFunctionCallOutputParam
+    | ResponseFunctionToolCallParam
+    | ResponseEasyInputMessageParam
     | ResponseOutputMessageParam
 )

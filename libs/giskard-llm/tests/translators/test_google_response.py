@@ -9,7 +9,7 @@ from typing import Literal
 
 import pytest
 from giskard.llm.translators.google_response import GoogleResponseTranslator
-from giskard.llm.types import ResponseEasyInputMessage, ResponseInputItem
+from giskard.llm.types import ResponseEasyInputMessageParam, ResponseInputItemParam
 
 from .sdk_payload_validation import validate_google_interaction_params
 from .tool_turn_fixtures import (
@@ -35,9 +35,13 @@ _MODEL = "gemini-2.0-flash"
 def _message(
     role: Literal["user", "assistant", "system", "developer"],
     content: str,
-) -> ResponseInputItem:
+) -> ResponseInputItemParam:
     """Easy message items with an explicit ``type`` (so system text is not mixed with user)."""
-    m: ResponseEasyInputMessage = {"type": "message", "role": role, "content": content}
+    m: ResponseEasyInputMessageParam = {
+        "type": "message",
+        "role": role,
+        "content": content,
+    }
     return m
 
 
@@ -83,7 +87,7 @@ def test_message_instruction_then_user(
         if instruction_role == "system"
         else _message("developer", "You are helpful.")
     )
-    items: list[ResponseInputItem] = [
+    items: list[ResponseInputItemParam] = [
         first,
         _message("user", "Hello."),
     ]
@@ -98,7 +102,7 @@ def test_message_instruction_then_user(
 
 def test_message_system_then_developer_then_user():
     """System and developer concatenate in order in ``system_instruction``; user in ``input``."""
-    items: list[ResponseInputItem] = [
+    items: list[ResponseInputItemParam] = [
         _message("system", "You are helpful."),
         _message("developer", "App version 2.0"),
         _message("user", "Hello."),
@@ -118,7 +122,7 @@ def test_message_two_instructions_then_user(
     instruction_role: Literal["system", "developer"],
 ):
     """Two system or developer lines join ``system_instruction``; one user text in ``input``."""
-    items: list[ResponseInputItem]
+    items: list[ResponseInputItemParam]
     if instruction_role == "system":
         items = [
             _message("system", "First system instruction."),
@@ -143,7 +147,7 @@ def test_message_two_instructions_then_user(
 
 def test_message_user_assistant_user():
     """User and assistant turns map to a flat list of text parts in ``input`` (like ``contents``)."""
-    items: list[ResponseInputItem] = [
+    items: list[ResponseInputItemParam] = [
         _message("user", "First user."),
         _message("assistant", "Assistant reply."),
         _message("user", "Second user."),
@@ -266,7 +270,7 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
 
 def test_assistant_message_mixed_output_text_and_refusal_maps_to_text_parts():
     """Structured assistant content with text + refusal maps to plain Gemini ``text`` parts."""
-    items: list[ResponseInputItem] = [
+    items: list[ResponseInputItemParam] = [
         {
             "type": "message",
             "role": "assistant",

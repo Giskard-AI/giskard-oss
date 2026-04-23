@@ -8,11 +8,11 @@ from typing import Any
 from .errors import UnsupportedOperationError
 from .providers.base import CompletionProvider, EmbeddingProvider, ResponseProvider
 from .types import (
-    ChatMessage,
+    ChatMessageParam,
     CompletionResponse,
     EmbeddingResponse,
     ResponseResult,
-    ToolDef,
+    ToolDefParam,
 )
 
 # Plain assignment (not `type` statement) so isinstance checks work at runtime.
@@ -136,9 +136,9 @@ class LLMClient:
     async def acompletion(
         self,
         model: str,
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam],
         *,
-        tools: list[ToolDef] | None = None,
+        tools: list[ToolDefParam] | None = None,
         **params: Any,
     ) -> CompletionResponse:
         """Parse model string and dispatch to the right provider."""
@@ -162,7 +162,7 @@ class LLMClient:
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDef] | None = None,
+        tools: list[ToolDefParam] | None = None,
         **params: Any,
     ) -> ResponseResult:
         """Parse model string and dispatch to the right provider's respond()."""
@@ -195,9 +195,9 @@ def reset() -> None:
 
 async def acompletion(
     model: str,
-    messages: Sequence[ChatMessage],
+    messages: Sequence[ChatMessageParam],
     *,
-    tools: list[ToolDef] | None = None,
+    tools: list[ToolDefParam] | None = None,
     **params: Any,
 ) -> CompletionResponse:
     """Module-level convenience wrapper around the default client."""
@@ -219,7 +219,7 @@ async def aresponse(
     *,
     instructions: str | None = None,
     previous_id: str | None = None,
-    tools: list[ToolDef] | None = None,
+    tools: list[ToolDefParam] | None = None,
     **params: Any,
 ) -> ResponseResult:
     """Module-level convenience wrapper around the default client."""

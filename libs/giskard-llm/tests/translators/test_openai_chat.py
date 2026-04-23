@@ -9,12 +9,12 @@ from typing import Literal
 import pytest
 from giskard.llm.translators.openai_chat import OpenAIChatTranslator
 from giskard.llm.types import (
-    ChatMessage,
-    DeveloperMessage,
-    RefusalContent,
-    SystemMessage,
-    TextContent,
-    UserMessage,
+    ChatMessageParam,
+    DeveloperMessageParam,
+    RefusalContentParam,
+    SystemMessageParam,
+    TextContentParam,
+    UserMessageParam,
 )
 
 from .sdk_payload_validation import validate_openai_completion_params
@@ -40,7 +40,7 @@ _MODEL = "gpt-4o-mini"
 
 def test_single_user_message():
     """A lone user turn maps to one ``user`` message (typical conversation start)."""
-    msg: UserMessage = {"role": "user", "content": "Hello."}
+    msg: UserMessageParam = {"role": "user", "content": "Hello."}
     payload = OpenAIChatTranslator.to_openai(_MODEL, [msg])
 
     assert payload["model"] == _MODEL
@@ -54,12 +54,12 @@ def test_single_user_message():
 )
 def test_instruction_then_user(instruction_role: Literal["system", "developer"]):
     """System or developer prompt precedes the first user message (distinct roles for OpenAI)."""
-    first: SystemMessage | DeveloperMessage = (
+    first: SystemMessageParam | DeveloperMessageParam = (
         {"role": "system", "content": "You are helpful."}
         if instruction_role == "system"
         else {"role": "developer", "content": "You are helpful."}
     )
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         first,
         {"role": "user", "content": "Hello."},
     ]
@@ -74,7 +74,7 @@ def test_instruction_then_user(instruction_role: Literal["system", "developer"])
 
 def test_system_then_developer_then_user():
     """System and developer are separate turns for OpenAI."""
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         {"role": "system", "content": "You are helpful."},
         {"role": "developer", "content": "App version 2.0"},
         {"role": "user", "content": "Hello."},
@@ -95,7 +95,7 @@ def test_system_then_developer_then_user():
 )
 def test_two_instructions_then_user(instruction_role: Literal["system", "developer"]):
     """Two consecutive system or developer turns stay separate in Chat Completions."""
-    messages: list[ChatMessage]
+    messages: list[ChatMessageParam]
     if instruction_role == "system":
         messages = [
             {"role": "system", "content": "First system instruction."},
@@ -120,7 +120,7 @@ def test_two_instructions_then_user(instruction_role: Literal["system", "develop
 
 def test_user_assistant_user():
     """Multi-turn chat preserves alternating user / assistant / user."""
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         {"role": "user", "content": "First user."},
         {"role": "assistant", "content": "Assistant reply."},
         {"role": "user", "content": "Second user."},
@@ -137,7 +137,7 @@ def test_user_assistant_user():
 
 def test_assistant_refusal_string():
     """Assistant turn may replay OpenAI ``refusal`` without normal ``content``."""
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         {"role": "user", "content": "Do something unsafe."},
         {
             "role": "assistant",
@@ -157,12 +157,12 @@ def test_assistant_refusal_string():
 
 def test_assistant_mixed_text_and_refusal_content_parts():
     """Structured assistant ``content`` with text and refusal parts maps to OpenAI parts."""
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         {
             "role": "assistant",
             "content": [
-                TextContent(type="text", text="Partial."),
-                RefusalContent(type="refusal", refusal="Declined."),
+                TextContentParam(type="text", text="Partial."),
+                RefusalContentParam(type="refusal", refusal="Declined."),
             ],
         },
     ]

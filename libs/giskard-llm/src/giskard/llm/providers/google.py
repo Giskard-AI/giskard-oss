@@ -65,13 +65,13 @@ from ..errors import (
 from ..translators.google_chat import GoogleChatTranslator
 from ..translators.google_response import GoogleResponseTranslator
 from ..types import (
-    ChatMessage,
+    ChatMessageParam,
     CompletionResponse,
     EmbeddingData,
     EmbeddingResponse,
-    ResponseInputItem,
+    ResponseInputItemParam,
     ResponseResult,
-    ToolDef,
+    ToolDefParam,
 )
 
 logger = logging.getLogger(__name__)
@@ -186,9 +186,9 @@ class GoogleProvider:
     async def complete(
         self,
         model: str,
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam],
         *,
-        tools: list[ToolDef] | None = None,
+        tools: list[ToolDefParam] | None = None,
         **params: Any,
     ) -> CompletionResponse:
         self._validate_messages(messages)
@@ -236,7 +236,7 @@ class GoogleProvider:
 
     # -- validation ------------------------------------------------------------
 
-    def _validate_messages(self, messages: Sequence[ChatMessage]) -> None:
+    def _validate_messages(self, messages: Sequence[ChatMessageParam]) -> None:
         if not messages:
             raise BadRequestError(400, "Messages list must not be empty.", PROVIDER)
         has_non_system = any(m.get("role") != "system" for m in messages)
@@ -268,11 +268,11 @@ class GoogleProvider:
     async def respond(
         self,
         model: str,
-        input: str | list[ResponseInputItem],
+        input: str | list[ResponseInputItemParam],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDef] | None = None,
+        tools: list[ToolDefParam] | None = None,
         **params: Any,
     ) -> ResponseResult:
         kwargs = GoogleResponseTranslator.to_google(

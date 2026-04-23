@@ -3,14 +3,14 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from giskard.llm.types import (
-    ChatMessage,
+    ChatMessageParam,
     Choice,
     ChoiceMessage,
     CompletionResponse,
     ToolCall,
-    ToolCallDict,
     ToolCallFunction,
-    ToolDef,
+    ToolCallParam,
+    ToolDefParam,
     Usage,
 )
 from pydantic import BaseModel
@@ -56,18 +56,18 @@ KNOWN_COMPLETION_PARAMS = frozenset(
 
 class OpenAIChatTranslator:
     @staticmethod
-    def _tool_def_to_openai(tool: "ToolDef") -> "ChatCompletionToolUnionParam":
+    def _tool_def_to_openai(tool: "ToolDefParam") -> "ChatCompletionToolUnionParam":
         return {**tool, "function": {**tool["function"]}}
 
     @staticmethod
     def _tools_to_openai(
-        tools: Sequence["ToolDef"],
+        tools: Sequence["ToolDefParam"],
     ) -> Sequence["ChatCompletionToolUnionParam"]:
         return [OpenAIChatTranslator._tool_def_to_openai(tool) for tool in tools]
 
     @staticmethod
     def _tool_call_to_openai(
-        tool_call: "ToolCallDict",
+        tool_call: "ToolCallParam",
     ) -> "ChatCompletionMessageToolCallUnionParam":
         return {
             "type": "function",
@@ -79,7 +79,7 @@ class OpenAIChatTranslator:
         }
 
     @staticmethod
-    def _message_to_openai(message: "ChatMessage") -> "ChatCompletionMessageParam":
+    def _message_to_openai(message: "ChatMessageParam") -> "ChatCompletionMessageParam":
         if message["role"] == "system":
             return {
                 "role": "system",
@@ -132,7 +132,7 @@ class OpenAIChatTranslator:
 
     @staticmethod
     def _messages_to_openai(
-        messages: Sequence["ChatMessage"],
+        messages: Sequence["ChatMessageParam"],
     ) -> Sequence["ChatCompletionMessageParam"]:
         return [
             OpenAIChatTranslator._message_to_openai(message) for message in messages
@@ -141,9 +141,9 @@ class OpenAIChatTranslator:
     @staticmethod
     def to_openai(
         model: str,
-        messages: Sequence["ChatMessage"],
+        messages: Sequence["ChatMessageParam"],
         *,
-        tools: Sequence["ToolDef"] | None = None,
+        tools: Sequence["ToolDefParam"] | None = None,
         **params: Any,
     ) -> "CompletionCreateParamsWithTimeout":
         unknown = set(params) - KNOWN_COMPLETION_PARAMS

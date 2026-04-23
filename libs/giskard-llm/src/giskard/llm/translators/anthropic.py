@@ -4,14 +4,14 @@ from typing import TYPE_CHECKING, Any, Required, TypedDict
 from pydantic import BaseModel
 
 from ..types import (
-    ChatMessage,
+    ChatMessageParam,
     Choice,
     ChoiceMessage,
-    CompletionContent,
+    CompletionContentParam,
     CompletionResponse,
     ToolCall,
     ToolCallFunction,
-    ToolDef,
+    ToolDefParam,
     Usage,
 )
 from ..utils import deserialize_arguments
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 
 class AnthropicChatTranslator:
     @staticmethod
-    def _tool_to_anthropic(tool: ToolDef) -> "ToolUnionParam":
+    def _tool_to_anthropic(tool: ToolDefParam) -> "ToolUnionParam":
         """Convert an OpenAI-format tool to Anthropic format."""
         func = tool.get("function", {})
         return {
@@ -66,7 +66,9 @@ class AnthropicChatTranslator:
         return content
 
     @staticmethod
-    def _completion_content_to_block(content: CompletionContent) -> "TextBlockParam":
+    def _completion_content_to_block(
+        content: CompletionContentParam,
+    ) -> "TextBlockParam":
         if content["type"] == "text":
             return AnthropicChatTranslator._string_to_text_block(content["text"])
 
@@ -75,7 +77,7 @@ class AnthropicChatTranslator:
 
     @staticmethod
     def _completion_content_to_blocks(
-        content: str | Sequence[CompletionContent],
+        content: str | Sequence[CompletionContentParam],
     ) -> "Sequence[TextBlockParam]":
         if isinstance(content, str):
             return [AnthropicChatTranslator._string_to_text_block(content)]
@@ -86,7 +88,7 @@ class AnthropicChatTranslator:
 
     @staticmethod
     def _message_to_anthropic(
-        message: ChatMessage,
+        message: ChatMessageParam,
     ) -> "MessageParam | None":
         """Convert a chat message to an Anthropic message."""
         if message["role"] == "system" or message["role"] == "developer":
@@ -144,7 +146,7 @@ class AnthropicChatTranslator:
 
     @staticmethod
     def _messages_to_anthropic(
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam],
     ) -> "Sequence[MessageParam]":
         """Convert chat messages to Anthropic format, merging adjacent same-role turns."""
         anthropic_messages: list[MessageParam] = []
@@ -175,7 +177,7 @@ class AnthropicChatTranslator:
         return anthropic_messages
 
     @staticmethod
-    def _extract_system_messages(messages: Sequence[ChatMessage]) -> list[str]:
+    def _extract_system_messages(messages: Sequence[ChatMessageParam]) -> list[str]:
         """Extract system and developer messages in order (both map to ``system``)."""
         return [
             m["content"]
@@ -185,7 +187,7 @@ class AnthropicChatTranslator:
 
     @staticmethod
     def _extract_system_messages_to_blocks(
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam],
     ) -> "list[TextBlockParam]":
         """Extract system messages from a list of messages and convert them to blocks."""
         system_messages = AnthropicChatTranslator._extract_system_messages(messages)
@@ -197,9 +199,9 @@ class AnthropicChatTranslator:
     @staticmethod
     def to_anthropic(
         model: str,
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam],
         *,
-        tools: list[ToolDef] | None = None,
+        tools: list[ToolDefParam] | None = None,
         **params: Any,
     ) -> "CompletionCreateParams":
         completion_params: "CompletionCreateParams" = {

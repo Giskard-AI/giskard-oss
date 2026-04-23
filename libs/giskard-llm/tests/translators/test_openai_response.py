@@ -10,7 +10,7 @@ from typing import Literal
 
 import pytest
 from giskard.llm.translators.openai_response import OpenAIResponseTranslator
-from giskard.llm.types import ResponseEasyInputMessage, ResponseInputItem
+from giskard.llm.types import ResponseEasyInputMessageParam, ResponseInputItemParam
 
 from .sdk_payload_validation import validate_openai_response_params
 from .tool_turn_fixtures import (
@@ -36,9 +36,13 @@ _MODEL = "gpt-4o-mini"
 def _message(
     role: Literal["user", "assistant", "system", "developer"],
     content: str,
-) -> ResponseInputItem:
+) -> ResponseInputItemParam:
     """Easy message items with an explicit ``type`` (mirrors API easy-input messages)."""
-    m: ResponseEasyInputMessage = {"type": "message", "role": role, "content": content}
+    m: ResponseEasyInputMessageParam = {
+        "type": "message",
+        "role": role,
+        "content": content,
+    }
     return m
 
 
@@ -81,7 +85,7 @@ def test_message_instruction_then_user(
         if instruction_role == "system"
         else _message("developer", "You are helpful.")
     )
-    items: list[ResponseInputItem] = [
+    items: list[ResponseInputItemParam] = [
         first,
         _message("user", "Hello."),
     ]
@@ -97,7 +101,7 @@ def test_message_instruction_then_user(
 
 def test_message_system_then_developer_then_user():
     """System and developer are separate list items, then user (like chat)."""
-    items: list[ResponseInputItem] = [
+    items: list[ResponseInputItemParam] = [
         _message("system", "You are helpful."),
         _message("developer", "App version 2.0"),
         _message("user", "Hello."),
@@ -120,7 +124,7 @@ def test_message_two_instructions_then_user(
     instruction_role: Literal["system", "developer"],
 ):
     """Two consecutive system or developer messages, then user (like chat)."""
-    items: list[ResponseInputItem]
+    items: list[ResponseInputItemParam]
     if instruction_role == "system":
         items = [
             _message("system", "First system instruction."),
@@ -153,7 +157,7 @@ def test_message_two_instructions_then_user(
 
 def test_message_user_assistant_user():
     """Multi-turn: user, assistant, user in ``input`` (like chat)."""
-    items: list[ResponseInputItem] = [
+    items: list[ResponseInputItemParam] = [
         _message("user", "First user."),
         _message("assistant", "Assistant reply."),
         _message("user", "Second user."),

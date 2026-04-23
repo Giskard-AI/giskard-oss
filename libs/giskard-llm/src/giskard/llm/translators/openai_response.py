@@ -2,14 +2,14 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from giskard.llm.types import (
-    ResponseInputItem,
+    ResponseInputItemParam,
     ResponseOutputFunctionCall,
     ResponseOutputItem,
     ResponseOutputMessage,
     ResponseOutputRefusal,
     ResponseOutputText,
     ResponseResult,
-    ToolDef,
+    ToolDefParam,
     Usage,
 )
 
@@ -21,7 +21,9 @@ if TYPE_CHECKING:
         ResponseCreateParamsNonStreaming,
     )
     from openai.types.responses.response_input_param import (
-        ResponseInputItemParam,
+        ResponseInputItemParam as OpenAIResponseInputItemParam,
+    )
+    from openai.types.responses.response_input_param import (
         ResponseInputParam,
     )
 
@@ -33,7 +35,9 @@ PROVIDER = "openai"
 
 class OpenAIResponseTranslator:
     @staticmethod
-    def _input_to_openai(input: ResponseInputItem) -> "ResponseInputItemParam":
+    def _input_to_openai(
+        input: ResponseInputItemParam,
+    ) -> "OpenAIResponseInputItemParam":
         if "type" not in input or input["type"] == "message":
             return input  # pyright: ignore[reportReturnType]
 
@@ -48,7 +52,7 @@ class OpenAIResponseTranslator:
 
     @staticmethod
     def _inputs_to_openai(
-        input: str | list[ResponseInputItem],
+        input: str | list[ResponseInputItemParam],
     ) -> "str | ResponseInputParam":
         if isinstance(input, list):
             return [OpenAIResponseTranslator._input_to_openai(item) for item in input]
@@ -58,11 +62,11 @@ class OpenAIResponseTranslator:
     @staticmethod
     def to_openai(
         model: str,
-        input: str | list[ResponseInputItem],
+        input: str | list[ResponseInputItemParam],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDef] | None = None,
+        tools: list[ToolDefParam] | None = None,
         **params: Any,
     ) -> "ResponseCreateParamsNonStreaming":
         unknown = set(params) - KNOWN_RESPONSE_PARAMS

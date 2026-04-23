@@ -54,14 +54,14 @@ from ..errors import (
 from ..translators.openai_chat import OpenAIChatTranslator
 from ..translators.openai_response import OpenAIResponseTranslator
 from ..types import (
-    ChatMessage,
+    ChatMessageParam,
     CompletionResponse,
     EmbeddingData,
     EmbeddingResponse,
     EmbeddingUsage,
-    ResponseInputItem,
+    ResponseInputItemParam,
     ResponseResult,
-    ToolDef,
+    ToolDefParam,
 )
 from ..utils import compact
 
@@ -122,9 +122,9 @@ class OpenAIProvider:
     async def complete(
         self,
         model: str,
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam],
         *,
-        tools: list[ToolDef] | None = None,
+        tools: list[ToolDefParam] | None = None,
         **params: Any,
     ) -> CompletionResponse:
         openai = _import_openai()
@@ -166,7 +166,7 @@ class OpenAIProvider:
 
     # -- validation ------------------------------------------------------------
 
-    def _validate_messages(self, messages: Sequence[ChatMessage]) -> None:
+    def _validate_messages(self, messages: Sequence[ChatMessageParam]) -> None:
         if not messages:
             raise BadRequestError(
                 400, "Messages list must not be empty.", self._PROVIDER
@@ -207,11 +207,11 @@ class OpenAIProvider:
     async def respond(
         self,
         model: str,
-        input: str | list[ResponseInputItem],
+        input: str | list[ResponseInputItemParam],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDef] | None = None,
+        tools: list[ToolDefParam] | None = None,
         **params: Any,
     ) -> ResponseResult:
         openai = _import_openai()

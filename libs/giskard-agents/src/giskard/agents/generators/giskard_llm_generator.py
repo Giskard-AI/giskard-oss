@@ -1,7 +1,7 @@
 from typing import Any, cast, override
 
 from giskard.llm import CompletionResponse, acompletion, should_retry
-from giskard.llm.types import ChatMessage
+from giskard.llm.types import ChatMessageParam
 from pydantic import Field
 
 from ..chat import Message
@@ -49,10 +49,10 @@ class GiskardLLMGenerator(BaseGenerator):
             for t in tools
         ]
 
-    def _serialize_messages(self, messages: list[Message]) -> list[ChatMessage]:
+    def _serialize_messages(self, messages: list[Message]) -> list[ChatMessageParam]:
         """Convert ``Message`` objects to the wire dict format."""
         return cast(
-            list[ChatMessage],
+            list[ChatMessageParam],
             [
                 m.model_dump(include={"role", "content", "tool_calls", "tool_call_id"})
                 for m in messages

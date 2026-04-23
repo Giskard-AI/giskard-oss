@@ -5,15 +5,15 @@ from typing import TYPE_CHECKING, Any, Required, TypedDict
 from pydantic import BaseModel
 
 from ..types import (
-    ResponseInputItem,
-    ResponseInputMessageContent,
+    ResponseInputItemParam,
+    ResponseInputMessageContentParam,
     ResponseOutputFunctionCall,
     ResponseOutputItem,
     ResponseOutputMessage,
-    ResponseOutputMessageContent,
+    ResponseOutputMessageContentParam,
     ResponseOutputText,
     ResponseResult,
-    ToolDef,
+    ToolDefParam,
     Usage,
 )
 from ..utils import deserialize_arguments
@@ -25,9 +25,11 @@ if TYPE_CHECKING:
         FunctionResultContentParam,
         GenerationConfigParam,
         Interaction,
-        TextContentParam,
         ToolParam,
         interaction_create_params,
+    )
+    from google.genai._interactions.types import (
+        TextContentParam as GoogleTextContentParam,
     )
 
     class InteractionCreateParams(TypedDict, total=False):
@@ -55,8 +57,8 @@ def _flatten[T](items: Sequence[Sequence[T]]) -> list[T]:
 class GoogleResponseTranslator:
     @staticmethod
     def _output_content_to_google(
-        content: ResponseInputMessageContent | ResponseOutputMessageContent,
-    ) -> "TextContentParam":
+        content: (ResponseInputMessageContentParam | ResponseOutputMessageContentParam),
+    ) -> "GoogleTextContentParam":
         if content["type"] == "input_text":
             return {"type": "text", "text": content["text"]}
         if content["type"] == "output_text":
@@ -69,8 +71,10 @@ class GoogleResponseTranslator:
     @staticmethod
     def _content_to_google(
         content: str
-        | Sequence[ResponseInputMessageContent | ResponseOutputMessageContent],
-    ) -> "list[TextContentParam]":
+        | Sequence[
+            ResponseInputMessageContentParam | ResponseOutputMessageContentParam
+        ],
+    ) -> "list[GoogleTextContentParam]":
         if isinstance(content, str):
             return [{"type": "text", "text": content}]
 
@@ -80,8 +84,8 @@ class GoogleResponseTranslator:
 
     @staticmethod
     def _input_to_google(
-        input: ResponseInputItem,
-    ) -> "Sequence[FunctionResultContentParam | FunctionCallContentParam | TextContentParam]":
+        input: ResponseInputItemParam,
+    ) -> "Sequence[FunctionResultContentParam | FunctionCallContentParam | GoogleTextContentParam]":
         if "type" not in input or input["type"] == "message":
             if input["role"] == "developer" or input["role"] == "system":
                 return []  # Those messages are folded into the system instruction
@@ -117,7 +121,7 @@ class GoogleResponseTranslator:
 
     @staticmethod
     def _inputs_to_google(
-        input: str | list[ResponseInputItem],
+        input: str | list[ResponseInputItemParam],
     ) -> "interaction_create_params.Input":
         if isinstance(input, list):
             return _flatten(
@@ -128,7 +132,7 @@ class GoogleResponseTranslator:
 
     @staticmethod
     def _extract_system_instruction(
-        input: str | list[ResponseInputItem],
+        input: str | list[ResponseInputItemParam],
     ) -> "str | None":
         if isinstance(input, str):
             return None
@@ -152,11 +156,11 @@ class GoogleResponseTranslator:
     @staticmethod
     def to_google(
         model: str,
-        input: str | list[ResponseInputItem],
+        input: str | list[ResponseInputItemParam],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDef] | None = None,
+        tools: list[ToolDefParam] | None = None,
         **params: Any,
     ) -> "InteractionCreateParams":
         unknown = set(params) - KNOWN_RESPONSE_PARAMS

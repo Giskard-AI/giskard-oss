@@ -9,7 +9,7 @@ import os
 import pytest
 from giskard.llm import LLMClient
 from giskard.llm.errors import AuthenticationError, LLMError, UnsupportedOperationError
-from giskard.llm.types import ResponseOutputFunctionCall, ToolDef
+from giskard.llm.types import ResponseOutputFunctionCall, ToolDefParam
 
 pytestmark = pytest.mark.functional
 
@@ -75,7 +75,7 @@ async def test_respond_with_instructions(provider: str):
 
 # -- Tool call scenario -------------------------------------------------------
 
-_ADD_TOOL: ToolDef = {
+_ADD_TOOL: ToolDefParam = {
     "type": "function",
     "function": {
         "name": "add",

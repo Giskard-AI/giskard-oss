@@ -8,12 +8,12 @@ from typing import Literal
 import pytest
 from giskard.llm.translators.google_chat import GoogleChatTranslator
 from giskard.llm.types import (
-    ChatMessage,
-    DeveloperMessage,
-    RefusalContent,
-    SystemMessage,
-    TextContent,
-    UserMessage,
+    ChatMessageParam,
+    DeveloperMessageParam,
+    RefusalContentParam,
+    SystemMessageParam,
+    TextContentParam,
+    UserMessageParam,
 )
 
 from .sdk_payload_validation import validate_google_contents
@@ -36,7 +36,7 @@ _MODEL = "gemini-2.0-flash"
 
 def test_single_user_message():
     """A lone user turn maps to one user ``contents`` entry."""
-    msg: UserMessage = {"role": "user", "content": "Hello."}
+    msg: UserMessageParam = {"role": "user", "content": "Hello."}
     payload = GoogleChatTranslator.to_google(_MODEL, [msg])
 
     assert payload["model"] == _MODEL
@@ -51,12 +51,12 @@ def test_single_user_message():
 )
 def test_instruction_then_user(instruction_role: Literal["system", "developer"]):
     """System or developer text becomes ``system_instruction``; user stays in ``contents``."""
-    first: SystemMessage | DeveloperMessage = (
+    first: SystemMessageParam | DeveloperMessageParam = (
         {"role": "system", "content": "You are helpful."}
         if instruction_role == "system"
         else {"role": "developer", "content": "You are helpful."}
     )
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         first,
         {"role": "user", "content": "Hello."},
     ]
@@ -71,7 +71,7 @@ def test_instruction_then_user(instruction_role: Literal["system", "developer"])
 
 def test_system_then_developer_then_user():
     """System and developer preserve message order in ``system_instruction``."""
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         {"role": "system", "content": "You are helpful."},
         {"role": "developer", "content": "App version 2.0"},
         {"role": "user", "content": "Hello."},
@@ -94,7 +94,7 @@ def test_system_then_developer_then_user():
 )
 def test_two_instructions_then_user(instruction_role: Literal["system", "developer"]):
     """Two system or developer messages concatenate in order in ``system_instruction``."""
-    messages: list[ChatMessage]
+    messages: list[ChatMessageParam]
     if instruction_role == "system":
         messages = [
             {"role": "system", "content": "First system instruction."},
@@ -121,7 +121,7 @@ def test_two_instructions_then_user(instruction_role: Literal["system", "develop
 
 def test_user_assistant_user():
     """User and model turns map to ``user`` / ``model`` content entries."""
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         {"role": "user", "content": "First user."},
         {"role": "assistant", "content": "Assistant reply."},
         {"role": "user", "content": "Second user."},
@@ -138,7 +138,7 @@ def test_user_assistant_user():
 
 def test_assistant_refusal_replayed_as_text_part():
     """Gemini has no refusal part on input; ``refusal`` is sent as a ``text`` part."""
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         {"role": "user", "content": "Unsafe ask."},
         {"role": "assistant", "refusal": "I can't help with that."},
     ]
@@ -152,12 +152,12 @@ def test_assistant_refusal_replayed_as_text_part():
 
 def test_assistant_structured_refusal_parts_as_text():
     """Structured refusal parts map to plain ``text`` parts for Gemini."""
-    messages: list[ChatMessage] = [
+    messages: list[ChatMessageParam] = [
         {
             "role": "assistant",
             "content": [
-                TextContent(type="text", text="Ok."),
-                RefusalContent(type="refusal", refusal="Stopped."),
+                TextContentParam(type="text", text="Ok."),
+                RefusalContentParam(type="refusal", refusal="Stopped."),
             ],
         },
     ]

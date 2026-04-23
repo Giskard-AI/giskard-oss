@@ -2,9 +2,13 @@
 
 from typing import cast
 
-from giskard.llm.types import ChatMessage, ResponseInputItem, ToolDef
+from giskard.llm.types import (
+    ChatMessageParam,
+    ResponseInputItemParam,
+    ToolDefParam,
+)
 
-WEATHER_TOOL: ToolDef = {
+WEATHER_TOOL: ToolDefParam = {
     "type": "function",
     "function": {
         "name": "get_weather",
@@ -22,7 +26,7 @@ TOOL_CALL_ID = "call_weather_1"
 TOOL_RESULT_CONTENT = '{"temperature_c": 22, "conditions": "sunny"}'
 
 
-def user_assistant_tool_then_tool_result() -> list[ChatMessage]:
+def user_assistant_tool_then_tool_result() -> list[ChatMessageParam]:
     """User question, model proposes a function call, tool returns a string result."""
     return [
         {"role": "user", "content": "What's the weather in Paris?"},
@@ -47,7 +51,7 @@ def user_assistant_tool_then_tool_result() -> list[ChatMessage]:
     ]
 
 
-GET_TIME_TOOL: ToolDef = {
+GET_TIME_TOOL: ToolDefParam = {
     "type": "function",
     "function": {
         "name": "get_local_time",
@@ -65,7 +69,7 @@ GET_TIME_TOOL: ToolDef = {
     },
 }
 
-PARALLEL_TOOLS: list[ToolDef] = [WEATHER_TOOL, GET_TIME_TOOL]
+PARALLEL_TOOLS: list[ToolDefParam] = [WEATHER_TOOL, GET_TIME_TOOL]
 
 TOOL_CALL_ID_WEATHER_PARALLEL = "call_parallel_weather"
 TOOL_CALL_ID_TIME_PARALLEL = "call_parallel_time"
@@ -78,7 +82,7 @@ PARALLEL_USER_PROMPT = "What's the weather in Paris and the time in Tokyo?"
 ASSISTANT_TEXT_WITH_PARALLEL_TOOLS = "I'll fetch the weather and the local time."
 
 
-def user_two_parallel_tool_calls_two_results() -> list[ChatMessage]:
+def user_two_parallel_tool_calls_two_results() -> list[ChatMessageParam]:
     """[user, assistant with 2 tool_calls, 2 tool results] — parallel calls, no assistant text."""
     return [
         {"role": "user", "content": PARALLEL_USER_PROMPT},
@@ -116,7 +120,7 @@ def user_two_parallel_tool_calls_two_results() -> list[ChatMessage]:
     ]
 
 
-def user_message_two_parallel_tool_calls_two_results() -> list[ChatMessage]:
+def user_message_two_parallel_tool_calls_two_results() -> list[ChatMessageParam]:
     """Same as parallel calls, but the assistant turn also includes visible text."""
     base = user_two_parallel_tool_calls_two_results()
     assistant = base[1]
@@ -139,13 +143,13 @@ def user_message_two_parallel_tool_calls_two_results() -> list[ChatMessage]:
     ]
 
 
-# -- Responses / Interactions API (flat ``ResponseInputItem`` lists) --------------
+# -- Responses / Interactions API (flat ``ResponseInputItemParam`` lists) --------------
 
 
-def openai_response_user_tool_call_then_result() -> list[ResponseInputItem]:
+def openai_response_user_tool_call_then_result() -> list[ResponseInputItemParam]:
     """[user, function_call, function_call_output] for OpenAI Responses (no extra keys)."""
     return cast(
-        list[ResponseInputItem],
+        list[ResponseInputItemParam],
         [
             {
                 "type": "message",
@@ -167,10 +171,10 @@ def openai_response_user_tool_call_then_result() -> list[ResponseInputItem]:
     )
 
 
-def google_response_user_tool_call_then_result() -> list[ResponseInputItem]:
+def google_response_user_tool_call_then_result() -> list[ResponseInputItemParam]:
     """Same conversation as :func:`openai_response_user_tool_call_then_result` with Google-required ids."""
     return cast(
-        list[ResponseInputItem],
+        list[ResponseInputItemParam],
         [
             {
                 "type": "message",
@@ -195,11 +199,11 @@ def google_response_user_tool_call_then_result() -> list[ResponseInputItem]:
 
 
 def openai_response_user_two_parallel_tool_calls_and_results() -> list[
-    ResponseInputItem
+    ResponseInputItemParam
 ]:
     """[user, 2× function_call, 2× function_call_output] (parallel tool calls, no assistant text)."""
     return cast(
-        list[ResponseInputItem],
+        list[ResponseInputItemParam],
         [
             {
                 "type": "message",
@@ -233,11 +237,11 @@ def openai_response_user_two_parallel_tool_calls_and_results() -> list[
 
 
 def google_response_user_two_parallel_tool_calls_and_results() -> list[
-    ResponseInputItem
+    ResponseInputItemParam
 ]:
     """Parallel tool calls and outputs with per-call ``id`` / ``name`` for Gemini Interactions."""
     return cast(
-        list[ResponseInputItem],
+        list[ResponseInputItemParam],
         [
             {
                 "type": "message",
@@ -275,11 +279,11 @@ def google_response_user_two_parallel_tool_calls_and_results() -> list[
 
 
 def openai_response_user_assistant_text_two_parallel_tool_calls_and_results() -> list[
-    ResponseInputItem
+    ResponseInputItemParam
 ]:
     """Assistant text message, then two function calls, then two outputs (parallel with preamble)."""
     return cast(
-        list[ResponseInputItem],
+        list[ResponseInputItemParam],
         [
             {
                 "type": "message",
@@ -318,11 +322,11 @@ def openai_response_user_assistant_text_two_parallel_tool_calls_and_results() ->
 
 
 def google_response_user_assistant_text_two_parallel_tool_calls_and_results() -> list[
-    ResponseInputItem
+    ResponseInputItemParam
 ]:
     """Same as :func:`openai_response_user_assistant_text_two_parallel_tool_calls_and_results` for Google."""
     return cast(
-        list[ResponseInputItem],
+        list[ResponseInputItemParam],
         [
             {
                 "type": "message",

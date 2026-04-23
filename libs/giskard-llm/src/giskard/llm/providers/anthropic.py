@@ -60,9 +60,9 @@ from ..errors import (
 )
 from ..translators.anthropic import AnthropicChatTranslator
 from ..types import (
-    ChatMessage,
+    ChatMessageParam,
     CompletionResponse,
-    ToolDef,
+    ToolDefParam,
 )
 from ..utils import compact
 
@@ -156,9 +156,9 @@ class AnthropicProvider:
     async def complete(
         self,
         model: str,
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam],
         *,
-        tools: list[ToolDef] | None = None,
+        tools: list[ToolDefParam] | None = None,
         **params: Any,
     ) -> CompletionResponse:
         anthropic = _import_anthropic()
@@ -176,7 +176,7 @@ class AnthropicProvider:
 
     # -- validation ------------------------------------------------------------
 
-    def _validate_messages(self, messages: Sequence[ChatMessage]) -> None:
+    def _validate_messages(self, messages: Sequence[ChatMessageParam]) -> None:
         if not messages:
             raise BadRequestError(400, "Messages list must not be empty.", PROVIDER)
 
