@@ -408,11 +408,11 @@ async def test_anthropic_validate_multi_system_with_merge(mock_import):
 
 @patch("giskard.llm.providers.anthropic._import_anthropic")
 async def test_anthropic_validate_consecutive_developers_ok(mock_import):
-    """Developer turns are folded into ``system``; they must not affect user/assistant alternation."""
+    """Developer turns are folded into ``system``; multiple developer messages require merge_system=True."""
     mock_anthropic = MagicMock()
     mock_import.return_value = mock_anthropic
 
-    provider = _make_anthropic_provider()
+    provider = _make_anthropic_provider(merge_system=True)
 
     mock_raw = MagicMock()
     mock_raw.content = [SimpleNamespace(type="text", text="Hello")]
@@ -430,6 +430,24 @@ async def test_anthropic_validate_consecutive_developers_ok(mock_import):
         ],
     )
     assert resp.choices[0].message.content == "Hello"
+
+
+@patch("giskard.llm.providers.anthropic._import_anthropic")
+async def test_anthropic_validate_system_and_developer_raises_without_merge(
+    mock_import,
+):
+    """A system + developer combo counts as two instruction messages and requires merge_system=True."""
+    mock_import.return_value = MagicMock()
+    provider = _make_anthropic_provider()
+    with pytest.raises(BadRequestError, match="multiple system messages"):
+        await provider.complete(
+            "claude-3",
+            [
+                {"role": "system", "content": "System instruction."},
+                {"role": "developer", "content": "Developer instruction."},
+                {"role": "user", "content": "Hi"},
+            ],
+        )
 
 
 @patch("giskard.llm.providers.anthropic._import_anthropic")

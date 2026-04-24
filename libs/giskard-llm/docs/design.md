@@ -38,4 +38,6 @@ The `name` field is required because Google's Interactions API needs it. OpenAI'
 
 ## `ToolCallFunction.arguments` Type
 
-`ToolCallFunction.arguments` is `str` (JSON). This matches the OpenAI SDK convention and ensures wire-compatible round-trips: when `model_dump()` is called on a `ToolCall` and the result is fed back as a message, the `arguments` field is already a JSON string that APIs accept directly. Providers that receive parsed dicts from their SDK (Anthropic `block.input`, Google `fc.args`) serialize them to JSON strings during response normalization.
+`ToolCallFunction.arguments` is `ArgumentDict` (`dict[str, object]`). A `BeforeValidator` automatically parses JSON strings on input, so callers may provide either a raw dict or a JSON string — both are stored as a dict. This makes tool arguments safe to inspect and pass to function calls without a separate parsing step.
+
+Translators that need to send arguments back to an API (e.g. Anthropic `tool_use` blocks) use `serialize_arguments()` from `giskard.llm.utils` to convert the dict to a JSON string. The `serialize_arguments` / `deserialize_arguments` helpers both accept `dict | str` for defensive handling.

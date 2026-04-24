@@ -4,6 +4,7 @@ from giskard.llm.types import (
     CompletionResponse,
     EmbeddingData,
     EmbeddingResponse,
+    FunctionMessage,
     ToolCall,
     ToolCallFunction,
 )
@@ -77,6 +78,16 @@ def test_tool_call_model():
     assert tc.id == "call_1"
     assert tc.type == "function"
     assert tc.function.name == "get_weather"
+
+
+def test_function_message_transcript_none_content():
+    assert FunctionMessage(name="fn").transcript == "[function]: "
+
+
+def test_function_message_transcript_with_content():
+    assert (
+        FunctionMessage(name="fn", content="result").transcript == "[function]: result"
+    )
 
 
 def test_embedding_response():

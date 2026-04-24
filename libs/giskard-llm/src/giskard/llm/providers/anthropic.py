@@ -193,7 +193,9 @@ class AnthropicProvider:
         if not messages:
             raise BadRequestError(400, "Messages list must not be empty.", PROVIDER)
 
-        system_count = sum(1 for m in messages if m.role == "system")
+        system_count = sum(
+            1 for m in messages if m.role in _ANTHROPIC_INSTRUCTION_ROLES
+        )
         has_conversation_message = any(
             m.role not in _ANTHROPIC_INSTRUCTION_ROLES for m in messages
         )

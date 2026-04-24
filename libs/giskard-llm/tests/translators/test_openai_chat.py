@@ -12,6 +12,7 @@ from giskard.llm.types import (
     AssistantMessage,
     ChatMessage,
     DeveloperMessage,
+    FunctionMessage,
     RefusalContent,
     SystemMessage,
     TextContent,
@@ -339,3 +340,16 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
         },
     ]
     validate_openai_completion_params(payload)
+
+
+def test_function_message_passes_through():
+    """FunctionMessage maps to the legacy OpenAI function-role wire format."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="What is 2+2?"),
+        FunctionMessage(name="calculate", content="4"),
+    ]
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
+    assert payload["messages"] == [
+        {"role": "user", "content": "What is 2+2?"},
+        {"role": "function", "name": "calculate", "content": "4"},
+    ]

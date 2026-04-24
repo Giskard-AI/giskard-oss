@@ -75,6 +75,8 @@ class AnthropicChatTranslator:
         if content.type == "refusal":
             return AnthropicChatTranslator._string_to_text_block(content.refusal)
 
+        raise ValueError(f"Unsupported content type: {content.type!r}")
+
     @staticmethod
     def _completion_content_to_blocks(
         content: str | Sequence[CompletionContent],
@@ -133,9 +135,7 @@ class AnthropicChatTranslator:
                             "type": "tool_use",
                             "id": tool_call.id,
                             "name": tool_call.function.name,
-                            "input": deserialize_arguments(
-                                tool_call.function.arguments
-                            ),
+                            "input": tool_call.function.arguments,
                         }
                     )
 

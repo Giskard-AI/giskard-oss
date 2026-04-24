@@ -11,6 +11,7 @@ from giskard.llm.types import (
     AssistantMessage,
     ChatMessage,
     DeveloperMessage,
+    FunctionMessage,
     RefusalContent,
     SystemMessage,
     TextContent,
@@ -329,3 +330,13 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
         },
     ]
     validate_anthropic_message_create(payload)
+
+
+def test_function_message_raises():
+    """FunctionMessage is not supported by the Anthropic translator."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="hi"),
+        FunctionMessage(name="fn", content="result"),
+    ]
+    with pytest.raises(ValueError, match="Unsupported message role"):
+        AnthropicChatTranslator.to_anthropic(_MODEL, messages)

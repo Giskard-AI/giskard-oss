@@ -11,6 +11,7 @@ from giskard.llm.types import (
     AssistantMessage,
     ChatMessage,
     DeveloperMessage,
+    FunctionMessage,
     RefusalContent,
     SystemMessage,
     TextContent,
@@ -360,3 +361,13 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
         },
     ]
     validate_google_contents(payload["contents"])
+
+
+def test_function_message_raises():
+    """FunctionMessage is not supported by the Google translator."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="hi"),
+        FunctionMessage(name="fn", content="result"),
+    ]
+    with pytest.raises(ValueError, match="Unsupported message role"):
+        GoogleChatTranslator.to_google(_MODEL, messages)

@@ -69,6 +69,8 @@ class GoogleChatTranslator:
         if content.type == "refusal":
             return {"text": content.refusal}
 
+        raise ValueError(f"Unsupported content type: {content.type!r}")
+
     @staticmethod
     def _assistant_content_to_parts(
         content: str | list[CompletionContent],
@@ -112,7 +114,7 @@ class GoogleChatTranslator:
                         {
                             "function_call": {
                                 "name": func.name,
-                                "args": deserialize_arguments(func.arguments),
+                                "args": func.arguments,
                             }
                         }
                     )
