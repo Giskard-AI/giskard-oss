@@ -230,7 +230,8 @@ class GoogleChatTranslator:
             if candidate.content and candidate.content.parts:
                 text_parts = []
                 fc_list: list[ToolCall] = []
-                for idx, part in enumerate(candidate.content.parts):
+                fc_idx = 0
+                for part in candidate.content.parts:
                     if part.text is not None:
                         text_parts.append(part.text)
                     elif part.function_call is not None:
@@ -244,7 +245,7 @@ class GoogleChatTranslator:
                             tool_args = {}
                         fc_list.append(
                             ToolCall(
-                                id=f"call_{idx}",
+                                id=f"call_{fc_idx}",
                                 type="function",
                                 function=ToolCallFunction(
                                     name=fc.name or "",
@@ -252,6 +253,7 @@ class GoogleChatTranslator:
                                 ),
                             )
                         )
+                        fc_idx += 1
                 content = "\n".join(text_parts) if text_parts else None
                 if fc_list:
                     tool_calls = fc_list

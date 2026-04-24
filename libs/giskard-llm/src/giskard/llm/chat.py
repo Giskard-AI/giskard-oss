@@ -37,3 +37,5 @@ def message(
             return system(content)
         case "developer":
             return developer(content)
+        case _:
+            raise ValueError(f"Unknown role: {role!r}")

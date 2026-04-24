@@ -145,9 +145,12 @@ class OpenAIProvider:
             raise BadRequestError(400, str(e), PROVIDER) from e
 
         self._validate_messages(messages_models)
-        kwargs = OpenAIChatTranslator.to_openai(
-            model, messages_models, tools=tools_models, **params
-        )
+        try:
+            kwargs = OpenAIChatTranslator.to_openai(
+                model, messages_models, tools=tools_models, **params
+            )
+        except ValueError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:
             raw = await self._client.chat.completions.create(**kwargs)
@@ -239,14 +242,17 @@ class OpenAIProvider:
         except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e
 
-        kwargs = OpenAIResponseTranslator.to_openai(
-            model,
-            input_models,
-            instructions=instructions,
-            previous_id=previous_id,
-            tools=tools_models,
-            **params,
-        )
+        try:
+            kwargs = OpenAIResponseTranslator.to_openai(
+                model,
+                input_models,
+                instructions=instructions,
+                previous_id=previous_id,
+                tools=tools_models,
+                **params,
+            )
+        except ValueError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:
             raw = await self._client.responses.create(**kwargs)

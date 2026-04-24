@@ -102,6 +102,8 @@ class OpenAIChatTranslator:
         if content.type == "refusal":
             return {"type": "refusal", "refusal": content.refusal}
 
+        raise ValueError(f"Unsupported content type: {content.type!r}")
+
     @staticmethod
     def _content_to_openai(
         content: str | list[CompletionContent],
@@ -164,6 +166,8 @@ class OpenAIChatTranslator:
                 "content": message.content,
                 "name": message.name,
             }
+
+        raise ValueError(f"Unsupported message role: {message.role!r}")
 
     @staticmethod
     def _messages_to_openai(
@@ -285,7 +289,3 @@ class OpenAIChatTranslator:
             if raw.usage
             else None,
         )
-
-
-class ResponseTranslator:
-    pass

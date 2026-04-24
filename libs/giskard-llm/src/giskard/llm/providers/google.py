@@ -207,9 +207,12 @@ class GoogleProvider:
             raise BadRequestError(400, str(e), PROVIDER) from e
 
         self._validate_messages(messages_models)
-        kwargs = GoogleChatTranslator.to_google(
-            model, messages_models, tools=tools_models, **params
-        )
+        try:
+            kwargs = GoogleChatTranslator.to_google(
+                model, messages_models, tools=tools_models, **params
+            )
+        except ValueError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:
             raw = await self._client.aio.models.generate_content(**kwargs)
@@ -256,7 +259,8 @@ class GoogleProvider:
     def _validate_messages(self, messages: Sequence[ChatMessage]) -> None:
         if not messages:
             raise BadRequestError(400, "Messages list must not be empty.", PROVIDER)
-        has_non_system = any(m.role != "system" for m in messages)
+        _INSTRUCTION_ROLES = frozenset({"system", "developer"})
+        has_non_system = any(m.role not in _INSTRUCTION_ROLES for m in messages)
         if not has_non_system:
             raise BadRequestError(
                 400, "Messages must contain at least one non-system message.", PROVIDER

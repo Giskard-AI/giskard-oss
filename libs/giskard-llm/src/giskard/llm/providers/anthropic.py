@@ -176,9 +176,12 @@ class AnthropicProvider:
             raise BadRequestError(400, str(e), PROVIDER) from e
 
         self._validate_messages(messages_models)
-        kwargs = AnthropicChatTranslator.to_anthropic(
-            model, messages_models, tools=tools_models, **params
-        )
+        try:
+            kwargs = AnthropicChatTranslator.to_anthropic(
+                model, messages_models, tools=tools_models, **params
+            )
+        except ValueError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:
             raw = await self._client.messages.create(**kwargs)
