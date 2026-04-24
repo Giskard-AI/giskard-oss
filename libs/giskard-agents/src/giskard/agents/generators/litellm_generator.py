@@ -7,13 +7,14 @@ This module requires the optional ``litellm`` dependency. Install it with::
 Importing this module without ``litellm`` installed raises ``ImportError``.
 """
 
+from collections.abc import Sequence
 from typing import Any, cast, override
 
+from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
 from pydantic import Field
 
-from ..chat import Message
 from ..tools import Tool
-from ._types import GenerationParams, Response
+from ._types import GenerationParams
 from .base import BaseGenerator
 from .middleware import CompletionMiddleware, RetryMiddleware, RetryPolicy
 
@@ -71,25 +72,24 @@ class LiteLLMGenerator(BaseGenerator):
             for t in tools
         ]
 
-    def _serialize_messages(self, messages: list[Message]) -> list[dict[str, Any]]:
+    def _serialize_messages(
+        self, messages: Sequence[ChatMessage]
+    ) -> list[dict[str, Any]]:
         """Convert ``Message`` objects to LiteLLM's dict format."""
-        return [
-            m.model_dump(include={"role", "content", "tool_calls", "tool_call_id"})
-            for m in messages
-        ]
+        return [m.model_dump() for m in messages]
 
-    def _deserialize_response(self, raw: Any) -> Message:
+    def _deserialize_response(self, raw: Any) -> AssistantMessage:
         """Convert a LiteLLM response object into an internal ``Message``."""
         data = raw if isinstance(raw, dict) else raw.model_dump()
-        return Message.model_validate(data)
+        return AssistantMessage.model_validate(data)
 
     @override
     async def _call_model(
         self,
-        messages: list[Message],
+        messages: Sequence[ChatMessage],
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
+    ) -> CompletionResponse:
         wire_messages = self._serialize_messages(messages)
         wire_params = params.model_dump(exclude={"tools"})
         wire_tools = self._serialize_tools(params.tools) if params.tools else []
@@ -106,8 +106,6 @@ class LiteLLMGenerator(BaseGenerator):
         choice = cast(Choices, raw.choices[0])
         message = self._deserialize_response(choice.message)
         response_metadata = raw.model_dump(exclude={"choices"})
-        return Response(
-            message=message,
-            finish_reason=choice.finish_reason,  # pyright: ignore[reportArgumentType]
-            metadata=response_metadata,
+        return CompletionResponse(
+            choices=[Choice(message=message, finish_reason=choice.finish_reason)],  # pyright: ignore[reportArgumentType]
         )

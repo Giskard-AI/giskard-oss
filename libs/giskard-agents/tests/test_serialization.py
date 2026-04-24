@@ -1,15 +1,14 @@
 """Unit tests for generator serialization and deserialization."""
 
 import uuid
+from collections.abc import Sequence
 from typing import Any, override
 
-from giskard.agents.chat import Message
 from giskard.agents.generators import (
     BaseGenerator,
     GenerationParams,
     Generator,
 )
-from giskard.agents.generators.base import Response
 from giskard.agents.generators.giskard_llm_generator import (
     GiskardLLMGenerator,
 )
@@ -17,6 +16,12 @@ from giskard.agents.generators.middleware import RetryPolicy
 from giskard.agents.tools import Tool
 from giskard.agents.workflow import ChatWorkflow, ErrorPolicy
 from giskard.core import MinIntervalRateLimiter
+from giskard.llm.types import (
+    AssistantMessage,
+    ChatMessage,
+    Choice,
+    CompletionResponse,
+)
 from pydantic import Field
 
 
@@ -65,13 +70,18 @@ async def test_generator_serialization_custom_generator():
         @override
         async def _call_model(
             self,
-            messages: list[Message],
+            messages: Sequence[ChatMessage],
             params: GenerationParams,
             metadata: dict[str, Any] | None = None,
-        ) -> Response:
-            return Response(
-                message=Message(role="assistant", content=self.content),
-                finish_reason="stop",
+        ) -> CompletionResponse:
+            return CompletionResponse(
+                choices=[
+                    Choice(
+                        message=AssistantMessage(content=self.content),
+                        finish_reason="stop",
+                        index=0,
+                    )
+                ]
             )
 
     original = CustomGenerator(content="Test response")
@@ -83,12 +93,12 @@ async def test_generator_serialization_custom_generator():
     assert deserialized.kind == f"custom_test_{generator_id}"
 
     response = await deserialized.complete(
-        messages=[Message(role="user", content="Test message")]
+        messages=[{"role": "user", "content": "Test message"}]
     )
-    assert isinstance(response, Response)
-    assert response.message.role == "assistant"
-    assert response.message.content == "Test response"
-    assert response.finish_reason == "stop"
+    assert isinstance(response, CompletionResponse)
+    assert response.choices[0].message.role == "assistant"
+    assert response.choices[0].message.content == "Test response"
+    assert response.choices[0].finish_reason == "stop"
 
 
 def test_chat_workflow_serialization():
@@ -125,10 +135,10 @@ def test_chat_workflow_serialization():
     assert deserialized.generator.rate_limiter == rate_limiter
 
     assert len(deserialized.messages) == 2
-    assert isinstance(deserialized.messages[0], Message)
+    assert isinstance(deserialized.messages[0], ChatMessage)
     assert deserialized.messages[0].role == "user"
     assert deserialized.messages[0].content == "Hello, how are you?"
-    assert isinstance(deserialized.messages[1], Message)
+    assert isinstance(deserialized.messages[1], ChatMessage)
     assert deserialized.messages[1].role == "assistant"
     assert deserialized.messages[1].content == "I'm doing well!"
 
@@ -150,13 +160,18 @@ async def test_chat_workflow_serialization_custom_generator():
         @override
         async def _call_model(
             self,
-            messages: list[Message],
+            messages: Sequence[ChatMessage],
             params: GenerationParams,
             metadata: dict[str, Any] | None = None,
-        ) -> Response:
-            return Response(
-                message=Message(role="assistant", content=self.content),
-                finish_reason="stop",
+        ) -> CompletionResponse:
+            return CompletionResponse(
+                choices=[
+                    Choice(
+                        message=AssistantMessage(content=self.content),
+                        finish_reason="stop",
+                        index=0,
+                    )
+                ]
             )
 
     generator = CustomGenerator(content="Workflow test response")
@@ -181,7 +196,7 @@ async def test_chat_workflow_serialization_custom_generator():
     assert deserialized.generator.kind == f"custom_workflow_{generator_id}"
 
     assert len(deserialized.messages) == 1
-    assert isinstance(deserialized.messages[0], Message)
+    assert isinstance(deserialized.messages[0], ChatMessage)
     assert deserialized.messages[0].content == "Test message"
 
     assert deserialized.inputs["test_input"] == "test_value"

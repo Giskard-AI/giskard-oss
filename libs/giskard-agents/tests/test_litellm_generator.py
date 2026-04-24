@@ -9,7 +9,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from giskard.agents.chat import Message
 from giskard.agents.generators.base import GenerationParams
 
 litellm = pytest.importorskip("litellm")
@@ -46,12 +45,12 @@ async def test_litellm_generator_completion(mock_litellm_response: Any) -> None:
         return_value=mock_litellm_response,
     ) as mock_acompletion:
         response = await generator.complete(
-            messages=[Message(role="user", content="Hi")]
+            messages=[{"role": "user", "content": "Hi"}]
         )
 
-    assert response.message.role == "assistant"
-    assert response.message.content == "Mock response"
-    assert response.finish_reason == "stop"
+    assert response.choices[0].message.role == "assistant"
+    assert response.choices[0].message.content == "Mock response"
+    assert response.choices[0].finish_reason == "stop"
     mock_acompletion.assert_called_once()
     assert mock_acompletion.call_args.kwargs["model"] == "gemini/gemini-2.0-flash"
 
@@ -66,7 +65,7 @@ async def test_litellm_generator_forwards_params(mock_litellm_response: Any) -> 
         return_value=mock_litellm_response,
     ) as mock_acompletion:
         await generator.complete(
-            messages=[Message(role="user", content="Hi")],
+            messages=[{"role": "user", "content": "Hi"}],
             params=GenerationParams(max_tokens=50),
         )
 

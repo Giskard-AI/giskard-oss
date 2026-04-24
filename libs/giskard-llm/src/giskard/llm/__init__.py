@@ -1,5 +1,6 @@
 """giskard-llm -- lightweight LLM routing over native provider SDKs."""
 
+from . import chat
 from .errors import (
     AuthenticationError,
     BadRequestError,
@@ -33,6 +34,8 @@ from .types import (
 )
 
 __all__ = [
+    # Chat functions
+    "chat",
     # Functions
     "acompletion",
     "aembedding",

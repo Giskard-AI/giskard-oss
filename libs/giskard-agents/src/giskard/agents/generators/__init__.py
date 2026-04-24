@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
-from ._types import FinishReason
-from .base import BaseGenerator, GenerationParams, Response
+from ._types import GenerationParams
+from .base import BaseGenerator
 from .giskard_llm_generator import GiskardLLMGenerator, GiskardLLMRetryMiddleware
 from .middleware import (
     CompletionMiddleware,

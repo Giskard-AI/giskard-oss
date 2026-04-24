@@ -5,6 +5,7 @@ from giskard import agents
 from giskard.agents.chat import Chat
 from giskard.agents.generators.giskard_llm_generator import GiskardLLMGenerator
 from giskard.agents.templates.prompts_manager import PromptsManager
+from giskard.llm.types import ChatMessage
 from pydantic import BaseModel
 
 
@@ -160,7 +161,7 @@ def test_chat_plain_string_is_not_jinja_by_default():
         generator=agents.Generator(model="openai/gpt-4o-mini")
     )
     wf = workflow.chat("{{ 1 + 1 }}", role="user")
-    assert isinstance(wf.messages[0], agents.Message)
+    assert isinstance(wf.messages[0], ChatMessage)
     assert wf.messages[0].content == "{{ 1 + 1 }}"
 
     wf_tpl = workflow.chat("{{ 1 + 1 }}", role="user", as_template=True)

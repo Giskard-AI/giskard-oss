@@ -17,9 +17,9 @@ import os
 
 import pytest
 from giskard import agents
-from giskard.agents.chat import Message
 from giskard.agents.generators.base import BaseGenerator
 from giskard.agents.generators.giskard_llm_generator import GiskardLLMGenerator
+from giskard.llm.types import SystemMessage, UserMessage
 
 pytestmark = pytest.mark.functional
 
@@ -61,11 +61,11 @@ async def test_backend_completion(backend: str, generator_factory) -> None:
     generator = generator_factory()
     response = await generator.complete(
         messages=[
-            Message(
+            SystemMessage(
                 role="system",
                 content="You are TestBot. Always include 'TestBot' in replies.",
             ),
-            Message(role="user", content="Say hi."),
+            UserMessage(content="Say hi."),
         ]
     )
 
@@ -101,15 +101,15 @@ async def test_backends_coexist_in_same_process() -> None:
     litellm_gen = _litellm_generator()
 
     giskard_response = await giskard_gen.complete(
-        messages=[Message(role="user", content="Reply with just the digit 1.")]
+        messages=[{"role": "user", "content": "Reply with just the digit 1."}]
     )
     litellm_response = await litellm_gen.complete(
-        messages=[Message(role="user", content="Reply with just the digit 2.")]
+        messages=[{"role": "user", "content": "Reply with just the digit 2."}]
     )
 
-    assert giskard_response.message.role == "assistant"
-    assert litellm_response.message.role == "assistant"
-    assert isinstance(giskard_response.message.content, str)
-    assert isinstance(litellm_response.message.content, str)
-    assert "1" in giskard_response.message.content
-    assert "2" in litellm_response.message.content
+    assert giskard_response.choices[0].message.role == "assistant"
+    assert litellm_response.choices[0].message.role == "assistant"
+    assert isinstance(giskard_response.choices[0].message.content, str)
+    assert isinstance(litellm_response.choices[0].message.content, str)
+    assert "1" in giskard_response.choices[0].message.content
+    assert "2" in litellm_response.choices[0].message.content
