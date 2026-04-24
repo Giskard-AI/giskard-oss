@@ -32,6 +32,26 @@ def test_choice_message_excludes_none():
     assert "tool_calls" not in dump
 
 
+def test_assistant_message_transcript_single_role_prefix():
+    assert AssistantMessage(content="Hello").transcript == "[assistant]: Hello"
+
+
+def test_assistant_message_transcript_with_tool_calls_no_duplicated_prefix():
+    msg = AssistantMessage(
+        content="OK",
+        tool_calls=[
+            ToolCall(
+                id="call_1",
+                type="function",
+                function=ToolCallFunction(name="add", arguments={"a": 1}),
+            )
+        ],
+    )
+    t = msg.transcript
+    assert t.count("[assistant]:") == 1, t
+    assert t.startswith("[assistant]: OK\n>")
+
+
 def test_choice_message_includes_typed_tool_calls():
     msg = AssistantMessage(
         role="assistant",

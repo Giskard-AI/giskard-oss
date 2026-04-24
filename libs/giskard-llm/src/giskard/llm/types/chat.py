@@ -86,7 +86,7 @@ class AssistantMessage(_BaseModel):
 
     @property
     def transcript(self) -> str:
-        message = f"[{self.role}]: {self.output_text}:"
+        message = self.output_text or ""
         if self.tool_calls is not None:
             for tool_call in self.tool_calls:
                 message += f"\n>[tool_call:{tool_call.function.name}:{tool_call.id}]: {tool_call.function.arguments}"
