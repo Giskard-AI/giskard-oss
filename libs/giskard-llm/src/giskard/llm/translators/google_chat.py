@@ -92,7 +92,7 @@ class GoogleChatTranslator:
         if message.role == "user":
             return {
                 "role": "user",
-                "parts": GoogleChatTranslator._content_to_parts(message.content),
+                "parts": [GoogleChatTranslator._content_to_parts(message.content)],
             }
 
         if message.role == "assistant":
