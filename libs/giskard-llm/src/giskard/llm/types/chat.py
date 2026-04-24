@@ -111,7 +111,7 @@ class FunctionMessage(_BaseModel):
 
     @property
     def transcript(self) -> str:
-        return f"[{self.role}]: {self.content}"
+        return f"[{self.role}]: {self.content or ''}"
 
 
 ChatMessage = (

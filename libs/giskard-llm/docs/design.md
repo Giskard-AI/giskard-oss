@@ -6,7 +6,7 @@ Input types and output types use different base classes:
 
 - **Input types** (`TypedDict`, names end with `Param`): `ChatMessageParam`, `ToolDefParam`, `FunctionDefParam`, `FunctionCallOutputParam`. These are constructed by users or framework code and passed to provider methods. `TypedDict` is lightweight and supports dict literal syntax (`{"role": "user", "content": "hello"}`).
 
-- **Output types** (Pydantic `_BaseModel`): `CompletionResponse`, `Choice`, `ChoiceMessage`, `ToolCall`, `ToolCallFunction`, `EmbeddingResponse`, `ResponseResult`, etc. These are constructed by provider implementations when parsing API responses. Pydantic provides attribute access (`resp.choices[0].message.content`), `.model_dump()` for serialization, and the `_BaseModel` base class defaults `model_dump(exclude_none=True)`.
+- **Output types** (Pydantic `_BaseModel`): `CompletionResponse`, `Choice`, `AssistantMessage`, `ToolCall`, `ToolCallFunction`, `EmbeddingResponse`, `ResponseResult`, etc. These are constructed by provider implementations when parsing API responses. Pydantic provides attribute access (`resp.choices[0].message.content`), `.model_dump()` for serialization, and the `_BaseModel` base class defaults `model_dump(exclude_none=True)`.
 
 ## Tool Definition Format
 
