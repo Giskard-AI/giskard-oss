@@ -105,7 +105,7 @@ class ToolMessage(_BaseModel):
 
 
 class FunctionMessage(_BaseModel):
-    content: str | None = "None"
+    content: str | None = None
     name: str
     role: Literal["function"] = "function"
 
