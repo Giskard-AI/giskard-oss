@@ -1,6 +1,6 @@
-from typing import Any, Literal
+from typing import Literal
 
-from ._base import _BaseModel
+from ._base import ArgumentDict, _BaseModel
 
 # -- Response Input types -------------------------------------------------------------
 
@@ -42,7 +42,7 @@ FunctionCallOutput = ResponseFunctionCallOutput
 
 class ResponseFunctionToolCall(_BaseModel):
     type: Literal["function_call"] = "function_call"
-    arguments: dict[str, Any]
+    arguments: ArgumentDict
     call_id: str
     name: str
 

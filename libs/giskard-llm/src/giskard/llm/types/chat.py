@@ -1,6 +1,6 @@
-from typing import Any, Literal
+from typing import Literal
 
-from ._base import _BaseModel
+from ._base import ArgumentDict, _BaseModel
 
 # -- Chat content types -------------------------------------------------------------
 
@@ -30,7 +30,7 @@ CompletionContent = TextContent | RefusalContent
 
 class ToolCallFunction(_BaseModel):
     name: str
-    arguments: dict[str, Any]
+    arguments: ArgumentDict
 
 
 class ToolCall(_BaseModel):
