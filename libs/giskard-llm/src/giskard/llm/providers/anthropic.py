@@ -200,7 +200,7 @@ class AnthropicProvider:
         if not has_conversation_message:
             raise BadRequestError(
                 400,
-                "Messages must contain at least one user, assistant, or tool message.",
+                "Messages must contain at least one non-system message.",
                 PROVIDER,
             )
 
