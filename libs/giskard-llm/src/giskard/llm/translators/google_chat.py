@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Required, TypedDict
+from uuid import uuid4
 
 from pydantic import BaseModel
 
@@ -227,7 +228,6 @@ class GoogleChatTranslator:
             if candidate.content and candidate.content.parts:
                 text_parts = []
                 fc_list: list[ToolCall] = []
-                fc_idx = 0
                 for part in candidate.content.parts:
                     if part.text is not None:
                         text_parts.append(part.text)
@@ -242,7 +242,7 @@ class GoogleChatTranslator:
                             tool_args = {}
                         fc_list.append(
                             ToolCall(
-                                id=f"call_{fc_idx}",
+                                id=f"call_{uuid4().hex[:8]}",
                                 type="function",
                                 function=ToolCallFunction(
                                     name=fc.name or "",
@@ -250,7 +250,6 @@ class GoogleChatTranslator:
                                 ),
                             )
                         )
-                        fc_idx += 1
                 content = "\n".join(text_parts) if text_parts else None
                 if fc_list:
                     tool_calls = fc_list

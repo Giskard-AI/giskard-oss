@@ -121,8 +121,9 @@ import logging
 from typing import Any
 
 from giskard.agents import Message
-from giskard.agents.generators import GenerationParams, Response
+from giskard.agents.generators import GenerationParams
 from giskard.agents.generators.middleware import CompletionMiddleware, NextFn
+from giskard.llm.types import CompletionResponse
 
 @CompletionMiddleware.register("logging")
 class LoggingMiddleware(CompletionMiddleware):
@@ -132,10 +133,10 @@ class LoggingMiddleware(CompletionMiddleware):
         params: GenerationParams | None,
         metadata: dict[str, Any] | None,
         next_fn: NextFn,
-    ) -> Response:
+    ) -> CompletionResponse:
         logging.info(f"Sending {len(messages)} messages")
         response = await next_fn(messages, params, metadata)
-        logging.info(f"Got response: {response.finish_reason}")
+        logging.info(f"Got response: {response.choices[0].finish_reason}")
         return response
 
 generator = agents.Generator(

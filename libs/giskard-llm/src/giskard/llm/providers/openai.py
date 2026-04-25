@@ -75,6 +75,7 @@ logger = logging.getLogger(__name__)
 PROVIDER = "openai"
 
 KNOWN_EMBEDDING_PARAMS = frozenset({"dimensions"})
+_INSTRUCTION_ROLES = frozenset({"system", "developer"})
 
 _CHAT_MESSAGES_TYPE_ADAPTER = TypeAdapter(Sequence[ChatMessage])
 _TOOL_DEFS_TYPE_ADAPTER = TypeAdapter(Sequence[ToolDef] | None)
@@ -191,7 +192,7 @@ class OpenAIProvider:
             raise BadRequestError(
                 400, "Messages list must not be empty.", self._PROVIDER
             )
-        has_non_system = any(m.role != "system" for m in messages)
+        has_non_system = any(m.role not in _INSTRUCTION_ROLES for m in messages)
         if not has_non_system:
             raise BadRequestError(
                 400,
@@ -203,7 +204,7 @@ class OpenAIProvider:
                 raise BadRequestError(
                     400, "Tool messages must have a tool_call_id.", self._PROVIDER
                 )
-            if m.role == "system" and not (m.content or "").strip():
+            if m.role in _INSTRUCTION_ROLES and not (m.content or "").strip():
                 raise BadRequestError(
                     400, "System messages must have non-empty content.", self._PROVIDER
                 )

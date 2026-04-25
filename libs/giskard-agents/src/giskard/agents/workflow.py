@@ -213,8 +213,8 @@ class _StepRunner:
         response = await self._workflow.generator.complete(chat.messages, self._params)
 
         # If the assistant produced tool calls, defer parsing to after tools are run
-        if isinstance(chat.last, AssistantMessage) and chat.last.tool_calls:
-            return chat.last
+        if response.choices[0].message.tool_calls:
+            return response.choices[0].message
 
         # Attempt the parsing to raise ValidationError if output is not compatible
         output_model.model_validate_json(response.choices[0].message.output_text or "")
