@@ -273,7 +273,8 @@ class AnthropicChatTranslator:
 
         refusal_out: str | None = None
         if raw.stop_reason == "refusal" and raw.stop_details is not None:
-            refusal_out = raw.stop_details.explanation
+            # stop_details.explanation is a beta Anthropic API attribute; use getattr for safety
+            refusal_out = getattr(raw.stop_details, "explanation", None)
 
         message = AssistantMessage(
             role="assistant",

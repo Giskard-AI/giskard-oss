@@ -126,6 +126,11 @@ def _import_interactions_errors() -> Any:
 
         return _interactions
     except (ImportError, AttributeError):
+        logger.warning(
+            "google.genai._interactions could not be imported; Interactions API error "
+            "mapping will be unavailable. This is a private module — verify your "
+            "google-genai version if error handling is degraded."
+        )
         return None
 
 
@@ -270,7 +275,7 @@ class GoogleProvider:
                 raise BadRequestError(
                     400, "Tool messages must have a tool_call_id.", PROVIDER
                 )
-            if m.role == "system" and not (m.content or "").strip():
+            if m.role in _INSTRUCTION_ROLES and not (m.content or "").strip():
                 raise BadRequestError(
                     400, "System messages must have non-empty content.", PROVIDER
                 )

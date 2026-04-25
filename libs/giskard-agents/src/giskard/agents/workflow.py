@@ -205,12 +205,18 @@ class _StepRunner:
         # Simple completion without output validation
         response = await self._workflow.generator.complete(chat.messages, self._params)
 
+        if not response.choices:
+            raise RuntimeError("Provider returned an empty choices list.")
+
         return response.choices[0].message
 
     async def _run_completion_with_output_validation(
         self, chat: Chat[OutputType], output_model: type[OutputType]
     ) -> AssistantMessage:
         response = await self._workflow.generator.complete(chat.messages, self._params)
+
+        if not response.choices:
+            raise RuntimeError("Provider returned an empty choices list.")
 
         # If the assistant produced tool calls, defer parsing to after tools are run
         if response.choices[0].message.tool_calls:

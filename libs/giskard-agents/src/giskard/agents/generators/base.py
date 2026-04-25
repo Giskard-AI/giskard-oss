@@ -46,7 +46,7 @@ class BaseGenerator(Discriminated, ABC):
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
     ) -> CompletionResponse:
-        """Call the provider and return a Response.
+        """Call the provider and return a CompletionResponse.
 
         Subclasses handle all serialization/deserialization internally.
 
@@ -61,7 +61,7 @@ class BaseGenerator(Discriminated, ABC):
 
         Returns
         -------
-        Response
+        CompletionResponse
             The model's response including message, finish reason, and metadata.
         """
         raise NotImplementedError
@@ -99,7 +99,7 @@ class BaseGenerator(Discriminated, ABC):
 
         Returns
         -------
-        Response
+        CompletionResponse
             The model's response.
         """
         chain = self._build_chain(self._complete)
@@ -180,7 +180,7 @@ class BaseGenerator(Discriminated, ABC):
 
         Returns
         -------
-        list[Response]
+        list[CompletionResponse]
             A list of model's responses.
         """
         completion_requests = [self.complete(m, params, metadata) for m in messages]
