@@ -120,16 +120,15 @@ For advanced cross-cutting concerns (logging, caching, etc.), you can write cust
 import logging
 from typing import Any
 
-from giskard.agents import Message
 from giskard.agents.generators import GenerationParams
 from giskard.agents.generators.middleware import CompletionMiddleware, NextFn
-from giskard.llm.types import CompletionResponse
+from giskard.llm.types import ChatMessage, CompletionResponse
 
 @CompletionMiddleware.register("logging")
 class LoggingMiddleware(CompletionMiddleware):
     async def call(
         self,
-        messages: list[Message],
+        messages: list[ChatMessage],
         params: GenerationParams | None,
         metadata: dict[str, Any] | None,
         next_fn: NextFn,

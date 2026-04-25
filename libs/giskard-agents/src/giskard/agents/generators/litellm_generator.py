@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from typing import Any, cast, override
 
 from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
+from giskard.llm.utils import serialize_arguments
 from pydantic import Field
 
 from ..tools import Tool
@@ -20,7 +21,6 @@ from .middleware import CompletionMiddleware, RetryMiddleware, RetryPolicy
 
 try:
     from litellm import (  # pyright: ignore[reportMissingImports]
-        Choices,
         ModelResponse,
         acompletion,
     )
@@ -76,7 +76,19 @@ class LiteLLMGenerator(BaseGenerator):
         self, messages: Sequence[ChatMessage]
     ) -> list[dict[str, Any]]:
         """Convert ``Message`` objects to LiteLLM's dict format."""
-        return [m.model_dump() for m in messages]
+        result = []
+        for m in messages:
+            serialized = m.model_dump()
+            if serialized.get("tool_calls"):
+                for tc in serialized["tool_calls"]:
+                    if "function" in tc and isinstance(
+                        tc["function"].get("arguments"), dict
+                    ):
+                        tc["function"]["arguments"] = serialize_arguments(
+                            tc["function"]["arguments"]
+                        )
+            result.append(serialized)
+        return result
 
     def _deserialize_response(self, raw: Any) -> AssistantMessage:
         """Convert a LiteLLM response object into an internal ``Message``."""
@@ -103,9 +115,12 @@ class LiteLLMGenerator(BaseGenerator):
             await acompletion(messages=wire_messages, model=self.model, **wire_params),
         )
 
-        choice = cast(Choices, raw.choices[0])
-        message = self._deserialize_response(choice.message)
-        response_metadata = raw.model_dump(exclude={"choices"})
         return CompletionResponse(
-            choices=[Choice(message=message, finish_reason=choice.finish_reason)],  # pyright: ignore[reportArgumentType]
+            choices=[
+                Choice(
+                    message=self._deserialize_response(choice.message),
+                    finish_reason=choice.finish_reason,
+                )
+                for choice in raw.choices
+            ],
         )

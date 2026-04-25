@@ -51,7 +51,7 @@ class GoogleChatTranslator:
             "function_declarations": [
                 {
                     "name": func.name,
-                    "description": func.description,
+                    "description": func.description or "",
                     "parameters": func.parameters,  # pyright: ignore[reportReturnType]
                 }
             ]
