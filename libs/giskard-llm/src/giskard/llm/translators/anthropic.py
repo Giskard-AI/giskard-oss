@@ -14,7 +14,7 @@ from ..types import (
     ToolDef,
     Usage,
 )
-from ..utils import deserialize_arguments
+from ..utils import deserialize_arguments, extract_system_messages
 
 if TYPE_CHECKING:
     import httpx
@@ -177,18 +177,11 @@ class AnthropicChatTranslator:
         return anthropic_messages
 
     @staticmethod
-    def _extract_system_messages(messages: Sequence[ChatMessage]) -> list[str]:
-        """Extract system and developer messages in order (both map to ``system``)."""
-        return [
-            m.content for m in messages if m.role == "system" or m.role == "developer"
-        ]
-
-    @staticmethod
     def _extract_system_messages_to_blocks(
         messages: Sequence[ChatMessage],
     ) -> "list[TextBlockParam]":
         """Extract system messages from a list of messages and convert them to blocks."""
-        system_messages = AnthropicChatTranslator._extract_system_messages(messages)
+        system_messages = extract_system_messages(messages)
         return [
             AnthropicChatTranslator._string_to_text_block(system_message)
             for system_message in system_messages

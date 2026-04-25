@@ -74,10 +74,6 @@ logger = logging.getLogger(__name__)
 
 PROVIDER = "anthropic"
 
-KNOWN_COMPLETION_PARAMS = frozenset(
-    {"temperature", "max_tokens", "timeout", "tools", "response_format"}
-)
-
 # Roles that never appear in ``messages`` on the wire (folded into top-level ``system``).
 _ANTHROPIC_INSTRUCTION_ROLES = frozenset({"system", "developer"})
 
@@ -157,14 +153,14 @@ class AnthropicProvider:
             raise LLMError(
                 getattr(e, "status_code", None) or 500, str(e), PROVIDER
             ) from e
-        raise e
+        raise
 
     async def complete(
         self,
         model: str,
         messages: Sequence[ChatMessageParam | ChatMessage],
         *,
-        tools: list[ToolDefParam | ToolDef] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> CompletionResponse:
         anthropic = _import_anthropic()

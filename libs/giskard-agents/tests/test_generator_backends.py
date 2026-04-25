@@ -69,9 +69,9 @@ async def test_backend_completion(backend: str, generator_factory) -> None:
         ]
     )
 
-    assert response.message.role == "assistant"
-    assert isinstance(response.message.content, str)
-    assert "testbot" in response.message.content.lower()
+    assert response.choices[0].message.role == "assistant"
+    assert isinstance(response.choices[0].message.content, str)
+    assert "testbot" in response.choices[0].message.content.lower()
 
 
 @pytest.mark.parametrize("backend, generator_factory", _BACKEND_CASES)

@@ -90,6 +90,7 @@ PROVIDER = "google"
 
 KNOWN_EMBEDDING_PARAMS = frozenset({"dimensions"})
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature"})
+_INSTRUCTION_ROLES = frozenset({"system", "developer"})
 
 
 def _import_genai() -> Any:
@@ -190,7 +191,7 @@ class GoogleProvider:
 
         if "timed out" in str(e).lower() or "timeout" in type(e).__name__.lower():
             raise LLMTimeoutError(408, str(e), PROVIDER) from e
-        raise e
+        raise
 
     async def complete(
         self,
@@ -259,7 +260,6 @@ class GoogleProvider:
     def _validate_messages(self, messages: Sequence[ChatMessage]) -> None:
         if not messages:
             raise BadRequestError(400, "Messages list must not be empty.", PROVIDER)
-        _INSTRUCTION_ROLES = frozenset({"system", "developer"})
         has_non_system = any(m.role not in _INSTRUCTION_ROLES for m in messages)
         if not has_non_system:
             raise BadRequestError(
@@ -302,14 +302,17 @@ class GoogleProvider:
         except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e
 
-        kwargs = GoogleResponseTranslator.to_google(
-            model,
-            input_models,
-            instructions=instructions,
-            previous_id=previous_id,
-            tools=tools_models,
-            **params,
-        )
+        try:
+            kwargs = GoogleResponseTranslator.to_google(
+                model,
+                input_models,
+                instructions=instructions,
+                previous_id=previous_id,
+                tools=tools_models,
+                **params,
+            )
+        except ValueError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:
             raw = await self._client.aio.interactions.create(**kwargs)

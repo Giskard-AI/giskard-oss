@@ -126,7 +126,7 @@ class OpenAIProvider:
             raise LLMError(
                 getattr(e, "status_code", None) or 500, str(e), self._PROVIDER
             ) from e
-        raise e
+        raise
 
     async def complete(
         self,

@@ -15,8 +15,7 @@ from ..types import (
     ToolDef,
     Usage,
 )
-from ..utils import deserialize_arguments
-from .anthropic import AnthropicChatTranslator
+from ..utils import deserialize_arguments, extract_system_messages
 
 if TYPE_CHECKING:
     from google.genai.types import (
@@ -182,9 +181,7 @@ class GoogleChatTranslator:
         if tools is not None:
             config["tools"] = [GoogleChatTranslator._tool_to_google(t) for t in tools]
 
-        if system_messages := AnthropicChatTranslator._extract_system_messages(
-            messages
-        ):
+        if system_messages := extract_system_messages(messages):
             config["system_instruction"] = system_messages
 
         if params.get("temperature") is not None:
