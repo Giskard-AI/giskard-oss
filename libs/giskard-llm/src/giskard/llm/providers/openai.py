@@ -155,7 +155,9 @@ class OpenAIProvider:
 
         try:
             raw = await self._client.chat.completions.create(**kwargs)
-        except openai.APIError as e:
+        except (
+            Exception
+        ) as e:  # Broad catch: _map_error checks SDK types first, then re-raises.
             self._map_error(e)
 
         return OpenAIChatTranslator.from_openai(raw)
@@ -180,7 +182,9 @@ class OpenAIProvider:
             kwargs["dimensions"] = dimensions
         try:
             raw = await self._client.embeddings.create(**kwargs)
-        except openai.APIError as e:
+        except (
+            Exception
+        ) as e:  # Broad catch: _map_error checks SDK types first, then re-raises.
             self._map_error(e)
 
         return self._to_embedding_response(raw)
@@ -257,7 +261,9 @@ class OpenAIProvider:
 
         try:
             raw = await self._client.responses.create(**kwargs)
-        except openai.APIError as e:
+        except (
+            Exception
+        ) as e:  # Broad catch: _map_error checks SDK types first, then re-raises.
             self._map_error(e)
 
         return OpenAIResponseTranslator.from_openai(raw)

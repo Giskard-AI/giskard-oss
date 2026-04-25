@@ -181,7 +181,9 @@ class AnthropicProvider:
 
         try:
             raw = await self._client.messages.create(**kwargs)
-        except anthropic.APIError as e:
+        except (
+            Exception
+        ) as e:  # Broad catch: _map_error checks SDK types first, then re-raises.
             self._map_error(e)
 
         return AnthropicChatTranslator.from_anthropic(raw)
