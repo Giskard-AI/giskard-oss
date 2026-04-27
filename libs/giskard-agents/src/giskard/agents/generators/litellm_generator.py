@@ -10,7 +10,6 @@ Importing this module without ``litellm`` installed raises ``ImportError``.
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast, override
 
-from giskard.llm.translators.openai_chat import OpenAIChatTranslator
 from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
 from pydantic import Field
 
@@ -80,7 +79,13 @@ class LiteLLMGenerator(BaseGenerator):
         self, messages: Sequence[ChatMessage]
     ) -> "list[ChatCompletionMessageParam]":
         """Convert ``Message`` objects to OpenaAI's dict format (litellm expects)."""
-        return OpenAIChatTranslator.messages_to_openai(messages)
+        return [
+            cast(
+                "ChatCompletionMessageParam",
+                cast(object, m.model_dump(context={"provider": "openai/chat"})),
+            )
+            for m in messages
+        ]
 
     def _deserialize_response(self, raw: Any) -> AssistantMessage:
         """Convert a LiteLLM response object into an internal ``Message``."""
