@@ -32,7 +32,10 @@ class ResponseResult(_BaseModel):
     def output_text(self) -> str | None:
         """Concatenate all text outputs, or None if there are none."""
         content = [
-            o.output_text for o in self.outputs if isinstance(o, ResponseOutputMessage)
+            o.output_text
+            for o in self.outputs
+            if isinstance(o, ResponseOutputMessage)
+            if o.output_text is not None
         ]
         return "\n".join(content) if content else None
 
