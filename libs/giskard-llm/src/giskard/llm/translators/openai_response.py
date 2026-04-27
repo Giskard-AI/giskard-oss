@@ -7,16 +7,16 @@ from giskard.llm.types import (
     ResponseResult,
     ToolDef,
 )
+from giskard.llm.types._base import _BaseModel
+from giskard.llm.types._serialization import register_serializer
+from pydantic import Field, SerializationInfo
 
 if TYPE_CHECKING:
     from openai.types.responses.response import Response
     from openai.types.responses.response_create_params import (
         ResponseCreateParamsNonStreaming,
     )
-    from openai.types.responses.response_input_param import (
-        ResponseInputItemParam,
-        ResponseInputParam,
-    )
+    from openai.types.responses.tool_param import ToolParam
 
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "max_tokens"})
 
@@ -24,25 +24,28 @@ logger = logging.getLogger(__name__)
 PROVIDER = "openai"
 
 
+@register_serializer(ToolDef, "openai/response")
+def tool_def_to_openai(tool: ToolDef, _info: SerializationInfo) -> "ToolParam":
+    return {
+        "type": "function",
+        "name": tool.function.name,
+        "description": tool.function.description,
+        "parameters": tool.function.parameters,
+        "strict": None,
+    }
+
+
+class OpenAIResponseParams(_BaseModel):
+    model: str
+    input: str | Sequence[ResponseInputItem]
+    instructions: str | None = None
+    previous_response_id: str | None = None
+    tools: Sequence[ToolDef] | None
+    temperature: float | None = None
+    max_output_tokens: int | None = Field(default=None, validation_alias="max_tokens")
+
+
 class OpenAIResponseTranslator:
-    @staticmethod
-    def _input_to_openai(
-        input: ResponseInputItem,
-    ) -> "ResponseInputItemParam":
-        return cast(
-            "ResponseInputItemParam",
-            cast(object, input.model_dump(context={"json_arguments": True})),
-        )
-
-    @staticmethod
-    def _inputs_to_openai(
-        input: str | Sequence[ResponseInputItem],
-    ) -> "str | ResponseInputParam":
-        if isinstance(input, str):
-            return input
-
-        return [OpenAIResponseTranslator._input_to_openai(item) for item in input]
-
     @staticmethod
     def to_openai(
         model: str,
@@ -61,32 +64,24 @@ class OpenAIResponseTranslator:
                 sorted(unknown),
             )
 
-        response_params: "ResponseCreateParamsNonStreaming" = {
-            "model": model,
-            "input": OpenAIResponseTranslator._inputs_to_openai(input),
-        }
+        response_params = OpenAIResponseParams.model_validate(
+            {
+                "model": model,
+                "input": input,
+                "instructions": instructions,
+                "previous_response_id": previous_id,
+                "tools": tools,
+                **params,
+            }
+        )
 
-        if instructions is not None:
-            response_params["instructions"] = instructions
-        if previous_id is not None:
-            response_params["previous_response_id"] = previous_id
-        if tools is not None:
-            response_params["tools"] = [
-                {
-                    "type": "function",
-                    "name": t.function.name,
-                    "description": t.function.description,
-                    "parameters": t.function.parameters,
-                    "strict": None,
-                }
-                for t in tools
-            ]
-        if params.get("temperature") is not None:
-            response_params["temperature"] = params["temperature"]
-        if params.get("max_tokens") is not None:
-            response_params["max_output_tokens"] = params["max_tokens"]
-
-        return response_params
+        return cast(
+            "ResponseCreateParamsNonStreaming",
+            cast(
+                object,
+                response_params.model_dump(context={"provider": "openai/response"}),
+            ),
+        )
 
     @staticmethod
     def from_openai(raw: "Response") -> ResponseResult:

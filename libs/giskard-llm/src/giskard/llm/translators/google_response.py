@@ -1,48 +1,50 @@
 import logging
 from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Any, Required, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 
-from pydantic import BaseModel
+from giskard.llm.types._base import _BaseModel
+from pydantic import BaseModel, SerializationInfo, field_serializer, model_validator
 
 from ..types import (
+    ResponseEasyInputMessage,
     ResponseInputItem,
-    ResponseInputMessageContent,
+    ResponseInputText,
     ResponseOutputFunctionCall,
     ResponseOutputItem,
     ResponseOutputMessage,
-    ResponseOutputMessageContent,
+    ResponseOutputRefusal,
     ResponseOutputText,
     ResponseResult,
     ToolDef,
     Usage,
 )
+from ..types._serialization import register_serializer
 from ..utils import deserialize_arguments
 
 if TYPE_CHECKING:
-    import httpx
     from google.genai._interactions.types import (
-        FunctionCallContentParam,
-        FunctionResultContentParam,
         GenerationConfigParam,
         Interaction,
+        TextContentParam,
         ToolParam,
+        TurnParam,
         interaction_create_params,
     )
-    from google.genai._interactions.types import (
-        TextContentParam as GoogleTextContentParam,
-    )
+    from httpx import Timeout as httpxTimeout
 
     class InteractionCreateParams(TypedDict, total=False):
         input: Required[interaction_create_params.Input]
         model: Required[str]
         previous_interaction_id: str
         system_instruction: str
-        timeout: float | httpx.Timeout
+        timeout: float | httpxTimeout
         tools: Iterable[ToolParam]
         generation_config: GenerationConfigParam
         response_format: object
         response_mime_type: str
-
+else:
+    # Skip validation for httpxTimeout
+    httpxTimeout = Any
 
 PROVIDER = "google"
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "timeout", "response_format"})
@@ -50,105 +52,145 @@ KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "timeout", "response_format"})
 logger = logging.getLogger(__name__)
 
 
-def _flatten[T](items: Sequence[Sequence[T]]) -> list[T]:
-    return [item for sublist in items for item in sublist]
+@register_serializer(ToolDef, "google/response")
+def serialize_tool_def(tool: ToolDef, _info: SerializationInfo) -> "ToolParam":
+    return {
+        "type": "function",
+        "name": tool.function.name,
+        "description": tool.function.description or "No description provided",
+        "parameters": tool.function.parameters or {},
+    }
+
+
+def _text_content(text: str) -> "TextContentParam":
+    return {"type": "text", "text": text}
+
+
+@register_serializer(ResponseInputText, "google/response")
+def serialize_input_text(
+    model: ResponseInputText, _info: SerializationInfo
+) -> "TextContentParam":
+    return _text_content(model.text)
+
+
+@register_serializer(ResponseOutputText, "google/response")
+def serialize_output_text(
+    model: ResponseOutputText, _info: SerializationInfo
+) -> "TextContentParam":
+    return _text_content(model.text)
+
+
+@register_serializer(ResponseOutputRefusal, "google/response")
+def serialize_output_refusal(
+    model: ResponseOutputRefusal, _info: SerializationInfo
+) -> "TextContentParam":
+    return _text_content(model.refusal)
+
+
+@register_serializer(ResponseEasyInputMessage, "google/response")
+def serialize_easy_input_message(
+    model: ResponseEasyInputMessage, info: SerializationInfo
+) -> "TurnParam | None":
+    if model.role == "developer" or model.role == "system":
+        return None
+
+    if isinstance(model.content, str):
+        return {"content": [_text_content(model.content)], "role": model.role}
+
+    content = [
+        cast("TextContentParam", cast(object, item.model_dump(context=info.context)))
+        for item in model.content
+    ]
+    return {"content": content, "role": model.role}
+
+
+@register_serializer(ResponseOutputMessage, "google/response")
+def serialize_output_message(
+    model: ResponseOutputMessage, info: SerializationInfo
+) -> "TurnParam":
+    if isinstance(model.content, str):
+        return {"content": [_text_content(model.content)], "role": model.role}
+
+    content = [
+        cast("TextContentParam", cast(object, item.model_dump(context=info.context)))
+        for item in model.content
+    ]
+    return {"content": content, "role": model.role}
+
+
+def _extract_system_instruction(input: str | Sequence[ResponseInputItem]) -> str | None:
+    if isinstance(input, str):
+        return None
+
+    system_parts = [
+        part.text
+        for part in input
+        if (part.type is None or part.type == "message")
+        and part.role in ("system", "developer")
+    ]
+    system_parts = [part for part in system_parts if part is not None]
+
+    return "\n".join(system_parts) if system_parts else None
+
+
+class GoogleResponseGenerationConfigParam(_BaseModel):
+    temperature: float | None = None
+
+
+class GoogleResponseParams(_BaseModel):
+    model: str
+    input: str | Sequence[ResponseInputItem]
+    system_instruction: str | None = None
+    previous_interaction_id: str | None = None
+    tools: Sequence[ToolDef] | None
+    generation_config: GoogleResponseGenerationConfigParam | None = None
+    timeout: float | httpxTimeout | None = None
+    response_mime_type: Literal["application/json"] | None = None
+    response_format: type[BaseModel] | dict[str, Any] | None = None
+
+    @field_serializer("input")
+    def serialize_input(
+        self, value: str | Sequence[ResponseInputItem], info: SerializationInfo
+    ) -> Any:
+        if isinstance(value, str):
+            return value
+
+        inputs = [item.model_dump(context=info.context) for item in value]
+        return [item for item in inputs if item is not None]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_dict(cls, v: Any) -> Any:
+        if not isinstance(v, dict):
+            return v
+
+        v = v.copy()
+
+        # Extract system instruction from input and merge with instructions
+        instructions_parts = [
+            v.get("system_instruction"),
+            _extract_system_instruction(v["input"]),
+        ]
+        instructions_parts = [part for part in instructions_parts if part is not None]
+        if instructions_parts:
+            v["system_instruction"] = "\n".join(instructions_parts)
+
+        # Move temperature to generation_config
+        if "temperature" in v:
+            v["generation_config"] = {"temperature": v.pop("temperature")}
+
+        # Setup response_format for JSON output
+        if (
+            "response_format" in v
+            and isinstance(v["response_format"], type)
+            and issubclass(v["response_format"], BaseModel)
+        ):
+            v["response_mime_type"] = "application/json"
+
+        return v
 
 
 class GoogleResponseTranslator:
-    @staticmethod
-    def _output_content_to_google(
-        content: (ResponseInputMessageContent | ResponseOutputMessageContent),
-    ) -> "GoogleTextContentParam":
-        if content.type == "input_text":
-            return {"type": "text", "text": content.text}
-        if content.type == "output_text":
-            return {"type": "text", "text": content.text}
-        if content.type == "refusal":
-            return {"type": "text", "text": content.refusal}
-        # Runtime guard: inputs may not match TypedDict at runtime.
-        raise ValueError(f"Unsupported message content type: {content.type!r}")  # pyright: ignore[reportUnreachable]
-
-    @staticmethod
-    def _content_to_google(
-        content: str
-        | Sequence[ResponseInputMessageContent | ResponseOutputMessageContent],
-    ) -> "list[GoogleTextContentParam]":
-        if isinstance(content, str):
-            return [{"type": "text", "text": content}]
-
-        return [
-            GoogleResponseTranslator._output_content_to_google(item) for item in content
-        ]
-
-    @staticmethod
-    def _input_to_google(
-        input: ResponseInputItem,
-    ) -> "Sequence[FunctionResultContentParam | FunctionCallContentParam | GoogleTextContentParam]":
-        if input.type == "message":
-            if input.role == "developer" or input.role == "system":
-                return []  # Those messages are folded into the system instruction
-
-            return GoogleResponseTranslator._content_to_google(input.content)
-
-        if input.type == "function_call_output":
-            name = input.name
-            if name is None:
-                raise ValueError("function_call_output: name is required")
-
-            return [
-                {
-                    "type": "function_result",
-                    "call_id": input.call_id,
-                    "name": name,
-                    "result": input.output,
-                }
-            ]
-
-        if input.type == "function_call":
-            return [
-                {
-                    "type": "function_call",
-                    "id": input.call_id,
-                    "name": input.name,
-                    "arguments": deserialize_arguments(input.arguments),
-                }
-            ]
-
-        raise ValueError(f"Unsupported input type: {input.type!r}")
-
-    @staticmethod
-    def _inputs_to_google(
-        input: str | Sequence[ResponseInputItem],
-    ) -> "interaction_create_params.Input":
-        if isinstance(input, str):
-            return input
-
-        return _flatten(
-            [GoogleResponseTranslator._input_to_google(item) for item in input]
-        )
-
-    @staticmethod
-    def _extract_system_instruction(
-        input: str | Sequence[ResponseInputItem],
-    ) -> "str | None":
-        if isinstance(input, str):
-            return None
-
-        system_parts = _flatten(
-            [
-                [
-                    part["text"]
-                    for part in GoogleResponseTranslator._content_to_google(
-                        item.content
-                    )
-                ]
-                for item in input
-                if (item.type == "message") and item.role in ("system", "developer")
-            ]
-        )
-
-        return "\n".join(system_parts) if system_parts else None
-
     @staticmethod
     def to_google(
         model: str,
@@ -167,53 +209,24 @@ class GoogleResponseTranslator:
                 sorted(unknown),
             )
 
-        interaction_create_params: "InteractionCreateParams" = {
-            "model": model,
-            "input": GoogleResponseTranslator._inputs_to_google(input),
-        }
+        google_params = GoogleResponseParams.model_validate(
+            {
+                "model": model,
+                "input": input,
+                "system_instruction": instructions,
+                "previous_interaction_id": previous_id,
+                "tools": tools,
+                **params,
+            }
+        )
 
-        instructions_parts = [
-            instructions,
-            GoogleResponseTranslator._extract_system_instruction(input),
-        ]
-        instructions_parts = [part for part in instructions_parts if part is not None]
-
-        if instructions_parts:
-            interaction_create_params["system_instruction"] = "\n".join(
-                instructions_parts
-            )
-        if previous_id is not None:
-            interaction_create_params["previous_interaction_id"] = previous_id
-        if tools is not None:
-            interaction_create_params["tools"] = [
-                {
-                    "type": "function",
-                    "name": t.function.name,
-                    "description": t.function.description or "",
-                    "parameters": t.function.parameters or {},
-                }
-                for t in tools
-            ]
-        if params.get("temperature") is not None:
-            interaction_create_params["generation_config"] = (
-                interaction_create_params.get("generation_config", {})
-            )
-            interaction_create_params["generation_config"]["temperature"] = params[
-                "temperature"
-            ]
-        if params.get("timeout") is not None:
-            interaction_create_params["timeout"] = params["timeout"]
-
-        response_format = params.get("response_format")
-        if (
-            response_format is not None
-            and isinstance(response_format, type)
-            and issubclass(response_format, BaseModel)
-        ):
-            interaction_create_params["response_mime_type"] = "application/json"
-            interaction_create_params["response_format"] = response_format
-
-        return interaction_create_params
+        return cast(
+            "InteractionCreateParams",
+            cast(
+                object,
+                google_params.model_dump(context={"provider": "google/response"}),
+            ),
+        )
 
     @staticmethod
     def from_google(raw: "Interaction", model: str) -> ResponseResult:

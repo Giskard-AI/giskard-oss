@@ -1,9 +1,15 @@
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Required, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 from uuid import uuid4
 
-from pydantic import BaseModel
+from pydantic import (
+    BaseModel,
+    Field,
+    SerializationInfo,
+    field_serializer,
+    model_validator,
+)
 
 from ..types import (
     AssistantMessage,
@@ -11,16 +17,24 @@ from ..types import (
     Choice,
     CompletionContent,
     CompletionResponse,
+    FunctionMessage,
+    RefusalContent,
+    TextContent,
     ToolCall,
     ToolCallFunction,
     ToolDef,
+    ToolMessage,
     Usage,
+    UserMessage,
 )
-from ..utils import deserialize_arguments, extract_system_messages
+from ..types._base import _BaseModel
+from ..types._serialization import register_serializer
+from ..utils import deserialize_arguments
 
 if TYPE_CHECKING:
     from google.genai.types import (
         ContentListUnionDict,
+        ContentUnionDict,
         GenerateContentConfigDict,
         GenerateContentResponse,
         PartDict,
@@ -42,119 +56,204 @@ KNOWN_COMPLETION_PARAMS = frozenset(
 logger = logging.getLogger(__name__)
 
 
-class GoogleChatTranslator:
-    @staticmethod
-    def _tool_to_google(tool: ToolDef) -> "ToolDict":
-        """Convert an OpenAI-format tool to Gemini FunctionDeclaration."""
-        func = tool.function
-        return {
-            "function_declarations": [
-                {
-                    "name": func.name,
-                    "description": func.description or "",
-                    "parameters": func.parameters,  # pyright: ignore[reportReturnType]
-                }
-            ]
+@register_serializer(ToolDef, "google/chat")
+def serialize_tool_def(tool: ToolDef, _info: SerializationInfo) -> "ToolDict":
+    return {
+        "function_declarations": [
+            {
+                "name": tool.function.name,
+                "description": tool.function.description or "No description provided",
+                "parameters": tool.function.parameters,  # pyright: ignore[reportReturnType]
+            }
+        ]
+    }
+
+
+def _text_content(text: str) -> "PartDict":
+    return {"text": text}
+
+
+@register_serializer(TextContent, "google/chat")
+def serialize_text_content(
+    content: TextContent, _info: SerializationInfo
+) -> "PartDict":
+    return _text_content(content.text)
+
+
+@register_serializer(RefusalContent, "google/chat")
+def serialize_refusal_content(
+    content: RefusalContent, _info: SerializationInfo
+) -> "PartDict":
+    return _text_content(content.refusal)
+
+
+def _assistant_content_to_parts(
+    content: str | list[CompletionContent], info: SerializationInfo
+) -> "Sequence[PartDict]":
+    if isinstance(content, str):
+        return [_text_content(content)]
+    return [
+        cast("PartDict", cast(object, c.model_dump(context=info.context)))
+        for c in content
+    ]
+
+
+@register_serializer(ToolCall, "google/chat")
+def serialize_tool_call(tool_call: ToolCall, info: SerializationInfo) -> "PartDict":
+    return {
+        "function_call": {
+            "name": tool_call.function.name,
+            "args": tool_call.function.arguments,
         }
+    }
 
-    @staticmethod
-    def _content_to_parts(content: str) -> "PartDict":
-        return {"text": content}
 
-    @staticmethod
-    def _completion_content_to_parts(content: CompletionContent) -> "PartDict":
-        if content.type == "text":
-            return {"text": content.text}
+@register_serializer(UserMessage, "google/chat")
+def serialize_user_message(
+    message: UserMessage, info: SerializationInfo
+) -> "ContentUnionDict":
+    return {
+        "role": "user",
+        "parts": [_text_content(message.content)],
+    }
 
-        if content.type == "refusal":
-            return {"text": content.refusal}
 
-        raise ValueError(f"Unsupported content type: {content.type!r}")
+def _get_name_from_call_id(call_id: str, info: SerializationInfo) -> str | None:
+    if not isinstance(info.context, dict):
+        return None
 
-    @staticmethod
-    def _assistant_content_to_parts(
-        content: str | list[CompletionContent],
-    ) -> "Sequence[PartDict]":
-        if isinstance(content, str):
-            return [GoogleChatTranslator._content_to_parts(content)]
+    call_ids_to_name = info.context.get("tool_call_id_to_name", {})
 
-        return [GoogleChatTranslator._completion_content_to_parts(p) for p in content]
+    if call_id in call_ids_to_name:
+        return call_ids_to_name[call_id]
+    return None
 
-    @staticmethod
-    def _message_to_contents(
-        message: ChatMessage, tc_id_to_name: dict[str, str]
-    ) -> "ContentListUnionDict | None":
-        if message.role == "system" or message.role == "developer":
-            # Folded into ``system_instruction`` (Gemini has no developer turn in ``contents``).
-            return None
 
-        if message.role == "function":
-            raise ValueError(f"Unsupported message role: {message.role}")
+@register_serializer(ToolMessage, "google/chat")
+def serialize_tool_message(
+    message: ToolMessage, info: SerializationInfo
+) -> "ContentUnionDict":
+    name = _get_name_from_call_id(message.tool_call_id, info)
+    if name is None:
+        raise ValueError(f"Tool call id {message.tool_call_id} not found in context")
 
-        if message.role == "user":
-            return {
-                "role": "user",
-                "parts": [GoogleChatTranslator._content_to_parts(message.content)],
+    return {
+        "role": "user",
+        "parts": [
+            {
+                "function_response": {
+                    "name": name,
+                    "response": {"result": message.content},
+                }
             }
+        ],
+    }
 
-        if message.role == "assistant":
-            parts = []
 
-            if message.content is not None:
-                parts.extend(
-                    GoogleChatTranslator._assistant_content_to_parts(message.content)
-                )
-            if message.refusal is not None:
-                parts.append({"text": message.refusal})
+@register_serializer(FunctionMessage, "google/chat")
+def serialize_function_message(
+    message: FunctionMessage, info: SerializationInfo
+) -> "ContentUnionDict":
+    raise ValueError(f"Unsupported message role for google chat: {message.role}")
 
-            if tool_calls := message.tool_calls:
-                for tc in tool_calls:
-                    func = tc.function
-                    parts.append(
-                        {
-                            "function_call": {
-                                "name": func.name,
-                                "args": func.arguments,
-                            }
-                        }
-                    )
 
-            return {
-                "role": "model",
-                "parts": parts,
-            }
+@register_serializer(AssistantMessage, "google/chat")
+def serialize_assistant_message(
+    message: AssistantMessage, info: SerializationInfo
+) -> "ContentUnionDict":
+    parts = []
+    if message.content is not None:
+        parts.extend(_assistant_content_to_parts(message.content, info))
+    if message.refusal is not None:
+        parts.append(_text_content(message.refusal))
+    if message.tool_calls is not None:
+        parts.extend(
+            [
+                cast("PartDict", cast(object, tc.model_dump(context=info.context)))
+                for tc in message.tool_calls
+            ]
+        )
+    return {
+        "role": "model",
+        "parts": parts,
+    }
 
-        if message.role == "tool":
-            tc_id = message.tool_call_id
-            return {
-                "role": "user",
-                "parts": [
-                    {
-                        "function_response": {
-                            "name": tc_id_to_name.get(tc_id, tc_id),
-                            "response": {"result": message.content},
-                        }
-                    }
-                ],
-            }
 
-    @staticmethod
-    def _messages_to_contents(
-        messages: Sequence[ChatMessage],
-    ) -> "ContentListUnionDict":
-        tc_id_to_name: dict[str, str] = {}
-        for msg in messages:
-            if isinstance(msg, AssistantMessage):
-                for tc in msg.tool_calls or []:
-                    tc_id_to_name[tc.id] = tc.function.name
+def _extract_system_instruction(messages: Sequence[ChatMessage]) -> list[str] | None:
+    system_parts = [
+        m.content for m in messages if m.role == "system" or m.role == "developer"
+    ]
+    return system_parts if system_parts else None
 
-        converted = [
-            GoogleChatTranslator._message_to_contents(msg, tc_id_to_name)
-            for msg in messages
+
+class GoogleChatConfigParams(_BaseModel):
+    tools: Sequence[ToolDef] | None
+    system_instruction: str | list[str] | None = None
+    temperature: float | None = None
+    max_output_tokens: int | None = Field(default=None, validation_alias="max_tokens")
+    response_mime_type: Literal["application/json"] | None = None
+    response_schema: type[BaseModel] | None = None
+
+
+class GoogleChatParams(_BaseModel):
+    model: str
+    contents: Sequence[ChatMessage]
+    config: GoogleChatConfigParams
+
+    @field_serializer("contents")
+    def serialize_messages(
+        self, value: Sequence[ChatMessage], info: SerializationInfo
+    ) -> Any:
+        tool_call_id_to_name: dict[str, str] = {}
+        for m in value:
+            if isinstance(m, AssistantMessage):
+                for tc in m.tool_calls or []:
+                    tool_call_id_to_name[tc.id] = tc.function.name
+
+        if isinstance(info.context, dict):
+            context = info.context.copy()
+            context["tool_call_id_to_name"] = tool_call_id_to_name
+        else:
+            context = info.context
+
+        return [
+            cast("ChatMessage", cast(object, m.model_dump(context=context)))
+            for m in value
         ]
 
-        return [content for content in converted if content is not None]
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_dict(cls, v: Any) -> Any:
+        if not isinstance(v, dict):
+            return v
 
+        v = v.copy()
+
+        v["config"] = v.get("config", {})
+
+        # Extract system instruction from messages
+        system_instruction = _extract_system_instruction(v["contents"])
+        if system_instruction:
+            v["config"]["system_instruction"] = system_instruction
+
+        # Remove system and developer messages from messages
+        v["contents"] = [
+            m for m in v["contents"] if m.role not in ("system", "developer")
+        ]
+
+        # Setup response_format for JSON output
+        if (
+            "response_format" in v["config"]
+            and isinstance(v["config"]["response_format"], type)
+            and issubclass(v["config"]["response_format"], BaseModel)
+        ):
+            v["config"]["response_mime_type"] = "application/json"
+            v["config"]["response_schema"] = v["config"].pop("response_format")
+
+        return v
+
+
+class GoogleChatTranslator:
     @staticmethod
     def to_google(
         model: str,
@@ -171,38 +270,24 @@ class GoogleChatTranslator:
                 sorted(unknown),
             )
 
-        completion_params: "GenerateContentParams" = {
-            "model": model,
-            "contents": GoogleChatTranslator._messages_to_contents(messages),
-            "config": {},
-        }
+        params_copy = dict(params)
+        config_base = dict(params_copy.pop("config", {}))
+        google_params = GoogleChatParams.model_validate(
+            {
+                "model": model,
+                "contents": messages,
+                "config": {
+                    "tools": tools,
+                    **config_base,
+                    **params_copy,
+                },
+            }
+        )
 
-        config: "GenerateContentConfigDict" = {}
-
-        if tools is not None:
-            config["tools"] = [GoogleChatTranslator._tool_to_google(t) for t in tools]
-
-        if system_messages := extract_system_messages(messages):
-            config["system_instruction"] = system_messages
-
-        if params.get("temperature") is not None:
-            config["temperature"] = params["temperature"]
-        if params.get("max_tokens") is not None:
-            config["max_output_tokens"] = params["max_tokens"]
-
-        response_format = params.get("response_format")
-        if (
-            response_format is not None
-            and isinstance(response_format, type)
-            and issubclass(response_format, BaseModel)
-        ):
-            config["response_mime_type"] = "application/json"
-            config["response_schema"] = response_format
-
-        if config:
-            completion_params["config"] = config
-
-        return completion_params
+        return cast(
+            "GenerateContentParams",
+            cast(object, google_params.model_dump(context={"provider": "google/chat"})),
+        )
 
     @staticmethod
     def from_google(raw: "GenerateContentResponse", model: str) -> CompletionResponse:

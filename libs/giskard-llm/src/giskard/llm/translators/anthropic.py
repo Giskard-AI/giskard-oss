@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Any, Required, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 
-from pydantic import BaseModel
+from pydantic import BaseModel, SerializationInfo, field_serializer, model_validator
 
 from ..types import (
     AssistantMessage,
@@ -9,15 +9,19 @@ from ..types import (
     Choice,
     CompletionContent,
     CompletionResponse,
+    FunctionMessage,
+    RefusalContent,
     ToolCall,
     ToolCallFunction,
     ToolDef,
+    ToolMessage,
     Usage,
 )
-from ..utils import deserialize_arguments, extract_system_messages
+from ..types._base import _BaseModel
+from ..types._serialization import register_serializer
+from ..utils import deserialize_arguments
 
 if TYPE_CHECKING:
-    import httpx
     from anthropic.types.message import Message
     from anthropic.types.message_param import MessageParam
     from anthropic.types.model_param import ModelParam
@@ -25,6 +29,7 @@ if TYPE_CHECKING:
     from anthropic.types.text_block_param import TextBlockParam
     from anthropic.types.tool_union_param import ToolUnionParam
     from anthropic.types.tool_use_block_param import ToolUseBlockParam
+    from httpx import Timeout as httpxTimeout
 
     class CompletionCreateParams(TypedDict, total=False):
         messages: Required[Sequence[MessageParam]]
@@ -33,160 +38,193 @@ if TYPE_CHECKING:
         tools: Sequence[ToolUnionParam]
         system: str | list[TextBlockParam]
         temperature: float
-        timeout: float | httpx.Timeout | None
+        timeout: float | httpxTimeout | None
         output_config: OutputConfigParam
+else:
+    httpxTimeout = Any
+
+
+@register_serializer(ToolDef, "anthropic/chat")
+def serialize_tool_def(tool: ToolDef, _info: SerializationInfo) -> "ToolUnionParam":
+    return {
+        "name": tool.function.name,
+        "description": tool.function.description or "",
+        "input_schema": tool.function.parameters or {},
+    }
+
+
+def _text_block(text: str) -> "TextBlockParam":
+    return {
+        "type": "text",
+        "text": text,
+    }
+
+
+@register_serializer(RefusalContent, "anthropic/chat")
+def serialize_text_content(
+    content: RefusalContent, _info: SerializationInfo
+) -> "TextBlockParam":
+    return _text_block(content.refusal)
+
+
+@register_serializer(ToolMessage, "anthropic/chat")
+def serialize_tool_message(
+    message: ToolMessage, _info: SerializationInfo
+) -> "MessageParam":
+    return {
+        "role": "user",
+        "content": [
+            {
+                "type": "tool_result",
+                "tool_use_id": message.tool_call_id,
+                "content": message.content,
+            }
+        ],
+    }
+
+
+@register_serializer(FunctionMessage, "anthropic/chat")
+def serialize_function_message(
+    message: FunctionMessage, info: SerializationInfo
+) -> "MessageParam":
+    raise ValueError(f"Unsupported message role for anthropic chat: {message.role}")
+
+
+def _completion_content_to_blocks(
+    content: str | Sequence[CompletionContent],
+    info: SerializationInfo,
+) -> "Sequence[TextBlockParam]":
+    if isinstance(content, str):
+        return [_text_block(content)]
+
+    return [
+        cast("TextBlockParam", cast(object, c.model_dump(context=info.context)))
+        for c in content
+    ]
+
+
+@register_serializer(AssistantMessage, "anthropic/chat")
+def serialize_assistant_message(
+    message: AssistantMessage, info: SerializationInfo
+) -> "MessageParam":
+    blocks: "list[TextBlockParam | ToolUseBlockParam]" = []
+    if message.content is not None:
+        blocks.extend(_completion_content_to_blocks(message.content, info))
+    if (refusal := message.refusal) is not None:
+        blocks.append(_text_block(refusal))
+
+    if tool_calls := message.tool_calls:
+        for tool_call in tool_calls:
+            blocks.append(
+                {
+                    "type": "tool_use",
+                    "id": tool_call.id,
+                    "name": tool_call.function.name,
+                    "input": tool_call.function.arguments,
+                }
+            )
+
+    return {
+        "role": "assistant",
+        "content": blocks,
+    }
+
+
+def _str_to_text_blocks[T](
+    content: "str | Iterable[T]",
+) -> "list[TextBlockParam | T]":
+    if isinstance(content, str):
+        return [_text_block(content)]
+
+    return list(content)
+
+
+def _extract_system_instruction(
+    messages: Sequence[ChatMessage],
+) -> "list[TextBlockParam] | None":
+    system_blocks = [
+        _text_block(m.content)
+        for m in messages
+        if m.role == "system" or m.role == "developer"
+    ]
+    return system_blocks if system_blocks else None
+
+
+class SystemTextBlock(_BaseModel):
+    text: str
+    type: Literal["text"] = "text"
+
+
+class AnthropicChatConfigParams(_BaseModel):
+    model: str
+    messages: Sequence[ChatMessage]
+    max_tokens: int = 4096
+    tools: Sequence[ToolDef] | None = None
+    system: str | list[SystemTextBlock] | None = None
+    temperature: float | None = None
+    timeout: float | httpxTimeout | None = None
+    output_config: dict[str, object] | None = None
+
+    @field_serializer("messages")
+    def serialize_messages(
+        self, values: Sequence[ChatMessage], info: SerializationInfo
+    ) -> Any:
+        messages = [m.model_dump(context=info.context) for m in values]
+
+        merged_messages: list[dict[str, Any]] = []
+        for message in messages:
+            last_message = merged_messages[-1] if merged_messages else None
+            if not last_message or last_message["role"] != message["role"]:
+                merged_messages.append(message)
+                continue
+
+            prev_content = _str_to_text_blocks(last_message["content"])
+            curr_content = _str_to_text_blocks(message["content"])
+            merged_messages[-1] = {
+                **last_message,
+                "content": prev_content + curr_content,
+            }
+
+        return merged_messages
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_dict(cls, v: Any) -> Any:
+        if not isinstance(v, dict):
+            return v
+
+        v = v.copy()
+
+        # Extract system instruction from messages
+        system = _extract_system_instruction(v["messages"])
+        if system:
+            v["system"] = system
+
+        # Remove system and developer messages from messages
+        v["messages"] = [
+            m for m in v["messages"] if m.role not in ("system", "developer")
+        ]
+
+        # Setup response_format for JSON output
+        if "response_format" in v:
+            if isinstance(v["response_format"], type) and issubclass(
+                v["response_format"], BaseModel
+            ):
+                schema = v["response_format"].model_json_schema()
+                schema["additionalProperties"] = False
+                v["output_config"] = {
+                    "format": {
+                        "type": "json_schema",
+                        "schema": schema,
+                    }
+                }
+            else:
+                v["output_config"] = v["response_format"]
+
+        return v
 
 
 class AnthropicChatTranslator:
-    @staticmethod
-    def _tool_to_anthropic(tool: ToolDef) -> "ToolUnionParam":
-        """Convert an OpenAI-format tool to Anthropic format."""
-        func = tool.function
-        return {
-            "name": func.name,
-            "description": func.description or "",
-            "input_schema": func.parameters or {},
-        }
-
-    @staticmethod
-    def _string_to_text_block(text: str) -> "TextBlockParam":
-        """Convert a tool call to an Anthropic tool use block."""
-        return {
-            "type": "text",
-            "text": text,
-        }
-
-    @staticmethod
-    def _str_to_text_blocks[T](
-        content: "str | Iterable[T]",
-    ) -> "Iterable[TextBlockParam | T]":
-        if isinstance(content, str):
-            return [AnthropicChatTranslator._string_to_text_block(content)]
-
-        return content
-
-    @staticmethod
-    def _completion_content_to_block(
-        content: CompletionContent,
-    ) -> "TextBlockParam":
-        if content.type == "text":
-            return AnthropicChatTranslator._string_to_text_block(content.text)
-
-        if content.type == "refusal":
-            return AnthropicChatTranslator._string_to_text_block(content.refusal)
-
-        raise ValueError(f"Unsupported content type: {content.type!r}")
-
-    @staticmethod
-    def _completion_content_to_blocks(
-        content: str | Sequence[CompletionContent],
-    ) -> "Sequence[TextBlockParam]":
-        if isinstance(content, str):
-            return [AnthropicChatTranslator._string_to_text_block(content)]
-
-        return [
-            AnthropicChatTranslator._completion_content_to_block(p) for p in content
-        ]
-
-    @staticmethod
-    def _message_to_anthropic(
-        message: ChatMessage,
-    ) -> "MessageParam | None":
-        """Convert a chat message to an Anthropic message."""
-        if message.role == "system" or message.role == "developer":
-            # Folded into top-level ``system`` (Anthropic has no developer role on messages).
-            return None
-
-        if message.role == "function":
-            raise ValueError(f"Unsupported message role: {message.role}")
-
-        if message.role == "tool":
-            return {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": message.tool_call_id,
-                        "content": message.content,
-                    }
-                ],
-            }
-
-        if message.role == "user":
-            return {
-                "role": "user",
-                "content": message.content,
-            }
-
-        if message.role == "assistant":
-            content = message.content
-            blocks: list[TextBlockParam | ToolUseBlockParam] = []
-            if content is not None:
-                blocks.extend(
-                    AnthropicChatTranslator._completion_content_to_blocks(content)
-                )
-            if (refusal := message.refusal) is not None:
-                blocks.append(AnthropicChatTranslator._string_to_text_block(refusal))
-
-            if tool_calls := message.tool_calls:
-                for tool_call in tool_calls:
-                    blocks.append(
-                        {
-                            "type": "tool_use",
-                            "id": tool_call.id,
-                            "name": tool_call.function.name,
-                            "input": tool_call.function.arguments,
-                        }
-                    )
-
-            return {
-                "role": "assistant",
-                "content": blocks,
-            }
-
-    @staticmethod
-    def _messages_to_anthropic(
-        messages: Sequence[ChatMessage],
-    ) -> "Sequence[MessageParam]":
-        """Convert chat messages to Anthropic format, merging adjacent same-role turns."""
-        anthropic_messages: list[MessageParam] = []
-
-        for raw in messages:
-            converted = AnthropicChatTranslator._message_to_anthropic(raw)
-            if converted is None:
-                continue
-
-            if (
-                anthropic_messages
-                and anthropic_messages[-1]["role"] == converted["role"]
-            ):
-                prev = anthropic_messages[-1]
-                prev_content = list(
-                    AnthropicChatTranslator._str_to_text_blocks(prev["content"])
-                )
-                curr_content = list(
-                    AnthropicChatTranslator._str_to_text_blocks(converted["content"])
-                )
-                anthropic_messages[-1] = {
-                    **prev,
-                    "content": prev_content + curr_content,
-                }
-            else:
-                anthropic_messages.append(converted)
-
-        return anthropic_messages
-
-    @staticmethod
-    def _extract_system_messages_to_blocks(
-        messages: Sequence[ChatMessage],
-    ) -> "list[TextBlockParam]":
-        """Extract system messages from a list of messages and convert them to blocks."""
-        system_messages = extract_system_messages(messages)
-        return [
-            AnthropicChatTranslator._string_to_text_block(system_message)
-            for system_message in system_messages
-        ]
-
     @staticmethod
     def to_anthropic(
         model: str,
@@ -195,47 +233,20 @@ class AnthropicChatTranslator:
         tools: Sequence[ToolDef] | None = None,
         **params: Any,
     ) -> "CompletionCreateParams":
-        completion_params: "CompletionCreateParams" = {
-            "model": model,
-            "messages": AnthropicChatTranslator._messages_to_anthropic(messages),
-            "max_tokens": params.get("max_tokens", 4096),
-        }
+        anthropic_params = AnthropicChatConfigParams(
+            model=model,
+            messages=messages,
+            tools=tools,
+            **params,
+        )
 
-        if tools is not None:
-            completion_params["tools"] = [
-                AnthropicChatTranslator._tool_to_anthropic(t) for t in tools
-            ]
-
-        if system_blocks := AnthropicChatTranslator._extract_system_messages_to_blocks(
-            messages
-        ):
-            completion_params["system"] = system_blocks
-
-        if params.get("temperature") is not None:
-            completion_params["temperature"] = params["temperature"]
-        if params.get("timeout") is not None:
-            completion_params["timeout"] = params["timeout"]
-
-        response_format = params.get("response_format")
-        if response_format is not None:
-            if isinstance(response_format, type) and issubclass(
-                response_format, BaseModel
-            ):
-                schema = response_format.model_json_schema()
-                schema["additionalProperties"] = False
-                completion_params["output_config"] = {
-                    "format": {
-                        "type": "json_schema",
-                        "schema": schema,
-                    }
-                }
-            elif isinstance(response_format, dict):
-                # Let anthropic validate the output config
-                completion_params["output_config"] = response_format  # pyright: ignore[reportGeneralTypeIssues]
-            else:
-                raise ValueError(f"Unsupported response format: {response_format}")
-
-        return completion_params
+        return cast(
+            "CompletionCreateParams",
+            cast(
+                object,
+                anthropic_params.model_dump(context={"provider": "anthropic/chat"}),
+            ),
+        )
 
     @staticmethod
     def from_anthropic(

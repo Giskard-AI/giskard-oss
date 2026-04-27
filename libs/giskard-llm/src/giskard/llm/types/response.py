@@ -57,6 +57,16 @@ class ResponseEasyInputMessage(_BaseModel):
     content: str | list[ResponseInputMessageContent]
     role: Literal["user", "assistant", "system", "developer"]
 
+    @property
+    def text(self) -> str | None:
+        """Return the text content, or None if there is no text."""
+        if isinstance(self.content, str):
+            return self.content
+
+        texts = [o.text for o in self.content if isinstance(o, ResponseInputText)]
+
+        return "\n".join(texts) if texts else None
+
 
 class ResponseOutputMessage(_BaseModel):
     type: Literal["message"] | None = "message"
@@ -64,11 +74,19 @@ class ResponseOutputMessage(_BaseModel):
     role: Literal["assistant"] = "assistant"
 
     @property
-    def output_text(self) -> str:
+    def text(self) -> str | None:
+        """Return the text content, or None if there is no text."""
+        return self.output_text
+
+    @property
+    def output_text(self) -> str | None:
         """Concatenate all text outputs, or None if there are none."""
         if isinstance(self.content, str):
             return self.content
-        return "\n".join([o.output_text for o in self.content])
+
+        texts = [o.output_text for o in self.content]
+
+        return "\n".join(texts) if texts else None
 
     @property
     def refusal(self) -> str | None:

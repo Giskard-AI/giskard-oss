@@ -7,19 +7,13 @@ from giskard.llm.types import (
     CompletionResponse,
     ToolDef,
 )
-from pydantic import BaseModel
+from giskard.llm.types._base import _BaseModel
+from pydantic import BaseModel, field_validator
 
 if TYPE_CHECKING:
     from openai.types.chat.chat_completion import ChatCompletion
-    from openai.types.chat.chat_completion_message_param import (
-        ChatCompletionMessageParam,
-    )
-    from openai.types.chat.chat_completion_tool_union_param import (
-        ChatCompletionToolUnionParam,
-    )
     from openai.types.chat.completion_create_params import (
         CompletionCreateParamsNonStreaming,
-        ResponseFormat,
     )
 
     class CompletionCreateParamsWithTimeout(
@@ -37,35 +31,37 @@ KNOWN_COMPLETION_PARAMS = frozenset(
 )
 
 
+class OpenAIChatParams(_BaseModel):
+    model: str
+    messages: Sequence[ChatMessage]
+    tools: Sequence[ToolDef] | None
+    temperature: float | None = None
+    max_tokens: int | None = None
+    timeout: float | int | None = None
+    metadata: dict[str, str] | None = None
+    response_format: dict[str, object] | None = None
+
+    @field_validator("response_format")
+    @staticmethod
+    def _coerce_response_format(
+        v: type | dict[str, object] | None,
+    ) -> type | dict[str, object] | None:
+        if not isinstance(v, type) or not issubclass(v, BaseModel):
+            return v
+
+        schema = v.model_json_schema()
+        schema["additionalProperties"] = False
+        return {
+            "type": "json_schema",
+            "json_schema": {
+                "name": v.__name__,
+                "strict": True,
+                "schema": schema,
+            },
+        }
+
+
 class OpenAIChatTranslator:
-    @staticmethod
-    def _tool_def_to_openai(tool: "ToolDef") -> "ChatCompletionToolUnionParam":
-        return cast(
-            "ChatCompletionToolUnionParam",
-            cast(object, tool.model_dump(context={"json_arguments": True})),
-        )
-
-    @staticmethod
-    def _tools_to_openai(
-        tools: Sequence["ToolDef"],
-    ) -> Sequence["ChatCompletionToolUnionParam"]:
-        return [OpenAIChatTranslator._tool_def_to_openai(tool) for tool in tools]
-
-    @staticmethod
-    def _message_to_openai(message: ChatMessage) -> "ChatCompletionMessageParam":
-        return cast(
-            "ChatCompletionMessageParam",
-            cast(object, message.model_dump(context={"json_arguments": True})),
-        )
-
-    @staticmethod
-    def messages_to_openai(
-        messages: Sequence[ChatMessage],
-    ) -> list["ChatCompletionMessageParam"]:
-        return [
-            OpenAIChatTranslator._message_to_openai(message) for message in messages
-        ]
-
     @staticmethod
     def to_openai(
         model: str,
@@ -82,44 +78,19 @@ class OpenAIChatTranslator:
                 sorted(unknown),
             )
 
-        completion_params: "CompletionCreateParamsWithTimeout" = {
-            "model": model,
-            "messages": OpenAIChatTranslator.messages_to_openai(messages),
-        }
+        chat_params = OpenAIChatParams.model_validate(
+            {
+                "model": model,
+                "messages": messages,
+                "tools": tools,
+                **params,
+            }
+        )
 
-        if tools is not None:
-            completion_params["tools"] = OpenAIChatTranslator._tools_to_openai(tools)
-
-        if params.get("temperature") is not None:
-            completion_params["temperature"] = params["temperature"]
-        if params.get("max_tokens") is not None:
-            completion_params["max_tokens"] = params["max_tokens"]
-        if params.get("timeout") is not None:
-            completion_params["timeout"] = params["timeout"]
-        if metadata := params.get("metadata"):
-            completion_params["metadata"] = metadata
-
-        response_format = params.get("response_format")
-        if response_format is not None:
-            if isinstance(response_format, type) and issubclass(
-                response_format, BaseModel
-            ):
-                schema = response_format.model_json_schema()
-                schema["additionalProperties"] = False
-                response_format = {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": response_format.__name__,
-                        "strict": True,
-                        "schema": schema,
-                    },
-                }
-
-            completion_params["response_format"] = cast(
-                "ResponseFormat", response_format
-            )
-
-        return completion_params
+        return cast(
+            "CompletionCreateParamsWithTimeout",
+            cast(object, chat_params.model_dump(context={"provider": "openai/chat"})),
+        )
 
     @staticmethod
     def from_openai(
