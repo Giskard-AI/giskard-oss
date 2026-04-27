@@ -8,10 +8,10 @@ Importing this module without ``litellm`` installed raises ``ImportError``.
 """
 
 from collections.abc import Sequence
-from typing import Any, cast, override
+from typing import TYPE_CHECKING, Any, cast, override
 
+from giskard.llm.translators.openai_chat import OpenAIChatTranslator
 from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
-from giskard.llm.utils import serialize_arguments
 from pydantic import Field
 
 from ..tools import Tool
@@ -19,6 +19,10 @@ from ._types import GenerationParams
 from .base import BaseGenerator
 from .middleware import CompletionMiddleware, RetryMiddleware, RetryPolicy
 
+if TYPE_CHECKING:
+    from openai.types.chat.chat_completion_message_param import (
+        ChatCompletionMessageParam,
+    )
 try:
     from litellm import (  # pyright: ignore[reportMissingImports]
         ModelResponse,
@@ -74,21 +78,9 @@ class LiteLLMGenerator(BaseGenerator):
 
     def _serialize_messages(
         self, messages: Sequence[ChatMessage]
-    ) -> list[dict[str, Any]]:
-        """Convert ``Message`` objects to LiteLLM's dict format."""
-        result = []
-        for m in messages:
-            serialized = m.model_dump()
-            if serialized.get("tool_calls"):
-                for tc in serialized["tool_calls"]:
-                    if "function" in tc and isinstance(
-                        tc["function"].get("arguments"), dict
-                    ):
-                        tc["function"]["arguments"] = serialize_arguments(
-                            tc["function"]["arguments"]
-                        )
-            result.append(serialized)
-        return result
+    ) -> "list[ChatCompletionMessageParam]":
+        """Convert ``Message`` objects to OpenaAI's dict format (litellm expects)."""
+        return OpenAIChatTranslator.messages_to_openai(messages)
 
     def _deserialize_response(self, raw: Any) -> AssistantMessage:
         """Convert a LiteLLM response object into an internal ``Message``."""
@@ -122,5 +114,5 @@ class LiteLLMGenerator(BaseGenerator):
                     finish_reason=choice.finish_reason,
                 )
                 for choice in raw.choices
-            ],
+            ]
         )

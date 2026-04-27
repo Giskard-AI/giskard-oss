@@ -170,9 +170,9 @@ class OpenAIChatTranslator:
         raise ValueError(f"Unsupported message role: {message.role!r}")
 
     @staticmethod
-    def _messages_to_openai(
+    def messages_to_openai(
         messages: Sequence[ChatMessage],
-    ) -> Sequence["ChatCompletionMessageParam"]:
+    ) -> list["ChatCompletionMessageParam"]:
         return [
             OpenAIChatTranslator._message_to_openai(message) for message in messages
         ]
@@ -195,7 +195,7 @@ class OpenAIChatTranslator:
 
         completion_params: "CompletionCreateParamsWithTimeout" = {
             "model": model,
-            "messages": OpenAIChatTranslator._messages_to_openai(messages),
+            "messages": OpenAIChatTranslator.messages_to_openai(messages),
         }
 
         if tools is not None:
