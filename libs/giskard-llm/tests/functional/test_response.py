@@ -260,9 +260,9 @@ async def test_respond_usage_populated(provider: str):
     client, model = _make_client(provider)
     resp = await client.aresponse(model, "Say one word.")
     assert resp.usage is not None
-    assert resp.usage.prompt_tokens >= 0
-    assert resp.usage.completion_tokens >= 0
-    assert resp.usage.total_tokens >= resp.usage.prompt_tokens
+    assert resp.usage.input_tokens >= 0
+    assert resp.usage.output_tokens >= 0
+    assert resp.usage.total_tokens >= resp.usage.input_tokens
 
 
 # -- Error path scenario ------------------------------------------------------

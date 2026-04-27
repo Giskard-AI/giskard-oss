@@ -270,8 +270,8 @@ class GoogleChatTranslator:
         usage = None
         if raw.usage_metadata:
             usage = Usage(
-                prompt_tokens=raw.usage_metadata.prompt_token_count or 0,
-                completion_tokens=raw.usage_metadata.candidates_token_count or 0,
+                input_tokens=raw.usage_metadata.prompt_token_count or 0,
+                output_tokens=raw.usage_metadata.candidates_token_count or 0,
                 total_tokens=raw.usage_metadata.total_token_count or 0,
             )
 

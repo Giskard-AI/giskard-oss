@@ -53,8 +53,8 @@ def test_from_openai_assistant_text_message():
     out = OpenAIChatTranslator.from_openai(raw)
     assert out.model == _MODEL
     assert out.usage is not None
-    assert out.usage.prompt_tokens == 10
-    assert out.usage.completion_tokens == 5
+    assert out.usage.input_tokens == 10
+    assert out.usage.output_tokens == 5
     assert out.usage.total_tokens == 15
     assert len(out.choices) == 1
     ch = out.choices[0]

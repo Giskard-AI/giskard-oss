@@ -1,20 +1,12 @@
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from giskard.llm.types import (
     ResponseInputItem,
-    ResponseOutputFunctionCall,
-    ResponseOutputItem,
-    ResponseOutputMessage,
-    ResponseOutputRefusal,
-    ResponseOutputText,
     ResponseResult,
     ToolDef,
-    Usage,
 )
-
-from ..utils import deserialize_arguments, serialize_arguments
 
 if TYPE_CHECKING:
     from openai.types.responses.response import Response
@@ -37,29 +29,10 @@ class OpenAIResponseTranslator:
     def _input_to_openai(
         input: ResponseInputItem,
     ) -> "ResponseInputItemParam":
-        if input.type == "message":
-            return {
-                "type": "message",
-                "content": input.content,
-                "role": input.role,
-            }  # pyright: ignore[reportReturnType]
-
-        if input.type == "function_call_output":
-            return {
-                "type": "function_call_output",
-                "call_id": input.call_id,
-                "output": input.output,
-            }
-
-        if input.type == "function_call":
-            return {
-                "type": "function_call",
-                "call_id": input.call_id,
-                "name": input.name,
-                "arguments": serialize_arguments(input.arguments),
-            }
-
-        raise ValueError(f"Unsupported input type: {input.type!r}")
+        return cast(
+            "ResponseInputItemParam",
+            cast(object, input.model_dump(context={"json_arguments": True})),
+        )
 
     @staticmethod
     def _inputs_to_openai(
@@ -102,8 +75,8 @@ class OpenAIResponseTranslator:
                 {
                     "type": "function",
                     "name": t.function.name,
-                    "description": t.function.description or "",
-                    "parameters": t.function.parameters or {},
+                    "description": t.function.description,
+                    "parameters": t.function.parameters,
                     "strict": None,
                 }
                 for t in tools
@@ -117,44 +90,4 @@ class OpenAIResponseTranslator:
 
     @staticmethod
     def from_openai(raw: "Response") -> ResponseResult:
-        outputs: list[ResponseOutputItem] = []
-        for item in raw.output:
-            if item.type == "message":
-                contents = []
-                for content_block in item.content:
-                    if content_block.type == "output_text":
-                        contents.append(ResponseOutputText(text=content_block.text))
-                    elif content_block.type == "refusal":
-                        contents.append(
-                            ResponseOutputRefusal(refusal=content_block.refusal)
-                        )
-                    else:
-                        raise ValueError(
-                            f"Unsupported message content block type: {content_block.type!r}"
-                        )
-                outputs.append(ResponseOutputMessage(content=contents, role=item.role))
-            elif item.type == "function_call":
-                outputs.append(
-                    ResponseOutputFunctionCall(
-                        call_id=item.call_id,
-                        name=item.name,
-                        arguments=deserialize_arguments(item.arguments),
-                    )
-                )
-            else:
-                raise ValueError(f"Unsupported item type: {item.type}")
-
-        usage = None
-        if raw.usage:
-            usage = Usage(
-                prompt_tokens=raw.usage.input_tokens,
-                completion_tokens=raw.usage.output_tokens,
-                total_tokens=raw.usage.total_tokens,
-            )
-
-        return ResponseResult(
-            id=raw.id,
-            outputs=outputs,
-            model=getattr(raw, "model", None),
-            usage=usage,
-        )
+        return ResponseResult.model_validate(raw.model_dump())

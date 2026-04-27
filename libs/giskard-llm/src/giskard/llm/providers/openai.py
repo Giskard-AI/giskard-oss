@@ -239,8 +239,6 @@ class OpenAIProvider:
         tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> ResponseResult:
-        openai = _import_openai()
-
         try:
             input_models = _RESPONSE_INPUT_ITEMS_TYPE_ADAPTER.validate_python(input)
             tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)

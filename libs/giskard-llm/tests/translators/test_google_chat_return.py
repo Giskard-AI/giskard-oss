@@ -43,8 +43,8 @@ def test_from_google_assistant_text():
     out = GoogleChatTranslator.from_google(raw, _MODEL)
     assert out.model == _MODEL
     assert out.usage is not None
-    assert out.usage.prompt_tokens == 3
-    assert out.usage.completion_tokens == 4
+    assert out.usage.input_tokens == 3
+    assert out.usage.output_tokens == 4
     assert out.usage.total_tokens == 7
     ch = out.choices[0]
     assert ch.index == 0

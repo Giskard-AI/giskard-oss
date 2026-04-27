@@ -250,8 +250,8 @@ class GoogleResponseTranslator:
             outputs_tokens = getattr(usage_meta, "output_tokens", 0) or 0
             input_tokens = getattr(usage_meta, "input_tokens", 0) or 0
             usage = Usage(
-                prompt_tokens=input_tokens,
-                completion_tokens=outputs_tokens,
+                input_tokens=input_tokens,
+                output_tokens=outputs_tokens,
                 total_tokens=input_tokens + outputs_tokens,
             )
 

@@ -286,8 +286,8 @@ class AnthropicChatTranslator:
         usage = None
         if raw.usage:
             usage = Usage(
-                prompt_tokens=raw.usage.input_tokens,
-                completion_tokens=raw.usage.output_tokens,
+                input_tokens=raw.usage.input_tokens,
+                output_tokens=raw.usage.output_tokens,
                 total_tokens=raw.usage.input_tokens + raw.usage.output_tokens,
             )
 

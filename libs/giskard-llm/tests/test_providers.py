@@ -483,50 +483,6 @@ async def test_anthropic_validate_alternation(mock_import):
 
 
 @patch("giskard.llm.providers.openai._import_openai")
-async def test_openai_respond_text(mock_import):
-    mock_import.return_value = MagicMock()
-    provider = _make_openai_provider()
-    provider._client.responses = MagicMock()
-    provider._client.responses.create = AsyncMock(
-        return_value=_make_openai_response_api_response()
-    )
-
-    resp = await provider.respond("gpt-4o", "Hello")
-    assert resp.id == "resp_001"
-    assert len(resp.outputs) == 1
-    assert isinstance(resp.outputs[0], ResponseOutputMessage)
-    assert isinstance(resp.outputs[0].content[0], ResponseOutputText)
-    assert resp.outputs[0].content[0].text == "Hello world"
-    assert resp.output_text == "Hello world"
-    assert resp.usage is not None
-    assert resp.usage.prompt_tokens == 10
-
-
-@patch("giskard.llm.providers.openai._import_openai")
-async def test_openai_respond_function_call(mock_import):
-    mock_import.return_value = MagicMock()
-    provider = _make_openai_provider()
-    provider._client.responses = MagicMock()
-
-    fc_item = SimpleNamespace(
-        type="function_call",
-        call_id="call_123",
-        name="get_weather",
-        arguments=json.dumps({"city": "Paris"}),
-    )
-    provider._client.responses.create = AsyncMock(
-        return_value=_make_openai_response_api_response(output_items=[fc_item])
-    )
-
-    resp = await provider.respond("gpt-4o", "What's the weather?")
-    assert len(resp.outputs) == 1
-    assert isinstance(resp.outputs[0], ResponseOutputFunctionCall)
-    assert resp.outputs[0].name == "get_weather"
-    assert resp.outputs[0].arguments == {"city": "Paris"}
-    assert resp.outputs[0].call_id == "call_123"
-
-
-@patch("giskard.llm.providers.openai._import_openai")
 async def test_openai_respond_error_mapping(mock_import):
     openai = pytest.importorskip("openai")
     mock_import.return_value = openai

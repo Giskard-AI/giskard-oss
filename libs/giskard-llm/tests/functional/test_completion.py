@@ -312,9 +312,9 @@ async def test_usage_populated(provider: str):
         model, [{"role": "user", "content": "Say one word."}]
     )
     assert resp.usage is not None
-    assert resp.usage.prompt_tokens >= 0
-    assert resp.usage.completion_tokens >= 0
-    assert resp.usage.total_tokens >= resp.usage.prompt_tokens
+    assert resp.usage.input_tokens >= 0
+    assert resp.usage.output_tokens >= 0
+    assert resp.usage.total_tokens >= resp.usage.input_tokens
 
 
 # -- Structured output scenarios -----------------------------------------------

@@ -1,6 +1,8 @@
-from typing import Any, Literal
+from typing import Literal
 
-from ._base import _BaseModel
+from pydantic import AliasChoices, Field
+
+from ._base import ArgumentDict, _BaseModel
 from .response import ResponseOutputMessage
 from .usage import Usage
 
@@ -11,7 +13,7 @@ class ResponseOutputFunctionCall(_BaseModel):
     type: Literal["function_call"] = "function_call"
     call_id: str | None = None
     name: str
-    arguments: dict[str, Any]
+    arguments: ArgumentDict
 
 
 # Plain assignment (not `type` statement) so isinstance(x, ResponseOutputItem) works at runtime.
@@ -20,7 +22,9 @@ ResponseOutputItem = ResponseOutputMessage | ResponseOutputFunctionCall
 
 class ResponseResult(_BaseModel):
     id: str
-    outputs: list[ResponseOutputItem]
+    outputs: list[ResponseOutputItem] = Field(
+        validation_alias=AliasChoices("output", "outputs")
+    )
     model: str | None = None
     usage: Usage | None = None
 

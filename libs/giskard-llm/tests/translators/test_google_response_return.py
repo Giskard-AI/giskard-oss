@@ -66,8 +66,8 @@ def test_from_google_text_output():
     assert out.id == "int_test"
     assert out.model == _MODEL
     assert out.usage is not None
-    assert out.usage.prompt_tokens == 3
-    assert out.usage.completion_tokens == 4
+    assert out.usage.input_tokens == 3
+    assert out.usage.output_tokens == 4
     assert out.usage.total_tokens == 7
     assert len(out.outputs) == 1
     m = out.outputs[0]

@@ -41,8 +41,8 @@ def test_from_anthropic_assistant_text():
     out = AnthropicChatTranslator.from_anthropic(raw)
     assert out.model == _MODEL
     assert out.usage is not None
-    assert out.usage.prompt_tokens == 10
-    assert out.usage.completion_tokens == 5
+    assert out.usage.input_tokens == 10
+    assert out.usage.output_tokens == 5
     assert out.usage.total_tokens == 15
     ch = out.choices[0]
     assert ch.index == 0
