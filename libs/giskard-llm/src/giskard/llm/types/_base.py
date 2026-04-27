@@ -1,7 +1,7 @@
 import json
 from typing import Annotated, Any
 
-from pydantic import BaseModel, BeforeValidator
+from pydantic import BaseModel, BeforeValidator, FieldSerializationInfo, PlainSerializer
 
 
 class _BaseModel(BaseModel):
@@ -18,4 +18,13 @@ def _coerce_json(value: Any) -> Any:
     return value
 
 
-ArgumentDict = Annotated[dict[str, object], BeforeValidator(_coerce_json)]
+def _serialize_json(value: Any, info: FieldSerializationInfo) -> Any:
+    if isinstance(info.context, dict) and info.context.get("json_arguments", False):
+        return json.dumps(value)
+
+    return value
+
+
+ArgumentDict = Annotated[
+    dict[str, object], BeforeValidator(_coerce_json), PlainSerializer(_serialize_json)
+]

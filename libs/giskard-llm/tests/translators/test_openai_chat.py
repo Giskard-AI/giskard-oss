@@ -189,7 +189,6 @@ def test_user_tool_call_and_result_with_tools():
                 "name": "get_weather",
                 "description": "Get weather for a city.",
                 "parameters": WEATHER_TOOL.function.parameters,
-                "strict": None,
             },
         },
     ]
@@ -229,7 +228,6 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
                 "name": "get_weather",
                 "description": "Get weather for a city.",
                 "parameters": WEATHER_TOOL.function.parameters,
-                "strict": None,
             },
         },
         {
@@ -238,7 +236,6 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
                 "name": "get_local_time",
                 "description": "Get local time for an IANA timezone.",
                 "parameters": GET_TIME_TOOL.function.parameters,
-                "strict": None,
             },
         },
     ]
@@ -291,7 +288,6 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
                 "name": "get_weather",
                 "description": "Get weather for a city.",
                 "parameters": WEATHER_TOOL.function.parameters,
-                "strict": None,
             },
         },
         {
@@ -300,7 +296,6 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
                 "name": "get_local_time",
                 "description": "Get local time for an IANA timezone.",
                 "parameters": GET_TIME_TOOL.function.parameters,
-                "strict": None,
             },
         },
     ]
