@@ -39,26 +39,26 @@ class OpenAIChatParams(_BaseModel):
     max_tokens: int | None = None
     timeout: float | int | None = None
     metadata: dict[str, str] | None = None
-    response_format: dict[str, object] | None = None
+    response_format: dict[str, Any] | None = None
 
-    @field_validator("response_format")
-    @staticmethod
+    @field_validator("response_format", mode="before")
+    @classmethod
     def _coerce_response_format(
-        v: type | dict[str, object] | None,
-    ) -> type | dict[str, object] | None:
-        if not isinstance(v, type) or not issubclass(v, BaseModel):
-            return v
-
-        schema = v.model_json_schema()
-        schema["additionalProperties"] = False
-        return {
-            "type": "json_schema",
-            "json_schema": {
-                "name": v.__name__,
-                "strict": True,
-                "schema": schema,
-            },
-        }
+        cls,
+        v: Any,
+    ) -> Any:
+        if isinstance(v, type) and issubclass(v, BaseModel):
+            schema = v.model_json_schema()
+            schema["additionalProperties"] = False
+            return {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": v.__name__,
+                    "strict": True,
+                    "schema": schema,
+                },
+            }
+        return v
 
 
 class OpenAIChatTranslator:
