@@ -5,21 +5,14 @@ from typing import TYPE_CHECKING, Any, cast
 from giskard.llm.types import (
     ChatMessage,
     CompletionResponse,
-    ToolCall,
-    ToolCallFunction,
     ToolDef,
 )
 from pydantic import BaseModel
-
-from ..utils import deserialize_arguments
 
 if TYPE_CHECKING:
     from openai.types.chat.chat_completion import ChatCompletion
     from openai.types.chat.chat_completion_message_param import (
         ChatCompletionMessageParam,
-    )
-    from openai.types.chat.chat_completion_message_tool_call import (
-        ChatCompletionMessageToolCallUnion,
     )
     from openai.types.chat.chat_completion_tool_union_param import (
         ChatCompletionToolUnionParam,
@@ -127,31 +120,6 @@ class OpenAIChatTranslator:
             )
 
         return completion_params
-
-    @staticmethod
-    def _tool_call_from_openai(
-        tool_call: "ChatCompletionMessageToolCallUnion",
-    ) -> ToolCall:
-        if tool_call.type == "function":
-            return ToolCall(
-                id=tool_call.id,
-                type=tool_call.type,
-                function=ToolCallFunction(
-                    name=tool_call.function.name,
-                    arguments=deserialize_arguments(tool_call.function.arguments),
-                ),
-            )
-
-        raise ValueError(f"Unknown tool call type: {tool_call.type}")
-
-    @staticmethod
-    def _tool_calls_from_openai(
-        tool_calls: Sequence["ChatCompletionMessageToolCallUnion"],
-    ) -> Sequence[ToolCall]:
-        return [
-            OpenAIChatTranslator._tool_call_from_openai(tool_call)
-            for tool_call in tool_calls
-        ]
 
     @staticmethod
     def from_openai(
