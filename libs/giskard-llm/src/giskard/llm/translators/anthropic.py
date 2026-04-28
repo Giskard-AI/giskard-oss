@@ -11,6 +11,7 @@ from ..types import (
     CompletionResponse,
     FunctionMessage,
     RefusalContent,
+    TextContent,
     ToolCall,
     ToolCallFunction,
     ToolDef,
@@ -22,6 +23,7 @@ from ..types._serialization import register_serializer
 from ..utils import deserialize_arguments
 
 if TYPE_CHECKING:
+    from anthropic.types.content_block import ContentBlock
     from anthropic.types.message import Message
     from anthropic.types.message_param import MessageParam
     from anthropic.types.model_param import ModelParam
@@ -69,7 +71,7 @@ def serialize_text_content(
 
 @register_serializer(ToolMessage, "anthropic/chat")
 def serialize_tool_message(
-    message: ToolMessage, _info: SerializationInfo
+    message: ToolMessage, info: SerializationInfo
 ) -> "MessageParam":
     return {
         "role": "user",
@@ -77,7 +79,7 @@ def serialize_tool_message(
             {
                 "type": "tool_result",
                 "tool_use_id": message.tool_call_id,
-                "content": message.content,
+                "content": _completion_content_to_blocks(message.content, info),
             }
         ],
     }
@@ -92,13 +94,16 @@ def serialize_function_message(
 
 def _completion_content_to_blocks(
     content: str | Sequence[CompletionContent],
-    info: SerializationInfo,
+    info: SerializationInfo | None = None,
 ) -> "Sequence[TextBlockParam]":
     if isinstance(content, str):
         return [_text_block(content)]
 
     return [
-        cast("TextBlockParam", cast(object, c.model_dump(context=info.context)))
+        cast(
+            "TextBlockParam",
+            cast(object, c.model_dump(context=info.context if info else None)),
+        )
         for c in content
     ]
 
@@ -143,9 +148,10 @@ def _extract_system_instruction(
     messages: Sequence[ChatMessage],
 ) -> "list[TextBlockParam] | None":
     system_blocks = [
-        _text_block(m.content)
+        block
         for m in messages
         if m.role == "system" or m.role == "developer"
+        for block in _completion_content_to_blocks(m.content)
     ]
     return system_blocks if system_blocks else None
 
@@ -224,6 +230,15 @@ class AnthropicChatConfigParams(_BaseModel):
         return v
 
 
+FINISH_REASON_MAP = {
+    "end_turn": "stop",
+    "max_tokens": "length",
+    "tool_use": "tool_calls",
+    "stop_sequence": "stop",
+    "refusal": "stop",
+}
+
+
 class AnthropicChatTranslator:
     @staticmethod
     def to_anthropic(
@@ -249,37 +264,51 @@ class AnthropicChatTranslator:
         )
 
     @staticmethod
+    def block_content_to_giskard(
+        block: "ContentBlock",
+    ) -> CompletionContent | ToolCall:
+        if block.type == "text":
+            return TextContent(text=block.text)
+        elif block.type == "tool_use":
+            return ToolCall(
+                id=block.id,
+                type="function",
+                function=ToolCallFunction(
+                    name=block.name,
+                    arguments=deserialize_arguments(block.input),
+                ),
+            )
+        else:
+            raise ValueError(f"Unsupported content block type: {block.type}")
+
+    @staticmethod
+    def blocks_to_giskard(
+        blocks: "Sequence[ContentBlock]",
+    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
+        content_and_tool_calls = [
+            AnthropicChatTranslator.block_content_to_giskard(block) for block in blocks
+        ]
+        content = [
+            content
+            for content in content_and_tool_calls
+            if not isinstance(content, ToolCall)
+        ]
+        tool_calls = [
+            tool_call
+            for tool_call in content_and_tool_calls
+            if isinstance(tool_call, ToolCall)
+        ]
+        return content, tool_calls
+
+    @staticmethod
     def from_anthropic(
         raw: "Message",
     ) -> CompletionResponse:
         """Convert raw SDK response to CompletionResponse."""
-        content_text: list[str] = []
-        tool_calls: list[ToolCall] = []
+        content, tool_calls = AnthropicChatTranslator.blocks_to_giskard(raw.content)
 
-        for block in raw.content:
-            if block.type == "text":
-                content_text.append(block.text)
-            elif block.type == "tool_use":
-                tool_calls.append(
-                    ToolCall(
-                        id=block.id,
-                        type="function",
-                        function=ToolCallFunction(
-                            name=block.name,
-                            arguments=deserialize_arguments(block.input),
-                        ),
-                    )
-                )
-
-        finish_reason_map = {
-            "end_turn": "stop",
-            "max_tokens": "length",
-            "tool_use": "tool_calls",
-            "stop_sequence": "stop",
-            "refusal": "stop",
-        }
         finish_reason = (
-            finish_reason_map.get(raw.stop_reason, "stop") if raw.stop_reason else None
+            FINISH_REASON_MAP.get(raw.stop_reason, "stop") if raw.stop_reason else None
         )
 
         refusal_out: str | None = None
@@ -289,7 +318,7 @@ class AnthropicChatTranslator:
 
         message = AssistantMessage(
             role="assistant",
-            content="\n".join(content_text) if content_text else None,
+            content=content if content else None,
             refusal=refusal_out,
             tool_calls=tool_calls or None,
         )

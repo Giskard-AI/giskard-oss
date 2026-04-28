@@ -12,6 +12,7 @@ import pytest
 pytest.importorskip("google.genai")
 
 from giskard.llm.translators.google_chat import GoogleChatTranslator
+from giskard.llm.types import TextContent
 from google.genai import types
 
 pytestmark = pytest.mark.google
@@ -49,7 +50,7 @@ def test_from_google_assistant_text():
     ch = out.choices[0]
     assert ch.index == 0
     assert ch.message.role == "assistant"
-    assert ch.message.content == "Hello from Gemini."
+    assert ch.message.content == [TextContent(text="Hello from Gemini.")]
     assert ch.message.tool_calls is None
     assert ch.finish_reason == "stop"
 
@@ -71,7 +72,10 @@ def test_from_google_multiple_text_parts_joined():
         }
     )
     out = GoogleChatTranslator.from_google(raw, _MODEL)
-    assert out.choices[0].message.content == "First.\nSecond."
+    assert out.choices[0].message.content == [
+        TextContent(text="First."),
+        TextContent(text="Second."),
+    ]
 
 
 def test_from_google_text_and_function_call():
@@ -99,7 +103,7 @@ def test_from_google_text_and_function_call():
     ch = out.choices[0]
     assert ch.finish_reason == "tool_calls"
     msg = ch.message
-    assert msg.content == "I will look up the weather."
+    assert msg.content == [TextContent(text="I will look up the weather.")]
     assert msg.tool_calls is not None
     assert len(msg.tool_calls) == 1
     assert msg.tool_calls[0].type == "function"

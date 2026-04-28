@@ -50,6 +50,38 @@ def test_single_user_message():
     validate_openai_completion_params(payload)
 
 
+def test_single_user_message_with_text_content():
+    """A lone user turn maps to one ``user`` message (typical conversation start)."""
+    msg: UserMessage = UserMessage(content=[TextContent(text="Hello.")])
+    payload = OpenAIChatTranslator.to_openai(_MODEL, [msg])
+
+    assert payload["model"] == _MODEL
+    assert payload["messages"] == [
+        {"role": "user", "content": [{"type": "text", "text": "Hello."}]}
+    ]
+    validate_openai_completion_params(payload)
+
+
+def test_single_user_message_with_text_contents():
+    """A lone user turn maps to one ``user`` message (typical conversation start)."""
+    msg: UserMessage = UserMessage(
+        content=[TextContent(text="Hello."), TextContent(text="World.")]
+    )
+    payload = OpenAIChatTranslator.to_openai(_MODEL, [msg])
+
+    assert payload["model"] == _MODEL
+    assert payload["messages"] == [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Hello."},
+                {"type": "text", "text": "World."},
+            ],
+        }
+    ]
+    validate_openai_completion_params(payload)
+
+
 @pytest.mark.parametrize(
     "instruction_role",
     ["system", "developer"],

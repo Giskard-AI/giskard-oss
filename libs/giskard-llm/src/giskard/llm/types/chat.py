@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Literal
 
 from ._base import ArgumentDict, _BaseModel
@@ -41,25 +42,39 @@ class ToolCall(_BaseModel):
 
 class SystemMessage(_BaseModel):
     role: Literal["system"] = "system"
-    content: str
+    content: str | Sequence[CompletionContent]
+
+    @property
+    def text(self) -> str:
+        if isinstance(self.content, str):
+            return self.content
+
+        return "\n".join([c.output_text for c in self.content])
 
     @property
     def transcript(self) -> str:
-        return f"[{self.role}]: {self.content}"
+        return f"[{self.role}]: {self.text}"
 
 
 class DeveloperMessage(_BaseModel):
     role: Literal["developer"] = "developer"
-    content: str
+    content: str | Sequence[CompletionContent]
+
+    @property
+    def text(self) -> str:
+        if isinstance(self.content, str):
+            return self.content
+
+        return "\n".join([c.output_text for c in self.content])
 
     @property
     def transcript(self) -> str:
-        return f"[{self.role}]: {self.content}"
+        return f"[{self.role}]: {self.text}"
 
 
 class UserMessage(_BaseModel):
     role: Literal["user"] = "user"
-    content: str
+    content: str | Sequence[CompletionContent]
 
     @property
     def transcript(self) -> str:
@@ -68,9 +83,9 @@ class UserMessage(_BaseModel):
 
 class AssistantMessage(_BaseModel):
     role: Literal["assistant"] = "assistant"
-    content: str | list[CompletionContent] | None = None
+    content: str | Sequence[CompletionContent] | None = None
     refusal: str | None = None
-    tool_calls: list[ToolCall] | None = None
+    tool_calls: Sequence[ToolCall] | None = None
 
     @property
     def output_text(self) -> str | None:
@@ -96,12 +111,19 @@ class AssistantMessage(_BaseModel):
 
 class ToolMessage(_BaseModel):
     role: Literal["tool"] = "tool"
-    content: str
+    content: str | Sequence[CompletionContent]
     tool_call_id: str
 
     @property
+    def text(self) -> str:
+        if isinstance(self.content, str):
+            return self.content
+
+        return "\n".join([c.output_text for c in self.content])
+
+    @property
     def transcript(self) -> str:
-        return f"[{self.role}]: {self.content}"
+        return f"[{self.role}]: {self.text}"
 
 
 class FunctionMessage(_BaseModel):

@@ -137,8 +137,6 @@ class OpenAIProvider:
         tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> CompletionResponse:
-        openai = _import_openai()
-
         try:
             messages_models = _CHAT_MESSAGES_TYPE_ADAPTER.validate_python(messages)
             tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
@@ -176,7 +174,6 @@ class OpenAIProvider:
                 sorted(unknown),
             )
 
-        openai = _import_openai()
         kwargs: dict[str, Any] = {"model": model, "input": input}
         if (dimensions := params.get("dimensions")) is not None:
             kwargs["dimensions"] = dimensions

@@ -51,6 +51,42 @@ def test_single_user_message():
     validate_anthropic_message_create(payload)
 
 
+def test_single_user_message_with_text_content():
+    """A lone user turn maps to one ``messages`` entry (typical conversation start)."""
+    msg: UserMessage = UserMessage(content=[TextContent(text="Hello.")])
+    payload = AnthropicChatTranslator.to_anthropic(_MODEL, [msg])
+
+    assert payload["model"] == _MODEL
+    assert payload["max_tokens"] == 4096
+    assert payload["messages"] == [
+        {"role": "user", "content": [{"type": "text", "text": "Hello."}]}
+    ]
+    assert "system" not in payload
+    validate_anthropic_message_create(payload)
+
+
+def test_single_user_message_with_text_contents():
+    """A lone user turn maps to one ``messages`` entry (typical conversation start)."""
+    msg: UserMessage = UserMessage(
+        content=[TextContent(text="Hello."), TextContent(text="World.")]
+    )
+    payload = AnthropicChatTranslator.to_anthropic(_MODEL, [msg])
+
+    assert payload["model"] == _MODEL
+    assert payload["max_tokens"] == 4096
+    assert payload["messages"] == [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Hello."},
+                {"type": "text", "text": "World."},
+            ],
+        }
+    ]
+    assert "system" not in payload
+    validate_anthropic_message_create(payload)
+
+
 @pytest.mark.parametrize(
     "instruction_role",
     ["system", "developer"],
@@ -209,7 +245,12 @@ def test_user_tool_call_and_result_with_tools():
                 {
                     "type": "tool_result",
                     "tool_use_id": TOOL_CALL_ID,
-                    "content": TOOL_RESULT_CONTENT,
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": TOOL_RESULT_CONTENT,
+                        }
+                    ],
                 }
             ],
         },
@@ -261,12 +302,22 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
                 {
                     "type": "tool_result",
                     "tool_use_id": TOOL_CALL_ID_WEATHER_PARALLEL,
-                    "content": TOOL_RESULT_WEATHER_PARALLEL,
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": TOOL_RESULT_WEATHER_PARALLEL,
+                        }
+                    ],
                 },
                 {
                     "type": "tool_result",
                     "tool_use_id": TOOL_CALL_ID_TIME_PARALLEL,
-                    "content": TOOL_RESULT_TIME_PARALLEL,
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": TOOL_RESULT_TIME_PARALLEL,
+                        }
+                    ],
                 },
             ],
         },
@@ -319,12 +370,22 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
                 {
                     "type": "tool_result",
                     "tool_use_id": TOOL_CALL_ID_WEATHER_PARALLEL,
-                    "content": TOOL_RESULT_WEATHER_PARALLEL,
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": TOOL_RESULT_WEATHER_PARALLEL,
+                        }
+                    ],
                 },
                 {
                     "type": "tool_result",
                     "tool_use_id": TOOL_CALL_ID_TIME_PARALLEL,
-                    "content": TOOL_RESULT_TIME_PARALLEL,
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": TOOL_RESULT_TIME_PARALLEL,
+                        }
+                    ],
                 },
             ],
         },

@@ -47,6 +47,32 @@ def test_single_user_message():
     validate_google_contents(payload["contents"])
 
 
+def test_single_user_message_with_text_content():
+    """A lone user turn maps to one user ``contents`` entry."""
+    msg: UserMessage = UserMessage(content=[TextContent(text="Hello.")])
+    payload = GoogleChatTranslator.to_google(_MODEL, [msg])
+
+    assert payload["model"] == _MODEL
+    assert payload["contents"] == [{"role": "user", "parts": [{"text": "Hello."}]}]
+    assert payload.get("config", {}) == {}
+    validate_google_contents(payload["contents"])
+
+
+def test_single_user_message_with_text_contents():
+    """A lone user turn maps to one user ``contents`` entry."""
+    msg: UserMessage = UserMessage(
+        content=[TextContent(text="Hello."), TextContent(text="World.")]
+    )
+    payload = GoogleChatTranslator.to_google(_MODEL, [msg])
+
+    assert payload["model"] == _MODEL
+    assert payload["contents"] == [
+        {"role": "user", "parts": [{"text": "Hello."}, {"text": "World."}]}
+    ]
+    assert payload.get("config", {}) == {}
+    validate_google_contents(payload["contents"])
+
+
 @pytest.mark.parametrize(
     "instruction_role",
     ["system", "developer"],

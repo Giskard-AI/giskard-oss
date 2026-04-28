@@ -19,6 +19,7 @@ from giskard.llm.types import (
     ResponseOutputFunctionCall,
     ResponseOutputMessage,
     ResponseOutputText,
+    TextContent,
     ToolCall,
 )
 
@@ -403,7 +404,7 @@ async def test_anthropic_validate_multi_system_with_merge(mock_import):
             {"role": "user", "content": "Hi"},
         ],
     )
-    assert resp.choices[0].message.content == "Hello"
+    assert resp.choices[0].message.content == [TextContent(text="Hello")]
 
 
 @patch("giskard.llm.providers.anthropic._import_anthropic")
@@ -429,7 +430,8 @@ async def test_anthropic_validate_consecutive_developers_ok(mock_import):
             {"role": "user", "content": "Hi"},
         ],
     )
-    assert resp.choices[0].message.content == "Hello"
+    assert resp.choices[0].message.content == [TextContent(text="Hello")]
+    assert resp.choices[0].message.tool_calls is None
 
 
 @patch("giskard.llm.providers.anthropic._import_anthropic")

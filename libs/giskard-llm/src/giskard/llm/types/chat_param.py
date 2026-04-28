@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any, Literal, Required, TypedDict
 
 # -- Chat content types -------------------------------------------------------------
@@ -36,23 +37,23 @@ class SystemMessageParam(TypedDict, total=False):
 
 class DeveloperMessageParam(TypedDict, total=False):
     role: Required[Literal["developer"]]
-    content: Required[str]
+    content: Required[str | Sequence[CompletionContentParam]]
 
 
 class UserMessageParam(TypedDict, total=False):
     role: Required[Literal["user"]]
-    content: Required[str]
+    content: Required[str | Sequence[CompletionContentParam]]
 
 
 class AssistantMessageParam(TypedDict, total=False):
     role: Required[Literal["assistant"]]
-    content: str | list[CompletionContentParam]
+    content: str | Sequence[CompletionContentParam]
     refusal: str
     tool_calls: list[ToolCallParam]
 
 
 class ToolMessageParam(TypedDict, total=False):
-    content: Required[str]
+    content: Required[str | Sequence[CompletionContentParam]]
     role: Required[Literal["tool"]]
     tool_call_id: Required[str]
 

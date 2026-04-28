@@ -12,6 +12,7 @@ pytest.importorskip("anthropic")
 
 from anthropic.types import Message
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
+from giskard.llm.types import TextContent
 
 pytestmark = pytest.mark.anthropic
 
@@ -48,7 +49,7 @@ def test_from_anthropic_assistant_text():
     assert ch.index == 0
     assert ch.finish_reason == "stop"
     assert ch.message.role == "assistant"
-    assert ch.message.content == "Hello from Claude."
+    assert ch.message.content == [TextContent(text="Hello from Claude.")]
     assert ch.message.refusal is None
     assert ch.message.tool_calls is None
 
@@ -83,7 +84,10 @@ def test_from_anthropic_multiple_text_blocks_joined():
         }
     )
     out = AnthropicChatTranslator.from_anthropic(raw)
-    assert out.choices[0].message.content == "Line one.\nLine two."
+    assert out.choices[0].message.content == [
+        TextContent(text="Line one."),
+        TextContent(text="Line two."),
+    ]
 
 
 def test_from_anthropic_text_and_tool_use():
@@ -106,7 +110,7 @@ def test_from_anthropic_text_and_tool_use():
     ch = out.choices[0]
     assert ch.finish_reason == "tool_calls"
     msg = ch.message
-    assert msg.content == "I will use a tool."
+    assert msg.content == [TextContent(text="I will use a tool.")]
     assert msg.tool_calls is not None
     assert len(msg.tool_calls) == 1
     assert msg.tool_calls[0].id == "toolu_01"

@@ -29,7 +29,6 @@ from ..types import (
 )
 from ..types._base import _BaseModel
 from ..types._serialization import register_serializer
-from ..utils import deserialize_arguments
 
 if TYPE_CHECKING:
     from google.genai.types import (
@@ -37,6 +36,7 @@ if TYPE_CHECKING:
         ContentUnionDict,
         GenerateContentConfigDict,
         GenerateContentResponse,
+        Part,
         PartDict,
         ToolDict,
     )
@@ -88,7 +88,7 @@ def serialize_refusal_content(
 
 
 def _assistant_content_to_parts(
-    content: str | list[CompletionContent], info: SerializationInfo
+    content: str | Sequence[CompletionContent], info: SerializationInfo
 ) -> "Sequence[PartDict]":
     if isinstance(content, str):
         return [_text_content(content)]
@@ -112,10 +112,19 @@ def serialize_tool_call(tool_call: ToolCall, info: SerializationInfo) -> "PartDi
 def serialize_user_message(
     message: UserMessage, info: SerializationInfo
 ) -> "ContentUnionDict":
-    return {
-        "role": "user",
-        "parts": [_text_content(message.content)],
-    }
+    if isinstance(message.content, str):
+        return {
+            "role": "user",
+            "parts": [_text_content(message.content)],
+        }
+    else:
+        return {
+            "role": "user",
+            "parts": [
+                cast("PartDict", cast(object, c.model_dump(context=info.context)))
+                for c in message.content
+            ],
+        }
 
 
 def _get_name_from_call_id(call_id: str, info: SerializationInfo) -> str | None:
@@ -181,7 +190,7 @@ def serialize_assistant_message(
 
 def _extract_system_instruction(messages: Sequence[ChatMessage]) -> list[str] | None:
     system_parts = [
-        m.content for m in messages if m.role == "system" or m.role == "developer"
+        m.text for m in messages if m.role == "system" or m.role == "developer"
     ]
     return system_parts if system_parts else None
 
@@ -253,6 +262,23 @@ class GoogleChatParams(_BaseModel):
         return v
 
 
+REFUSAL_REASONS = frozenset(
+    {
+        "SAFETY",
+        "BLOCKLIST",
+        "PROHIBITED_CONTENT",
+        "SPII",
+        "IMAGE_PROHIBITED_CONTENT",
+    }
+)
+
+FINISH_REASON_MAP = {
+    "STOP": "stop",
+    "MAX_TOKENS": "length",
+    "SAFETY": "content_filter",
+} | {reason: "refusal" for reason in REFUSAL_REASONS}
+
+
 class GoogleChatTranslator:
     @staticmethod
     def to_google(
@@ -290,62 +316,77 @@ class GoogleChatTranslator:
         )
 
     @staticmethod
+    def part_content_to_giskard(part: "Part") -> CompletionContent | ToolCall:
+        if part.text is not None:
+            return TextContent(text=part.text)
+        if part.function_call is not None:
+            fc = part.function_call
+            return ToolCall(
+                id=f"call_{uuid4().hex[:8]}",
+                type="function",
+                function=ToolCallFunction(
+                    name=fc.name or "",
+                    arguments=fc.args or {},
+                ),
+            )
+        raise ValueError(f"Unsupported part content type: {part}")
+
+    @staticmethod
+    def parts_to_giskard(
+        parts: "Sequence[Part]",
+    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
+        content_and_tool_calls = [
+            GoogleChatTranslator.part_content_to_giskard(part) for part in parts
+        ]
+        content = [
+            content
+            for content in content_and_tool_calls
+            if not isinstance(content, ToolCall)
+        ]
+        tool_calls = [
+            tool_call
+            for tool_call in content_and_tool_calls
+            if isinstance(tool_call, ToolCall)
+        ]
+        return content, tool_calls
+
+    @staticmethod
     def from_google(raw: "GenerateContentResponse", model: str) -> CompletionResponse:
         choices: list[Choice] = []
         if not raw.candidates:
             return CompletionResponse(choices=[], model=model)
 
         for i, candidate in enumerate(raw.candidates):
-            content = None
-            tool_calls: list[ToolCall] | None = None
             finish_reason = "stop"
 
             if candidate.finish_reason:
-                finish_reason_map = {
-                    "STOP": "stop",
-                    "MAX_TOKENS": "length",
-                    "SAFETY": "content_filter",
-                }
-                finish_reason = finish_reason_map.get(
+                finish_reason = FINISH_REASON_MAP.get(
                     str(candidate.finish_reason), "stop"
                 )
 
+            refusal_out = (
+                (candidate.finish_message or candidate.finish_reason)
+                if finish_reason == "refusal"
+                else None
+            )
+
             if candidate.content and candidate.content.parts:
-                text_parts = []
-                fc_list: list[ToolCall] = []
-                for part in candidate.content.parts:
-                    if part.text is not None:
-                        text_parts.append(part.text)
-                    elif part.function_call is not None:
-                        fc = part.function_call
-                        raw_args = fc.args
-                        if raw_args is None:
-                            tool_args: dict[str, Any] = {}
-                        elif isinstance(raw_args, (str, dict)):
-                            tool_args = deserialize_arguments(raw_args)
-                        else:
-                            tool_args = {}
-                        fc_list.append(
-                            ToolCall(
-                                id=f"call_{uuid4().hex[:8]}",
-                                type="function",
-                                function=ToolCallFunction(
-                                    name=fc.name or "",
-                                    arguments=tool_args,
-                                ),
-                            )
-                        )
-                content = "\n".join(text_parts) if text_parts else None
-                if fc_list:
-                    tool_calls = fc_list
+                content, tool_calls = GoogleChatTranslator.parts_to_giskard(
+                    candidate.content.parts
+                )
+                if tool_calls:
                     finish_reason = "tool_calls"
+            else:
+                content = None
+                tool_calls = None
 
             choices.append(
                 Choice(
                     message=AssistantMessage(
                         role="assistant",
-                        content=content,
-                        tool_calls=tool_calls,
+                        content=content if content else None,
+                        refusal=refusal_out,
+                        tool_calls=tool_calls if tool_calls else None,
                     ),
                     finish_reason=finish_reason,
                     index=i,
