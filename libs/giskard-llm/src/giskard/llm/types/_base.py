@@ -11,7 +11,7 @@ from pydantic import (
     model_serializer,
 )
 
-from ._serialization import get_serializer
+from ._serialization import get_serializer, register_serializer
 
 
 class _BaseModel(BaseModel):
@@ -36,6 +36,10 @@ class _BaseModel(BaseModel):
             return custom_serializer(self, info)
 
         return handler(self)
+
+    @classmethod
+    def register_serializer(cls, provider: str):
+        return register_serializer(cls, provider)
 
 
 def _coerce_json(value: Any) -> Any:
