@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 PROVIDER = "openai"
-
+_PROVIDER = "openai/chat"
 KNOWN_COMPLETION_PARAMS = frozenset(
     {"temperature", "max_tokens", "timeout", "tools", "response_format", "metadata"}
 )
@@ -88,7 +88,7 @@ class OpenAIChatTranslator:
 
         return cast(
             "CompletionCreateParamsWithTimeout",
-            cast(object, chat_params.model_dump(context={"provider": "openai/chat"})),
+            cast(object, chat_params.model_dump(context={"provider": _PROVIDER})),
         )
 
     @staticmethod

@@ -27,7 +27,6 @@ from ..types import (
     UserMessage,
 )
 from ..types._base import _BaseModel
-from ..types._serialization import register_serializer
 
 if TYPE_CHECKING:
     from google.genai.types import (
@@ -46,6 +45,7 @@ if TYPE_CHECKING:
         config: GenerateContentConfigDict
 
 
+_PROVIDER = "google/chat"
 PROVIDER = "google"
 
 KNOWN_COMPLETION_PARAMS = frozenset(
@@ -55,7 +55,7 @@ KNOWN_COMPLETION_PARAMS = frozenset(
 logger = logging.getLogger(__name__)
 
 
-@register_serializer(ToolDef, "google/chat")
+@ToolDef.register_serializer(_PROVIDER)
 def serialize_tool_def(tool: ToolDef, _info: SerializationInfo) -> "ToolDict":
     return {
         "function_declarations": [
@@ -72,14 +72,14 @@ def _text_content(text: str) -> "PartDict":
     return {"text": text}
 
 
-@register_serializer(TextContent, "google/chat")
+@TextContent.register_serializer(_PROVIDER)
 def serialize_text_content(
     content: TextContent, _info: SerializationInfo
 ) -> "PartDict":
     return _text_content(content.text)
 
 
-@register_serializer(RefusalContent, "google/chat")
+@RefusalContent.register_serializer(_PROVIDER)
 def serialize_refusal_content(
     content: RefusalContent, _info: SerializationInfo
 ) -> "PartDict":
@@ -97,7 +97,7 @@ def _assistant_content_to_parts(
     ]
 
 
-@register_serializer(ToolCall, "google/chat")
+@ToolCall.register_serializer(_PROVIDER)
 def serialize_tool_call(tool_call: ToolCall, info: SerializationInfo) -> "PartDict":
     return {
         "function_call": {
@@ -107,7 +107,7 @@ def serialize_tool_call(tool_call: ToolCall, info: SerializationInfo) -> "PartDi
     }
 
 
-@register_serializer(UserMessage, "google/chat")
+@UserMessage.register_serializer(_PROVIDER)
 def serialize_user_message(
     message: UserMessage, info: SerializationInfo
 ) -> "ContentUnionDict":
@@ -137,7 +137,7 @@ def _get_name_from_call_id(call_id: str, info: SerializationInfo) -> str | None:
     return None
 
 
-@register_serializer(ToolMessage, "google/chat")
+@ToolMessage.register_serializer(_PROVIDER)
 def serialize_tool_message(
     message: ToolMessage, info: SerializationInfo
 ) -> "ContentUnionDict":
@@ -158,14 +158,14 @@ def serialize_tool_message(
     }
 
 
-@register_serializer(FunctionMessage, "google/chat")
+@FunctionMessage.register_serializer(_PROVIDER)
 def serialize_function_message(
     message: FunctionMessage, info: SerializationInfo
 ) -> "ContentUnionDict":
     raise ValueError(f"Unsupported message role for google chat: {message.role}")
 
 
-@register_serializer(AssistantMessage, "google/chat")
+@AssistantMessage.register_serializer(_PROVIDER)
 def serialize_assistant_message(
     message: AssistantMessage, info: SerializationInfo
 ) -> "ContentUnionDict":
@@ -313,7 +313,7 @@ class GoogleChatTranslator:
 
         return cast(
             "GenerateContentParams",
-            cast(object, google_params.model_dump(context={"provider": "google/chat"})),
+            cast(object, google_params.model_dump(context={"provider": _PROVIDER})),
         )
 
     @staticmethod

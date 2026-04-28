@@ -19,7 +19,6 @@ from ..types import (
     Usage,
 )
 from ..types._base import _BaseModel
-from ..types._serialization import register_serializer
 from ..utils import deserialize_arguments
 
 if TYPE_CHECKING:
@@ -45,8 +44,10 @@ if TYPE_CHECKING:
 else:
     httpxTimeout = Any
 
+_PROVIDER = "anthropic/chat"
 
-@register_serializer(ToolDef, "anthropic/chat")
+
+@ToolDef.register_serializer(_PROVIDER)
 def serialize_tool_def(tool: ToolDef, _info: SerializationInfo) -> "ToolUnionParam":
     return {
         "name": tool.function.name,
@@ -62,14 +63,14 @@ def _text_block(text: str) -> "TextBlockParam":
     }
 
 
-@register_serializer(RefusalContent, "anthropic/chat")
+@RefusalContent.register_serializer(_PROVIDER)
 def serialize_text_content(
     content: RefusalContent, _info: SerializationInfo
 ) -> "TextBlockParam":
     return _text_block(content.refusal)
 
 
-@register_serializer(ToolMessage, "anthropic/chat")
+@ToolMessage.register_serializer(_PROVIDER)
 def serialize_tool_message(
     message: ToolMessage, info: SerializationInfo
 ) -> "MessageParam":
@@ -85,7 +86,7 @@ def serialize_tool_message(
     }
 
 
-@register_serializer(FunctionMessage, "anthropic/chat")
+@FunctionMessage.register_serializer(_PROVIDER)
 def serialize_function_message(
     message: FunctionMessage, info: SerializationInfo
 ) -> "MessageParam":
@@ -108,7 +109,7 @@ def _completion_content_to_blocks(
     ]
 
 
-@register_serializer(AssistantMessage, "anthropic/chat")
+@AssistantMessage.register_serializer(_PROVIDER)
 def serialize_assistant_message(
     message: AssistantMessage, info: SerializationInfo
 ) -> "MessageParam":
@@ -259,7 +260,7 @@ class AnthropicChatTranslator:
             "CompletionCreateParams",
             cast(
                 object,
-                anthropic_params.model_dump(context={"provider": "anthropic/chat"}),
+                anthropic_params.model_dump(context={"provider": _PROVIDER}),
             ),
         )
 

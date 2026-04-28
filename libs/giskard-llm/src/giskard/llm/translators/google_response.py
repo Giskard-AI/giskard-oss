@@ -18,7 +18,6 @@ from ..types import (
     ToolDef,
     Usage,
 )
-from ..types._serialization import register_serializer
 from ..utils import deserialize_arguments
 
 if TYPE_CHECKING:
@@ -46,13 +45,14 @@ else:
     # Skip validation for httpxTimeout
     httpxTimeout = Any
 
+_PROVIDER = "google/response"
 PROVIDER = "google"
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "timeout", "response_format"})
 
 logger = logging.getLogger(__name__)
 
 
-@register_serializer(ToolDef, "google/response")
+@ToolDef.register_serializer(_PROVIDER)
 def serialize_tool_def(tool: ToolDef, _info: SerializationInfo) -> "ToolParam":
     return {
         "type": "function",
@@ -66,28 +66,28 @@ def _text_content(text: str) -> "TextContentParam":
     return {"type": "text", "text": text}
 
 
-@register_serializer(ResponseInputText, "google/response")
+@ResponseInputText.register_serializer(_PROVIDER)
 def serialize_input_text(
     model: ResponseInputText, _info: SerializationInfo
 ) -> "TextContentParam":
     return _text_content(model.text)
 
 
-@register_serializer(ResponseOutputText, "google/response")
+@ResponseOutputText.register_serializer(_PROVIDER)
 def serialize_output_text(
     model: ResponseOutputText, _info: SerializationInfo
 ) -> "TextContentParam":
     return _text_content(model.text)
 
 
-@register_serializer(ResponseOutputRefusal, "google/response")
+@ResponseOutputRefusal.register_serializer(_PROVIDER)
 def serialize_output_refusal(
     model: ResponseOutputRefusal, _info: SerializationInfo
 ) -> "TextContentParam":
     return _text_content(model.refusal)
 
 
-@register_serializer(ResponseEasyInputMessage, "google/response")
+@ResponseEasyInputMessage.register_serializer(_PROVIDER)
 def serialize_easy_input_message(
     model: ResponseEasyInputMessage, info: SerializationInfo
 ) -> "TurnParam | None":
@@ -104,7 +104,7 @@ def serialize_easy_input_message(
     return {"content": content, "role": model.role}
 
 
-@register_serializer(ResponseOutputMessage, "google/response")
+@ResponseOutputMessage.register_serializer(_PROVIDER)
 def serialize_output_message(
     model: ResponseOutputMessage, info: SerializationInfo
 ) -> "TurnParam":
@@ -224,7 +224,7 @@ class GoogleResponseTranslator:
             "InteractionCreateParams",
             cast(
                 object,
-                google_params.model_dump(context={"provider": "google/response"}),
+                google_params.model_dump(context={"provider": _PROVIDER}),
             ),
         )
 

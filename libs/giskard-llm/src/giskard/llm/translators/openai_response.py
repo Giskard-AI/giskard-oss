@@ -8,7 +8,6 @@ from giskard.llm.types import (
     ToolDef,
 )
 from giskard.llm.types._base import _BaseModel
-from giskard.llm.types._serialization import register_serializer
 from pydantic import Field, SerializationInfo
 
 if TYPE_CHECKING:
@@ -22,9 +21,10 @@ KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "max_tokens"})
 
 logger = logging.getLogger(__name__)
 PROVIDER = "openai"
+_PROVIDER = "openai/response"
 
 
-@register_serializer(ToolDef, "openai/response")
+@ToolDef.register_serializer(_PROVIDER)
 def tool_def_to_openai(tool: ToolDef, _info: SerializationInfo) -> "ToolParam":
     return {
         "type": "function",
@@ -79,7 +79,7 @@ class OpenAIResponseTranslator:
             "ResponseCreateParamsNonStreaming",
             cast(
                 object,
-                response_params.model_dump(context={"provider": "openai/response"}),
+                response_params.model_dump(context={"provider": _PROVIDER}),
             ),
         )
 
