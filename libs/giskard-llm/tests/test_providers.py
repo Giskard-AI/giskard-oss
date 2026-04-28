@@ -157,8 +157,9 @@ def _make_google_interaction_response(
         id=id,
         outputs=output_items,
         usage=SimpleNamespace(
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
+            total_input_tokens=input_tokens,
+            total_output_tokens=output_tokens,
+            total_tokens=input_tokens + output_tokens,
         ),
     )
 

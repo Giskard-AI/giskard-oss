@@ -209,15 +209,13 @@ class GoogleProvider:
         try:
             messages_models = _CHAT_MESSAGES_TYPE_ADAPTER.validate_python(messages)
             tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
-        except ValidationError as e:
-            raise BadRequestError(400, str(e), PROVIDER) from e
 
-        self._validate_messages(messages_models)
-        try:
+            self._validate_messages(messages_models)
+
             kwargs = GoogleChatTranslator.to_google(
                 model, messages_models, tools=tools_models, **params
             )
-        except ValueError as e:
+        except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:
@@ -225,7 +223,7 @@ class GoogleProvider:
         except Exception as e:  # Broad catch: _map_error checks SDK types first, then applies timeout heuristic, then re-raises.
             self._map_error(e)
 
-        return GoogleChatTranslator.from_google(raw, model)
+        return GoogleChatTranslator.from_google(raw, model, len(messages))
 
     async def embed(
         self,
@@ -304,10 +302,7 @@ class GoogleProvider:
         try:
             input_models = _RESPONSE_INPUT_ITEMS_TYPE_ADAPTER.validate_python(input)
             tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
-        except ValidationError as e:
-            raise BadRequestError(400, str(e), PROVIDER) from e
 
-        try:
             kwargs = GoogleResponseTranslator.to_google(
                 model,
                 input_models,
@@ -316,7 +311,7 @@ class GoogleProvider:
                 tools=tools_models,
                 **params,
             )
-        except ValueError as e:
+        except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:

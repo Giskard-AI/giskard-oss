@@ -47,7 +47,7 @@ Provider-specific kwargs (configure-time):
 
 import logging
 from collections.abc import Sequence
-from typing import Any, Literal, NoReturn, TypedDict
+from typing import Any, NoReturn
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -81,29 +81,6 @@ _ANTHROPIC_INSTRUCTION_ROLES = frozenset({"system", "developer"})
 _CHAT_MESSAGES_TYPE_ADAPTER = TypeAdapter(Sequence[ChatMessage])
 _TOOL_DEFS_TYPE_ADAPTER = TypeAdapter(Sequence[ToolDef] | None)
 # -- Private wire-format TypedDicts -------------------------------------------
-
-
-class _ToolResultContent(TypedDict):
-    type: Literal["tool_result"]
-    tool_use_id: str
-    content: str
-
-
-class _ToolUseContent(TypedDict):
-    type: Literal["tool_use"]
-    id: str
-    name: str
-    input: dict[str, Any]
-
-
-class _TextContent(TypedDict):
-    type: Literal["text"]
-    text: str
-
-
-class _AnthropicMessage(TypedDict):
-    role: str
-    content: str | list[_ToolResultContent | _ToolUseContent | _TextContent]
 
 
 def _import_anthropic() -> Any:
@@ -163,20 +140,16 @@ class AnthropicProvider:
         tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> CompletionResponse:
-        anthropic = _import_anthropic()
-
         try:
             messages_models = _CHAT_MESSAGES_TYPE_ADAPTER.validate_python(messages)
             tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
-        except ValidationError as e:
-            raise BadRequestError(400, str(e), PROVIDER) from e
 
-        self._validate_messages(messages_models)
-        try:
+            self._validate_messages(messages_models)
+
             kwargs = AnthropicChatTranslator.to_anthropic(
                 model, messages_models, tools=tools_models, **params
             )
-        except ValueError as e:
+        except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:

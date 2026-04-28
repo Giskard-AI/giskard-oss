@@ -258,14 +258,11 @@ class GoogleResponseTranslator:
                 )
 
         usage = None
-        usage_meta = getattr(raw, "usage", None)
-        if usage_meta:
-            outputs_tokens = getattr(usage_meta, "output_tokens", 0) or 0
-            input_tokens = getattr(usage_meta, "input_tokens", 0) or 0
+        if raw.usage:
             usage = Usage(
-                input_tokens=input_tokens,
-                output_tokens=outputs_tokens,
-                total_tokens=input_tokens + outputs_tokens,
+                input_tokens=raw.usage.total_input_tokens or 0,
+                output_tokens=raw.usage.total_output_tokens or 0,
+                total_tokens=raw.usage.total_tokens or 0,
             )
 
         return ResponseResult(

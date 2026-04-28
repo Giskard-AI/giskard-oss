@@ -41,7 +41,7 @@ def test_from_google_assistant_text():
             },
         }
     )
-    out = GoogleChatTranslator.from_google(raw, _MODEL)
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
     assert out.model == _MODEL
     assert out.usage is not None
     assert out.usage.input_tokens == 3
@@ -71,7 +71,7 @@ def test_from_google_multiple_text_parts_joined():
             ],
         }
     )
-    out = GoogleChatTranslator.from_google(raw, _MODEL)
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
     assert out.choices[0].message.content == [
         TextContent(text="First."),
         TextContent(text="Second."),
@@ -99,7 +99,7 @@ def test_from_google_text_and_function_call():
             ],
         }
     )
-    out = GoogleChatTranslator.from_google(raw, _MODEL)
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
     ch = out.choices[0]
     assert ch.finish_reason == "tool_calls"
     msg = ch.message
@@ -114,6 +114,6 @@ def test_from_google_text_and_function_call():
 def test_from_google_empty_candidates():
     """No `candidates` yields an empty `choices` list; only `model` is set."""
     raw = _raw({"candidates": []})
-    out = GoogleChatTranslator.from_google(raw, _MODEL)
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
     assert out.choices == []
     assert out.model == _MODEL

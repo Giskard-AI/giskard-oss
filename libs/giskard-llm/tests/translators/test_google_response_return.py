@@ -8,7 +8,6 @@ This is the Interactions (response) path. For **request** translation (``to_goog
 """
 
 from datetime import datetime, timezone
-from types import SimpleNamespace
 
 import pytest
 
@@ -24,6 +23,7 @@ from google.genai._interactions.types import (
     FunctionCallContent,
     Interaction,
     TextContent,
+    Usage,
 )
 
 pytestmark = pytest.mark.google
@@ -60,7 +60,11 @@ def test_from_google_text_output():
     """``type: text`` outputs become a :class:`ResponseOutputMessage` with ``ResponseOutputText``."""
     raw = _interaction(
         [TextContent(type="text", text="Hello from Interactions.")],
-        usage=SimpleNamespace(input_tokens=3, output_tokens=4),
+        usage=Usage(
+            total_input_tokens=3,
+            total_output_tokens=4,
+            total_tokens=7,
+        ),
     )
     out = GoogleResponseTranslator.from_google(raw, _MODEL)
     assert out.id == "int_test"

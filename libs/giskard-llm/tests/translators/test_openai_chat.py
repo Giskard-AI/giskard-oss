@@ -4,7 +4,7 @@ Request shape: https://platform.openai.com/docs/api-reference/chat/create
 """
 
 import json
-from typing import Literal
+from typing import Literal, cast
 
 import pytest
 from giskard.llm.translators.openai_chat import OpenAIChatTranslator
@@ -18,6 +18,7 @@ from giskard.llm.types import (
     TextContent,
     UserMessage,
 )
+from pydantic import BaseModel
 
 from .sdk_payload_validation import validate_openai_completion_params
 from .tool_turn_fixtures import (
@@ -380,3 +381,33 @@ def test_function_message_passes_through():
         {"role": "user", "content": "What is 2+2?"},
         {"role": "function", "name": "calculate", "content": "4"},
     ]
+
+
+class _OptionalReasonModel(BaseModel):
+    passed: bool
+    reason: str | None = None
+
+
+def test_response_format_pydantic_model_json_schema_without_strict():
+    """Coerce ``response_format`` BaseModel to json_schema without OpenAI strict mode.
+
+    Strict structured output rejects Pydantic schemas where some properties are not
+    listed in ``required`` (e.g. optional nullable ``reason``); non-strict json_schema
+    must still validate as Chat Completions params.
+    """
+    msg: UserMessage = UserMessage(content="Hi.")
+    payload_raw = OpenAIChatTranslator.to_openai(
+        _MODEL, [msg], response_format=_OptionalReasonModel
+    )
+    payload = json.loads(json.dumps(cast(object, payload_raw)))
+    rf = payload["response_format"]
+    assert isinstance(rf, dict)
+    assert rf["type"] == "json_schema"
+    inner = rf["json_schema"]
+    assert isinstance(inner, dict)
+    assert inner["name"] == "_OptionalReasonModel"
+    assert "strict" not in inner
+    schema_inner = inner["schema"]
+    assert isinstance(schema_inner, dict)
+    assert schema_inner.get("additionalProperties") is False
+    validate_openai_completion_params(payload_raw)

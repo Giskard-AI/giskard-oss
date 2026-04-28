@@ -54,7 +54,6 @@ class OpenAIChatParams(_BaseModel):
                 "type": "json_schema",
                 "json_schema": {
                     "name": v.__name__,
-                    "strict": True,
                     "schema": schema,
                 },
             }

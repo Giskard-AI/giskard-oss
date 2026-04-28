@@ -1,7 +1,6 @@
 import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
-from uuid import uuid4
 
 from pydantic import (
     BaseModel,
@@ -316,13 +315,15 @@ class GoogleChatTranslator:
         )
 
     @staticmethod
-    def part_content_to_giskard(part: "Part") -> CompletionContent | ToolCall:
+    def part_content_to_giskard(
+        part: "Part", num_messages: int, part_index: int
+    ) -> CompletionContent | ToolCall:
         if part.text is not None:
             return TextContent(text=part.text)
         if part.function_call is not None:
             fc = part.function_call
             return ToolCall(
-                id=f"call_{uuid4().hex[:8]}",
+                id=f"call_{num_messages}_{part_index}",
                 type="function",
                 function=ToolCallFunction(
                     name=fc.name or "",
@@ -334,9 +335,11 @@ class GoogleChatTranslator:
     @staticmethod
     def parts_to_giskard(
         parts: "Sequence[Part]",
+        num_messages: int,
     ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
         content_and_tool_calls = [
-            GoogleChatTranslator.part_content_to_giskard(part) for part in parts
+            GoogleChatTranslator.part_content_to_giskard(part, num_messages, part_index)
+            for part_index, part in enumerate(parts)
         ]
         content = [
             content
@@ -351,7 +354,9 @@ class GoogleChatTranslator:
         return content, tool_calls
 
     @staticmethod
-    def from_google(raw: "GenerateContentResponse", model: str) -> CompletionResponse:
+    def from_google(
+        raw: "GenerateContentResponse", model: str, num_messages: int
+    ) -> CompletionResponse:
         choices: list[Choice] = []
         if not raw.candidates:
             return CompletionResponse(choices=[], model=model)
@@ -372,7 +377,8 @@ class GoogleChatTranslator:
 
             if candidate.content and candidate.content.parts:
                 content, tool_calls = GoogleChatTranslator.parts_to_giskard(
-                    candidate.content.parts
+                    candidate.content.parts,
+                    num_messages,
                 )
                 if tool_calls:
                     finish_reason = "tool_calls"

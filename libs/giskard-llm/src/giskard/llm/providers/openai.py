@@ -140,15 +140,13 @@ class OpenAIProvider:
         try:
             messages_models = _CHAT_MESSAGES_TYPE_ADAPTER.validate_python(messages)
             tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
-        except ValidationError as e:
-            raise BadRequestError(400, str(e), PROVIDER) from e
 
-        self._validate_messages(messages_models)
-        try:
+            self._validate_messages(messages_models)
+
             kwargs = OpenAIChatTranslator.to_openai(
                 model, messages_models, tools=tools_models, **params
             )
-        except ValueError as e:
+        except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:
@@ -239,10 +237,7 @@ class OpenAIProvider:
         try:
             input_models = _RESPONSE_INPUT_ITEMS_TYPE_ADAPTER.validate_python(input)
             tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
-        except ValidationError as e:
-            raise BadRequestError(400, str(e), PROVIDER) from e
 
-        try:
             kwargs = OpenAIResponseTranslator.to_openai(
                 model,
                 input_models,
@@ -251,7 +246,7 @@ class OpenAIProvider:
                 tools=tools_models,
                 **params,
             )
-        except ValueError as e:
+        except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:

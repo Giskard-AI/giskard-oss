@@ -321,13 +321,22 @@ async def test_usage_populated(provider: str):
 
 
 class ColorModel(BaseModel):
+    """All fields required (typical \"full\" structured-output shape)."""
+
     name: str
     hex: str
 
 
+class JudgeLikeResult(BaseModel):
+    """Shape aligned with checks that use optional ``reason`` (nullable, not required key)."""
+
+    passed: bool
+    reason: str | None = None
+
+
 @pytest.mark.parametrize("provider", _PROVIDER_PARAMS)
 async def test_response_format(provider: str):
-    """response_format with Pydantic model -> valid JSON matching schema."""
+    """response_format with Pydantic model -> JSON that validates as the model (full required fields)."""
     client, model = _make_client(provider)
     resp = await client.acompletion(
         model,
@@ -340,8 +349,37 @@ async def test_response_format(provider: str):
     assert isinstance(raw_json, str)
 
     parsed = json.loads(raw_json)
-    assert "name" in parsed
-    assert "hex" in parsed
+    validated = ColorModel.model_validate(parsed)
+    assert isinstance(validated.name, str)
+    assert isinstance(validated.hex, str)
+
+
+@pytest.mark.parametrize("provider", _PROVIDER_PARAMS)
+async def test_response_format_optional_nullable_reason(provider: str):
+    """Judge-like schema: ``passed`` plus optional nullable ``reason`` (matches LLM checks)."""
+    client, model = _make_client(provider)
+    resp = await client.acompletion(
+        model,
+        [
+            {
+                "role": "user",
+                "content": (
+                    "Judge whether 2 equals 2. Use the structured format. "
+                    "Include a brief reason field when you explain."
+                ),
+            },
+        ],
+        response_format=JudgeLikeResult,
+    )
+    choice = resp.choices[0]
+    assert choice.message.content
+    raw_json = choice.message.content
+    assert isinstance(raw_json, str)
+
+    parsed = json.loads(raw_json)
+    result = JudgeLikeResult.model_validate(parsed)
+    assert isinstance(result.passed, bool)
+    assert result.reason is None or isinstance(result.reason, str)
 
 
 # -- LLMClient.configure() scenarios ------------------------------------------
