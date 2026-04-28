@@ -31,7 +31,7 @@ class Chat[OutputType: BaseModel](BaseModel):
         if not isinstance(last, AssistantMessage):
             raise ValueError("Last message is not an assistant message")
 
-        output_text = last.output_text
+        output_text = last.text
         if output_text is None:
             raise ValueError("Last message has no output text")
 

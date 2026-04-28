@@ -189,7 +189,9 @@ def serialize_assistant_message(
 
 def _extract_system_instruction(messages: Sequence[ChatMessage]) -> list[str] | None:
     system_parts = [
-        m.text for m in messages if m.role == "system" or m.role == "developer"
+        m.text
+        for m in messages
+        if (m.role == "system" or m.role == "developer") and m.text is not None
     ]
     return system_parts if system_parts else None
 

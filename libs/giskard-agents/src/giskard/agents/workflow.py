@@ -223,7 +223,7 @@ class _StepRunner:
             return response.choices[0].message
 
         # Attempt the parsing to raise ValidationError if output is not compatible
-        output_model.model_validate_json(response.choices[0].message.output_text or "")
+        output_model.model_validate_json(response.choices[0].message.text or "")
 
         return response.choices[0].message
 

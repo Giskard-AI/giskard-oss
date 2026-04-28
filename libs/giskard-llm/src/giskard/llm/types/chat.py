@@ -1,7 +1,32 @@
 from collections.abc import Sequence
-from typing import Literal
+from typing import Literal, Protocol
 
 from ._base import ArgumentDict, _BaseModel
+
+# -- Utility functions -------------------------------------------------------------
+
+
+class _TextContentProtocol(Protocol):
+    text: str | None
+
+
+class _TextualizableContentProtocol(Protocol):
+    @property
+    def text(self) -> str | None: ...
+
+
+def _extract_text(
+    content: str
+    | Sequence[_TextualizableContentProtocol | _TextContentProtocol]
+    | None,
+) -> str | None:
+    if isinstance(content, str) or content is None:
+        return content
+
+    texts = [c.text for c in content if c.text is not None]
+
+    return "\n".join(texts) if texts else None
+
 
 # -- Chat content types -------------------------------------------------------------
 
@@ -10,17 +35,13 @@ class TextContent(_BaseModel):
     type: Literal["text"] = "text"
     text: str
 
-    @property
-    def output_text(self) -> str:
-        return self.text
-
 
 class RefusalContent(_BaseModel):
     type: Literal["refusal"] = "refusal"
     refusal: str
 
     @property
-    def output_text(self) -> str:
+    def text(self) -> str:
         return self.refusal
 
 
@@ -42,43 +63,41 @@ class ToolCall(_BaseModel):
 
 class SystemMessage(_BaseModel):
     role: Literal["system"] = "system"
-    content: str | Sequence[CompletionContent]
+    content: str | Sequence[TextContent]
 
     @property
-    def text(self) -> str:
-        if isinstance(self.content, str):
-            return self.content
-
-        return "\n".join([c.output_text for c in self.content])
+    def text(self) -> str | None:
+        return _extract_text(self.content)
 
     @property
     def transcript(self) -> str:
-        return f"[{self.role}]: {self.text}"
+        return f"[{self.role}]: {self.text or 'empty'}"
 
 
 class DeveloperMessage(_BaseModel):
     role: Literal["developer"] = "developer"
-    content: str | Sequence[CompletionContent]
+    content: str | Sequence[TextContent]
 
     @property
-    def text(self) -> str:
-        if isinstance(self.content, str):
-            return self.content
-
-        return "\n".join([c.output_text for c in self.content])
+    def text(self) -> str | None:
+        return _extract_text(self.content)
 
     @property
     def transcript(self) -> str:
-        return f"[{self.role}]: {self.text}"
+        return f"[{self.role}]: {self.text or 'empty'}"
 
 
 class UserMessage(_BaseModel):
     role: Literal["user"] = "user"
-    content: str | Sequence[CompletionContent]
+    content: str | Sequence[TextContent]
+
+    @property
+    def text(self) -> str | None:
+        return _extract_text(self.content)
 
     @property
     def transcript(self) -> str:
-        return f"[{self.role}]: {self.content}"
+        return f"[{self.role}]: {self.text or 'empty'}"
 
 
 class AssistantMessage(_BaseModel):
@@ -88,20 +107,18 @@ class AssistantMessage(_BaseModel):
     tool_calls: Sequence[ToolCall] | None = None
 
     @property
-    def output_text(self) -> str | None:
-        if self.content is None:
-            return self.refusal
+    def text(self) -> str | None:
+        texts = [
+            text
+            for text in (self.refusal, _extract_text(self.content))
+            if text is not None
+        ]
 
-        if isinstance(self.content, str):
-            return self.content
-
-        return (
-            "\n".join([c.output_text for c in self.content]) if self.content else None
-        )
+        return "\n".join(texts) if texts else None
 
     @property
     def transcript(self) -> str:
-        message = self.output_text or ""
+        message = self.text or "empty"
         if self.tool_calls is not None:
             for tool_call in self.tool_calls:
                 message += f"\n>[tool_call:{tool_call.function.name}:{tool_call.id}]: {tool_call.function.arguments}"
@@ -111,19 +128,16 @@ class AssistantMessage(_BaseModel):
 
 class ToolMessage(_BaseModel):
     role: Literal["tool"] = "tool"
-    content: str | Sequence[CompletionContent]
+    content: str | Sequence[TextContent]
     tool_call_id: str
 
     @property
-    def text(self) -> str:
-        if isinstance(self.content, str):
-            return self.content
-
-        return "\n".join([c.output_text for c in self.content])
+    def text(self) -> str | None:
+        return _extract_text(self.content)
 
     @property
     def transcript(self) -> str:
-        return f"[{self.role}]: {self.text}"
+        return f"[{self.role}]: {self.text or 'empty'}"
 
 
 class FunctionMessage(_BaseModel):
@@ -132,8 +146,12 @@ class FunctionMessage(_BaseModel):
     role: Literal["function"] = "function"
 
     @property
+    def text(self) -> str | None:
+        return _extract_text(self.content)
+
+    @property
     def transcript(self) -> str:
-        return f"[{self.role}]: {self.content or ''}"
+        return f"[{self.role}]: {self.text or 'empty'}"
 
 
 ChatMessage = (

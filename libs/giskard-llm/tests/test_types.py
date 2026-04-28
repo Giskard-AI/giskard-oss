@@ -81,7 +81,7 @@ def test_tool_call_model():
 
 
 def test_function_message_transcript_none_content():
-    assert FunctionMessage(name="fn").transcript == "[function]: "
+    assert FunctionMessage(name="fn").transcript == "[function]: empty"
 
 
 def test_function_message_transcript_with_content():
