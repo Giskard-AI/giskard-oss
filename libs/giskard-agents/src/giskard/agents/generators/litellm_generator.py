@@ -7,19 +7,23 @@ This module requires the optional ``litellm`` dependency. Install it with::
 Importing this module without ``litellm`` installed raises ``ImportError``.
 """
 
-from typing import Any, cast, override
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, cast, override
 
+from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
 from pydantic import Field
 
-from ..chat import Message
 from ..tools import Tool
-from ._types import GenerationParams, Response
+from ._types import GenerationParams
 from .base import BaseGenerator
 from .middleware import CompletionMiddleware, RetryMiddleware, RetryPolicy
 
+if TYPE_CHECKING:
+    from openai.types.chat.chat_completion_message_param import (
+        ChatCompletionMessageParam,
+    )
 try:
     from litellm import (  # pyright: ignore[reportMissingImports]
-        Choices,
         ModelResponse,
         acompletion,
     )
@@ -71,27 +75,32 @@ class LiteLLMGenerator(BaseGenerator):
             for t in tools
         ]
 
-    def _serialize_messages(self, messages: list[Message]) -> list[dict[str, Any]]:
-        """Convert ``Message`` objects to LiteLLM's dict format."""
+    def _serialize_messages(
+        self, messages: Sequence[ChatMessage]
+    ) -> "list[ChatCompletionMessageParam]":
+        """Convert ``Message`` objects to OpenaAI's dict format (litellm expects)."""
         return [
-            m.model_dump(include={"role", "content", "tool_calls", "tool_call_id"})
+            cast(
+                "ChatCompletionMessageParam",
+                cast(object, m.model_dump(context={"provider": "openai/chat"})),
+            )
             for m in messages
         ]
 
-    def _deserialize_response(self, raw: Any) -> Message:
+    def _deserialize_response(self, raw: Any) -> AssistantMessage:
         """Convert a LiteLLM response object into an internal ``Message``."""
         data = raw if isinstance(raw, dict) else raw.model_dump()
-        return Message.model_validate(data)
+        return AssistantMessage.model_validate(data)
 
     @override
     async def _call_model(
         self,
-        messages: list[Message],
+        messages: Sequence[ChatMessage],
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
+    ) -> CompletionResponse:
         wire_messages = self._serialize_messages(messages)
-        wire_params = params.model_dump(exclude={"tools"})
+        wire_params = params.model_dump(exclude={"tools"}, exclude_unset=True)
         wire_tools = self._serialize_tools(params.tools) if params.tools else []
         if wire_tools:
             wire_params["tools"] = wire_tools
@@ -103,11 +112,12 @@ class LiteLLMGenerator(BaseGenerator):
             await acompletion(messages=wire_messages, model=self.model, **wire_params),
         )
 
-        choice = cast(Choices, raw.choices[0])
-        message = self._deserialize_response(choice.message)
-        response_metadata = raw.model_dump(exclude={"choices"})
-        return Response(
-            message=message,
-            finish_reason=choice.finish_reason,  # pyright: ignore[reportArgumentType]
-            metadata=response_metadata,
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=self._deserialize_response(choice.message),
+                    finish_reason=choice.finish_reason,
+                )
+                for choice in raw.choices
+            ]
         )

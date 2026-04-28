@@ -1,17 +1,17 @@
 from pathlib import Path
 from typing import Any, Dict
 
+from giskard.llm.types import ChatMessage, UserMessage
 from jinja2 import Template
 from pydantic import BaseModel, Field
 from typing_extensions import deprecated
 
-from ..chat import Message
 from .environment import create_message_environment
 
 
 async def render_messages_template(
     template: Template, variables: dict[str, Any] | None = None
-) -> list[Message]:
+) -> list[ChatMessage]:
     """
     Render a template and collect any messages defined with {% message %} blocks.
 
@@ -40,7 +40,7 @@ async def render_messages_template(
             )
         return messages
     else:
-        return [Message(role="user", content=rendered_output)]
+        return [UserMessage(content=rendered_output)]
 
 
 class PromptsManager(BaseModel):
@@ -75,7 +75,7 @@ class PromptsManager(BaseModel):
 
     async def render_template(
         self, template_name: str, variables: dict[str, Any] | None = None
-    ) -> list[Message]:
+    ) -> list[ChatMessage]:
         """
         Load and parse a template file, returning a list of Message objects.
 
@@ -139,6 +139,6 @@ def remove_prompts_path(namespace: str):
 
 async def render_template(
     template_name: str, variables: dict[str, Any] | None = None
-) -> list[Message]:
+) -> list[ChatMessage]:
     """Load and parse a template file."""
     return await _prompts_manager.render_template(template_name, variables)

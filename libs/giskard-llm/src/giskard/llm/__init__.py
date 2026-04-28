@@ -1,5 +1,6 @@
 """giskard-llm -- lightweight LLM routing over native provider SDKs."""
 
+from . import chat
 from .errors import (
     AuthenticationError,
     BadRequestError,
@@ -14,26 +15,27 @@ from .providers.base import CompletionProvider, EmbeddingProvider, ResponseProvi
 from .retry import should_retry
 from .routing import LLMClient, acompletion, aembedding, aresponse, configure, reset
 from .types import (
-    ChatMessage,
+    ChatMessageParam,
     Choice,
-    ChoiceMessage,
     CompletionResponse,
     EmbeddingData,
     EmbeddingResponse,
     EmbeddingUsage,
-    FunctionCallOutput,
-    FunctionDef,
+    FunctionCallOutputParam,
+    FunctionDefParam,
     ResponseOutputFunctionCall,
     ResponseOutputItem,
     ResponseOutputText,
     ResponseResult,
     ToolCall,
     ToolCallFunction,
-    ToolDef,
+    ToolDefParam,
     Usage,
 )
 
 __all__ = [
+    # Chat functions
+    "chat",
     # Functions
     "acompletion",
     "aembedding",
@@ -50,15 +52,14 @@ __all__ = [
     # Types — Completion
     "CompletionResponse",
     "Choice",
-    "ChoiceMessage",
-    "ChatMessage",
+    "ChatMessageParam",
     "Usage",
     # Types — Tools
     "ToolCall",
     "ToolCallFunction",
-    "ToolDef",
-    "FunctionDef",
-    "FunctionCallOutput",
+    "ToolDefParam",
+    "FunctionDefParam",
+    "FunctionCallOutputParam",
     # Types — Embedding
     "EmbeddingResponse",
     "EmbeddingData",

@@ -48,13 +48,12 @@ Provider-specific kwargs:
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
-import json
 import logging
 import os
 from collections.abc import Sequence
 from typing import Any, NoReturn
 
-from pydantic import BaseModel
+from pydantic import TypeAdapter, ValidationError
 
 from ..errors import (
     AuthenticationError,
@@ -65,31 +64,33 @@ from ..errors import (
     RateLimitError,
     ServerError,
 )
+from ..translators.google_chat import GoogleChatTranslator
+from ..translators.google_response import GoogleResponseTranslator
 from ..types import (
     ChatMessage,
-    Choice,
-    ChoiceMessage,
+    ChatMessageParam,
     CompletionResponse,
     EmbeddingData,
     EmbeddingResponse,
-    ResponseOutputFunctionCall,
-    ResponseOutputText,
+    ResponseInputItem,
+    ResponseInputItemParam,
     ResponseResult,
-    ToolCall,
-    ToolCallFunction,
     ToolDef,
-    Usage,
+    ToolDefParam,
 )
+
+_CHAT_MESSAGES_TYPE_ADAPTER = TypeAdapter(Sequence[ChatMessage])
+_TOOL_DEFS_TYPE_ADAPTER = TypeAdapter(Sequence[ToolDef] | None)
+_RESPONSE_INPUT_ITEMS_TYPE_ADAPTER = TypeAdapter(str | Sequence[ResponseInputItem])
 
 logger = logging.getLogger(__name__)
 
 PROVIDER = "google"
 
-KNOWN_COMPLETION_PARAMS = frozenset(
-    {"temperature", "max_tokens", "tools", "response_format", "safety_settings"}
-)
+
 KNOWN_EMBEDDING_PARAMS = frozenset({"dimensions"})
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature"})
+_INSTRUCTION_ROLES = frozenset({"system", "developer"})
 
 
 def _import_genai() -> Any:
@@ -125,6 +126,11 @@ def _import_interactions_errors() -> Any:
 
         return _interactions
     except (ImportError, AttributeError):
+        logger.warning(
+            "google.genai._interactions could not be imported; Interactions API error "
+            "mapping will be unavailable. This is a private module — verify your "
+            "google-genai version if error handling is degraded."
+        )
         return None
 
 
@@ -190,34 +196,34 @@ class GoogleProvider:
 
         if "timed out" in str(e).lower() or "timeout" in type(e).__name__.lower():
             raise LLMTimeoutError(408, str(e), PROVIDER) from e
-        raise e
+        raise
 
     async def complete(
         self,
         model: str,
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam | ChatMessage],
         *,
-        tools: list[ToolDef] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> CompletionResponse:
-        types = _import_genai_types()
+        try:
+            messages_models = _CHAT_MESSAGES_TYPE_ADAPTER.validate_python(messages)
+            tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
 
-        self._validate_messages(messages)
-        if tools is not None:
-            params["tools"] = tools
-        contents = self._convert_messages(messages)
-        config = self._build_config(messages, params, types)
+            self._validate_messages(messages_models)
+
+            kwargs = GoogleChatTranslator.to_google(
+                model, messages_models, tools=tools_models, **params
+            )
+        except ValidationError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:
-            raw = await self._client.aio.models.generate_content(
-                model=model,
-                contents=contents,
-                config=config,
-            )
+            raw = await self._client.aio.models.generate_content(**kwargs)
         except Exception as e:  # Broad catch: _map_error checks SDK types first, then applies timeout heuristic, then re-raises.
             self._map_error(e)
 
-        return self._to_completion_response(raw, model)
+        return GoogleChatTranslator.from_google(raw, model, len(messages))
 
     async def embed(
         self,
@@ -257,198 +263,22 @@ class GoogleProvider:
     def _validate_messages(self, messages: Sequence[ChatMessage]) -> None:
         if not messages:
             raise BadRequestError(400, "Messages list must not be empty.", PROVIDER)
-        has_non_system = any(m.get("role") != "system" for m in messages)
+        has_non_system = any(m.role not in _INSTRUCTION_ROLES for m in messages)
         if not has_non_system:
             raise BadRequestError(
                 400, "Messages must contain at least one non-system message.", PROVIDER
             )
         for m in messages:
-            if m.get("role") == "tool" and not m.get("tool_call_id"):
+            if m.role == "tool" and not m.tool_call_id:
                 raise BadRequestError(
                     400, "Tool messages must have a tool_call_id.", PROVIDER
                 )
-            if m.get("role") == "system" and not (m.get("content") or "").strip():
+            if m.role in _INSTRUCTION_ROLES and not (m.content or "").strip():
                 raise BadRequestError(
                     400, "System messages must have non-empty content.", PROVIDER
                 )
 
     # -- helpers ---------------------------------------------------------------
-
-    def _convert_messages(
-        self, messages: Sequence[ChatMessage]
-    ) -> list[dict[str, Any]]:
-        """Convert OpenAI-format messages to Gemini content format."""
-        # Build tool_call_id → function_name map from assistant tool_calls
-        tc_id_to_name: dict[str, str] = {}
-        for msg in messages:
-            for tc in msg.get("tool_calls") or []:
-                tc_data = tc if isinstance(tc, dict) else tc.model_dump()
-                tc_id_to_name[tc_data.get("id", "")] = tc_data.get("function", {}).get(
-                    "name", ""
-                )
-
-        contents: list[dict[str, Any]] = []
-        for msg in messages:
-            role = msg.get("role", "user")
-            if role == "system":
-                continue
-            if role == "assistant":
-                role = "model"
-            if role == "tool":
-                tc_id = msg.get("tool_call_id", "unknown")
-                parts = [
-                    {
-                        "function_response": {
-                            "name": tc_id_to_name.get(tc_id, tc_id),
-                            "response": {"result": msg.get("content", "")},
-                        }
-                    }
-                ]
-                role = "user"
-            elif msg.get("tool_calls"):
-                raw_tcs = msg.get("tool_calls", [])
-                parts = []
-                for tc in raw_tcs:
-                    tc_data = tc if isinstance(tc, dict) else tc.model_dump()
-                    func = tc_data.get("function", tc_data)
-                    parts.append(
-                        {
-                            "function_call": {
-                                "name": func.get("name", ""),
-                                "args": json.loads(func.get("arguments", "{}")),
-                            }
-                        }
-                    )
-            else:
-                parts = [{"text": (msg.get("content") or "")}]
-            contents.append({"role": role, "parts": parts})
-        return contents
-
-    def _build_config(
-        self, messages: Sequence[ChatMessage], params: dict[str, Any], types: Any
-    ) -> Any:
-        """Build a GenerateContentConfig from OpenAI-style params."""
-        unknown = set(params) - KNOWN_COMPLETION_PARAMS
-        if unknown:
-            logger.warning(
-                "%s provider: ignoring unknown completion params: %s",
-                PROVIDER,
-                sorted(unknown),
-            )
-
-        config_kwargs: dict[str, Any] = {}
-
-        if params.get("temperature") is not None:
-            config_kwargs["temperature"] = params["temperature"]
-        if params.get("max_tokens") is not None:
-            config_kwargs["max_output_tokens"] = params["max_tokens"]
-
-        if tools := params.get("tools"):
-            config_kwargs["tools"] = [self._convert_tool(t, types) for t in tools]
-
-        response_format = params.get("response_format")
-        if (
-            response_format is not None
-            and isinstance(response_format, type)
-            and issubclass(response_format, BaseModel)
-        ):
-            config_kwargs["response_mime_type"] = "application/json"
-            config_kwargs["response_schema"] = response_format
-
-        system_instructions = self._extract_system_instructions(messages)
-        if system_instructions:
-            config_kwargs["system_instruction"] = system_instructions
-
-        return types.GenerateContentConfig(**config_kwargs) if config_kwargs else None
-
-    def _convert_tool(self, tool: dict[str, Any], types: Any) -> Any:
-        """Convert an OpenAI-format tool to Gemini FunctionDeclaration."""
-        func = tool.get("function", {})
-        return types.Tool(
-            function_declarations=[
-                types.FunctionDeclaration(
-                    name=func.get("name", ""),
-                    description=func.get("description", ""),
-                    parameters=func.get("parameters"),
-                )
-            ]
-        )
-
-    def _extract_system_instructions(
-        self, messages: Sequence[ChatMessage]
-    ) -> list[str] | None:
-        """Pull system messages out for use as system_instruction (list)."""
-        parts = [
-            m.get("content", "") or "" for m in messages if m.get("role") == "system"
-        ]
-        return parts if parts else None
-
-    def _to_completion_response(self, raw: Any, model: str) -> CompletionResponse:
-        choices: list[Choice] = []
-        if not raw.candidates:
-            return CompletionResponse(choices=[], model=model)
-
-        for i, candidate in enumerate(raw.candidates):
-            content = None
-            tool_calls: list[ToolCall] | None = None
-            finish_reason = "stop"
-
-            if candidate.finish_reason:
-                finish_reason_map = {
-                    "STOP": "stop",
-                    "MAX_TOKENS": "length",
-                    "SAFETY": "content_filter",
-                }
-                finish_reason = finish_reason_map.get(
-                    str(candidate.finish_reason), "stop"
-                )
-
-            if candidate.content and candidate.content.parts:
-                text_parts = []
-                fc_list: list[ToolCall] = []
-                for idx, part in enumerate(candidate.content.parts):
-                    if part.text is not None:
-                        text_parts.append(part.text)
-                    elif part.function_call is not None:
-                        fc = part.function_call
-                        fc_list.append(
-                            ToolCall(
-                                id=f"call_{idx}",
-                                type="function",
-                                function=ToolCallFunction(
-                                    name=fc.name,
-                                    arguments=json.dumps(dict(fc.args))
-                                    if fc.args
-                                    else "{}",
-                                ),
-                            )
-                        )
-                content = "\n".join(text_parts) if text_parts else None
-                if fc_list:
-                    tool_calls = fc_list
-                    finish_reason = "tool_calls"
-
-            choices.append(
-                Choice(
-                    message=ChoiceMessage(
-                        role="assistant",
-                        content=content,
-                        tool_calls=tool_calls,
-                    ),
-                    finish_reason=finish_reason,
-                    index=i,
-                )
-            )
-
-        usage = None
-        if raw.usage_metadata:
-            usage = Usage(
-                prompt_tokens=raw.usage_metadata.prompt_token_count or 0,
-                completion_tokens=raw.usage_metadata.candidates_token_count or 0,
-                total_tokens=raw.usage_metadata.total_token_count or 0,
-            )
-
-        return CompletionResponse(choices=choices, model=model, usage=usage)
 
     def _to_embedding_response(self, raw: Any, model: str) -> EmbeddingResponse:
         data: list[EmbeddingData] = []
@@ -462,138 +292,31 @@ class GoogleProvider:
     async def respond(
         self,
         model: str,
-        input: str | list[dict[str, Any]],
+        input: str | Sequence[ResponseInputItemParam | ResponseInputItem],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDef] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> ResponseResult:
-        unknown = set(params) - KNOWN_RESPONSE_PARAMS
-        if unknown:
-            logger.warning(
-                "%s provider: ignoring unknown response params: %s",
-                PROVIDER,
-                sorted(unknown),
+        try:
+            input_models = _RESPONSE_INPUT_ITEMS_TYPE_ADAPTER.validate_python(input)
+            tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
+
+            kwargs = GoogleResponseTranslator.to_google(
+                model,
+                input_models,
+                instructions=instructions,
+                previous_id=previous_id,
+                tools=tools_models,
+                **params,
             )
-
-        if isinstance(input, list):
-            input = self._normalize_input_items(input)
-
-        kwargs: dict[str, Any] = {"model": model, "input": input}
-        if instructions is not None:
-            kwargs["system_instruction"] = instructions
-        if previous_id is not None:
-            kwargs["previous_interaction_id"] = previous_id
-        if tools is not None:
-            kwargs["tools"] = [{"type": "function", **t["function"]} for t in tools]
-        if params.get("temperature") is not None:
-            kwargs["generation_config"] = kwargs.get("generation_config", {})
-            kwargs["generation_config"]["temperature"] = params["temperature"]
+        except ValidationError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:
             raw = await self._client.aio.interactions.create(**kwargs)
         except Exception as e:  # Broad catch: _map_error checks SDK types first, then applies timeout heuristic, then re-raises.
             self._map_error(e)
 
-        return self._to_response_result(raw, model)
-
-    def _normalize_input_items(
-        self, items: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        """Normalize input items to Google Interactions API ``ContentParam`` format.
-
-        The SDK's ``Input`` type is a union where ``Iterable[ContentParam]``
-        (flat typed items) is the preferred variant.  Mixing ``TurnParam``
-        (role-tagged dicts) with ``ContentParam`` items in the same list
-        confuses the SDK's union resolution, so we convert *everything* to
-        flat ``ContentParam`` dicts keyed by ``type``.
-
-        SDK type references (installed at ``google.genai._interactions.types``):
-          - ``FunctionCallContentParam``:  type="function_call", **id** (not
-            call_id), name, arguments (dict, not JSON string)
-          - ``FunctionResultContentParam``: type="function_result", **call_id**
-            (must match the function_call's id), result, name (optional)
-          - ``TextContentParam``: type="text", text
-
-        See also:
-          - Official example: https://github.com/googleapis/python-genai/commit/e28a69c
-          - Known issue on result format: https://github.com/googleapis/python-genai/issues/1906
-        """
-        # Build call_id/id → function_name map from function_call items
-        call_id_to_name: dict[str, str] = {}
-        for item in items:
-            if item.get("type") == "function_call":
-                cid = item.get("call_id") or item.get("id")
-                if cid and item.get("name"):
-                    call_id_to_name[cid] = item["name"]
-
-        return [self._normalize_input_item(item, call_id_to_name) for item in items]
-
-    def _normalize_input_item(
-        self, item: dict[str, Any], call_id_to_name: dict[str, str]
-    ) -> dict[str, Any]:
-        """Convert a single input item to a flat ``ContentParam`` dict."""
-        item_type = item.get("type")
-
-        if item_type == "function_call_output":
-            call_id = item.get("call_id") or ""
-            return {
-                "type": "function_result",
-                "call_id": call_id,
-                "name": item.get("name") or call_id_to_name.get(call_id, ""),
-                "result": item["output"],
-            }
-
-        if item_type == "function_call":
-            args = item.get("arguments", {})
-            if isinstance(args, str):
-                args = json.loads(args)
-            return {
-                "type": "function_call",
-                "id": item.get("call_id") or item.get("id", ""),
-                "name": item.get("name", ""),
-                "arguments": args,
-            }
-
-        # Role-tagged turn (TurnParam) → TextContentParam
-        if "role" in item and "content" in item and "type" not in item:
-            return {"type": "text", "text": item.get("content") or ""}
-
-        return item
-
-    def _to_response_result(self, raw: Any, model: str) -> ResponseResult:
-        outputs: list[ResponseOutputText | ResponseOutputFunctionCall] = []
-        for item in getattr(raw, "outputs", []):
-            item_type = getattr(item, "type", None)
-            if item_type == "text":
-                outputs.append(ResponseOutputText(text=item.text))
-            elif item_type == "function_call":
-                args = getattr(item, "arguments", {})
-                # Google returns "id" on function_call outputs, not "call_id"
-                call_id = getattr(item, "id", None) or getattr(item, "call_id", None)
-                outputs.append(
-                    ResponseOutputFunctionCall(
-                        call_id=call_id,
-                        name=item.name,
-                        arguments=args if isinstance(args, dict) else {},
-                    )
-                )
-
-        usage = None
-        usage_meta = getattr(raw, "usage", None)
-        if usage_meta:
-            outputs_tokens = getattr(usage_meta, "output_tokens", 0) or 0
-            input_tokens = getattr(usage_meta, "input_tokens", 0) or 0
-            usage = Usage(
-                prompt_tokens=input_tokens,
-                completion_tokens=outputs_tokens,
-                total_tokens=input_tokens + outputs_tokens,
-            )
-
-        return ResponseResult(
-            id=raw.id,
-            outputs=outputs,
-            model=model,
-            usage=usage,
-        )
+        return GoogleResponseTranslator.from_google(raw, model)

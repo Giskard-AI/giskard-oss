@@ -5,6 +5,7 @@ from giskard import agents
 from giskard.agents.chat import Chat
 from giskard.agents.generators.giskard_llm_generator import GiskardLLMGenerator
 from giskard.agents.templates.prompts_manager import PromptsManager
+from giskard.llm.types import ChatMessage
 from pydantic import BaseModel
 
 
@@ -19,8 +20,8 @@ async def test_single_run(generator):
         .run()
     )
 
-    assert isinstance(chat.last.content, str)
-    assert "testbot" in chat.last.content.lower()
+    assert chat.last.text is not None
+    assert "testbot" in chat.last.text.lower()
 
 
 @pytest.mark.google
@@ -113,25 +114,23 @@ async def test_workflow_with_mixed_templates(generator: GiskardLLMGenerator):
     assert len(chat.messages) == 5
 
     assert chat.messages[0].role == "system"
-    assert isinstance(chat.messages[0].content, str)
+    assert chat.messages[0].text is not None
     assert (
         "You are an impartial evaluator of scientific theories."
-        in chat.messages[0].content
+        in chat.messages[0].text
     )
 
     assert chat.messages[1].role == "user"
-    assert isinstance(chat.messages[1].content, str)
-    assert (
-        "Normandy is actually the center of the universe." in chat.messages[1].content
-    )
+    assert chat.messages[1].text is not None
+    assert "Normandy is actually the center of the universe." in chat.messages[1].text
 
     assert chat.messages[2].role == "assistant"
-    assert isinstance(chat.messages[2].content, str)
-    assert "100" in chat.messages[2].content
+    assert chat.messages[2].text is not None
+    assert "100" in chat.messages[2].text
 
     assert chat.messages[3].role == "user"
-    assert isinstance(chat.messages[3].content, str)
-    assert "Well done TestBot!" in chat.messages[3].content
+    assert chat.messages[3].text is not None
+    assert "Well done TestBot!" in chat.messages[3].text
 
     assert chat.messages[4].role == "assistant"
 
@@ -160,7 +159,7 @@ def test_chat_plain_string_is_not_jinja_by_default():
         generator=agents.Generator(model="openai/gpt-4o-mini")
     )
     wf = workflow.chat("{{ 1 + 1 }}", role="user")
-    assert isinstance(wf.messages[0], agents.Message)
+    assert isinstance(wf.messages[0], ChatMessage)
     assert wf.messages[0].content == "{{ 1 + 1 }}"
 
     wf_tpl = workflow.chat("{{ 1 + 1 }}", role="user", as_template=True)

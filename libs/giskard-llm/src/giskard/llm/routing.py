@@ -9,10 +9,14 @@ from .errors import UnsupportedOperationError
 from .providers.base import CompletionProvider, EmbeddingProvider, ResponseProvider
 from .types import (
     ChatMessage,
+    ChatMessageParam,
     CompletionResponse,
     EmbeddingResponse,
+    ResponseInputItem,
+    ResponseInputItemParam,
     ResponseResult,
     ToolDef,
+    ToolDefParam,
 )
 
 # Plain assignment (not `type` statement) so isinstance checks work at runtime.
@@ -136,9 +140,9 @@ class LLMClient:
     async def acompletion(
         self,
         model: str,
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam | ChatMessage],
         *,
-        tools: list[ToolDef] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> CompletionResponse:
         """Parse model string and dispatch to the right provider."""
@@ -158,11 +162,11 @@ class LLMClient:
     async def aresponse(
         self,
         model: str,
-        input: str | list[dict[str, Any]],
+        input: str | Sequence[ResponseInputItemParam | ResponseInputItem],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDef] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> ResponseResult:
         """Parse model string and dispatch to the right provider's respond()."""
@@ -195,9 +199,9 @@ def reset() -> None:
 
 async def acompletion(
     model: str,
-    messages: Sequence[ChatMessage],
+    messages: Sequence[ChatMessageParam | ChatMessage],
     *,
-    tools: list[ToolDef] | None = None,
+    tools: Sequence[ToolDefParam | ToolDef] | None = None,
     **params: Any,
 ) -> CompletionResponse:
     """Module-level convenience wrapper around the default client."""
@@ -215,11 +219,11 @@ async def aembedding(
 
 async def aresponse(
     model: str,
-    input: str | list[dict[str, Any]],
+    input: str | Sequence[ResponseInputItemParam | ResponseInputItem],
     *,
     instructions: str | None = None,
     previous_id: str | None = None,
-    tools: list[ToolDef] | None = None,
+    tools: Sequence[ToolDefParam | ToolDef] | None = None,
     **params: Any,
 ) -> ResponseResult:
     """Module-level convenience wrapper around the default client."""

@@ -7,19 +7,23 @@ and round-trips via ``model_dump_json`` / ``model_validate_json``.
 """
 
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 import tenacity as t
 from giskard.core import BaseRateLimiter, Discriminated, discriminated_base
+from giskard.llm.types import ChatMessage, CompletionResponse
 from pydantic import BaseModel, Field
 
-from ..chat import Message
-from ._types import GenerationParams, Response
+from ._types import GenerationParams
 
 type NextFn = Callable[
-    [list[Message], GenerationParams | None, dict[str, Any] | None],
-    Awaitable[Response],
+    [
+        Sequence[ChatMessage],
+        GenerationParams | None,
+        dict[str, Any] | None,
+    ],
+    Awaitable[CompletionResponse],
 ]
 
 
@@ -35,11 +39,11 @@ class CompletionMiddleware(Discriminated, ABC):
     @abstractmethod
     async def call(
         self,
-        messages: list[Message],
+        messages: Sequence[ChatMessage],
         params: GenerationParams | None,
         metadata: dict[str, Any] | None,
         next_fn: NextFn,
-    ) -> Response:
+    ) -> CompletionResponse:
         """Invoke the middleware, calling *next_fn* to continue the chain."""
 
 
@@ -66,11 +70,11 @@ class RetryMiddleware(CompletionMiddleware):
 
     async def call(
         self,
-        messages: list[Message],
+        messages: Sequence[ChatMessage],
         params: GenerationParams | None,
         metadata: dict[str, Any] | None,
         next_fn: NextFn,
-    ) -> Response:
+    ) -> CompletionResponse:
         policy = self.retry_policy
         wait_kwargs: dict[str, float] = {"multiplier": policy.base_delay}
         if policy.max_delay is not None:
@@ -99,10 +103,10 @@ class RateLimiterMiddleware(CompletionMiddleware):
 
     async def call(
         self,
-        messages: list[Message],
+        messages: Sequence[ChatMessage],
         params: GenerationParams | None,
         metadata: dict[str, Any] | None,
         next_fn: NextFn,
-    ) -> Response:
+    ) -> CompletionResponse:
         async with self.rate_limiter.throttle():
             return await next_fn(messages, params, metadata)

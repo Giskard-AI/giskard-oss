@@ -14,12 +14,13 @@ are marked ``functional`` so ``make test-unit`` never picks them up.
 """
 
 import os
+from typing import Callable
 
 import pytest
 from giskard import agents
-from giskard.agents.chat import Message
 from giskard.agents.generators.base import BaseGenerator
 from giskard.agents.generators.giskard_llm_generator import GiskardLLMGenerator
+from giskard.llm.types import SystemMessage, UserMessage
 
 pytestmark = pytest.mark.functional
 
@@ -56,26 +57,30 @@ _BACKEND_CASES = [
 
 
 @pytest.mark.parametrize("backend, generator_factory", _BACKEND_CASES)
-async def test_backend_completion(backend: str, generator_factory) -> None:
+async def test_backend_completion(
+    backend: str, generator_factory: Callable[[], BaseGenerator]
+) -> None:
     """Direct ``complete()`` call returns an assistant message."""
     generator = generator_factory()
     response = await generator.complete(
         messages=[
-            Message(
+            SystemMessage(
                 role="system",
                 content="You are TestBot. Always include 'TestBot' in replies.",
             ),
-            Message(role="user", content="Say hi."),
+            UserMessage(content="Say hi."),
         ]
     )
 
-    assert response.message.role == "assistant"
-    assert isinstance(response.message.content, str)
-    assert "testbot" in response.message.content.lower()
+    assert response.choices[0].message.role == "assistant"
+    assert response.choices[0].message.text is not None
+    assert "testbot" in response.choices[0].message.text.lower()
 
 
 @pytest.mark.parametrize("backend, generator_factory", _BACKEND_CASES)
-async def test_backend_chat_workflow(backend: str, generator_factory) -> None:
+async def test_backend_chat_workflow(
+    backend: str, generator_factory: Callable[[], BaseGenerator]
+) -> None:
     """``ChatWorkflow`` runs to completion on both backends."""
     workflow = agents.ChatWorkflow(generator=generator_factory())
     chat = await (
@@ -84,8 +89,8 @@ async def test_backend_chat_workflow(backend: str, generator_factory) -> None:
         .run()
     )
 
-    assert isinstance(chat.last.content, str)
-    assert "testbot" in chat.last.content.lower()
+    assert chat.last.text is not None
+    assert "testbot" in chat.last.text.lower()
 
 
 @pytest.mark.litellm
@@ -101,15 +106,15 @@ async def test_backends_coexist_in_same_process() -> None:
     litellm_gen = _litellm_generator()
 
     giskard_response = await giskard_gen.complete(
-        messages=[Message(role="user", content="Reply with just the digit 1.")]
+        messages=[{"role": "user", "content": "Reply with just the digit 1."}]
     )
     litellm_response = await litellm_gen.complete(
-        messages=[Message(role="user", content="Reply with just the digit 2.")]
+        messages=[{"role": "user", "content": "Reply with just the digit 2."}]
     )
 
-    assert giskard_response.message.role == "assistant"
-    assert litellm_response.message.role == "assistant"
-    assert isinstance(giskard_response.message.content, str)
-    assert isinstance(litellm_response.message.content, str)
-    assert "1" in giskard_response.message.content
-    assert "2" in litellm_response.message.content
+    assert giskard_response.choices[0].message.role == "assistant"
+    assert litellm_response.choices[0].message.role == "assistant"
+    assert giskard_response.choices[0].message.text is not None
+    assert litellm_response.choices[0].message.text is not None
+    assert "1" in giskard_response.choices[0].message.text
+    assert "2" in litellm_response.choices[0].message.text

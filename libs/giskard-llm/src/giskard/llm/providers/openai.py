@@ -36,14 +36,13 @@ Provider-specific kwargs:
     - ``timeout``: request timeout in seconds
 """
 
-# pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false
+# pyright: reportAttributeAccessIssue=false
 
-import json
 import logging
 from collections.abc import Sequence
 from typing import Any, NoReturn
 
-from pydantic import BaseModel
+from pydantic import TypeAdapter, ValidationError
 
 from ..errors import (
     AuthenticationError,
@@ -54,21 +53,20 @@ from ..errors import (
     RateLimitError,
     ServerError,
 )
+from ..translators.openai_chat import OpenAIChatTranslator
+from ..translators.openai_response import OpenAIResponseTranslator
 from ..types import (
     ChatMessage,
-    Choice,
-    ChoiceMessage,
+    ChatMessageParam,
     CompletionResponse,
     EmbeddingData,
     EmbeddingResponse,
     EmbeddingUsage,
-    ResponseOutputFunctionCall,
-    ResponseOutputText,
+    ResponseInputItem,
+    ResponseInputItemParam,
     ResponseResult,
-    ToolCall,
-    ToolCallFunction,
     ToolDef,
-    Usage,
+    ToolDefParam,
 )
 from ..utils import compact
 
@@ -76,11 +74,12 @@ logger = logging.getLogger(__name__)
 
 PROVIDER = "openai"
 
-KNOWN_COMPLETION_PARAMS = frozenset(
-    {"temperature", "max_tokens", "timeout", "tools", "response_format", "metadata"}
-)
 KNOWN_EMBEDDING_PARAMS = frozenset({"dimensions"})
-KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "max_tokens"})
+_INSTRUCTION_ROLES = frozenset({"system", "developer"})
+
+_CHAT_MESSAGES_TYPE_ADAPTER = TypeAdapter(Sequence[ChatMessage])
+_TOOL_DEFS_TYPE_ADAPTER = TypeAdapter(Sequence[ToolDef] | None)
+_RESPONSE_INPUT_ITEMS_TYPE_ADAPTER = TypeAdapter(str | Sequence[ResponseInputItem])
 
 
 def _import_openai() -> Any:
@@ -128,27 +127,36 @@ class OpenAIProvider:
             raise LLMError(
                 getattr(e, "status_code", None) or 500, str(e), self._PROVIDER
             ) from e
-        raise e
+        raise
 
     async def complete(
         self,
         model: str,
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam | ChatMessage],
         *,
-        tools: list[ToolDef] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> CompletionResponse:
-        openai = _import_openai()
-        self._validate_messages(messages)
-        if tools is not None:
-            params["tools"] = tools
-        kwargs = self._build_completion_kwargs(model, messages, params)
+        try:
+            messages_models = _CHAT_MESSAGES_TYPE_ADAPTER.validate_python(messages)
+            tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
+
+            self._validate_messages(messages_models)
+
+            kwargs = OpenAIChatTranslator.to_openai(
+                model, messages_models, tools=tools_models, **params
+            )
+        except ValidationError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
+
         try:
             raw = await self._client.chat.completions.create(**kwargs)
-        except openai.APIError as e:
+        except (
+            Exception
+        ) as e:  # Broad catch: _map_error checks SDK types first, then re-raises.
             self._map_error(e)
 
-        return self._to_completion_response(raw)
+        return OpenAIChatTranslator.from_openai(raw)
 
     async def embed(
         self,
@@ -164,13 +172,14 @@ class OpenAIProvider:
                 sorted(unknown),
             )
 
-        openai = _import_openai()
         kwargs: dict[str, Any] = {"model": model, "input": input}
         if (dimensions := params.get("dimensions")) is not None:
             kwargs["dimensions"] = dimensions
         try:
             raw = await self._client.embeddings.create(**kwargs)
-        except openai.APIError as e:
+        except (
+            Exception
+        ) as e:  # Broad catch: _map_error checks SDK types first, then re-raises.
             self._map_error(e)
 
         return self._to_embedding_response(raw)
@@ -182,7 +191,7 @@ class OpenAIProvider:
             raise BadRequestError(
                 400, "Messages list must not be empty.", self._PROVIDER
             )
-        has_non_system = any(m.get("role") != "system" for m in messages)
+        has_non_system = any(m.role not in _INSTRUCTION_ROLES for m in messages)
         if not has_non_system:
             raise BadRequestError(
                 400,
@@ -190,106 +199,14 @@ class OpenAIProvider:
                 self._PROVIDER,
             )
         for m in messages:
-            if m.get("role") == "tool" and not m.get("tool_call_id"):
+            if m.role == "tool" and not m.tool_call_id:
                 raise BadRequestError(
                     400, "Tool messages must have a tool_call_id.", self._PROVIDER
                 )
-            if m.get("role") == "system" and not (m.get("content") or "").strip():
+            if m.role in _INSTRUCTION_ROLES and not (m.content or "").strip():
                 raise BadRequestError(
                     400, "System messages must have non-empty content.", self._PROVIDER
                 )
-
-    # -- helpers ---------------------------------------------------------------
-
-    def _build_completion_kwargs(
-        self,
-        model: str,
-        messages: Sequence[ChatMessage],
-        params: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Build kwargs dict for the Chat Completions API."""
-        unknown = set(params) - KNOWN_COMPLETION_PARAMS
-        if unknown:
-            logger.warning(
-                "%s provider: ignoring unknown completion params: %s",
-                self._PROVIDER,
-                sorted(unknown),
-            )
-
-        kwargs: dict[str, Any] = {"model": model, "messages": messages}
-
-        if params.get("temperature") is not None:
-            kwargs["temperature"] = params["temperature"]
-        if params.get("max_tokens") is not None:
-            kwargs["max_tokens"] = params["max_tokens"]
-        if params.get("timeout") is not None:
-            kwargs["timeout"] = params["timeout"]
-        if tools := params.get("tools"):
-            kwargs["tools"] = tools
-        if metadata := params.get("metadata"):
-            kwargs["metadata"] = metadata
-
-        response_format = params.get("response_format")
-        if response_format is not None:
-            if isinstance(response_format, type) and issubclass(
-                response_format, BaseModel
-            ):
-                schema = response_format.model_json_schema()
-                schema["additionalProperties"] = False
-                response_format = {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": response_format.__name__,
-                        "strict": True,
-                        "schema": schema,
-                    },
-                }
-            kwargs["response_format"] = response_format
-
-        return kwargs
-
-    def _to_completion_response(self, raw: Any) -> CompletionResponse:
-        """Convert raw SDK response to CompletionResponse."""
-        choices = []
-        for c in raw.choices:
-            tool_calls = None
-            if c.message.tool_calls:
-                tool_calls = [
-                    ToolCall(
-                        id=tc.id,
-                        type=tc.type,
-                        function=ToolCallFunction(
-                            name=tc.function.name,
-                            arguments=tc.function.arguments,
-                        ),
-                    )
-                    for tc in c.message.tool_calls
-                ]
-            choices.append(
-                Choice(
-                    message=ChoiceMessage(
-                        role=c.message.role,
-                        content=c.message.content,
-                        tool_calls=tool_calls,
-                    ),
-                    finish_reason=c.finish_reason,
-                    index=c.index,
-                )
-            )
-
-        usage = None
-        if raw.usage:
-            usage = Usage(
-                prompt_tokens=raw.usage.prompt_tokens,
-                completion_tokens=raw.usage.completion_tokens,
-                total_tokens=raw.usage.total_tokens,
-            )
-
-        return CompletionResponse(
-            choices=choices,
-            model=raw.model,
-            usage=usage,
-        )
 
     def _to_embedding_response(self, raw: Any) -> EmbeddingResponse:
         """Convert raw SDK response to EmbeddingResponse."""
@@ -310,85 +227,33 @@ class OpenAIProvider:
     async def respond(
         self,
         model: str,
-        input: str | list[dict[str, Any]],
+        input: str | Sequence[ResponseInputItemParam | ResponseInputItem],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDef] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> ResponseResult:
-        unknown = set(params) - KNOWN_RESPONSE_PARAMS
-        if unknown:
-            logger.warning(
-                "%s provider: ignoring unknown response params: %s",
-                self._PROVIDER,
-                sorted(unknown),
-            )
+        try:
+            input_models = _RESPONSE_INPUT_ITEMS_TYPE_ADAPTER.validate_python(input)
+            tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
 
-        openai = _import_openai()
-        if isinstance(input, list):
-            input = [self._normalize_input_item(item) for item in input]
-        kwargs: dict[str, Any] = {"model": model, "input": input}
-        if instructions is not None:
-            kwargs["instructions"] = instructions
-        if previous_id is not None:
-            kwargs["previous_response_id"] = previous_id
-        if tools is not None:
-            kwargs["tools"] = [{"type": "function", **t["function"]} for t in tools]
-        if params.get("temperature") is not None:
-            kwargs["temperature"] = params["temperature"]
-        if params.get("max_tokens") is not None:
-            kwargs["max_output_tokens"] = params["max_tokens"]
+            kwargs = OpenAIResponseTranslator.to_openai(
+                model,
+                input_models,
+                instructions=instructions,
+                previous_id=previous_id,
+                tools=tools_models,
+                **params,
+            )
+        except ValidationError as e:
+            raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:
             raw = await self._client.responses.create(**kwargs)
-        except openai.APIError as e:
+        except (
+            Exception
+        ) as e:  # Broad catch: _map_error checks SDK types first, then re-raises.
             self._map_error(e)
 
-        return self._to_response_result(raw)
-
-    def _normalize_input_item(self, item: dict[str, Any]) -> dict[str, Any]:
-        """Normalize an input item for the OpenAI Responses API.
-
-        Ensures ``function_call`` items have ``arguments`` as a JSON string
-        (OpenAI rejects dict values).
-        """
-        if item.get("type") == "function_call" and isinstance(
-            item.get("arguments"), dict
-        ):
-            return {**item, "arguments": json.dumps(item["arguments"])}
-        return item
-
-    def _to_response_result(self, raw: Any) -> ResponseResult:
-        """Convert raw Responses API output to ResponseResult."""
-        outputs: list[ResponseOutputText | ResponseOutputFunctionCall] = []
-        for item in raw.output:
-            item_type = getattr(item, "type", None)
-            if item_type == "message":
-                for content_block in getattr(item, "content", []):
-                    if getattr(content_block, "type", None) == "output_text":
-                        outputs.append(ResponseOutputText(text=content_block.text))
-            elif item_type == "function_call":
-                args = getattr(item, "arguments", "{}")
-                outputs.append(
-                    ResponseOutputFunctionCall(
-                        call_id=getattr(item, "call_id", None),
-                        name=item.name,
-                        arguments=json.loads(args) if isinstance(args, str) else args,
-                    )
-                )
-
-        usage = None
-        if raw.usage:
-            usage = Usage(
-                prompt_tokens=getattr(raw.usage, "input_tokens", 0),
-                completion_tokens=getattr(raw.usage, "output_tokens", 0),
-                total_tokens=getattr(raw.usage, "total_tokens", 0),
-            )
-
-        return ResponseResult(
-            id=raw.id,
-            outputs=outputs,
-            model=getattr(raw, "model", None),
-            usage=usage,
-        )
+        return OpenAIResponseTranslator.from_openai(raw)

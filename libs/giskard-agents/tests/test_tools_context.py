@@ -2,12 +2,17 @@
 
 from unittest.mock import MagicMock
 
-from giskard.agents.chat import Message
 from giskard.agents.context import RunContext
 from giskard.agents.generators import BaseGenerator
-from giskard.agents.generators.base import Response
-from giskard.agents.tools import Function, ToolCall, tool
+from giskard.agents.tools import tool
 from giskard.agents.workflow import ChatWorkflow
+from giskard.llm.types import (
+    AssistantMessage,
+    Choice,
+    CompletionResponse,
+    ToolCall,
+    ToolCallFunction,
+)
 
 
 @tool
@@ -71,17 +76,23 @@ def test_tool_context_not_in_params():
 
 async def test_pipeline_calls_context():
     generator = MagicMock(spec=BaseGenerator)
-    generator.complete.return_value = Response(
-        message=Message(
-            role="assistant",
-            tool_calls=[
-                ToolCall(
-                    id="1",
-                    function=Function(name="count_tool", arguments='{"increment": 1}'),
-                )
-            ],
-        ),
-        finish_reason="tool_calls",
+    generator.complete.return_value = CompletionResponse(
+        choices=[
+            Choice(
+                message=AssistantMessage(
+                    tool_calls=[
+                        ToolCall(
+                            id="1",
+                            function=ToolCallFunction(
+                                name="count_tool", arguments={"increment": 1}
+                            ),
+                        )
+                    ]
+                ),
+                finish_reason="tool_calls",
+                index=0,
+            )
+        ]
     )
 
     pipeline = (

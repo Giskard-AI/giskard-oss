@@ -1,4 +1,4 @@
-from .chat import Chat, Message
+from .chat import Chat
 from .context import RunContext
 from .embeddings import EmbeddingModel
 from .errors import Error, WorkflowError
@@ -18,7 +18,6 @@ __all__ = [
     "Generator",
     "ChatWorkflow",
     "Chat",
-    "Message",
     "Tool",
     "tool",
     "MessageTemplate",

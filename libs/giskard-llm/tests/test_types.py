@@ -1,9 +1,10 @@
 from giskard.llm.types import (
+    AssistantMessage,
     Choice,
-    ChoiceMessage,
     CompletionResponse,
     EmbeddingData,
     EmbeddingResponse,
+    FunctionMessage,
     ToolCall,
     ToolCallFunction,
 )
@@ -13,7 +14,7 @@ def test_completion_response_model_dump():
     resp = CompletionResponse(
         choices=[
             Choice(
-                message=ChoiceMessage(role="assistant", content="Hello"),
+                message=AssistantMessage(content="Hello"),
                 finish_reason="stop",
             )
         ],
@@ -27,19 +28,39 @@ def test_completion_response_model_dump():
 
 
 def test_choice_message_excludes_none():
-    msg = ChoiceMessage(role="assistant", content="Hello")
+    msg = AssistantMessage(content="Hello")
     dump = msg.model_dump()
     assert "tool_calls" not in dump
 
 
+def test_assistant_message_transcript_single_role_prefix():
+    assert AssistantMessage(content="Hello").transcript == "[assistant]: Hello"
+
+
+def test_assistant_message_transcript_with_tool_calls_no_duplicated_prefix():
+    msg = AssistantMessage(
+        content="OK",
+        tool_calls=[
+            ToolCall(
+                id="call_1",
+                type="function",
+                function=ToolCallFunction(name="add", arguments={"a": 1}),
+            )
+        ],
+    )
+    t = msg.transcript
+    assert t.count("[assistant]:") == 1, t
+    assert t.startswith("[assistant]: OK\n>")
+
+
 def test_choice_message_includes_typed_tool_calls():
-    msg = ChoiceMessage(
+    msg = AssistantMessage(
         role="assistant",
         tool_calls=[
             ToolCall(
                 id="call_1",
                 type="function",
-                function=ToolCallFunction(name="add", arguments='{"a": 1, "b": 2}'),
+                function=ToolCallFunction(name="add", arguments={"a": 1, "b": 2}),
             )
         ],
     )
@@ -52,11 +73,21 @@ def test_choice_message_includes_typed_tool_calls():
 def test_tool_call_model():
     tc = ToolCall(
         id="call_1",
-        function=ToolCallFunction(name="get_weather", arguments='{"city": "Paris"}'),
+        function=ToolCallFunction(name="get_weather", arguments={"city": "Paris"}),
     )
     assert tc.id == "call_1"
     assert tc.type == "function"
     assert tc.function.name == "get_weather"
+
+
+def test_function_message_transcript_none_content():
+    assert FunctionMessage(name="fn").transcript == "[function]: empty"
+
+
+def test_function_message_transcript_with_content():
+    assert (
+        FunctionMessage(name="fn", content="result").transcript == "[function]: result"
+    )
 
 
 def test_embedding_response():

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
-from ._types import FinishReason
-from .base import BaseGenerator, GenerationParams, Response
+from ._types import GenerationParams
+from .base import BaseGenerator
 from .giskard_llm_generator import GiskardLLMGenerator, GiskardLLMRetryMiddleware
 from .middleware import (
     CompletionMiddleware,
@@ -18,10 +18,8 @@ if TYPE_CHECKING:
     from .litellm_generator import LiteLLMGenerator, LiteLLMRetryMiddleware
 
 __all__ = [
-    "FinishReason",
     "Generator",
     "GenerationParams",
-    "Response",
     "BaseGenerator",
     "GiskardLLMGenerator",
     "GiskardLLMRetryMiddleware",

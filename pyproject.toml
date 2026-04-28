@@ -61,7 +61,10 @@ markers = [
 
 [dependency-groups]
 dev = [
+    "anthropic>=0.96.0",
+    "google-genai>=1.73.1",
     "ipykernel==7.2.0",
+    "openai>=2.24.0",
     "pip-audit==2.10.0",
     "pylint-pydantic==0.4.1",
     "pytest==9.0.3",

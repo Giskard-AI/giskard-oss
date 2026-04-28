@@ -1,12 +1,12 @@
-from typing import Any, cast, override
+from collections.abc import Sequence
+from typing import Any, override
 
 from giskard.llm import CompletionResponse, acompletion, should_retry
-from giskard.llm.types import ChatMessage
+from giskard.llm.types import ChatMessage, ToolDefParam
 from pydantic import Field
 
-from ..chat import Message
 from ..tools import Tool
-from ._types import FinishReason, GenerationParams, Response
+from ._types import GenerationParams
 from .base import BaseGenerator
 from .middleware import CompletionMiddleware, RetryMiddleware, RetryPolicy
 
@@ -35,7 +35,7 @@ class GiskardLLMGenerator(BaseGenerator):
             return None
         return GiskardLLMRetryMiddleware(retry_policy=self.retry_policy)
 
-    def _serialize_tools(self, tools: list[Tool]) -> list[dict[str, Any]]:
+    def _serialize_tools(self, tools: list[Tool]) -> list[ToolDefParam]:
         """Convert ``Tool`` objects to the OpenAI function-calling format."""
         return [
             {
@@ -49,45 +49,18 @@ class GiskardLLMGenerator(BaseGenerator):
             for t in tools
         ]
 
-    def _serialize_messages(self, messages: list[Message]) -> list[ChatMessage]:
-        """Convert ``Message`` objects to the wire dict format."""
-        return cast(
-            list[ChatMessage],
-            [
-                m.model_dump(include={"role", "content", "tool_calls", "tool_call_id"})
-                for m in messages
-            ],
-        )
-
-    def _deserialize_response(self, raw: Any) -> Message:
-        """Convert a response message object into an internal ``Message``."""
-        data = raw if isinstance(raw, dict) else raw.model_dump()
-        return Message.model_validate(data)
-
     @override
     async def _call_model(
         self,
-        messages: list[Message],
+        messages: Sequence[ChatMessage],
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
-        wire_messages = self._serialize_messages(messages)
-        wire_params = params.model_dump(exclude={"tools"})
+    ) -> CompletionResponse:
+        wire_params = params.model_dump(exclude={"tools"}, exclude_unset=True)
         wire_tools = self._serialize_tools(params.tools) if params.tools else []
         if wire_tools:
             wire_params["tools"] = wire_tools
         if metadata:
             wire_params["metadata"] = metadata
 
-        raw: CompletionResponse = await acompletion(
-            messages=wire_messages, model=self.model, **wire_params
-        )
-
-        choice = raw.choices[0]
-        message = self._deserialize_response(choice.message)
-        response_metadata = raw.model_dump(exclude={"choices"})
-        return Response(
-            message=message,
-            finish_reason=cast(FinishReason, choice.finish_reason),
-            metadata=response_metadata,
-        )
+        return await acompletion(messages=messages, model=self.model, **wire_params)

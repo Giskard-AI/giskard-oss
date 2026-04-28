@@ -9,10 +9,14 @@ from typing import Any, Protocol, runtime_checkable
 
 from ..types import (
     ChatMessage,
+    ChatMessageParam,
     CompletionResponse,
     EmbeddingResponse,
+    ResponseInputItem,
+    ResponseInputItemParam,
     ResponseResult,
     ToolDef,
+    ToolDefParam,
 )
 
 
@@ -23,9 +27,9 @@ class CompletionProvider(Protocol):
     async def complete(
         self,
         model: str,
-        messages: Sequence[ChatMessage],
+        messages: Sequence[ChatMessageParam | ChatMessage],
         *,
-        tools: list[ToolDef] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> CompletionResponse:
         """Send a chat completion request. Raises LLMError on provider failures."""
@@ -53,12 +57,12 @@ class ResponseProvider(Protocol):
     async def respond(
         self,
         model: str,
-        input: str | list[dict[str, Any]],
+        input: str | Sequence[ResponseInputItemParam | ResponseInputItem],
         *,
         instructions: str | None = None,
         previous_id: str | None = None,
-        tools: list[ToolDef] | None = None,
+        tools: Sequence[ToolDefParam | ToolDef] | None = None,
         **params: Any,
     ) -> ResponseResult:
-        """Send a stateful response request. ``input`` is a string or list of role/content dicts for multi-turn."""
+        """Send a stateful response request. ``input`` is a string or structured items for multi-turn."""
         ...

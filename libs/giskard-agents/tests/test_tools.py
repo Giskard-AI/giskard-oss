@@ -7,6 +7,7 @@ from uuid import UUID
 
 import pytest
 from giskard import agents
+from giskard.agents.generators import BaseGenerator
 from giskard.agents.tools import Tool, tool
 from pydantic import BaseModel
 
@@ -86,7 +87,7 @@ async def test_tool_with_methods():
 
 @pytest.mark.google
 @pytest.mark.functional
-async def test_tool_run(generator):
+async def test_tool_run(generator: BaseGenerator):
     """Test that the tool runs correctly."""
 
     @agents.tool
@@ -109,7 +110,8 @@ async def test_tool_run(generator):
         .run()
     )
 
-    assert "rain" in chat.last.content.lower()
+    assert chat.last.text is not None
+    assert "rain" in chat.last.text.lower()
 
 
 async def test_tool_catches_errors(generator):

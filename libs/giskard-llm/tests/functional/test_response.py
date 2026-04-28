@@ -9,7 +9,7 @@ import os
 import pytest
 from giskard.llm import LLMClient
 from giskard.llm.errors import AuthenticationError, LLMError, UnsupportedOperationError
-from giskard.llm.types import ResponseOutputFunctionCall, ResponseOutputText, ToolDef
+from giskard.llm.types import ResponseOutputFunctionCall, ToolDefParam
 
 pytestmark = pytest.mark.functional
 
@@ -75,7 +75,7 @@ async def test_respond_with_instructions(provider: str):
 
 # -- Tool call scenario -------------------------------------------------------
 
-_ADD_TOOL: ToolDef = {
+_ADD_TOOL: ToolDefParam = {
     "type": "function",
     "function": {
         "name": "add",
@@ -130,19 +130,19 @@ async def test_respond_tool_roundtrip(provider: str):
             {
                 "type": "function_call",
                 "name": fc.name,
-                "call_id": fc.call_id,
+                "call_id": fc.call_id or fc.name,
                 "arguments": fc.arguments,
             },
             {
                 "type": "function_call_output",
-                "call_id": fc.call_id,
+                "call_id": fc.call_id or fc.name,
+                "name": fc.name,
                 "output": "4",
             },
         ],
     )
-    text_outputs = [o for o in resp2.outputs if isinstance(o, ResponseOutputText)]
-    assert len(text_outputs) > 0
-    assert text_outputs[0].text.strip()
+    assert resp2.output_text is not None
+    assert resp2.output_text.strip()
 
 
 # -- Stateful turn scenario ---------------------------------------------------
@@ -260,9 +260,9 @@ async def test_respond_usage_populated(provider: str):
     client, model = _make_client(provider)
     resp = await client.aresponse(model, "Say one word.")
     assert resp.usage is not None
-    assert resp.usage.prompt_tokens >= 0
-    assert resp.usage.completion_tokens >= 0
-    assert resp.usage.total_tokens >= resp.usage.prompt_tokens
+    assert resp.usage.input_tokens >= 0
+    assert resp.usage.output_tokens >= 0
+    assert resp.usage.total_tokens >= resp.usage.input_tokens
 
 
 # -- Error path scenario ------------------------------------------------------

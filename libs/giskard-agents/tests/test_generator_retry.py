@@ -1,11 +1,18 @@
+from collections.abc import Sequence
 from typing import Any, override
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from giskard.agents.chat import Message
 from giskard.agents.generators import GenerationParams
-from giskard.agents.generators.base import BaseGenerator, Response
+from giskard.agents.generators.base import BaseGenerator
 from giskard.agents.generators.middleware import RetryMiddleware, RetryPolicy
+from giskard.llm.types import (
+    AssistantMessage,
+    ChatMessage,
+    Choice,
+    CompletionResponse,
+    UserMessage,
+)
 
 
 class RetriableError(Exception):
@@ -30,10 +37,10 @@ class MockGenerator(BaseGenerator):
     @override
     async def _call_model(
         self,
-        messages: list[Message],
+        messages: Sequence[ChatMessage],
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
+    ) -> CompletionResponse:
         return await self._call_model_mock(messages, params)
 
 
@@ -49,7 +56,7 @@ async def test_raises_exception_after_retries_exhausted():
 
     with pytest.raises(RetriableError):
         _ = await generator.complete(
-            messages=[Message(role="user", content="Test message")]
+            messages=[{"role": "user", "content": "Test message"}]
         )
 
     assert generator._call_model_mock.call_count == 3
@@ -61,7 +68,7 @@ async def test_raises_exception_if_not_retriable():
 
     with pytest.raises(ValueError):
         _ = await generator.complete(
-            messages=[Message(role="user", content="Test message")]
+            messages=[{"role": "user", "content": "Test message"}]
         )
 
     assert generator._call_model_mock.call_count == 1
@@ -72,17 +79,22 @@ async def test_retries_with_result():
     generator._call_model_mock.side_effect = [
         RetriableError("Test error"),
         RetriableError("Test error"),
-        Response(
-            message=Message(role="assistant", content="Test response"),
-            finish_reason="stop",
+        CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content="Test response"),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
         ),
     ]
 
     res = await generator.complete(
-        messages=[Message(role="user", content="Test message")]
+        messages=[{"role": "user", "content": "Test message"}]
     )
-    assert res.message.content == "Test response"
-    assert res.finish_reason == "stop"
+    assert res.choices[0].message.content == "Test response"
+    assert res.choices[0].finish_reason == "stop"
 
     assert generator._call_model_mock.call_count == 3
 
@@ -92,21 +104,26 @@ async def test_retries_works_with_batch_complete():
     generator._call_model_mock.side_effect = [
         RetriableError("Test error"),
         RetriableError("Test error"),
-        Response(
-            message=Message(role="assistant", content="Test response"),
-            finish_reason="stop",
+        CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content="Test response"),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
         ),
     ]
 
     res = await generator.batch_complete(
         messages=[
-            [Message(role="user", content="Test message")],
+            [UserMessage(content="Test message")],
         ]
     )
 
     assert len(res) == 1
-    assert res[0].message.content == "Test response"
-    assert res[0].finish_reason == "stop"
+    assert res[0].choices[0].message.content == "Test response"
+    assert res[0].choices[0].finish_reason == "stop"
 
     assert generator._call_model_mock.call_count == 3
 
@@ -119,18 +136,23 @@ async def test_retries_with_max_delay():
         RetriableError("Test error"),
         RetriableError("Test error"),
         RetriableError("Test error"),
-        Response(
-            message=Message(role="assistant", content="Test response"),
-            finish_reason="stop",
+        CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content="Test response"),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
         ),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
         res = await generator.complete(
-            messages=[Message(role="user", content="Test message")]
+            messages=[{"role": "user", "content": "Test message"}]
         )
 
-    assert res.message.content == "Test response"
+    assert res.choices[0].message.content == "Test response"
     assert generator._call_model_mock.call_count == 5
 
     for call in mock_sleep.call_args_list:
@@ -144,18 +166,23 @@ async def test_retries_exponential_backoff():
         RetriableError("Test error"),
         RetriableError("Test error"),
         RetriableError("Test error"),
-        Response(
-            message=Message(role="assistant", content="Test response"),
-            finish_reason="stop",
+        CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content="Test response"),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
         ),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
         res = await generator.complete(
-            messages=[Message(role="user", content="Test message")]
+            messages=[{"role": "user", "content": "Test message"}]
         )
 
-    assert res.message.content == "Test response"
+    assert res.choices[0].message.content == "Test response"
     assert generator._call_model_mock.call_count == 4
 
     sleep_times = [call.args[0] for call in mock_sleep.call_args_list]
@@ -173,18 +200,23 @@ async def test_retries_exponential_backoff_with_max_delay():
         RetriableError("Test error"),
         RetriableError("Test error"),
         RetriableError("Test error"),
-        Response(
-            message=Message(role="assistant", content="Test response"),
-            finish_reason="stop",
+        CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content="Test response"),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
         ),
     ]
 
     with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
         res = await generator.complete(
-            messages=[Message(role="user", content="Test message")]
+            messages=[{"role": "user", "content": "Test message"}]
         )
 
-    assert res.message.content == "Test response"
+    assert res.choices[0].message.content == "Test response"
     assert generator._call_model_mock.call_count == 6
 
     sleep_times = [call.args[0] for call in mock_sleep.call_args_list]
