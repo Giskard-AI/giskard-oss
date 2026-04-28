@@ -100,7 +100,7 @@ class LiteLLMGenerator(BaseGenerator):
         metadata: dict[str, Any] | None = None,
     ) -> CompletionResponse:
         wire_messages = self._serialize_messages(messages)
-        wire_params = params.model_dump(exclude={"tools"})
+        wire_params = params.model_dump(exclude={"tools"}, exclude_unset=True)
         wire_tools = self._serialize_tools(params.tools) if params.tools else []
         if wire_tools:
             wire_params["tools"] = wire_tools

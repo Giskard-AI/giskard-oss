@@ -14,6 +14,7 @@ are marked ``functional`` so ``make test-unit`` never picks them up.
 """
 
 import os
+from typing import Callable
 
 import pytest
 from giskard import agents
@@ -56,7 +57,9 @@ _BACKEND_CASES = [
 
 
 @pytest.mark.parametrize("backend, generator_factory", _BACKEND_CASES)
-async def test_backend_completion(backend: str, generator_factory) -> None:
+async def test_backend_completion(
+    backend: str, generator_factory: Callable[[], BaseGenerator]
+) -> None:
     """Direct ``complete()`` call returns an assistant message."""
     generator = generator_factory()
     response = await generator.complete(
@@ -70,12 +73,14 @@ async def test_backend_completion(backend: str, generator_factory) -> None:
     )
 
     assert response.choices[0].message.role == "assistant"
-    assert isinstance(response.choices[0].message.content, str)
-    assert "testbot" in response.choices[0].message.content.lower()
+    assert response.choices[0].message.text is not None
+    assert "testbot" in response.choices[0].message.text.lower()
 
 
 @pytest.mark.parametrize("backend, generator_factory", _BACKEND_CASES)
-async def test_backend_chat_workflow(backend: str, generator_factory) -> None:
+async def test_backend_chat_workflow(
+    backend: str, generator_factory: Callable[[], BaseGenerator]
+) -> None:
     """``ChatWorkflow`` runs to completion on both backends."""
     workflow = agents.ChatWorkflow(generator=generator_factory())
     chat = await (
@@ -84,8 +89,8 @@ async def test_backend_chat_workflow(backend: str, generator_factory) -> None:
         .run()
     )
 
-    assert isinstance(chat.last.content, str)
-    assert "testbot" in chat.last.content.lower()
+    assert chat.last.text is not None
+    assert "testbot" in chat.last.text.lower()
 
 
 @pytest.mark.litellm
@@ -109,7 +114,7 @@ async def test_backends_coexist_in_same_process() -> None:
 
     assert giskard_response.choices[0].message.role == "assistant"
     assert litellm_response.choices[0].message.role == "assistant"
-    assert isinstance(giskard_response.choices[0].message.content, str)
-    assert isinstance(litellm_response.choices[0].message.content, str)
-    assert "1" in giskard_response.choices[0].message.content
-    assert "2" in litellm_response.choices[0].message.content
+    assert giskard_response.choices[0].message.text is not None
+    assert litellm_response.choices[0].message.text is not None
+    assert "1" in giskard_response.choices[0].message.text
+    assert "2" in litellm_response.choices[0].message.text

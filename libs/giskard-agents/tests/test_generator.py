@@ -64,8 +64,8 @@ async def test_generator_completion(generator: GiskardLLMGenerator):
 
     assert isinstance(response, CompletionResponse)
     assert response.choices[0].message.role == "assistant"
-    assert isinstance(response.choices[0].message.content, str)
-    assert "I am TestBot" in response.choices[0].message.content
+    assert response.choices[0].message.text is not None
+    assert "I am TestBot" in response.choices[0].message.text
     assert response.choices[0].finish_reason == "stop"
 
 

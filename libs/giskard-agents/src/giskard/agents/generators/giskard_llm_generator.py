@@ -56,7 +56,7 @@ class GiskardLLMGenerator(BaseGenerator):
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
     ) -> CompletionResponse:
-        wire_params = params.model_dump(exclude={"tools"})
+        wire_params = params.model_dump(exclude={"tools"}, exclude_unset=True)
         wire_tools = self._serialize_tools(params.tools) if params.tools else []
         if wire_tools:
             wire_params["tools"] = wire_tools
