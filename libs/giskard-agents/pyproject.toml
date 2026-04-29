@@ -14,7 +14,7 @@ dependencies = [
     "jinja2>=3.1.6,<4",
     "logfire-api>=3.22.0,<5",
     "tenacity>=9.1.0,<10",
-    "giskard-core>=1.0.0a1",
+    "giskard-core>=1.0.1b3,<2",
     "numpy>=2.4.1,<3",
 ]
 
