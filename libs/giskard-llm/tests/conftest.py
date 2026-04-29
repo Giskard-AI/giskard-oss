@@ -1,6 +1,7 @@
 """Test configuration with auto-skip for missing or present SDKs."""
 
 import importlib
+import os
 
 import pytest
 
@@ -14,7 +15,27 @@ _PROVIDER_PACKAGES = {
     "azure_ai": "openai",
 }
 
+# When TEST_PROVIDER is set, keep only tests whose pytest provider mark is in this set.
+# This lets CI slice the suite with one credential without repeating -m expressions.
+# - ``openai`` includes ``bare`` (same OpenAI SDK, no ``configure()`` path).
+# - ``google`` includes ``gemini`` (same ``google.genai`` SDK, different routing prefix).
+_TEST_PROVIDER_GROUPS: dict[str, frozenset[str]] = {
+    "openai": frozenset({"openai"}),
+    "google": frozenset({"google", "gemini"}),
+    "anthropic": frozenset({"anthropic"}),
+}
+
 _ANY_PROVIDER_PACKAGES = ["openai", "google.genai", "anthropic"]
+
+
+def _parse_test_provider() -> frozenset[str] | None:
+    """Return allowed provider marks, or ``None`` if filtering is disabled."""
+
+    raw = os.environ.get("TEST_PROVIDER", "").strip()
+    if not raw or raw.lower() == "all":
+        return None
+    key = raw.lower()
+    return _TEST_PROVIDER_GROUPS.get(key, frozenset({key}))
 
 
 def _is_installed(module_path: str) -> bool:
@@ -28,9 +49,30 @@ def _is_installed(module_path: str) -> bool:
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     """Auto-skip tests based on SDK availability.
 
+    **TEST_PROVIDER** (optional): if set to a nonempty value other than ``all``,
+    skip tests that carry a provider mark (``openai``, ``google``, …) not allowed
+    for that value. Example: ``TEST_PROVIDER=openai`` keeps ``openai`` and ``bare``.
+
+    **Otherwise**
+
     - Tests marked with a provider name skip when that SDK is missing.
     - Tests marked ``no_providers`` skip when any provider SDK is installed.
     """
+    allowed = _parse_test_provider()
+    if allowed is not None:
+        tp_disp = os.environ.get("TEST_PROVIDER", "").strip() or "?"
+        for item in items:
+            present = {name for name in _PROVIDER_PACKAGES if name in item.keywords}
+            if present and present.isdisjoint(allowed):
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason=(
+                            f"Not selected by TEST_PROVIDER={tp_disp!r} "
+                            f"(allowed marks: {sorted(allowed)})"
+                        )
+                    )
+                )
+
     installed_cache: dict[str, bool] = {}
     for item in items:
         for mark_name, package in _PROVIDER_PACKAGES.items():

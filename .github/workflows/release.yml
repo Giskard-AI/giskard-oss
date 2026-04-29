@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - giskard-core
+          - giskard-llm
           - giskard-agents
           - giskard-checks
       bump_type:
@@ -92,12 +93,22 @@ jobs:
       - name: Run checks
         run: make check
 
+      # OpenAI credentials; TEST_PROVIDER=openai makes libs/giskard-llm/tests/conftest.py
+      # skip non-OpenAI provider tests (bare is included via groups). Full `make test` still
+      # runs other workspace packages—only giskard-llm reads TEST_PROVIDER for now.
+      - name: Install OpenAI extras for functional tests
+        run: |
+          uv pip install "giskard-llm[openai]"
+          uv pip install "giskard-agents[openai]"
       - name: Run tests
         env:
-          TEST_MODEL: "gemini/gemini-2.0-flash"
-          TEST_EMBEDDING_MODEL: "gemini/gemini-embedding-001"
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: make test
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TEST_MODEL: "openai/gpt-4.1-nano"
+          TEST_PROVIDER: openai
+          TEST_LITELLM_MODEL: "openai/gpt-4.1-nano"
+          TEST_EMBEDDING_MODEL: "openai/text-embedding-3-small"
+        run: |
+          make test
 
       - name: Bump version
         id: bump
