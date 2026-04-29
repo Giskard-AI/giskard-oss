@@ -47,7 +47,7 @@ async def test_anthropic_relaxed_multi_system_merges():
             {"role": "user", "content": "Tell me something."},
         ],
     )
-    content = resp.choices[0].message.content or ""
+    content = resp.choices[0].message.text
     assert isinstance(content, str)
     assert "pineapple" in content.lower() and "mango" in content.lower()
 

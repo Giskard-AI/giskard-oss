@@ -89,9 +89,9 @@ async def test_user_only(provider: str):
     resp = await client.acompletion(model, [{"role": "user", "content": "Say hello"}])
     assert len(resp.choices) > 0
     assert resp.choices[0].message.role == "assistant"
-    assert resp.choices[0].message.content
-    assert isinstance(resp.choices[0].message.content, str)
-    assert len(resp.choices[0].message.content.strip()) > 0
+    assert resp.choices[0].message.text
+    assert isinstance(resp.choices[0].message.text, str)
+    assert len(resp.choices[0].message.text.strip()) > 0
 
 
 @pytest.mark.parametrize("provider", _PROVIDER_PARAMS)
@@ -116,9 +116,9 @@ async def test_system_user_keyword_injection(provider: str):
             {"role": "user", "content": "Tell me something."},
         ],
     )
-    assert resp.choices[0].message.content
-    assert isinstance(resp.choices[0].message.content, str)
-    assert "pineapple" in resp.choices[0].message.content.lower()
+    assert resp.choices[0].message.text
+    assert isinstance(resp.choices[0].message.text, str)
+    assert "pineapple" in resp.choices[0].message.text.lower()
 
 
 @pytest.mark.parametrize("provider", _PROVIDER_PARAMS)
@@ -134,9 +134,9 @@ async def test_multi_turn(provider: str):
             {"role": "user", "content": "And what is 3+3?"},
         ],
     )
-    assert resp.choices[0].message.content
-    assert isinstance(resp.choices[0].message.content, str)
-    assert len(resp.choices[0].message.content.strip()) > 0
+    assert resp.choices[0].message.text
+    assert isinstance(resp.choices[0].message.text, str)
+    assert len(resp.choices[0].message.text.strip()) > 0
 
 
 @pytest.mark.parametrize("provider", _PROVIDER_PARAMS)
@@ -212,7 +212,7 @@ async def test_tool_result_loop(provider: str):
         tools=[ADD_TOOL],
     )
     assert resp2.choices[0].finish_reason == "stop"
-    assert resp2.choices[0].message.content
+    assert resp2.choices[0].message.text
 
 
 @pytest.mark.parametrize("provider", _PROVIDER_PARAMS)
@@ -241,7 +241,7 @@ async def test_tool_result_loop_hardcoded(provider: str):
     ]
     resp = await client.acompletion(model, messages, tools=[ADD_TOOL])  # pyright: ignore[reportArgumentType]
     assert resp.choices[0].finish_reason == "stop"
-    assert resp.choices[0].message.content
+    assert resp.choices[0].message.text
 
 
 MULTIPLY_TOOL: ToolDefParam = {
@@ -298,7 +298,7 @@ async def test_tool_result_loop_parallel(provider: str):
     ]
     resp = await client.acompletion(model, messages, tools=[ADD_TOOL, MULTIPLY_TOOL])  # pyright: ignore[reportArgumentType]
     assert resp.choices[0].finish_reason == "stop"
-    assert resp.choices[0].message.content
+    assert resp.choices[0].message.text
 
 
 # -- Usage scenarios -----------------------------------------------------------
@@ -344,8 +344,8 @@ async def test_response_format(provider: str):
         response_format=ColorModel,
     )
     choice = resp.choices[0]
-    assert choice.message.content
-    raw_json = choice.message.content
+    assert choice.message.text
+    raw_json = choice.message.text
     assert isinstance(raw_json, str)
 
     parsed = json.loads(raw_json)
@@ -372,8 +372,8 @@ async def test_response_format_optional_nullable_reason(provider: str):
         response_format=JudgeLikeResult,
     )
     choice = resp.choices[0]
-    assert choice.message.content
-    raw_json = choice.message.content
+    assert choice.message.text
+    raw_json = choice.message.text
     assert isinstance(raw_json, str)
 
     parsed = json.loads(raw_json)
@@ -390,7 +390,7 @@ async def test_configure_explicit(provider: str):
     """Explicit configure() -> completion succeeds."""
     client, model = _make_client(provider)
     resp = await client.acompletion(model, [{"role": "user", "content": "Say hi"}])
-    assert resp.choices[0].message.content
+    assert resp.choices[0].message.text
 
 
 # -- Error handling scenarios --------------------------------------------------
