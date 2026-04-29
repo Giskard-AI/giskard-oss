@@ -1,7 +1,14 @@
 """Tests for the StringMatching check."""
 
 import pytest
-from giskard.checks import CheckStatus, Interaction, StringMatching, Trace
+from giskard.checks import (
+    CheckStatus,
+    ContainsAll,
+    ContainsAny,
+    Interaction,
+    StringMatching,
+    Trace,
+)
 from giskard.checks.core.extraction import NoMatch
 
 
@@ -413,3 +420,131 @@ async def test_unicode_e_acute_no_normalization_fails() -> None:
     result = await check.run(Trace())
     # Without normalization, they should not match
     assert result.status == CheckStatus.FAIL
+
+
+async def test_contains_any_passes_when_any_value_is_found() -> None:
+    """Test that ContainsAny passes when at least one value is found."""
+    check = ContainsAny(
+        text="ML is a subset of AI.",
+        values=["machine learning", "ML", "artificial intelligence"],
+    )
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["matched_values"] == ["ML"]
+
+
+async def test_contains_any_fails_when_no_value_is_found() -> None:
+    """Test that ContainsAny fails when none of the values are found."""
+    check = ContainsAny(text="The answer is about databases.", values=["ML", "AI"])
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.FAIL
+    assert result.details["matched_values"] == []
+
+
+async def test_contains_all_passes_when_all_values_are_found() -> None:
+    """Test that ContainsAll passes when every value is found."""
+    check = ContainsAll(
+        text="The response includes a definition and an example.",
+        values=["definition", "example"],
+    )
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["matched_values"] == ["definition", "example"]
+    assert result.details["missing_values"] == []
+
+
+async def test_contains_all_fails_when_any_value_is_missing() -> None:
+    """Test that ContainsAll fails when at least one value is missing."""
+    check = ContainsAll(
+        text="The response includes a definition.",
+        values=["definition", "example"],
+    )
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.FAIL
+    assert result.details["matched_values"] == ["definition"]
+    assert result.details["missing_values"] == ["example"]
+
+
+async def test_contains_checks_are_case_insensitive_by_default() -> None:
+    """Test that list matching checks are case-insensitive by default."""
+    check = ContainsAny(text="Machine Learning is useful.", values=["machine learning"])
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+
+
+async def test_contains_checks_support_case_sensitive_matching() -> None:
+    """Test case-sensitive matching behavior for list matching checks."""
+    check = ContainsAny(
+        text="Machine Learning is useful.",
+        values=["machine learning"],
+        case_sensitive=True,
+    )
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.FAIL
+
+
+async def test_contains_checks_extract_text_from_trace() -> None:
+    """Test extracting text from trace for list matching checks."""
+    check = ContainsAll(
+        text_key="trace.last.outputs.response",
+        values=["Paris", "France"],
+    )
+    interaction = Interaction(
+        inputs={"query": "Where is Paris?"},
+        outputs={"response": "Paris is the capital of France."},
+    )
+    result = await check.run(Trace(interactions=[interaction]))
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["text"] == "Paris is the capital of France."
+
+
+async def test_contains_checks_support_unicode_normalization() -> None:
+    """Test Unicode normalization for list matching checks."""
+    check = ContainsAny(
+        text="Hello Ａ World",
+        values=["A"],
+        normalization_form="NFKC",
+    )
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+
+
+async def test_contains_any_with_empty_values_fails() -> None:
+    """Test ContainsAny behavior with an empty values list."""
+    check = ContainsAny(text="Some text", values=[])
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.FAIL
+    assert result.details["matched_values"] == []
+
+
+async def test_contains_all_with_empty_values_passes() -> None:
+    """Test ContainsAll behavior with an empty values list."""
+    check = ContainsAll(text="Some text", values=[])
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["matched_values"] == []
+    assert result.details["missing_values"] == []
+
+
+async def test_contains_checks_report_missing_text_key() -> None:
+    """Test missing text extraction behavior for list matching checks."""
+    check = ContainsAny(
+        text_key="trace.last.outputs.nonexistent",
+        values=["test"],
+    )
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "No value found for text key 'trace.last.outputs.nonexistent'" in result.message
+    assert isinstance(result.details["text"], NoMatch)
