@@ -17,7 +17,6 @@ _PROVIDER_PACKAGES = {
 
 # When TEST_PROVIDER is set, keep only tests whose pytest provider mark is in this set.
 # This lets CI slice the suite with one credential without repeating -m expressions.
-# - ``openai`` includes ``bare`` (same OpenAI SDK, no ``configure()`` path).
 # - ``google`` includes ``gemini`` (same ``google.genai`` SDK, different routing prefix).
 _TEST_PROVIDER_GROUPS: dict[str, frozenset[str]] = {
     "openai": frozenset({"openai"}),
@@ -28,14 +27,14 @@ _TEST_PROVIDER_GROUPS: dict[str, frozenset[str]] = {
 _ANY_PROVIDER_PACKAGES = ["openai", "google.genai", "anthropic"]
 
 
-def _parse_test_provider() -> frozenset[str] | None:
-    """Return allowed provider marks, or ``None`` if filtering is disabled."""
+def _parse_test_provider() -> tuple[frozenset[str], str] | None:
+    """Return allowed marks and display name, or ``None`` if filtering is disabled."""
 
     raw = os.environ.get("TEST_PROVIDER", "").strip()
     if not raw or raw.lower() == "all":
         return None
     key = raw.lower()
-    return _TEST_PROVIDER_GROUPS.get(key, frozenset({key}))
+    return _TEST_PROVIDER_GROUPS.get(key, frozenset({key})), raw
 
 
 def _is_installed(module_path: str) -> bool:
@@ -58,9 +57,9 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     - Tests marked with a provider name skip when that SDK is missing.
     - Tests marked ``no_providers`` skip when any provider SDK is installed.
     """
-    allowed = _parse_test_provider()
-    if allowed is not None:
-        tp_disp = os.environ.get("TEST_PROVIDER", "").strip() or "?"
+    provider_filter = _parse_test_provider()
+    if provider_filter is not None:
+        allowed, tp_disp = provider_filter
         for item in items:
             present = {name for name in _PROVIDER_PACKAGES if name in item.keywords}
             if present and present.isdisjoint(allowed):
