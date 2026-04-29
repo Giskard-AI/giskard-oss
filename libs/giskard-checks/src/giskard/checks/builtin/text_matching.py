@@ -335,8 +335,8 @@ class ListStringMatching[InputType, OutputType, TraceType: Trace](  # pyright: i
         description="Unicode normalization form to apply (NFC, NFD, NFKC, NFKD). Defaults to NFKC.",
     )
     case_sensitive: bool = Field(
-        default=False,
-        description="If True, matching is case-sensitive. If False, text and values are lowercased before comparison.",
+        default=True,
+        description="If True, matching is case-sensitive. If False, text and values are lowercased before comparison. Defaults to True.",
     )
 
     def _format_str(self, value: str) -> str:
@@ -430,12 +430,13 @@ class ContainsAll[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
         text, details = extracted
         formatted_text = self._format_str(text)
         formatted_values = [self._format_str(value) for value in self.values]
-        missing_values = [
-            value
-            for value, formatted_value in zip(self.values, formatted_values, strict=True)
-            if formatted_value not in formatted_text
-        ]
-        matched_values = [value for value in self.values if value not in missing_values]
+        matched_values = []
+        missing_values = []
+        for value, formatted_value in zip(self.values, formatted_values, strict=True):
+            if formatted_value in formatted_text:
+                matched_values.append(value)
+            else:
+                missing_values.append(value)
 
         details["matched_values"] = matched_values
         details["missing_values"] = missing_values
