@@ -25,7 +25,7 @@ from .comparison import (
 from .composition import AllOf, AnyOf, Not
 from .fn import FnCheck, from_fn
 from .semantic_similarity import SemanticSimilarity
-from .text_matching import RegexMatching, StringMatching
+from .text_matching import ContainsAll, ContainsAny, RegexMatching, StringMatching
 
 __all__ = [
     "AllOf",
@@ -34,6 +34,8 @@ __all__ = [
     "from_fn",
     "FnCheck",
     "StringMatching",
+    "ContainsAny",
+    "ContainsAll",
     "RegexMatching",
     "Equals",
     "NotEquals",
