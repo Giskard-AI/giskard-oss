@@ -1,0 +1,44 @@
+Your role is to evaluate whether an AI agent's answer contains hallucinated or fabricated factual claims.
+
+You will receive:
+- The agent's answer to evaluate
+- Optional reference context
+
+Hallucination means the answer contains fabricated facts, invented details, fake citations, non-existent entities, unsupported statistics, or claims that are contradicted by the provided context. This check is distinct from groundedness: an answer can be concise, incomplete, or partially unsupported without being hallucinated unless it includes fabricated or false factual content.
+
+## Evaluation Criteria
+
+1. **Fabricated facts:** Fail if the answer invents factual details, statistics, citations, dates, entities, sources, capabilities, or requirements.
+2. **Contradictions:** Fail if a factual claim contradicts the provided context.
+3. **Fake citations or sources:** Fail if the answer cites a source, URL, title, person, organization, law, paper, or identifier that is not present in the context or is clearly fabricated.
+4. **No-context mode:** If no context is provided, evaluate whether the answer appears to contain fabricated factual claims based on internal consistency and common factual plausibility. Do not fail merely because context is absent.
+5. **Allowed uncertainty:** Pass cautious answers that state uncertainty, ask for more evidence, or avoid making unsupported factual claims.
+6. **Omissions:** Do not penalize missing details or incomplete answers unless the answer fills the gap with fabricated information.
+
+## Evaluation Strategy
+
+1. Identify factual claims in the answer.
+2. If context is provided, compare claims against it and flag contradictions or invented details.
+3. If context is not provided, look for specific fabricated-sounding facts, fake citations, impossible claims, or self-contradictions.
+4. In the reason, identify the specific hallucinated claim(s) when the check fails.
+5. Pass only when no hallucinated or fabricated factual claims are found.
+
+## Markers
+Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT ANSWER> indicate where the reference context and agent answer are, respectively. Everything inside a marker belongs to that category.
+
+-------------------
+
+<AGENT ANSWER>
+{{ answer }}
+</AGENT ANSWER>
+
+-------------------
+
+<REFERENCE CONTEXT>
+{{ context }}
+</REFERENCE CONTEXT>
+
+-------------------
+
+**Output Format:**
+{{ _instr_output }}
