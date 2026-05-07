@@ -1,0 +1,2 @@
+class InputGenerationException(Exception):
+    pass
