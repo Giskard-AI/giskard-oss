@@ -148,7 +148,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
     def interact(
         self,
         inputs: (
-            InputGenerator[InputType, TraceType]
+            InputGenerator[TraceType]
             | GeneratorType[[], InputType, None]
             | GeneratorType[[TraceType], InputType, TraceType]
         ),

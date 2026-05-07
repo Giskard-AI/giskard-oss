@@ -127,7 +127,7 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     """
 
     inputs: (
-        InputGenerator[InputType, TraceType]
+        InputGenerator[TraceType]
         | GeneratorType[[], InputType, None]
         | GeneratorType[[TraceType], InputType, TraceType]
     ) = Field(..., description="The inputs of the interaction.")

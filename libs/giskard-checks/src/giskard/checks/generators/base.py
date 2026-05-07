@@ -22,7 +22,7 @@ class LLMGeneratorOutput(BaseModel):
 
 
 class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    InputGenerator[str, TraceType], WithGeneratorMixin
+    InputGenerator[TraceType], WithGeneratorMixin
 ):
     """Abstract base for LLM-driven multi-turn input generators.
 
@@ -40,7 +40,12 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
         """Return template variables. Default provides trace only."""
         return {"trace": trace}
 
-    async def __call__(self, trace: TraceType) -> AsyncGenerator[str, TraceType]:
+    async def __call__(
+        self, trace: TraceType, input_type: type[str | BaseModel] | None = None
+    ) -> AsyncGenerator[Any, TraceType]:
+        if input_type is not None:
+            raise ValueError("input_type is not supported for BaseLLMGenerator")
+
         prompt = self.get_prompt()
 
         if isinstance(prompt, TemplateReference):
