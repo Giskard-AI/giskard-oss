@@ -26,6 +26,7 @@ from .core import (
     Check,
     CheckResult,
     CheckStatus,
+    InputGenerationException,
     Interact,
     Interaction,
     InteractionSpec,
@@ -39,7 +40,6 @@ from .core import (
     Trace,
     resolve,
 )
-from .core.exceptions import InputGenerationException
 from .generators.base import BaseLLMGenerator, LLMGenerator
 from .generators.user import UserSimulator
 from .judges import (
