@@ -6,6 +6,7 @@ from giskard.agents.workflow import ChatWorkflow, TemplateReference
 from pydantic import BaseModel, Field, model_validator
 
 from ..core import Trace
+from ..core.exceptions import InputGenerationException
 from ..core.input_generator import InputGenerator
 from ..core.mixin import WithGeneratorMixin
 
@@ -51,23 +52,22 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
         """Return template variables. Default provides trace only."""
         return {"trace": trace}
 
+    @override
     async def __call__(
         self, trace: TraceType, input_type: type[str | BaseModel] | None = None
     ) -> AsyncGenerator[Any, TraceType]:
-        if input_type is not None:
-            raise ValueError("input_type is not supported for BaseLLMGenerator")
-
+        T = input_type or str
         prompt = self.get_prompt()
 
         if isinstance(prompt, TemplateReference):
             workflow = self.generator.template(prompt.template_name).with_output(
-                LLMGeneratorOutput
+                LLMGeneratorOutput[T]
             )
         else:
             workflow = ChatWorkflow(
                 generator=self.generator,
                 messages=[MessageTemplate(role="user", content_template=prompt)],
-            ).with_output(LLMGeneratorOutput)
+            ).with_output(LLMGeneratorOutput[T])
 
         step = 0
         while step < self.max_steps:
@@ -75,6 +75,8 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
             chat = await workflow.with_inputs(**inputs).run()
             output = chat.output
 
+            if output.schema_issue:
+                raise InputGenerationException(f"schema issue: {output.schema_issue}")
             if output.goal_reached or not output.message:
                 return
 

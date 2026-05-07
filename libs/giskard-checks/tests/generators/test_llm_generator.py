@@ -1,6 +1,6 @@
 # libs/giskard-checks/tests/generators/test_llm_generator.py
 import pytest
-from giskard.checks import Interaction
+from giskard.checks import InputGenerationException, Interaction
 from giskard.checks.generators.base import LLMGenerator, LLMGeneratorOutput
 from pydantic import BaseModel
 
@@ -128,3 +128,75 @@ def test_llm_generator_output_has_schema_issue():
 def test_llm_generator_output_schema_issue_defaults_to_none():
     output = LLMGeneratorOutput[str](goal_reached=False, message="hello")
     assert output.schema_issue is None
+
+
+class UserMessage(BaseModel):
+    role: str = "user"
+    content: str
+
+
+@pytest.mark.asyncio
+async def test_llm_generator_produces_base_model_when_input_type_provided():
+    mock_gen = MockGenerator(
+        responses=[
+            {
+                "goal_reached": False,
+                "schema_issue": None,
+                "message": {"role": "user", "content": "Hello"},
+            },
+            {"goal_reached": True, "schema_issue": None, "message": None},
+        ]
+    )
+    gen = LLMGenerator(generator=mock_gen, prompt="Say hello.", max_steps=5)
+    trace = LLMTrace()
+    agen = gen(trace, input_type=UserMessage)
+    msg = await anext(agen)
+    assert isinstance(msg, UserMessage)
+    assert msg.content == "Hello"
+
+
+@pytest.mark.asyncio
+async def test_llm_generator_raises_on_schema_issue():
+    mock_gen = MockGenerator(
+        responses=[
+            {"goal_reached": False, "schema_issue": "no string field", "message": None},
+        ]
+    )
+    gen = LLMGenerator(generator=mock_gen, prompt="Say something.", max_steps=3)
+    trace = LLMTrace()
+    agen = gen(trace, input_type=UserMessage)
+    with pytest.raises(InputGenerationException, match="schema issue: no string field"):
+        await anext(agen)
+
+
+@pytest.mark.asyncio
+async def test_llm_generator_includes_schema_in_inputs_for_base_model():
+    mock_gen = MockGenerator(
+        responses=[
+            {"goal_reached": True, "schema_issue": None, "message": None},
+        ]
+    )
+    gen = LLMGenerator(generator=mock_gen, prompt="Say something.", max_steps=3)
+    trace = LLMTrace()
+    agen = gen(trace, input_type=UserMessage)
+    with pytest.raises(StopAsyncIteration):
+        await anext(agen)
+    # The prompt inputs passed to the LLM should include the schema
+    rendered_messages = mock_gen.calls[0]
+    assert any("content" in str(m) for m in rendered_messages)
+
+
+@pytest.mark.asyncio
+async def test_llm_generator_str_output_unchanged_without_input_type():
+    mock_gen = MockGenerator(
+        responses=[
+            {"goal_reached": False, "schema_issue": None, "message": "Hello there"},
+            {"goal_reached": True, "schema_issue": None, "message": None},
+        ]
+    )
+    gen = LLMGenerator(generator=mock_gen, prompt="Say hello.", max_steps=5)
+    trace = LLMTrace()
+    agen = gen(trace)
+    msg = await anext(agen)
+    assert msg == "Hello there"
+    assert isinstance(msg, str)
