@@ -1,7 +1,8 @@
 # libs/giskard-checks/tests/generators/test_llm_generator.py
 import pytest
 from giskard.checks import Interaction
-from giskard.checks.generators.base import LLMGenerator
+from giskard.checks.generators.base import LLMGenerator, LLMGeneratorOutput
+from pydantic import BaseModel
 
 from .conftest import LLMTrace, MockGenerator
 
@@ -105,3 +106,25 @@ async def test_llm_generator_stops_when_message_is_none_and_goal_not_reached():
     with pytest.raises(StopAsyncIteration):
         await anext(agen)
     assert len(mock_gen.calls) == 1
+
+
+def test_llm_generator_output_is_generic():
+    class MyModel(BaseModel):
+        content: str
+
+    output = LLMGeneratorOutput[MyModel](
+        goal_reached=False, message=MyModel(content="hi")
+    )
+    assert output.message is not None
+    assert output.message.content == "hi"
+
+
+def test_llm_generator_output_has_schema_issue():
+    output = LLMGeneratorOutput[str](goal_reached=False, schema_issue="no string field")
+    assert output.schema_issue == "no string field"
+    assert output.message is None
+
+
+def test_llm_generator_output_schema_issue_defaults_to_none():
+    output = LLMGeneratorOutput[str](goal_reached=False, message="hello")
+    assert output.schema_issue is None

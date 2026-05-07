@@ -10,12 +10,17 @@ from ..core.input_generator import InputGenerator
 from ..core.mixin import WithGeneratorMixin
 
 
-class LLMGeneratorOutput(BaseModel):
+class LLMGeneratorOutput[T: str | BaseModel](BaseModel):
     goal_reached: bool = Field(
         ...,
         description="Whether the goal has been reached and no more messages are needed.",
     )
-    message: str | None = Field(
+    schema_issue: str | None = Field(
+        default=None,
+        description="Schema issue preventing message generation (e.g. no string-like field). "
+        "Set this instead of message when the schema cannot produce a user message.",
+    )
+    message: T | None = Field(
         default=None,
         description="The message to send. None if goal_reached is True.",
     )
