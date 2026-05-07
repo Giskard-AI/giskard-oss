@@ -72,7 +72,4 @@ def generate_suite(
     for scenario in all_scenarios:
         scenario.annotations = {**scenario.annotations, "description": description}
 
-    suite = Suite(name=name)
-    for scenario in all_scenarios:
-        suite.append(scenario)
-    return suite
+    return Suite(name=name, scenarios=all_scenarios)
