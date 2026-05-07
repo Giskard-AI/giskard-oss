@@ -37,7 +37,7 @@ def generate_suite(
     max_scenarios: int | None = None,
     seed: int = 42,
     name: str = "Security Suite",
-) -> Suite:  # pyright: ignore[reportMissingTypeArgument]
+) -> Suite[str, Any]:
     """Generate a Suite of scenarios for the given categories.
 
     Parameters
