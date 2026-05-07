@@ -50,6 +50,9 @@ _PROVIDER = "google/response"
 PROVIDER = "google"
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "timeout", "response_format"})
 
+
+_ROLE_MAP = {"user": "user", "assistant": "model"}
+
 logger = logging.getLogger(__name__)
 
 
@@ -96,13 +99,16 @@ def serialize_easy_input_message(
         return None
 
     if isinstance(model.content, str):
-        return {"content": [_text_content(model.content)], "role": model.role}
+        return {
+            "content": [_text_content(model.content)],
+            "role": _ROLE_MAP[model.role],
+        }
 
     content = [
         cast("TextContentParam", cast(object, item.model_dump(context=info.context)))
         for item in model.content
     ]
-    return {"content": content, "role": model.role}
+    return {"content": content, "role": _ROLE_MAP[model.role]}
 
 
 @ResponseOutputMessage.register_serializer(_PROVIDER)
@@ -110,13 +116,16 @@ def serialize_output_message(
     model: ResponseOutputMessage, info: SerializationInfo
 ) -> "TurnParam":
     if isinstance(model.content, str):
-        return {"content": [_text_content(model.content)], "role": model.role}
+        return {
+            "content": [_text_content(model.content)],
+            "role": _ROLE_MAP[model.role],
+        }
 
     content = [
         cast("TextContentParam", cast(object, item.model_dump(context=info.context)))
         for item in model.content
     ]
-    return {"content": content, "role": model.role}
+    return {"content": content, "role": _ROLE_MAP[model.role]}
 
 
 @ResponseOutputFunctionCall.register_serializer(_PROVIDER)
@@ -135,7 +144,7 @@ def serialize_output_function_call(
                 "arguments": deserialize_arguments(model.arguments),
             }
         ],
-        "role": "assistant",
+        "role": "model",
     }
 
 

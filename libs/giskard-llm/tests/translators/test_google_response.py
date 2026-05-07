@@ -5,6 +5,12 @@ Each :class:`~giskard.llm.types.ResponseEasyInputMessage` and message item seria
 ``TurnParam`` (``content`` + ``role``); ``ResponseFunctionCallOutput`` becomes a **user**
 turn whose ``content`` contains ``function_result`` (Gemini Interactions). ``None`` from
 system/developer turns is dropped.
+
+**Role mapping** (Gemini Interactions ``TurnParam.role``): ``user`` stays ``user``;
+``assistant`` becomes ``model`` (same for :class:`~giskard.llm.types.ResponseOutputMessage`).
+:class:`~giskard.llm.types.ResponseOutputFunctionCall` is always ``model``.
+System and developer text is not emitted as turns: it is merged into ``system_instruction``.
+
 For **return** mapping -> :class:`~giskard.llm.types.ResponseResult`, see ``test_google_response_return.py``.
 For **generateContent** -> :class:`~giskard.llm.types.CompletionResponse`, see ``test_google_chat_return.py``.
 """
@@ -86,7 +92,7 @@ def _text_part(text: str) -> dict[str, str]:
     return {**_TEXT, "text": text}
 
 
-def _msg_turn(role: Literal["user", "assistant"], text: str) -> dict[str, object]:
+def _msg_turn(role: Literal["user", "model"], text: str) -> dict[str, object]:
     """One ``ResponseEasyInputMessage`` serializes to a single Interactions turn dict."""
     return {"content": [_text_part(text)], "role": role}
 
@@ -183,7 +189,7 @@ def test_message_user_assistant_user():
 
     assert payload["input"] == [
         _msg_turn("user", "First user."),
-        _msg_turn("assistant", "Assistant reply."),
+        _msg_turn("model", "Assistant reply."),
         _msg_turn("user", "Second user."),
     ]
     assert "system_instruction" not in payload
@@ -259,7 +265,7 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
     ]
     assert payload.get("input") == [
         _msg_turn("user", PARALLEL_USER_PROMPT),
-        _msg_turn("assistant", ASSISTANT_TEXT_WITH_PARALLEL_TOOLS),
+        _msg_turn("model", ASSISTANT_TEXT_WITH_PARALLEL_TOOLS),
         {
             "type": "function_call",
             "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
@@ -304,7 +310,7 @@ def test_assistant_message_mixed_output_text_and_refusal_maps_to_text_parts():
                 {"type": "text", "text": "Partial."},
                 {"type": "text", "text": "Stopped."},
             ],
-            "role": "assistant",
+            "role": "model",
         }
     ]
     validate_google_interaction_params(payload)
