@@ -9,10 +9,6 @@ from .suite import Suite
 
 _DATA_DIR = Path(__file__).parent / "data"
 
-_CATEGORY_FILES: dict[str, str] = {
-    "llm01_indirect_injection": "llm01_indirect_injection.jsonl",
-}
-
 
 class ScenarioCategory(str, Enum):
     """Scenario categories available for suite generation."""
@@ -23,8 +19,7 @@ class ScenarioCategory(str, Enum):
 def _load_scenarios(
     category: ScenarioCategory,
 ) -> list[Scenario[str, Any, Trace[str, Any]]]:
-    filename = _CATEGORY_FILES[category.value]
-    path = _DATA_DIR / filename
+    path = _DATA_DIR / f"{category.value}.jsonl"
     scenarios = []
     with path.open() as f:
         for line in f:
@@ -42,7 +37,7 @@ def generate_suite(
     max_scenarios: int | None = None,
     seed: int = 42,
     name: str = "Security Suite",
-) -> Suite[str, Any]:
+) -> Suite:  # pyright: ignore[reportMissingTypeArgument]
     """Generate a Suite of scenarios for the given categories.
 
     Parameters
