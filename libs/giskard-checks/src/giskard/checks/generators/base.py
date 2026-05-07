@@ -25,6 +25,12 @@ class LLMGeneratorOutput[T: str | BaseModel](BaseModel):
         description="The message to send. None if goal_reached is True.",
     )
 
+    @model_validator(mode="after")
+    def _validate_message_and_schema_issue(self) -> "LLMGeneratorOutput[T]":
+        if self.message is not None and self.schema_issue is not None:
+            raise ValueError("'message' and 'schema_issue' cannot both be set")
+        return self
+
 
 class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     InputGenerator[TraceType], WithGeneratorMixin
