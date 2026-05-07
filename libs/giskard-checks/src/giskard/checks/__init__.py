@@ -39,6 +39,7 @@ from .core import (
     Trace,
     resolve,
 )
+from .generators.base import BaseLLMGenerator, LLMGenerator
 from .generators.user import UserSimulator
 from .judges import (
     AnswerRelevance,
@@ -49,6 +50,7 @@ from .judges import (
     LLMJudge,
     Toxicity,
 )
+from .scenarios.catalog import ScenarioCategory, generate_suite
 from .scenarios.runner import ScenarioRunner
 from .scenarios.suite import Suite
 from .settings import get_default_generator, set_default_generator
@@ -111,8 +113,14 @@ __all__ = [
     "Toxicity",
     "StringMatching",
     "RegexMatching",
+    # LLM-based generators
+    "BaseLLMGenerator",
+    "LLMGenerator",
     # Generators
     "UserSimulator",
+    # Suite generation
+    "ScenarioCategory",
+    "generate_suite",
     # Testing
     "WithSpy",
     "TestCaseRunner",
