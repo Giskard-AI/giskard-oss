@@ -40,7 +40,6 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
         """Return template variables. Default provides trace only."""
         return {"trace": trace}
 
-    @override
     async def __call__(self, trace: TraceType) -> AsyncGenerator[str, TraceType]:
         prompt = self.get_prompt()
 
@@ -99,10 +98,10 @@ class LLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgume
     @model_validator(mode="after")
     def _validate_prompt_xor_path(self) -> Self:
         if self.prompt is None and self.prompt_path is None:
-            raise ValueError("Either 'prompt' or 'prompt_path' must be provided.")
+            raise ValueError("Either 'prompt' or 'prompt_path' must be provided")
         if self.prompt is not None and self.prompt_path is not None:
             raise ValueError(
-                "Cannot provide both 'prompt' and 'prompt_path' — choose one."
+                "Cannot provide both 'prompt' and 'prompt_path' - choose one"
             )
         return self
 

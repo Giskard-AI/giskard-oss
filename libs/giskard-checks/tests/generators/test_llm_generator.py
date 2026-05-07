@@ -1,43 +1,9 @@
 # libs/giskard-checks/tests/generators/test_llm_generator.py
-import json
-from collections.abc import Sequence
-from typing import Any, override
-
 import pytest
-from giskard.agents.generators.base import BaseGenerator, GenerationParams
-from giskard.checks import Interaction, Trace
+from giskard.checks import Interaction
 from giskard.checks.generators.base import LLMGenerator
-from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
-from pydantic import Field
 
-
-class MockGenerator(BaseGenerator):
-    responses: list[dict[str, Any]]
-    index: int = 0
-    calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
-
-    @override
-    async def _call_model(
-        self,
-        messages: Sequence[ChatMessage],
-        params: GenerationParams,
-        metadata: dict[str, Any] | None = None,
-    ) -> CompletionResponse:
-        self.calls.append(messages)
-        message = AssistantMessage(content=json.dumps(self.responses[self.index]))
-        self.index += 1
-        return CompletionResponse(
-            choices=[Choice(message=message, finish_reason="stop", index=0)]
-        )
-
-
-class LLMTrace(Trace[str, str], frozen=True):
-    def _repr_prompt_(self) -> str:
-        if not self.interactions:
-            return "**No interactions yet**"
-        return "\n".join(
-            f"[user]: {i.inputs}\n[assistant]: {i.outputs}" for i in self.interactions
-        )
+from .conftest import LLMTrace, MockGenerator
 
 
 def test_llm_generator_requires_prompt_or_prompt_path():
@@ -100,7 +66,6 @@ async def test_llm_generator_stops_at_max_steps():
     mock_gen = MockGenerator(
         responses=[
             {"goal_reached": False, "message": "Step 1"},
-            {"goal_reached": False, "message": "Step 2"},
         ]
     )
     gen = LLMGenerator(generator=mock_gen, prompt="Keep going.", max_steps=1)
@@ -113,4 +78,30 @@ async def test_llm_generator_stops_at_max_steps():
     with pytest.raises(StopAsyncIteration):
         _ = await agen.asend(trace)
 
+    assert len(mock_gen.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_llm_generator_stops_immediately_when_max_steps_zero():
+    mock_gen = MockGenerator(responses=[])
+    gen = LLMGenerator(generator=mock_gen, prompt="Say something.", max_steps=0)
+    trace = LLMTrace()
+    agen = gen(trace)
+    with pytest.raises(StopAsyncIteration):
+        await anext(agen)
+    assert len(mock_gen.calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_llm_generator_stops_when_message_is_none_and_goal_not_reached():
+    mock_gen = MockGenerator(
+        responses=[
+            {"goal_reached": False, "message": None},
+        ]
+    )
+    gen = LLMGenerator(generator=mock_gen, prompt="Say something.", max_steps=3)
+    trace = LLMTrace()
+    agen = gen(trace)
+    with pytest.raises(StopAsyncIteration):
+        await anext(agen)
     assert len(mock_gen.calls) == 1
