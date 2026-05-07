@@ -23,7 +23,6 @@ from .types import (
     EmbeddingUsage,
     FunctionCallOutputParam,
     FunctionDefParam,
-    ResponseOutputFunctionCall,
     ResponseOutputItem,
     ResponseOutputText,
     ResponseResult,

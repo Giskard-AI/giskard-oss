@@ -2,8 +2,16 @@
 
 Request shape mirrors :meth:`giskard.llm.translators.google_response.GoogleResponseTranslator.to_google`.
 Each :class:`~giskard.llm.types.ResponseEasyInputMessage` and message item serializes to one
-``TurnParam`` (``content`` + ``role``); the overall ``input`` is a flat list of those turns
-plus function-call items (``None`` from system/developer turns is dropped).
+``TurnParam`` (``content`` + ``role``); :class:`~giskard.llm.types.ResponseFunctionToolCall`
+matches assistant replay as a model turn whose ``content`` contains ``function_call`` (``id``, not top-level ``call_id``);
+:class:`~giskard.llm.types.ResponseFunctionCallOutput` becomes a **user** turn whose ``content`` contains ``function_result``.
+``None`` from system/developer turns is dropped.
+
+**Role mapping** (Gemini Interactions ``TurnParam.role``): ``user`` stays ``user``;
+``assistant`` becomes ``model`` (same for :class:`~giskard.llm.types.ResponseOutputMessage`).
+:class:`~giskard.llm.types.ResponseOutputFunctionCall` is always ``model``.
+System and developer text is not emitted as turns: it is merged into ``system_instruction``.
+
 For **return** mapping -> :class:`~giskard.llm.types.ResponseResult`, see ``test_google_response_return.py``.
 For **generateContent** -> :class:`~giskard.llm.types.CompletionResponse`, see ``test_google_chat_return.py``.
 """
@@ -85,9 +93,43 @@ def _text_part(text: str) -> dict[str, str]:
     return {**_TEXT, "text": text}
 
 
-def _msg_turn(role: Literal["user", "assistant"], text: str) -> dict[str, object]:
+def _msg_turn(role: Literal["user", "model"], text: str) -> dict[str, object]:
     """One ``ResponseEasyInputMessage`` serializes to a single Interactions turn dict."""
     return {"content": [_text_part(text)], "role": role}
+
+
+def _model_function_call_turn(
+    call_id: str, name: str, arguments: dict[str, object]
+) -> dict[str, object]:
+    """Input ``ResponseFunctionToolCall`` matches assistant replay shape (Interactions API)."""
+    return {
+        "content": [
+            {
+                "type": "function_call",
+                "id": call_id,
+                "name": name,
+                "arguments": arguments,
+            }
+        ],
+        "role": "model",
+    }
+
+
+def _user_function_result_turn(
+    call_id: str, name: str, result: str
+) -> dict[str, object]:
+    """``ResponseFunctionCallOutput`` → user turn with ``function_result`` content (Gemini API)."""
+    return {
+        "content": [
+            {
+                "type": "function_result",
+                "call_id": call_id,
+                "name": name,
+                "result": result,
+            }
+        ],
+        "role": "user",
+    }
 
 
 @pytest.mark.parametrize(
@@ -165,7 +207,7 @@ def test_message_user_assistant_user():
 
     assert payload["input"] == [
         _msg_turn("user", "First user."),
-        _msg_turn("assistant", "Assistant reply."),
+        _msg_turn("model", "Assistant reply."),
         _msg_turn("user", "Second user."),
     ]
     assert "system_instruction" not in payload
@@ -173,7 +215,7 @@ def test_message_user_assistant_user():
 
 
 def test_user_tool_call_and_result_with_tools():
-    """Tool declaration plus [user, function_call, function_result] in ``input`` (like chat)."""
+    """Tool declaration plus user text, model turn ``function_call``, then user ``function_result``."""
     items = google_response_user_tool_call_then_result()
     payload = GoogleResponseTranslator.to_google(_MODEL, items, tools=[WEATHER_TOOL])
 
@@ -182,24 +224,14 @@ def test_user_tool_call_and_result_with_tools():
     ]
     assert payload.get("input") == [
         _msg_turn("user", "What's the weather in Paris?"),
-        {
-            "type": "function_call",
-            "call_id": TOOL_CALL_ID,
-            "name": "get_weather",
-            "arguments": {"city": "Paris"},
-        },
-        {
-            "type": "function_call_output",
-            "call_id": TOOL_CALL_ID,
-            "name": "get_weather",
-            "output": TOOL_RESULT_CONTENT,
-        },
+        _model_function_call_turn(TOOL_CALL_ID, "get_weather", {"city": "Paris"}),
+        _user_function_result_turn(TOOL_CALL_ID, "get_weather", TOOL_RESULT_CONTENT),
     ]
     validate_google_interaction_params(payload)
 
 
 def test_user_two_parallel_tool_calls_and_results_with_tools():
-    """Two function calls, then two function results, flat in ``input`` (like chat)."""
+    """Two model-turn ``function_call`` entries, then two user turns with ``function_result`` each."""
     items = google_response_user_two_parallel_tool_calls_and_results()
     payload = GoogleResponseTranslator.to_google(_MODEL, items, tools=PARALLEL_TOOLS)
 
@@ -209,36 +241,32 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
     ]
     assert payload.get("input") == [
         _msg_turn("user", PARALLEL_USER_PROMPT),
-        {
-            "type": "function_call",
-            "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
-            "name": "get_weather",
-            "arguments": {"city": "Paris"},
-        },
-        {
-            "type": "function_call",
-            "call_id": TOOL_CALL_ID_TIME_PARALLEL,
-            "name": "get_local_time",
-            "arguments": {"timezone": "Asia/Tokyo"},
-        },
-        {
-            "type": "function_call_output",
-            "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
-            "name": "get_weather",
-            "output": TOOL_RESULT_WEATHER_PARALLEL,
-        },
-        {
-            "type": "function_call_output",
-            "call_id": TOOL_CALL_ID_TIME_PARALLEL,
-            "name": "get_local_time",
-            "output": TOOL_RESULT_TIME_PARALLEL,
-        },
+        _model_function_call_turn(
+            TOOL_CALL_ID_WEATHER_PARALLEL,
+            "get_weather",
+            {"city": "Paris"},
+        ),
+        _model_function_call_turn(
+            TOOL_CALL_ID_TIME_PARALLEL,
+            "get_local_time",
+            {"timezone": "Asia/Tokyo"},
+        ),
+        _user_function_result_turn(
+            TOOL_CALL_ID_WEATHER_PARALLEL,
+            "get_weather",
+            TOOL_RESULT_WEATHER_PARALLEL,
+        ),
+        _user_function_result_turn(
+            TOOL_CALL_ID_TIME_PARALLEL,
+            "get_local_time",
+            TOOL_RESULT_TIME_PARALLEL,
+        ),
     ]
     validate_google_interaction_params(payload)
 
 
 def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
-    """Assistant text, then two calls and two results (like chat, parallel with preamble)."""
+    """Assistant text turn, two model-turn ``function_call`` entries, then two ``function_result`` user turns."""
     items = google_response_user_assistant_text_two_parallel_tool_calls_and_results()
     payload = GoogleResponseTranslator.to_google(_MODEL, items, tools=PARALLEL_TOOLS)
 
@@ -248,31 +276,27 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
     ]
     assert payload.get("input") == [
         _msg_turn("user", PARALLEL_USER_PROMPT),
-        _msg_turn("assistant", ASSISTANT_TEXT_WITH_PARALLEL_TOOLS),
-        {
-            "type": "function_call",
-            "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
-            "name": "get_weather",
-            "arguments": {"city": "Paris"},
-        },
-        {
-            "type": "function_call",
-            "call_id": TOOL_CALL_ID_TIME_PARALLEL,
-            "name": "get_local_time",
-            "arguments": {"timezone": "Asia/Tokyo"},
-        },
-        {
-            "type": "function_call_output",
-            "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
-            "name": "get_weather",
-            "output": TOOL_RESULT_WEATHER_PARALLEL,
-        },
-        {
-            "type": "function_call_output",
-            "call_id": TOOL_CALL_ID_TIME_PARALLEL,
-            "name": "get_local_time",
-            "output": TOOL_RESULT_TIME_PARALLEL,
-        },
+        _msg_turn("model", ASSISTANT_TEXT_WITH_PARALLEL_TOOLS),
+        _model_function_call_turn(
+            TOOL_CALL_ID_WEATHER_PARALLEL,
+            "get_weather",
+            {"city": "Paris"},
+        ),
+        _model_function_call_turn(
+            TOOL_CALL_ID_TIME_PARALLEL,
+            "get_local_time",
+            {"timezone": "Asia/Tokyo"},
+        ),
+        _user_function_result_turn(
+            TOOL_CALL_ID_WEATHER_PARALLEL,
+            "get_weather",
+            TOOL_RESULT_WEATHER_PARALLEL,
+        ),
+        _user_function_result_turn(
+            TOOL_CALL_ID_TIME_PARALLEL,
+            "get_local_time",
+            TOOL_RESULT_TIME_PARALLEL,
+        ),
     ]
     validate_google_interaction_params(payload)
 
@@ -295,7 +319,7 @@ def test_assistant_message_mixed_output_text_and_refusal_maps_to_text_parts():
                 {"type": "text", "text": "Partial."},
                 {"type": "text", "text": "Stopped."},
             ],
-            "role": "assistant",
+            "role": "model",
         }
     ]
     validate_google_interaction_params(payload)

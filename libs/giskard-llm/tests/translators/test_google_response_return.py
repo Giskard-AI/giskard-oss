@@ -15,7 +15,7 @@ pytest.importorskip("google.genai")
 
 from giskard.llm.translators.google_response import GoogleResponseTranslator
 from giskard.llm.types import (
-    ResponseOutputFunctionCall,
+    ResponseFunctionToolCall,
     ResponseOutputMessage,
     ResponseOutputText,
 )
@@ -104,7 +104,7 @@ def test_from_google_function_call():
     out = GoogleResponseTranslator.from_google(raw, _MODEL)
     assert len(out.outputs) == 1
     o = out.outputs[0]
-    assert isinstance(o, ResponseOutputFunctionCall)
+    assert isinstance(o, ResponseFunctionToolCall)
     assert o.call_id == "fc_1"
     assert o.name == "get_weather"
     assert o.arguments == {"city": "Paris"}
@@ -132,6 +132,6 @@ def test_from_google_text_then_text_then_function():
     assert isinstance(out.outputs[1], ResponseOutputMessage)
     assert isinstance(out.outputs[1].content[0], ResponseOutputText)
     assert out.outputs[1].content[0].text == "B"
-    assert isinstance(out.outputs[2], ResponseOutputFunctionCall)
+    assert isinstance(out.outputs[2], ResponseFunctionToolCall)
     assert out.outputs[2].name == "f"
     assert out.output_text == "A\nB"
