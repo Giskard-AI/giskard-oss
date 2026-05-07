@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 class InputGenerator[TraceType: "Trace"](Discriminated):  # pyright: ignore[reportMissingTypeArgument]
     @overload
     def __call__(
-        self, trace: TraceType, input_type: type[str] | None
+        self, trace: TraceType, input_type: type[str] | None = None
     ) -> AsyncGenerator[str, TraceType]: ...
     @overload
     def __call__[T: BaseModel](
