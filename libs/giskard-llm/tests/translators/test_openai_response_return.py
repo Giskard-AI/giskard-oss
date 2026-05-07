@@ -15,7 +15,7 @@ pytest.importorskip("openai")
 
 from giskard.llm.translators.openai_response import OpenAIResponseTranslator
 from giskard.llm.types import (
-    ResponseOutputFunctionCall,
+    ResponseFunctionToolCall as GiskardFunctionToolCall,
 )
 from giskard.llm.types import (
     ResponseOutputMessage as GiskardMessage,
@@ -191,7 +191,7 @@ def test_from_openai_function_call():
     out = OpenAIResponseTranslator.from_openai(raw)
     assert len(out.outputs) == 1
     o = out.outputs[0]
-    assert isinstance(o, ResponseOutputFunctionCall)
+    assert isinstance(o, GiskardFunctionToolCall)
     assert o.call_id == "call_abc"
     assert o.name == "get_weather"
     assert o.arguments == {"city": "Paris"}
@@ -220,5 +220,5 @@ def test_from_openai_message_then_function():
     assert isinstance(out.outputs[0], GiskardMessage)
     assert isinstance(out.outputs[0].content[0], GiskardText)
     assert out.outputs[0].output_text == "Calling tool…"
-    assert isinstance(out.outputs[1], ResponseOutputFunctionCall)
+    assert isinstance(out.outputs[1], GiskardFunctionToolCall)
     assert out.outputs[1].name == "f"

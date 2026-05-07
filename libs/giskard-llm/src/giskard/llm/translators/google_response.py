@@ -7,9 +7,10 @@ from pydantic import BaseModel, SerializationInfo, field_serializer, model_valid
 
 from ..types import (
     ResponseEasyInputMessage,
+    ResponseFunctionCallOutput,
+    ResponseFunctionToolCall,
     ResponseInputItem,
     ResponseInputText,
-    ResponseOutputFunctionCall,
     ResponseOutputItem,
     ResponseOutputMessage,
     ResponseOutputRefusal,
@@ -48,6 +49,9 @@ else:
 _PROVIDER = "google/response"
 PROVIDER = "google"
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "timeout", "response_format"})
+
+
+_ROLE_MAP = {"user": "user", "assistant": "model"}
 
 logger = logging.getLogger(__name__)
 
@@ -95,13 +99,16 @@ def serialize_easy_input_message(
         return None
 
     if isinstance(model.content, str):
-        return {"content": [_text_content(model.content)], "role": model.role}
+        return {
+            "content": [_text_content(model.content)],
+            "role": _ROLE_MAP[model.role],
+        }
 
     content = [
         cast("TextContentParam", cast(object, item.model_dump(context=info.context)))
         for item in model.content
     ]
-    return {"content": content, "role": model.role}
+    return {"content": content, "role": _ROLE_MAP[model.role]}
 
 
 @ResponseOutputMessage.register_serializer(_PROVIDER)
@@ -109,13 +116,54 @@ def serialize_output_message(
     model: ResponseOutputMessage, info: SerializationInfo
 ) -> "TurnParam":
     if isinstance(model.content, str):
-        return {"content": [_text_content(model.content)], "role": model.role}
+        return {
+            "content": [_text_content(model.content)],
+            "role": _ROLE_MAP[model.role],
+        }
 
     content = [
         cast("TextContentParam", cast(object, item.model_dump(context=info.context)))
         for item in model.content
     ]
-    return {"content": content, "role": model.role}
+    return {"content": content, "role": _ROLE_MAP[model.role]}
+
+
+@ResponseFunctionToolCall.register_serializer(_PROVIDER)
+def serialize_output_function_call(
+    model: ResponseFunctionToolCall, _info: SerializationInfo
+) -> "TurnParam":
+    return {
+        "content": [
+            {
+                "type": "function_call",
+                "id": model.call_id,
+                "name": model.name,
+                "arguments": deserialize_arguments(model.arguments),
+            }
+        ],
+        "role": "model",
+    }
+
+
+@ResponseFunctionCallOutput.register_serializer(_PROVIDER)
+def serialize_output_function_call_output(
+    model: ResponseFunctionCallOutput, _info: SerializationInfo
+) -> "TurnParam":
+    if model.name is None:
+        # We cannot compute name from call_id alone since function calls are not guaranteed to be in the input.
+        raise ValueError("name is required for function calls")
+
+    return {
+        "content": [
+            {
+                "type": "function_result",
+                "call_id": model.call_id,
+                "name": model.name,
+                "result": model.output,
+            }
+        ],
+        "role": "user",
+    }
 
 
 def _extract_system_instruction(input: str | Sequence[ResponseInputItem]) -> str | None:
@@ -231,29 +279,19 @@ class GoogleResponseTranslator:
     @staticmethod
     def from_google(raw: "Interaction", model: str) -> ResponseResult:
         outputs: list[ResponseOutputItem] = []
-        for item in getattr(raw, "outputs", []):
-            item_type = getattr(item, "type", None)
-            if item_type == "text":
+        for item in raw.outputs or []:
+            if item.type == "text":
                 outputs.append(
                     ResponseOutputMessage(
                         content=[ResponseOutputText(text=item.text)], role="assistant"
                     )
                 )
-            elif item_type == "function_call":
-                raw_args = getattr(item, "arguments", None)
-                if raw_args is None:
-                    arguments: dict[str, Any] = {}
-                elif isinstance(raw_args, (str, dict)):
-                    arguments = deserialize_arguments(raw_args)
-                else:
-                    arguments = {}
-                # Google returns "id" on function_call outputs, not "call_id"
-                call_id = getattr(item, "id", None) or getattr(item, "call_id", None)
+            elif item.type == "function_call":
                 outputs.append(
-                    ResponseOutputFunctionCall(
-                        call_id=call_id,
+                    ResponseFunctionToolCall(
+                        call_id=item.id,
                         name=item.name,
-                        arguments=arguments,
+                        arguments=item.arguments,
                     )
                 )
 

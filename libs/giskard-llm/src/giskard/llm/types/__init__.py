@@ -58,7 +58,6 @@ from .response_param import (
     ResponseRefusalParam,
 )
 from .response_result import (
-    ResponseOutputFunctionCall,
     ResponseOutputItem,
     ResponseResult,
 )
@@ -99,7 +98,6 @@ __all__ = [
     "ResponseInputMessageContentParam",
     "ResponseInputText",
     "ResponseInputTextParam",
-    "ResponseOutputFunctionCall",
     "ResponseOutputItem",
     "ResponseOutputMessage",
     "ResponseOutputMessageContent",
