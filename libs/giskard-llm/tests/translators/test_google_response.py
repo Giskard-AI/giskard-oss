@@ -2,9 +2,10 @@
 
 Request shape mirrors :meth:`giskard.llm.translators.google_response.GoogleResponseTranslator.to_google`.
 Each :class:`~giskard.llm.types.ResponseEasyInputMessage` and message item serializes to one
-``TurnParam`` (``content`` + ``role``); ``ResponseFunctionCallOutput`` becomes a **user**
-turn whose ``content`` contains ``function_result`` (Gemini Interactions). ``None`` from
-system/developer turns is dropped.
+``TurnParam`` (``content`` + ``role``); :class:`~giskard.llm.types.ResponseFunctionToolCall`
+matches assistant replay as a model turn whose ``content`` contains ``function_call`` (``id``, not top-level ``call_id``);
+:class:`~giskard.llm.types.ResponseFunctionCallOutput` becomes a **user** turn whose ``content`` contains ``function_result``.
+``None`` from system/developer turns is dropped.
 
 **Role mapping** (Gemini Interactions ``TurnParam.role``): ``user`` stays ``user``;
 ``assistant`` becomes ``model`` (same for :class:`~giskard.llm.types.ResponseOutputMessage`).
@@ -95,6 +96,23 @@ def _text_part(text: str) -> dict[str, str]:
 def _msg_turn(role: Literal["user", "model"], text: str) -> dict[str, object]:
     """One ``ResponseEasyInputMessage`` serializes to a single Interactions turn dict."""
     return {"content": [_text_part(text)], "role": role}
+
+
+def _model_function_call_turn(
+    call_id: str, name: str, arguments: dict[str, object]
+) -> dict[str, object]:
+    """Input ``ResponseFunctionToolCall`` matches assistant replay shape (Interactions API)."""
+    return {
+        "content": [
+            {
+                "type": "function_call",
+                "id": call_id,
+                "name": name,
+                "arguments": arguments,
+            }
+        ],
+        "role": "model",
+    }
 
 
 def _user_function_result_turn(
@@ -197,7 +215,7 @@ def test_message_user_assistant_user():
 
 
 def test_user_tool_call_and_result_with_tools():
-    """Tool declaration plus user text, flat ``function_call``, then user turn ``function_result``."""
+    """Tool declaration plus user text, model turn ``function_call``, then user ``function_result``."""
     items = google_response_user_tool_call_then_result()
     payload = GoogleResponseTranslator.to_google(_MODEL, items, tools=[WEATHER_TOOL])
 
@@ -206,19 +224,14 @@ def test_user_tool_call_and_result_with_tools():
     ]
     assert payload.get("input") == [
         _msg_turn("user", "What's the weather in Paris?"),
-        {
-            "type": "function_call",
-            "call_id": TOOL_CALL_ID,
-            "name": "get_weather",
-            "arguments": {"city": "Paris"},
-        },
+        _model_function_call_turn(TOOL_CALL_ID, "get_weather", {"city": "Paris"}),
         _user_function_result_turn(TOOL_CALL_ID, "get_weather", TOOL_RESULT_CONTENT),
     ]
     validate_google_interaction_params(payload)
 
 
 def test_user_two_parallel_tool_calls_and_results_with_tools():
-    """Two flat ``function_call`` dicts, then two user turns with ``function_result`` each."""
+    """Two model-turn ``function_call`` entries, then two user turns with ``function_result`` each."""
     items = google_response_user_two_parallel_tool_calls_and_results()
     payload = GoogleResponseTranslator.to_google(_MODEL, items, tools=PARALLEL_TOOLS)
 
@@ -228,18 +241,16 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
     ]
     assert payload.get("input") == [
         _msg_turn("user", PARALLEL_USER_PROMPT),
-        {
-            "type": "function_call",
-            "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
-            "name": "get_weather",
-            "arguments": {"city": "Paris"},
-        },
-        {
-            "type": "function_call",
-            "call_id": TOOL_CALL_ID_TIME_PARALLEL,
-            "name": "get_local_time",
-            "arguments": {"timezone": "Asia/Tokyo"},
-        },
+        _model_function_call_turn(
+            TOOL_CALL_ID_WEATHER_PARALLEL,
+            "get_weather",
+            {"city": "Paris"},
+        ),
+        _model_function_call_turn(
+            TOOL_CALL_ID_TIME_PARALLEL,
+            "get_local_time",
+            {"timezone": "Asia/Tokyo"},
+        ),
         _user_function_result_turn(
             TOOL_CALL_ID_WEATHER_PARALLEL,
             "get_weather",
@@ -255,7 +266,7 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
 
 
 def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
-    """Assistant text turn, two flat ``function_call`` dicts, then two ``function_result`` user turns."""
+    """Assistant text turn, two model-turn ``function_call`` entries, then two ``function_result`` user turns."""
     items = google_response_user_assistant_text_two_parallel_tool_calls_and_results()
     payload = GoogleResponseTranslator.to_google(_MODEL, items, tools=PARALLEL_TOOLS)
 
@@ -266,18 +277,16 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
     assert payload.get("input") == [
         _msg_turn("user", PARALLEL_USER_PROMPT),
         _msg_turn("model", ASSISTANT_TEXT_WITH_PARALLEL_TOOLS),
-        {
-            "type": "function_call",
-            "call_id": TOOL_CALL_ID_WEATHER_PARALLEL,
-            "name": "get_weather",
-            "arguments": {"city": "Paris"},
-        },
-        {
-            "type": "function_call",
-            "call_id": TOOL_CALL_ID_TIME_PARALLEL,
-            "name": "get_local_time",
-            "arguments": {"timezone": "Asia/Tokyo"},
-        },
+        _model_function_call_turn(
+            TOOL_CALL_ID_WEATHER_PARALLEL,
+            "get_weather",
+            {"city": "Paris"},
+        ),
+        _model_function_call_turn(
+            TOOL_CALL_ID_TIME_PARALLEL,
+            "get_local_time",
+            {"timezone": "Asia/Tokyo"},
+        ),
         _user_function_result_turn(
             TOOL_CALL_ID_WEATHER_PARALLEL,
             "get_weather",

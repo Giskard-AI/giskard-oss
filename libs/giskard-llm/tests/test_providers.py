@@ -16,7 +16,7 @@ from giskard.llm.providers.base import (
 from giskard.llm.providers.google import GoogleProvider
 from giskard.llm.providers.openai import OpenAIProvider
 from giskard.llm.types import (
-    ResponseOutputFunctionCall,
+    ResponseFunctionToolCall,
     ResponseOutputMessage,
     ResponseOutputText,
     TextContent,
@@ -549,7 +549,7 @@ async def test_google_respond_function_call(mock_errors):
 
     resp = await provider.respond("gemini-2.0-flash", "Weather?")
     assert len(resp.outputs) == 1
-    assert isinstance(resp.outputs[0], ResponseOutputFunctionCall)
+    assert isinstance(resp.outputs[0], ResponseFunctionToolCall)
     assert resp.outputs[0].call_id == "call_xyz"
     assert resp.outputs[0].name == "get_weather"
     assert resp.outputs[0].arguments == {"city": "Tokyo"}

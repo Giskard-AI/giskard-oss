@@ -8,9 +8,9 @@ from pydantic import BaseModel, SerializationInfo, field_serializer, model_valid
 from ..types import (
     ResponseEasyInputMessage,
     ResponseFunctionCallOutput,
+    ResponseFunctionToolCall,
     ResponseInputItem,
     ResponseInputText,
-    ResponseOutputFunctionCall,
     ResponseOutputItem,
     ResponseOutputMessage,
     ResponseOutputRefusal,
@@ -128,13 +128,10 @@ def serialize_output_message(
     return {"content": content, "role": _ROLE_MAP[model.role]}
 
 
-@ResponseOutputFunctionCall.register_serializer(_PROVIDER)
+@ResponseFunctionToolCall.register_serializer(_PROVIDER)
 def serialize_output_function_call(
-    model: ResponseOutputFunctionCall, _info: SerializationInfo
+    model: ResponseFunctionToolCall, _info: SerializationInfo
 ) -> "TurnParam":
-    if model.call_id is None:
-        raise ValueError("call_id is required for function calls")
-
     return {
         "content": [
             {
@@ -149,7 +146,7 @@ def serialize_output_function_call(
 
 
 @ResponseFunctionCallOutput.register_serializer(_PROVIDER)
-def serialize_output_function_call(
+def serialize_output_function_call_output(
     model: ResponseFunctionCallOutput, _info: SerializationInfo
 ) -> "TurnParam":
     if model.name is None:
@@ -282,29 +279,19 @@ class GoogleResponseTranslator:
     @staticmethod
     def from_google(raw: "Interaction", model: str) -> ResponseResult:
         outputs: list[ResponseOutputItem] = []
-        for item in getattr(raw, "outputs", []):
-            item_type = getattr(item, "type", None)
-            if item_type == "text":
+        for item in raw.outputs or []:
+            if item.type == "text":
                 outputs.append(
                     ResponseOutputMessage(
                         content=[ResponseOutputText(text=item.text)], role="assistant"
                     )
                 )
-            elif item_type == "function_call":
-                raw_args = getattr(item, "arguments", None)
-                if raw_args is None:
-                    arguments: dict[str, Any] = {}
-                elif isinstance(raw_args, (str, dict)):
-                    arguments = deserialize_arguments(raw_args)
-                else:
-                    arguments = {}
-                # Google returns "id" on function_call outputs, not "call_id"
-                call_id = getattr(item, "id", None) or getattr(item, "call_id", None)
+            elif item.type == "function_call":
                 outputs.append(
-                    ResponseOutputFunctionCall(
-                        call_id=call_id,
+                    ResponseFunctionToolCall(
+                        call_id=item.id,
                         name=item.name,
-                        arguments=arguments,
+                        arguments=item.arguments,
                     )
                 )
 

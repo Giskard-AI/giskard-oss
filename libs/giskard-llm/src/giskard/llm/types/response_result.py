@@ -1,23 +1,14 @@
-from typing import Literal
-
 from pydantic import AliasChoices, Field
 
-from ._base import ArgumentDict, _BaseModel
-from .response import ResponseOutputMessage
+from ._base import _BaseModel
+from .response import ResponseFunctionToolCall, ResponseOutputMessage
 from .usage import Usage
 
 # -- Response / Interaction types (Responses API + Interactions API) -----------
 
 
-class ResponseOutputFunctionCall(_BaseModel):
-    type: Literal["function_call"] = "function_call"
-    call_id: str | None = None
-    name: str
-    arguments: ArgumentDict
-
-
 # Plain assignment (not `type` statement) so isinstance(x, ResponseOutputItem) works at runtime.
-ResponseOutputItem = ResponseOutputMessage | ResponseOutputFunctionCall
+ResponseOutputItem = ResponseOutputMessage | ResponseFunctionToolCall
 
 
 class ResponseResult(_BaseModel):
@@ -40,6 +31,6 @@ class ResponseResult(_BaseModel):
         return "\n".join(content) if content else None
 
     @property
-    def function_calls(self) -> list[ResponseOutputFunctionCall]:
+    def function_calls(self) -> list[ResponseFunctionToolCall]:
         """Return all function-call outputs."""
-        return [o for o in self.outputs if isinstance(o, ResponseOutputFunctionCall)]
+        return [o for o in self.outputs if isinstance(o, ResponseFunctionToolCall)]
