@@ -7,6 +7,7 @@ from pydantic import BaseModel, SerializationInfo, field_serializer, model_valid
 
 from ..types import (
     ResponseEasyInputMessage,
+    ResponseFunctionCallOutput,
     ResponseInputItem,
     ResponseInputText,
     ResponseOutputFunctionCall,
@@ -116,6 +117,47 @@ def serialize_output_message(
         for item in model.content
     ]
     return {"content": content, "role": model.role}
+
+
+@ResponseOutputFunctionCall.register_serializer(_PROVIDER)
+def serialize_output_function_call(
+    model: ResponseOutputFunctionCall, _info: SerializationInfo
+) -> "TurnParam":
+    if model.call_id is None:
+        raise ValueError("call_id is required for function calls")
+
+    return {
+        "content": [
+            {
+                "type": "function_call",
+                "id": model.call_id,
+                "name": model.name,
+                "arguments": deserialize_arguments(model.arguments),
+            }
+        ],
+        "role": "assistant",
+    }
+
+
+@ResponseFunctionCallOutput.register_serializer(_PROVIDER)
+def serialize_output_function_call(
+    model: ResponseFunctionCallOutput, _info: SerializationInfo
+) -> "TurnParam":
+    if model.name is None:
+        # We cannot compute name from call_id alone since function calls are not guaranteed to be in the input.
+        raise ValueError("name is required for function calls")
+
+    return {
+        "content": [
+            {
+                "type": "function_result",
+                "call_id": model.call_id,
+                "name": model.name,
+                "result": model.output,
+            }
+        ],
+        "role": "user",
+    }
 
 
 def _extract_system_instruction(input: str | Sequence[ResponseInputItem]) -> str | None:
