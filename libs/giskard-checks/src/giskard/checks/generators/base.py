@@ -110,7 +110,5 @@ class LLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgume
         if self.prompt is not None:
             return self.prompt
 
-        if self.prompt_path is not None:
-            return TemplateReference(template_name=self.prompt_path)
-
-        raise ValueError("Either 'prompt' or 'prompt_path' must be provided")
+        assert self.prompt_path is not None
+        return TemplateReference(template_name=self.prompt_path)
