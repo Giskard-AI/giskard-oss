@@ -170,20 +170,27 @@ async def test_llm_generator_raises_on_schema_issue():
 
 
 @pytest.mark.asyncio
-async def test_llm_generator_includes_schema_in_inputs_for_base_model():
+async def test_llm_generator_parses_structured_response_using_input_type_schema():
+    # with_output(LLMGeneratorOutput[UserMessage]) controls response parsing —
+    # the LLM response JSON is deserialized into a UserMessage instance.
+    # Schema injection into the prompt requires {{ _instr_output }} in the template.
     mock_gen = MockGenerator(
         responses=[
+            {
+                "goal_reached": False,
+                "schema_issue": None,
+                "message": {"role": "user", "content": "Hi"},
+            },
             {"goal_reached": True, "schema_issue": None, "message": None},
         ]
     )
     gen = LLMGenerator(generator=mock_gen, prompt="Say something.", max_steps=3)
     trace = LLMTrace()
     agen = gen(trace, input_type=UserMessage)
-    with pytest.raises(StopAsyncIteration):
-        await anext(agen)
-    # The prompt inputs passed to the LLM should include the schema
-    rendered_messages = mock_gen.calls[0]
-    assert any("content" in str(m) for m in rendered_messages)
+    msg = await anext(agen)
+    assert isinstance(msg, UserMessage)
+    assert msg.content == "Hi"
+    assert len(mock_gen.calls) == 1
 
 
 @pytest.mark.asyncio
