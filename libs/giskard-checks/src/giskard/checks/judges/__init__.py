@@ -5,6 +5,7 @@ from .base import BaseLLMCheck, LLMCheckResult
 from .conformity import Conformity
 from .groundedness import Groundedness
 from .judge import LLMJudge
+from .prompt_injection import PromptInjection
 from .toxicity import Toxicity
 
 __all__ = [
@@ -14,5 +15,6 @@ __all__ = [
     "Conformity",
     "Groundedness",
     "LLMJudge",
+    "PromptInjection",
     "Toxicity",
 ]
