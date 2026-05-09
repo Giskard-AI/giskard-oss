@@ -6,6 +6,7 @@ from .conformity import Conformity
 from .groundedness import Groundedness
 from .judge import LLMJudge
 from .toxicity import Toxicity
+from .bias import Bias
 
 __all__ = [
     "AnswerRelevance",
@@ -15,4 +16,5 @@ __all__ = [
     "Groundedness",
     "LLMJudge",
     "Toxicity",
+    "Bias"
 ]

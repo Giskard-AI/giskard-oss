@@ -9,6 +9,7 @@ from ..judges import (
     LLMCheckResult,
     LLMJudge,
     Toxicity,
+    Bias
 )
 
 # Import comparison checks (staying in builtin)
@@ -53,4 +54,5 @@ __all__ = [
     "Toxicity",
     "BaseLLMCheck",
     "LLMCheckResult",
+    "Bias"
 ]
