@@ -5,7 +5,14 @@ import pytest
 from giskard import agents
 from giskard.agents.errors import WorkflowError
 from giskard.agents.workflow import ErrorPolicy
-from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
+from giskard.llm.types import (
+    AssistantMessage,
+    ChatMessage,
+    Choice,
+    CompletionResponse,
+    ToolCall,
+    ToolCallFunction,
+)
 from pydantic import Field, PrivateAttr
 
 
@@ -62,6 +69,40 @@ async def test_run_skips_error():
     assert chat.last.content == "Hello!"
     assert chat.last.role == "user"
     assert chat.failed
+
+
+async def test_unknown_tool_call_raises_error():
+    class UnknownToolGenerator(agents.generators.BaseGenerator):
+        @override
+        async def _call_model(
+            self,
+            messages: Sequence[ChatMessage],
+            params: agents.generators.GenerationParams,
+            metadata: dict[str, Any] | None = None,
+        ) -> CompletionResponse:
+            return CompletionResponse(
+                choices=[
+                    Choice(
+                        message=AssistantMessage(
+                            tool_calls=[
+                                ToolCall(
+                                    id="tc_unknown",
+                                    function=ToolCallFunction(
+                                        name="missing_tool", arguments={}
+                                    ),
+                                )
+                            ]
+                        ),
+                        finish_reason="tool_calls",
+                        index=0,
+                    )
+                ]
+            )
+
+    workflow = agents.ChatWorkflow(generator=UnknownToolGenerator())
+
+    with pytest.raises(WorkflowError, match="Unknown tool call requested by generator"):
+        _ = await workflow.chat("Hello!", role="user").run()
 
 
 async def test_run_many_raises_error():

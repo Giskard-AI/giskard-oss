@@ -174,7 +174,9 @@ class _StepRunner:
 
         for tool_call in chat.last.tool_calls:
             if tool_call.function.name not in self._workflow.tools:
-                continue  # TODO: raise an error?
+                raise WorkflowError(
+                    f"Unknown tool call requested by generator: {tool_call.function.name}"
+                )
 
             tool = self._workflow.tools[tool_call.function.name]
             tool_content = await tool.run(
@@ -468,6 +470,10 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
     ) -> Chat[OutputType]:
         # Raise an error if the error mode is RAISE.
         if self.error_policy == ErrorPolicy.RAISE:
+            if isinstance(err, WorkflowError):
+                if err.last_step is None:
+                    err.last_step = last_step
+                raise err
             raise WorkflowError(
                 "Step processing failed",
                 last_step=last_step,
