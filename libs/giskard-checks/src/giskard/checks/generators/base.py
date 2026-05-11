@@ -3,6 +3,8 @@ from typing import Any, Self, override
 
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow, TemplateReference
+from giskard.llm import chat
+from giskard.llm.types import ChatMessage
 from pydantic import BaseModel, Field, model_validator
 
 from ..core import Trace
@@ -44,7 +46,7 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
 
     max_steps: int = Field(default=3, ge=0)
 
-    def get_prompt(self) -> str | TemplateReference:
+    def get_prompt(self) -> ChatMessage | TemplateReference | MessageTemplate:
         """Return the prompt string or template reference. Subclasses must override."""
         raise NotImplementedError
 
@@ -66,7 +68,7 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
         else:
             workflow = ChatWorkflow(
                 generator=self.generator,
-                messages=[MessageTemplate(role="user", content_template=prompt)],
+                messages=[prompt],
             ).with_output(LLMGeneratorOutput[T])
 
         step = 0
@@ -109,6 +111,10 @@ class LLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgume
     """
 
     prompt: str | None = Field(default=None, description="Inline prompt string.")
+    as_template: bool = Field(
+        default=False,
+        description="Whether to render the prompt as jinja2 template. prompt_path is always rendered as a template.",
+    )
     prompt_path: str | None = Field(
         default=None, description="Template file reference."
     )
@@ -124,9 +130,13 @@ class LLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgume
         return self
 
     @override
-    def get_prompt(self) -> str | TemplateReference:
+    def get_prompt(self) -> ChatMessage | TemplateReference | MessageTemplate:
         if self.prompt is not None:
-            return self.prompt
+            return (
+                MessageTemplate(role="user", content_template=self.prompt)
+                if self.as_template
+                else chat.user(self.prompt)
+            )
 
         assert self.prompt_path is not None
         return TemplateReference(template_name=self.prompt_path)

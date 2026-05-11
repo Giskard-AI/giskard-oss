@@ -1,6 +1,6 @@
 # libs/giskard-checks/tests/generators/test_llm_generator.py
 import pytest
-from giskard.checks import InputGenerationException, Interaction
+from giskard.checks import InputGenerationException, Interaction, Scenario
 from giskard.checks.generators.base import LLMGenerator, LLMGeneratorOutput
 from pydantic import BaseModel
 
@@ -207,3 +207,125 @@ async def test_llm_generator_str_output_unchanged_without_input_type():
     msg = await anext(agen)
     assert msg == "Hello there"
     assert isinstance(msg, str)
+
+
+# --- End-to-end: Scenario + LLMGenerator with as_template ---
+
+
+@pytest.mark.asyncio
+async def test_full_chain_llm_generator_produces_user_message_for_base_model_target():
+    mock_gen = MockGenerator(
+        responses=[
+            {
+                "goal_reached": False,
+                "schema_issue": None,
+                "message": {"role": "user", "content": "Tell me about your product"},
+            },
+            {"goal_reached": True, "schema_issue": None, "message": None},
+        ]
+    )
+    received_inputs: list[UserMessage] = []
+
+    def agent_target(inputs: UserMessage) -> str:
+        received_inputs.append(inputs)
+        return f"Response to: {inputs.content}"
+
+    llm_gen = LLMGenerator(
+        generator=mock_gen,
+        prompt="Ask about the product.\n{{ _instr_output }}",
+        max_steps=5,
+        as_template=True,
+    )
+    scenario = Scenario(name="test").interact(inputs=llm_gen, outputs=agent_target)
+
+    result = await scenario.run()
+    assert result.passed
+    assert len(received_inputs) == 1
+    assert isinstance(received_inputs[0], UserMessage)
+    assert received_inputs[0].content == "Tell me about your product"
+    assert len(mock_gen.calls) == 2
+    for call in mock_gen.calls:
+        assert (
+            str(LLMGeneratorOutput[UserMessage].model_json_schema())
+            in call[0].transcript
+        )
+
+
+@pytest.mark.asyncio
+async def test_full_chain_llm_generator_raises_on_schema_issue():
+    class _NoStringLikeField(BaseModel):
+        content: int
+
+    mock_gen = MockGenerator(
+        responses=[
+            {
+                "goal_reached": False,
+                "schema_issue": "no string-like field in schema",
+                "message": None,
+            },
+        ]
+    )
+
+    def agent_target(inputs: _NoStringLikeField) -> str:
+        return f"Response to: {inputs.content}"
+
+    llm_gen = LLMGenerator(
+        generator=mock_gen,
+        prompt="Ask about the product.\n{{ _instr_output }}",
+        max_steps=5,
+        as_template=True,
+    )
+    scenario = Scenario(name="test").interact(inputs=llm_gen, outputs=agent_target)
+
+    with pytest.raises(
+        InputGenerationException, match="schema issue: no string-like field in schema"
+    ):
+        await scenario.run()
+
+    assert len(mock_gen.calls) == 1
+    assert (
+        str(LLMGeneratorOutput[_NoStringLikeField].model_json_schema())
+        in mock_gen.calls[0][0].transcript
+    )
+
+
+@pytest.mark.asyncio
+async def test_full_chain_llm_generator_does_not_render_template_when_as_template_false():
+    """When as_template=False, Jinja2 syntax in the prompt must not be evaluated.
+
+    This is a security guard: user-controlled content in the prompt should not
+    be rendered as a template, preventing prompt injection via template execution.
+    """
+    mock_gen = MockGenerator(
+        responses=[
+            {
+                "goal_reached": False,
+                "schema_issue": None,
+                "message": {"role": "user", "content": "Tell me about your product"},
+            },
+            {"goal_reached": True, "schema_issue": None, "message": None},
+        ]
+    )
+
+    def agent_target(inputs: UserMessage) -> str:
+        return f"Response to: {inputs.content}"
+
+    llm_gen = LLMGenerator(
+        generator=mock_gen,
+        prompt="Ask about the product.\n{{ _instr_output }}",
+        max_steps=5,
+        as_template=False,
+    )
+    scenario = Scenario(name="test").interact(inputs=llm_gen, outputs=agent_target)
+
+    await scenario.run()
+
+    # With as_template=False the raw literal "{{ _instr_output }}" must appear
+    # in the prompt message — it must NOT have been replaced by the schema JSON.
+    assert len(mock_gen.calls) >= 1
+    first_message_content = mock_gen.calls[0][0].transcript
+    assert "{{ _instr_output }}" in first_message_content
+    assert (
+        str(LLMGeneratorOutput[UserMessage].model_json_schema())
+        not in first_message_content
+    )
