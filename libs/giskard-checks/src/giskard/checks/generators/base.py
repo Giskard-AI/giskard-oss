@@ -47,7 +47,7 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
     max_steps: int = Field(default=3, ge=0)
 
     def get_prompt(self) -> ChatMessage | TemplateReference | MessageTemplate:
-        """Return the prompt string or template reference. Subclasses must override."""
+        """Return the prompt. Subclasses must override."""
         raise NotImplementedError
 
     async def get_inputs(self, trace: TraceType) -> dict[str, Any]:
@@ -98,7 +98,7 @@ class LLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgume
     Parameters
     ----------
     prompt : str | None
-        Inline prompt string (Jinja2 syntax supported).
+        Inline prompt string. Jinja2 rendering only applies when `as_template=True`.
     prompt_path : str | None
         Template reference (e.g. "giskard.checks::scenarios/my_template.j2").
     max_steps : int
