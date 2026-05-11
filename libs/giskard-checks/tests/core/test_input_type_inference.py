@@ -44,6 +44,22 @@ def test_infer_returns_none_for_forward_ref_that_cannot_resolve():
     assert _infer_input_type(target) is None
 
 
+def test_infer_returns_base_model_type_for_callable_class():
+    class AgentAdapter:
+        def __call__(self, input: MyModel) -> str:
+            return input.content
+
+    assert _infer_input_type(AgentAdapter()) is MyModel
+
+
+def test_infer_returns_none_for_callable_class_with_str_annotation():
+    class AgentAdapter:
+        def __call__(self, input: str) -> str:
+            return input
+
+    assert _infer_input_type(AgentAdapter()) is None
+
+
 # --- Integration: Interact forwards input_type to InputGenerator ---
 
 

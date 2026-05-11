@@ -32,8 +32,8 @@ def _load_scenarios(
 
 
 def generate_suite(
-    categories: list[ScenarioCategory],
     description: str,
+    categories: list[ScenarioCategory] | None = None,
     max_scenarios: int | None = None,
     seed: int = 42,
     name: str = "Security Suite",
@@ -42,11 +42,12 @@ def generate_suite(
 
     Parameters
     ----------
-    categories : list[ScenarioCategory]
-        Categories to include.
     description : str
         Description of the agent under test. Injected into each scenario's
-        annotations so prompt templates can adapt to the agent's context.
+        annotations as ``"description"``; overwrites any existing value from
+        the JSONL so prompt templates can adapt to the agent's context.
+    categories : list[ScenarioCategory] | None
+        Categories to include. ``None`` (default) selects all available categories.
     max_scenarios : int | None
         Maximum number of scenarios to include. None means all.
     seed : int
@@ -59,8 +60,9 @@ def generate_suite(
     Suite
         A Suite with all selected scenarios, no target bound.
     """
+    selected = categories if categories is not None else list(ScenarioCategory)
     all_scenarios: list[Scenario[str, Any, Trace[str, Any]]] = []
-    for category in categories:
+    for category in selected:
         all_scenarios.extend(_load_scenarios(category))
 
     if max_scenarios is not None:

@@ -24,6 +24,12 @@ def _infer_input_type(outputs: object) -> type | None:
         return None
     try:
         hints = get_type_hints(outputs)
+    except TypeError:
+        try:
+            hints = get_type_hints(type(outputs).__call__)
+            hints.pop("self", None)
+        except Exception:
+            return None
     except Exception:
         return None
     # Filter out the return annotation so we only look at parameter hints.
