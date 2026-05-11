@@ -1,3 +1,4 @@
+import inspect
 from collections.abc import AsyncGenerator
 from typing import Any, cast, get_type_hints, override
 
@@ -25,15 +26,25 @@ def _infer_input_type(outputs: object) -> type | None:
     try:
         hints = get_type_hints(outputs)
     except TypeError:
-        try:
-            hints = get_type_hints(type(outputs).__call__)
-            hints.pop("self", None)
-        except Exception:
-            return None
+        hints = {}
     except Exception:
         return None
     # Filter out the return annotation so we only look at parameter hints.
     param_hints = {k: v for k, v in hints.items() if k != "return"}
+    # In Python 3.14+, get_type_hints on a callable instance (not a function/method/class)
+    # returns {} instead of raising TypeError. Fall back to inspecting __call__ directly.
+    if (
+        not param_hints
+        and not inspect.isfunction(outputs)
+        and not inspect.ismethod(outputs)
+        and not inspect.isclass(outputs)
+    ):
+        try:
+            call_hints = get_type_hints(type(outputs).__call__)
+            call_hints.pop("self", None)
+            param_hints = {k: v for k, v in call_hints.items() if k != "return"}
+        except Exception:
+            return None
     if not param_hints:
         return None
     first_param_type = next(iter(param_hints.values()))
