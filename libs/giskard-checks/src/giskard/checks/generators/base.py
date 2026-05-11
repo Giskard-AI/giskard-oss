@@ -74,8 +74,8 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
         step = 0
         while step < self.max_steps:
             inputs = await self.get_inputs(trace)
-            chat = await workflow.with_inputs(**inputs).run()
-            output = chat.output
+            result = await workflow.with_inputs(**inputs).run()
+            output = result.output
 
             if output.schema_issue:
                 raise InputGenerationException(f"schema issue: {output.schema_issue}")
