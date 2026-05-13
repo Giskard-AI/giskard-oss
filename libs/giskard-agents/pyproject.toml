@@ -1,22 +1,29 @@
 [project]
 name = "giskard-agents"
-version = "1.0.2b1"
+version = "1.0.2b2"
 description = " A lightweight library that orchestrates LLM completions and agents in parallel workflows "
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Giskard R&D", email = "rnd@giskard.ai" }]
 requires-python = ">=3.12"
 dependencies = [
-    "litellm>=1.72.0,<2",
+    "giskard-llm>=1.0.0a1,<2",
     "pydantic>=2.11.0,<3",
-    "griffe>=1.7.0,<2",
+    "griffe>=1.7.0,<3",
     "typing-extensions>=4.14.0,<5",
     "jinja2>=3.1.6,<4",
     "logfire-api>=3.22.0,<5",
     "tenacity>=9.1.0,<10",
-    "giskard-core>=1.0.0a1",
-    "numpy>=2.4.1",
+    "giskard-core>=1.0.1b3,<2",
+    "numpy>=2.4.1,<3",
 ]
+
+[project.optional-dependencies]
+openai = ["giskard-llm[openai]>=1.0.0a1,<2"]
+google = ["giskard-llm[google]>=1.0.0a1,<2"]
+anthropic = ["giskard-llm[anthropic]>=1.0.0a1,<2"]
+litellm = ["litellm>=1.83.0,<2"]
+all = ["giskard-llm[all]>=1.0.0a1,<2"]
 
 [build-system]
 requires = ["hatchling"]
@@ -35,6 +42,11 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
     "functional: marks tests that depend on external APIs (e.g., Gemini, OpenAI)",
+    "openai: marks tests requiring the openai provider SDK",
+    "google: marks tests requiring the google-genai provider SDK",
+    "anthropic: marks tests requiring the anthropic provider SDK",
+    "litellm: marks tests requiring the optional litellm SDK",
+    "giskard_llm: marks tests requiring the giskard-llm routing layer",
 ]
 
 [tool.ruff.lint.isort.sections]

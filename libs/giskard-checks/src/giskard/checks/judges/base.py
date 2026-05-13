@@ -1,8 +1,8 @@
 from typing import Any, override
 
-from giskard.agents.chat import Message
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow, TemplateReference
+from giskard.llm.types import ChatMessage
 from pydantic import BaseModel, Field
 
 from ..core import Trace
@@ -40,15 +40,15 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     def output_type(self) -> type[BaseModel] | None:
         return LLMCheckResult
 
-    def get_prompt(self) -> str | Message | MessageTemplate | TemplateReference:
+    def get_prompt(self) -> str | ChatMessage | MessageTemplate | TemplateReference:
         """Get the prompt for the LLM evaluation.
 
         Returns
         -------
-        str | Message | MessageTemplate | TemplateReference
+        str | ChatMessage | MessageTemplate | TemplateReference
             The prompt to send to the LLM. Can be:
             - A string (converted to MessageTemplate)
-            - A Message object
+            - A ChatMessage object
             - A MessageTemplate object
             - A TemplateReference for file-based templates
         """

@@ -1,0 +1,39 @@
+---
+description: Architecture and design principles for giskard-llm. Always read before modifying providers, routing, or error handling.
+alwaysApply: true
+---
+
+# giskard-llm Architecture
+
+## Overview
+
+`giskard-llm` is a lightweight routing layer that dispatches `"provider/model"` strings to native LLM SDKs. It replaces litellm with direct SDK calls while presenting a unified response shape to consumers.
+
+## Architecture
+
+The public API (`acompletion`, `aembedding`, `aresponse`) routes `"provider/model"` strings through a lazy-loading registry to provider implementations. Providers are self-contained modules under `providers/`, each conforming to one or more `Protocol` classes (`CompletionProvider`, `EmbeddingProvider`, `ResponseProvider`) and responsible for: role mapping, message validation, tool conversion, error mapping, and response normalization.
+
+Shared contracts live at the package root: Pydantic v2 response types (OpenAI-shaped), a unified error hierarchy with `status_code` for consumer retry logic, and a `should_retry` helper.
+
+## Type Conventions
+
+Input types (messages, tool definitions, tool results) use `TypedDict` — lightweight, constructed with dict literals. Output types (responses, tool calls, embeddings) use Pydantic `_BaseModel` — attribute access, `.model_dump()`, validation on construction. See `docs/design.md` for rationale.
+
+## Core Principles
+
+1. **Lazy imports.** Importing `giskard.llm` must never require any provider SDK. SDKs are imported inside provider modules only.
+2. **Strict message validation.** Providers validate messages before calling the SDK and raise `BadRequestError` with a clear message. Invalid input must not silently pass through to opaque SDK errors. Opt-in relaxation (e.g., `merge_system=True`) is explicit.
+3. **Unified error boundary.** Raw SDK exceptions never escape a provider. Every provider maps its SDK errors to the `errors.py` hierarchy.
+4. **Response normalization.** All providers convert native responses to the shared `types.py` models. Consumers never see provider-specific shapes.
+5. **Provider config via env vars or `**params`.** The public API has no provider-specific kwargs. Configuration flows through environment variables or pass-through params.
+6. **Provider behavior is self-documented.** Each provider class must have a comprehensive docstring covering: env vars, role mapping, error mapping, supported features, and provider-specific kwargs. This is the source of truth for provider behavior.
+
+## Adding a New Provider
+
+1. Create `providers/<name>.py` implementing the relevant protocols (`CompletionProvider`, `EmbeddingProvider`, `ResponseProvider`).
+2. Guard SDK imports with `try/except ImportError` and raise `ProviderNotAvailableError`.
+3. Register it in the provider registry in `routing.py`.
+4. Add the SDK as an optional dependency extra in `pyproject.toml`.
+5. Implement role mapping, message validation, tool conversion, error mapping, and response conversion.
+6. Write the class docstring following the provider documentation template (see `04-provider-docs.mdc`).
+7. Add unit tests (mocked SDK) and functional test scenarios.

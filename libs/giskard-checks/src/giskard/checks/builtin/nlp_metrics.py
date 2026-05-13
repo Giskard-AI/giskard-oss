@@ -20,6 +20,34 @@ ReadabilityMetric = Literal[
 ]
 
 
+READABILITY_SCORE_GUIDE: dict[ReadabilityMetric, str] = {
+    "flesch_reading_ease": (
+        "Usually interpreted on a 0-100 scale where higher is easier to read; "
+        "60-70 is commonly considered plain English."
+    ),
+    "flesch_kincaid_grade": (
+        "Approximate US school grade level where lower is easier to read; "
+        "8-10 is often appropriate for a general audience."
+    ),
+    "gunning_fog": (
+        "Approximate years of formal education needed to understand the text; "
+        "scores below 12 are usually easier for broad audiences."
+    ),
+    "automated_readability_index": (
+        "Approximate US school grade level where lower is easier to read; "
+        "8-10 is often appropriate for a general audience."
+    ),
+    "coleman_liau_index": (
+        "Approximate US school grade level where lower is easier to read; "
+        "8-10 is often appropriate for a general audience."
+    ),
+    "dale_chall_readability_score": (
+        "Lower scores are easier to read; scores around 6 or below are easier, "
+        "7-8 is more difficult, and 9+ is very difficult."
+    ),
+}
+
+
 @Check.register("readability")
 class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     Check[InputType, OutputType, TraceType]
@@ -37,15 +65,25 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
     )
     metric: ReadabilityMetric = Field(
         default="flesch_reading_ease",
-        description="Readability metric to compute.",
+        description=(
+            "Readability metric to compute. Metrics either use a higher-is-easier "
+            "0-100 style scale (flesch_reading_ease) or lower-is-easier grade/"
+            "difficulty style scales (the other metrics)."
+        ),
     )
     min_score: float | None = Field(
         default=None,
-        description="Minimum acceptable readability score.",
+        description=(
+            "Minimum acceptable readability score. Use this for metrics where "
+            "higher scores are better, such as flesch_reading_ease."
+        ),
     )
     max_score: float | None = Field(
         default=None,
-        description="Maximum acceptable readability score.",
+        description=(
+            "Maximum acceptable readability score. Use this for grade or "
+            "difficulty metrics where lower scores are easier to read."
+        ),
     )
 
     @model_validator(mode="after")
@@ -69,7 +107,7 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
                 status=CheckStatus.ERROR,
                 message=(
                     "The 'textstat' package is required for the Readability check. "
-                    "Install it with: pip install 'giskard-checks[nlp]'"
+                    "Install it with: pip install 'giskard-checks[readability]'"
                 ),
                 details={"package": "textstat"},
             )
@@ -78,6 +116,7 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
         details = {
             "key": self.key,
             "metric": self.metric,
+            "score_guide": READABILITY_SCORE_GUIDE[self.metric],
             "min_score": self.min_score,
             "max_score": self.max_score,
         }

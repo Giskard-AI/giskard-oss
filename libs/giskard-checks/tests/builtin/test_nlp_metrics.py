@@ -23,6 +23,18 @@ def fake_textstat(monkeypatch: pytest.MonkeyPatch) -> None:
             "Simple text.": 6.0,
             "Complex text.": 18.0,
         }[text],
+        automated_readability_index=lambda text: {
+            "Simple text.": 5.0,
+            "Complex text.": 16.0,
+        }[text],
+        coleman_liau_index=lambda text: {
+            "Simple text.": 7.0,
+            "Complex text.": 15.0,
+        }[text],
+        dale_chall_readability_score=lambda text: {
+            "Simple text.": 5.5,
+            "Complex text.": 9.5,
+        }[text],
     )
     monkeypatch.setitem(__import__("sys").modules, "textstat", module)
 
@@ -37,6 +49,7 @@ async def test_readability_passes_with_min_score(fake_textstat: None) -> None:
     assert result.metrics[0].name == "flesch_reading_ease"
     assert result.metrics[0].value == 75.0
     assert result.details["score"] == 75.0
+    assert "plain English" in result.details["score_guide"]
 
 
 async def test_readability_fails_when_below_min_score(fake_textstat: None) -> None:
@@ -69,6 +82,9 @@ async def test_readability_fails_when_above_max_score(fake_textstat: None) -> No
         ("flesch_reading_ease", 75.0),
         ("flesch_kincaid_grade", 4.0),
         ("gunning_fog", 6.0),
+        ("automated_readability_index", 5.0),
+        ("coleman_liau_index", 7.0),
+        ("dale_chall_readability_score", 5.5),
     ],
 )
 async def test_readability_supports_each_metric(
@@ -82,6 +98,7 @@ async def test_readability_supports_each_metric(
     assert result.status == CheckStatus.PASS
     assert result.metrics[0].name == metric
     assert result.metrics[0].value == expected_score
+    assert result.details["score_guide"]
 
 
 async def test_readability_without_thresholds_reports_metric(
@@ -159,6 +176,7 @@ async def test_readability_errors_when_textstat_is_missing(
     assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert "textstat" in result.message
+    assert "giskard-checks[readability]" in result.message
 
 
 def test_readability_rejects_invalid_score_range() -> None:

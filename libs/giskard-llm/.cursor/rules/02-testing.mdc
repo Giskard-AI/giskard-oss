@@ -1,0 +1,20 @@
+---
+description: Testing conventions for giskard-llm. Read before writing or modifying tests.
+globs: "**/test*.py,**/conftest.py"
+---
+
+# giskard-llm Testing Conventions
+
+## Test Structure
+
+- **Unit tests** (`tests/`): Mocked SDK calls, no API keys needed. Cover routing, message conversion, error mapping, response conversion, validation.
+- **Functional tests** (`tests/functional/`): Real API calls. Cover end-to-end scenarios across all providers.
+
+## Provider Marks and Auto-Skip
+
+Every functional test is marked with its provider (`@pytest.mark.google`, `@pytest.mark.openai`, etc.). Auto-skip logic in `conftest.py` skips tests whose provider SDK is not installed, so unit test runs never fail due to missing optional dependencies.
+
+## Scenario Design
+
+- **Assert on structure, not content.** Tests must pass with even the weakest model. Assert non-empty responses, correct roles, correct types, parseable JSON — never assert on specific wording.
+- **Meaningful inputs and outputs.** Test scenarios should exercise real behavior: system prompts that produce verifiable effects, tool calls with checkable arguments, structured output that validates against a schema. The goal is a test that fails for the right reasons.
