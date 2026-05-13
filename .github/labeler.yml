@@ -3,6 +3,11 @@
       - any-glob-to-any-file:
           - "libs/giskard-core/**"
 
+"Scope: LLM":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "libs/giskard-llm/**"
+
 "Scope: Agents":
   - changed-files:
       - any-glob-to-any-file:

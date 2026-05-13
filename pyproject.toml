@@ -43,6 +43,7 @@ members = [
 
 [tool.uv.sources]
 giskard-core = { workspace = true }
+giskard-llm = { workspace = true }
 giskard-agents = { workspace = true }
 giskard-checks = { workspace = true }
 
@@ -50,11 +51,20 @@ giskard-checks = { workspace = true }
 asyncio_mode = "auto"
 markers = [
     "functional: tests that require external API calls (deselect with '-m \"not functional\"')",
+    "openai: tests requiring the openai provider SDK",
+    "google: tests requiring the google-genai provider SDK",
+    "anthropic: tests requiring the anthropic provider SDK",
+    "azure: tests requiring the openai SDK (Azure OpenAI)",
+    "azure_ai: tests requiring the openai SDK (Azure AI Foundry)",
+    "no_providers: tests that run without any provider SDK installed",
 ]
 
 [dependency-groups]
 dev = [
+    "anthropic>=0.96.0",
+    "google-genai>=1.73.1",
     "ipykernel==7.2.0",
+    "openai>=2.24.0",
     "pip-audit==2.10.0",
     "pylint-pydantic==0.4.1",
     "pytest==9.0.3",

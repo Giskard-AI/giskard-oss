@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any, override
 
 import pytest
@@ -6,6 +7,7 @@ from giskard.agents.errors import WorkflowError
 from giskard.agents.generators.base import Response
 from giskard.agents.tools import Function, ToolCall
 from giskard.agents.workflow import ErrorPolicy
+from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
 from pydantic import Field, PrivateAttr
 
 
@@ -16,19 +18,23 @@ class FailingGenerator(agents.generators.BaseGenerator):
     @override
     async def _call_model(
         self,
-        messages: list[agents.chat.Message],
+        messages: Sequence[ChatMessage],
         params: agents.generators.GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
+    ) -> CompletionResponse:
         if self._num_calls >= self.fail_after:
             raise ValueError("Test error")
         self._num_calls += 1
-        return Response(
-            message=agents.chat.Message(
-                role="assistant",
-                content=f"Test response {self._num_calls}",
-            ),
-            finish_reason="stop",
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(
+                        content=f"Test response {self._num_calls}"
+                    ),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
         )
 
 
