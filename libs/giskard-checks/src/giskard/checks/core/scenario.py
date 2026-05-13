@@ -174,7 +174,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
 
         Parameters
         ----------
-        inputs : InputGenerator | Generator | Callable
+        inputs : InputType | InputGenerator | Generator | Callable
             Input specification: static value, ``InputGenerator``, generator, or
             callable producing inputs (same options as ``Interact``).
         outputs : OutputType | Callable | NotProvided, optional
