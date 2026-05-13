@@ -72,6 +72,12 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         Optional custom trace type to use. If not provided, the trace type will be
         inferred from the components. Useful when using custom trace subclasses
         with additional computed fields or methods.
+    annotations : dict[str, Any]
+        Key-value pairs merged into the trace at run start.
+        Can be accessed as `trace.annotations` during scenario execution.
+    target : ProviderType[[InputType], OutputType] | ProviderType[[InputType, TraceType], OutputType] | NotProvided
+        Default SUT for interactions whose outputs are ``NOT_PROVIDED`` when no
+        per-call ``target`` is passed to ``run`` (see ``with_target``).
     multiple_runs : int
         Default upper bound on how many times to execute the full scenario (each
         execution uses a fresh trace). Each run must pass for the next to run;
@@ -148,7 +154,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
     def interact(
         self,
         inputs: (
-            InputGenerator[InputType, TraceType]
+            InputGenerator[TraceType]
             | GeneratorType[[], InputType, None]
             | GeneratorType[[TraceType], InputType, TraceType]
         ),
@@ -168,17 +174,19 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
 
         Parameters
         ----------
-        inputs : InputType | Callable | Generator | InputGenerator
-            The input specification for the interaction.
-        outputs : OutputType | Callable
-            The output specification for the interaction.
+        inputs : InputType | InputGenerator | Generator | Callable
+            Input specification: static value, ``InputGenerator``, generator, or
+            callable producing inputs (same options as ``Interact``).
+        outputs : OutputType | Callable | NotProvided, optional
+            Output specification, or ``NOT_PROVIDED`` to use the scenario-level
+            or ``run()``-level target. Defaults to ``NOT_PROVIDED``.
         metadata : dict[str, object] | None
             Optional metadata to attach to the interaction.
 
         Returns
         -------
-        Scenario
-            Self for method chaining.
+        Self
+            This scenario for method chaining.
         """
         interaction = Interact(
             inputs=inputs,
@@ -245,6 +253,17 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
 
         Annotations provide shared, read-only context available on the Trace
         as `trace.annotations` during scenario execution.
+
+        Parameters
+        ----------
+        annotations : dict[str, Any]
+            Key-value pairs merged into the trace at run start.
+            Can be accessed as `trace.annotations` during scenario execution.
+
+        Returns
+        -------
+        Self
+            This scenario for method chaining.
         """
         self.annotations = annotations
         return self
@@ -256,7 +275,18 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             | ProviderType[[InputType, TraceType], OutputType]
         ),
     ) -> Self:
-        """Set scenario-level target for the scenario."""
+        """Set the default SUT for interactions with ``NOT_PROVIDED`` outputs.
+
+        Parameters
+        ----------
+        target : ProviderType[[InputType], OutputType] | ProviderType[[InputType, TraceType], OutputType]
+            Callable that produces outputs given inputs (and optionally the trace).
+
+        Returns
+        -------
+        Self
+            This scenario for method chaining.
+        """
         self.target = target
         return self
 
@@ -290,10 +320,19 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             Optional cap on full scenario executions. When provided, it overrides
             the scenario-level `multiple_runs` value.
 
+        Parameters
+        ----------
+        target : ProviderType[[InputType], OutputType] | ProviderType[[InputType, TraceType], OutputType] | NotProvided, optional
+            SUT used to replace ``NOT_PROVIDED`` outputs on ``Interact`` specs.
+            Defaults to ``NOT_PROVIDED``; overrides the scenario's ``target`` when set.
+        return_exception : bool, default False
+            If True, exceptions raised by checks become ``CheckResult.error``
+            entries instead of propagating.
+
         Returns
         -------
-        ScenarioResult
-            Results from the last run executed, including multi-run metadata.
+        ScenarioResult[TraceType]
+            Aggregated step results, timing, and final trace from the last run executed, including multi-run metadata.
         """
         # Lazy import to avoid circular dependency
         from ..scenarios.runner import get_runner
