@@ -60,14 +60,6 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         default=NOT_PROVIDED,
         description="Suite-level target SUT that will override any scenario-level target.",
     )
-    max_reported_failures: int | None = Field(
-        default=20,
-        description=(
-            "Maximum number of failed or errored scenarios to show in suite "
-            "reports. Use None to show all."
-        ),
-        ge=0,
-    )
 
     def append(
         self,
@@ -154,7 +146,6 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             suite_result = SuiteResult(
                 results=results,
                 duration_ms=int((end_time - start_time) * 1000),
-                max_reported_failures=self.max_reported_failures,
             )
 
             telemetry_capture(

@@ -1,3 +1,4 @@
+import os
 from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar
@@ -37,6 +38,9 @@ STATUS_MAPPING = {
     },
 }
 
+MAX_REPORTED_FAILURES_ENV_VAR = "GISKARD_CHECKS_MAX_REPORTED_FAILURES"
+DEFAULT_MAX_REPORTED_FAILURES = 20
+
 
 def _pluralize(count: int, word: str, plural: str | None = None) -> str:
     if count == 1:
@@ -44,6 +48,19 @@ def _pluralize(count: int, word: str, plural: str | None = None) -> str:
     if plural is None:
         plural = word + "s"
     return f"{count} {plural}"
+
+
+def _max_reported_failures_from_env() -> int:
+    raw_value = os.getenv(MAX_REPORTED_FAILURES_ENV_VAR)
+    if raw_value is None:
+        return DEFAULT_MAX_REPORTED_FAILURES
+
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return DEFAULT_MAX_REPORTED_FAILURES
+
+    return max(0, value)
 
 
 class CheckStatus(str, Enum):
@@ -509,14 +526,6 @@ class SuiteResult(BaseResult, frozen=True):
         ..., description="List of scenario results"
     )
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
-    max_reported_failures: int | None = Field(
-        default=20,
-        description=(
-            "Maximum number of failed or errored scenarios to show in the rich "
-            "report. Use None to show all."
-        ),
-        ge=0,
-    )
 
     @computed_field
     @property
@@ -576,12 +585,8 @@ class SuiteResult(BaseResult, frozen=True):
         failures_and_errors = self.failures_and_errors
 
         if failures_and_errors:
-            max_reported_failures = self.max_reported_failures
-            reported_failures = (
-                failures_and_errors
-                if max_reported_failures is None
-                else failures_and_errors[:max_reported_failures]
-            )
+            max_reported_failures = _max_reported_failures_from_env()
+            reported_failures = failures_and_errors[:max_reported_failures]
             n_hidden = len(failures_and_errors) - len(reported_failures)
 
             # Details

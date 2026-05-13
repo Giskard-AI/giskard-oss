@@ -2,6 +2,7 @@ import pytest
 from giskard.checks import Equals, Scenario, Suite
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.result import (
+    MAX_REPORTED_FAILURES_ENV_VAR,
     CheckResult,
     ScenarioResult,
     SuiteResult,
@@ -30,6 +31,25 @@ def sut3():
 @pytest.fixture
 def identity_sut():
     return lambda inputs: inputs
+
+
+def failed_scenario(name: str) -> ScenarioResult[Trace]:
+    return ScenarioResult(
+        scenario_name=name,
+        steps=[
+            CheckTestCaseResult(
+                results=[
+                    CheckResult.failure(
+                        message=f"{name} failed",
+                        details={"check_name": "ExampleCheck"},
+                    )
+                ],
+                duration_ms=1,
+            )
+        ],
+        duration_ms=1,
+        final_trace=Trace(interactions=[]),
+    )
 
 
 @pytest.mark.asyncio
@@ -161,46 +181,13 @@ async def test_suite_append_chaining():
     assert result.results[0].scenario_name == "a"
     assert result.results[1].scenario_name == "b"
 
-
-@pytest.mark.asyncio
-async def test_suite_run_propagates_max_reported_failures():
-    scenario = (
-        Scenario("s1")
-        .interact("b", "c")
-        .check(Equals(expected_value="b", key="trace.last.outputs"))
-    )
-
-    suite = Suite(name="agg_suite", max_reported_failures=3)
-    suite.append(scenario)
-
-    result = await suite.run()
-
-    assert result.max_reported_failures == 3
-
-
-def test_suite_result_rich_console_respects_max_reported_failures():
-    def failed_scenario(name: str) -> ScenarioResult[Trace]:
-        return ScenarioResult(
-            scenario_name=name,
-            steps=[
-                CheckTestCaseResult(
-                    results=[
-                        CheckResult.failure(
-                            message=f"{name} failed",
-                            details={"check_name": "ExampleCheck"},
-                        )
-                    ],
-                    duration_ms=1,
-                )
-            ],
-            duration_ms=1,
-            final_trace=Trace(interactions=[]),
-        )
-
+def test_suite_result_rich_console_respects_max_reported_failures_env(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "2")
     result = SuiteResult(
         results=[failed_scenario("s1"), failed_scenario("s2"), failed_scenario("s3")],
         duration_ms=3,
-        max_reported_failures=2,
     )
     console = Console(record=True, width=120)
 
@@ -213,29 +200,16 @@ def test_suite_result_rich_console_respects_max_reported_failures():
     assert "... and 1 more" in output
 
 
-def test_suite_result_rich_console_shows_all_failures_when_unbounded():
-    def failed_scenario(name: str) -> ScenarioResult[Trace]:
-        return ScenarioResult(
-            scenario_name=name,
-            steps=[
-                CheckTestCaseResult(
-                    results=[
-                        CheckResult.failure(
-                            message=f"{name} failed",
-                            details={"check_name": "ExampleCheck"},
-                        )
-                    ],
-                    duration_ms=1,
-                )
-            ],
-            duration_ms=1,
-            final_trace=Trace(interactions=[]),
-        )
-
+def test_suite_result_rich_console_uses_default_failure_limit(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.delenv(MAX_REPORTED_FAILURES_ENV_VAR, raising=False)
     result = SuiteResult(
-        results=[failed_scenario("s1"), failed_scenario("s2"), failed_scenario("s3")],
+        results=[
+            failed_scenario(f"s{i}")
+            for i in range(1, 22)
+        ],
         duration_ms=3,
-        max_reported_failures=None,
     )
     console = Console(record=True, width=120)
 
@@ -243,34 +217,18 @@ def test_suite_result_rich_console_shows_all_failures_when_unbounded():
 
     output = console.export_text()
     assert "s1" in output
-    assert "s2" in output
-    assert "s3" in output
-    assert "... and" not in output
+    assert "s20" in output
+    assert "s21" not in output
+    assert "... and 1 more" in output
 
 
-def test_suite_result_rich_console_can_hide_all_failure_details():
-    def failed_scenario(name: str) -> ScenarioResult[Trace]:
-        return ScenarioResult(
-            scenario_name=name,
-            steps=[
-                CheckTestCaseResult(
-                    results=[
-                        CheckResult.failure(
-                            message=f"{name} failed",
-                            details={"check_name": "ExampleCheck"},
-                        )
-                    ],
-                    duration_ms=1,
-                )
-            ],
-            duration_ms=1,
-            final_trace=Trace(interactions=[]),
-        )
-
+def test_suite_result_rich_console_can_hide_all_failure_details(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "0")
     result = SuiteResult(
         results=[failed_scenario("s1"), failed_scenario("s2"), failed_scenario("s3")],
         duration_ms=3,
-        max_reported_failures=0,
     )
     console = Console(record=True, width=120)
 
@@ -281,3 +239,24 @@ def test_suite_result_rich_console_can_hide_all_failure_details():
     assert "s2" not in output
     assert "s3" not in output
     assert "... and 3 more" in output
+
+
+def test_suite_result_rich_console_ignores_invalid_failure_limit_env(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "invalid")
+    result = SuiteResult(
+        results=[
+            failed_scenario(f"s{i}")
+            for i in range(1, 22)
+        ],
+        duration_ms=3,
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "s20" in output
+    assert "s21" not in output
+    assert "... and 1 more" in output
