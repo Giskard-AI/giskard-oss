@@ -1,14 +1,14 @@
-"""Azure AI Foundry provider using the ``openai`` SDK (OpenAI-compatible endpoint).
+"""Azure AI Foundry provider using the ``openai`` SDK (``AsyncAzureOpenAI``).
 
 Routing prefix: ``azure_ai/``
 
 Authentication:
     - Env: ``AZURE_AI_API_KEY``, ``AZURE_AI_ENDPOINT``
+    - Optional env: ``AZURE_AI_API_VERSION`` (default ``2024-10-21``, aligned with ``azure/``)
     - Kwargs: ``api_key``, ``base_url``
 
 Role mapping:
-    Same as OpenAI — all canonical roles passed through as-is. Azure AI
-    Foundry endpoints expose an OpenAI-compatible API.
+    Same as OpenAI — all canonical roles passed through as-is.
 
 Message constraints:
     Same as OpenAI.
@@ -24,12 +24,17 @@ Supported features:
     - Embeddings: depends on deployed model
     - Structured output (response_format): depends on deployed model
 
+Implementation note:
+    Foundry hosts (``*.services.ai.azure.com``) route chat and embeddings via
+    ``/openai/deployments/{deployment-id}/…``. The SDK's ``AsyncAzureOpenAI`` uses
+    that layout. A bare Foundry URL must be the **resource root** (no trailing
+    ``/models`` path): posting to ``/models/embeddings`` on several Foundry tenants
+    returns HTTP 200 with an empty body, which breaks plain ``AsyncOpenAI``.
+
 Provider-specific kwargs:
-    - ``base_url``: Azure AI Foundry endpoint URL. A bare Foundry root URL
-      (``https://<resource>.services.ai.azure.com``) is auto-suffixed with
-      ``/models`` to reach the Azure AI Model Inference API, matching how
-      litellm's ``azure_ai/`` provider shaped the URL. URLs that already
-      include a path are passed through unchanged.
+    - ``base_url``: Azure AI Foundry **resource endpoint** URL (typically
+      ``https://<resource>.services.ai.azure.com``). If callers still pass a URL
+      that only appends legacy ``/models``, that suffix is stripped for Foundry hosts.
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false, reportMissingSuperCall=false
@@ -48,29 +53,28 @@ logger = logging.getLogger(__name__)
 PROVIDER = "azure_ai"
 
 _FOUNDRY_HOST_SUFFIX = ".services.ai.azure.com"
-_FOUNDRY_DEFAULT_PATH = "/models"
+_DEFAULT_API_VERSION = "2024-10-21"
 
 
-def _shape_foundry_base_url(base_url: str | None) -> str | None:
-    """Append ``/models`` to a bare Azure AI Foundry root URL.
+def _normalize_azure_ai_endpoint(base_url: str | None) -> str | None:
+    """Normalize Foundry endpoint URLs for ``AsyncAzureOpenAI``.
 
-    Foundry hosts (``*.services.ai.azure.com``) serve the OpenAI-compatible
-    inference surface under ``/models``, so handing a bare Foundry root URL
-    to ``openai.AsyncOpenAI`` produces 404 on ``/chat/completions``. If the
-    caller already specified a path (e.g. ``/openai/v1`` or ``/models/...``),
-    the URL is returned unchanged. Non-Foundry hosts are always untouched.
-
-    Mirrors litellm's ``azure_ai`` path-shaping so an ``AZURE_AI_API_BASE``
-    that previously worked with litellm continues to work here.
+    On ``*.services.ai.azure.com``, use the resource root (scheme + netloc only).
+    Legacy configs that appended ``/models`` for plain ``AsyncOpenAI`` strip that
+    suffix so deployments resolve to ``/openai/deployments/{model}/…``.
     """
-    if not base_url:
-        return base_url
-    parsed = urlparse(base_url)
+    if base_url is None:
+        return None
+    raw = base_url.strip()
+    if raw == "":
+        return ""
+    parsed = urlparse(raw)
     if not parsed.netloc.endswith(_FOUNDRY_HOST_SUFFIX):
-        return base_url
-    if parsed.path and parsed.path != "/":
-        return base_url
-    return urlunparse(parsed._replace(path=_FOUNDRY_DEFAULT_PATH))
+        return raw
+    path = (parsed.path or "").rstrip("/")
+    if path in ("", "/models"):
+        return urlunparse((parsed.scheme, parsed.netloc, "", "", "", ""))
+    return raw
 
 
 class AzureAIProvider(OpenAIProvider):
@@ -93,10 +97,16 @@ class AzureAIProvider(OpenAIProvider):
             raise ProviderNotAvailableError(PROVIDER, "openai", extra="azure") from exc
 
         resolved_key = api_key or os.environ.get("AZURE_AI_API_KEY")
-        resolved_base = _shape_foundry_base_url(
+        resolved_endpoint = _normalize_azure_ai_endpoint(
             base_url or os.environ.get("AZURE_AI_ENDPOINT")
         )
+        resolved_version = os.environ.get("AZURE_AI_API_VERSION", _DEFAULT_API_VERSION)
 
-        self._client = openai.AsyncOpenAI(
-            **compact(api_key=resolved_key, base_url=resolved_base, timeout=timeout)
+        self._client = openai.AsyncAzureOpenAI(
+            **compact(
+                api_key=resolved_key,
+                azure_endpoint=resolved_endpoint,
+                api_version=resolved_version,
+                timeout=timeout,
+            )
         )
