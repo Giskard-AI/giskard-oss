@@ -106,3 +106,22 @@ async def test_answer_and_context_from_trace() -> None:
     assert result.details["inputs"]["answer"] == "Python was first released in 1991."
     context = cast(str, result.details["inputs"]["context"])
     assert "Python was first released in 1991" in context
+
+
+async def test_list_context_is_formatted_for_prompt() -> None:
+    generator = MockGenerator(passed=True, reason=None)
+    check = Hallucination(
+        generator=generator,
+        answer="Python was first released in 1991.",
+        context=[
+            "Python was first released in 1991.",
+            "Guido van Rossum created Python.",
+        ],
+    )
+
+    result = await check.run(Trace())
+
+    assert (
+        result.details["inputs"]["context"]
+        == "Python was first released in 1991.\n\nGuido van Rossum created Python."
+    )

@@ -55,9 +55,16 @@ class Hallucination[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         )
 
     @override
-    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
+    async def get_inputs(self, trace: TraceType) -> dict[str, str]:
+        def fmt(value: object) -> str:
+            if value is None:
+                return ""
+            if isinstance(value, list):
+                return "\n\n".join(str(item) for item in value)
+            return str(value)
+
         inputs = {
-            "answer": str(
+            "answer": fmt(
                 provided_or_resolve(
                     trace,
                     key=self.answer_key,
@@ -67,7 +74,7 @@ class Hallucination[InputType, OutputType, TraceType: Trace](  # pyright: ignore
             "context": "",
         }
         if self.context is not None or self.context_key is not None:
-            inputs["context"] = str(
+            inputs["context"] = fmt(
                 provided_or_resolve(
                     trace,
                     key=self.context_key,

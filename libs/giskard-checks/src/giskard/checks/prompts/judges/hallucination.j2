@@ -1,3 +1,11 @@
+{#
+Prompt rationale:
+- Aligns with hallucination/factuality framing from SelfCheckGPT, which checks whether generated passages contain non-factual claims.
+  Reference: Manakul et al., "SelfCheckGPT: Zero-Resource Black-Box Hallucination Detection for Generative Large Language Models", EMNLP 2023.
+- Uses the same context-supported-claim principle as faithfulness/groundedness metrics in RAG evaluation libraries such as Ragas.
+  Reference: Ragas faithfulness evaluates factual consistency of the answer against the provided context.
+- Keeps omissions separate from fabricated additions, matching the neighboring Groundedness judge's explicit omission handling.
+#}
 Your role is to evaluate whether an AI agent's answer contains hallucinated or fabricated factual claims.
 
 You will receive:
