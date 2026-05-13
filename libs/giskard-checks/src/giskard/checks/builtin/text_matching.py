@@ -5,10 +5,10 @@ This module provides checks for text matching:
 - RegexMatching: Regular expression pattern matching
 """
 
-import re
 from abc import ABC, abstractmethod
 from typing import Any, Self, override
 
+import regex
 from giskard.core import provide_not_none
 from pydantic import Field, model_validator
 
@@ -326,14 +326,12 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
 ):
     r"""Check that validates if a regex pattern matches within text.
 
-    This check performs regex pattern matching using standard Python re module.
-    The pattern is matched against the raw text without any normalization,
-    giving users full control through regex syntax.
+    Matching uses the PyPI :mod:`regex` package, which is largely compatible
+    with Python's standard :mod:`re` module.
 
     The matching process:
     1. Extracts text and pattern (from provided values or trace)
-    2. Compiles regex pattern
-    3. Checks if pattern matches anywhere in the text using re.search()
+    2. Searches the text for the pattern
 
     Attributes
     ----------
@@ -347,6 +345,8 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         The regex pattern to search for. Either this or pattern_key must be provided.
     pattern_key : JSONPathStr | None
         JSONPath expression to extract pattern from trace.
+    match_timeout_seconds : float
+        Upper bound on how long matching may take before the check raises an error.
 
     Examples
     --------
@@ -402,6 +402,11 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         default=None,
         description="JSONPath expression to extract the pattern from the trace.",
     )
+    match_timeout_seconds: float = Field(
+        default=2.0,
+        gt=0,
+        description="Maximum time allowed for matching, in seconds.",
+    )
 
     @model_validator(mode="after")
     def validate_pattern_or_pattern_key(self) -> Self:
@@ -452,20 +457,20 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         # Extract successful values
         text, pattern, details = result[0], result[1], result[2]
 
-        # Try to compile and match
         try:
-            if re.search(pattern, text):
-                return CheckResult.success(
-                    message=f"Text matches the regex pattern '{pattern}'.",
-                    details=details,
-                )
-            else:
-                return CheckResult.failure(
-                    message=f"Text does not match the regex pattern '{pattern}'.",
-                    details=details,
-                )
-        except re.error as e:
+            matched = regex.search(pattern, text, timeout=self.match_timeout_seconds)
+        except regex.error as e:
             return CheckResult.failure(
                 message=f"Invalid regex pattern '{pattern}': {str(e)}",
                 details=details,
             )
+
+        if matched:
+            return CheckResult.success(
+                message=f"Text matches the regex pattern '{pattern}'.",
+                details=details,
+            )
+        return CheckResult.failure(
+            message=f"Text does not match the regex pattern '{pattern}'.",
+            details=details,
+        )

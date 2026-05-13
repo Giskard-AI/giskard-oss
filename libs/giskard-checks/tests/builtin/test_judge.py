@@ -1,11 +1,17 @@
 import json
+from collections.abc import Sequence
 from typing import Any, cast, override
 
 import pytest
-from giskard.agents.chat import Message
-from giskard.agents.generators._types import Response
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import Check, CheckStatus, Interaction, LLMJudge, Trace
+from giskard.llm.types import (
+    AssistantMessage,
+    ChatMessage,
+    Choice,
+    CompletionResponse,
+    UserMessage,
+)
 from pydantic import Field, ValidationError
 
 
@@ -15,22 +21,30 @@ class MockGenerator(BaseGenerator):
 
     passed: bool
     reason: str | None
-    calls: list[list[Message]] = Field(default_factory=list)
+    calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
 
     @override
     async def _call_model(
         self,
-        messages: list[Message],
+        messages: Sequence[ChatMessage],
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
+    ) -> CompletionResponse:
         self.calls.append(messages)
-        return Response(
-            message=Message(
-                role="assistant",
-                content=json.dumps({"passed": self.passed, "reason": self.reason}),
-            ),
-            finish_reason="stop",
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(
+                        role="assistant",
+                        content=json.dumps(
+                            {"passed": self.passed, "reason": self.reason}
+                        ),
+                    ),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ],
+            model="mock",
         )
 
 
@@ -68,7 +82,7 @@ async def test_run_returns_success() -> None:
     assert result.details["reason"] == "Looks good"
 
     assert len(generator.calls) == 1
-    assert generator.calls[0] == [Message(role="user", content="Evaluate the answer.")]
+    assert generator.calls[0] == [UserMessage(content="Evaluate the answer.")]
 
     roundtrip_judge = serialization_roundtrip(judge)
     result = await roundtrip_judge.run(Trace())
@@ -78,7 +92,7 @@ async def test_run_returns_success() -> None:
     # Generator state (including calls) is preserved by roundtrip; one more call from this run
     assert len(roundtrip_judge.generator.calls) == 2
     assert roundtrip_judge.generator.calls[-1] == [
-        Message(role="user", content="Evaluate the answer.")
+        UserMessage(content="Evaluate the answer.")
     ]
 
 
@@ -90,7 +104,7 @@ async def test_run_returns_failure() -> None:
     assert result.details["reason"] == "Looks bad"
 
     assert len(generator.calls) == 1
-    assert generator.calls[0] == [Message(role="user", content="Evaluate the answer.")]
+    assert generator.calls[0] == [UserMessage(content="Evaluate the answer.")]
 
     roundtrip_judge = serialization_roundtrip(judge)
     result = await roundtrip_judge.run(Trace())
@@ -99,7 +113,7 @@ async def test_run_returns_failure() -> None:
     assert isinstance(roundtrip_judge.generator, MockGenerator)
     assert len(roundtrip_judge.generator.calls) == 2
     assert roundtrip_judge.generator.calls[-1] == [
-        Message(role="user", content="Evaluate the answer.")
+        UserMessage(content="Evaluate the answer.")
     ]
 
 
@@ -121,9 +135,7 @@ async def test_run_handle_template_reference() -> None:
     assert result.details["reason"] is None
 
     assert len(generator.calls) == 1
-    assert generator.calls[0] == [
-        Message(role="user", content="Evaluate the answer: Hello")
-    ]
+    assert generator.calls[0] == [UserMessage(content="Evaluate the answer: Hello")]
 
     roundtrip_judge = serialization_roundtrip(judge)
     result = await roundtrip_judge.run(
@@ -138,7 +150,7 @@ async def test_run_handle_template_reference() -> None:
     assert isinstance(roundtrip_judge.generator, MockGenerator)
     assert len(roundtrip_judge.generator.calls) == 2
     assert roundtrip_judge.generator.calls[-1] == [
-        Message(role="user", content="Evaluate the answer: Hello")
+        UserMessage(content="Evaluate the answer: Hello")
     ]
 
 

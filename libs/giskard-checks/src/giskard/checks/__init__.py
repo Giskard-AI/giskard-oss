@@ -7,12 +7,15 @@ from giskard.agents import add_prompts_path
 
 from . import builtin, judges
 from .builtin import (
+    AllOf,
+    AnyOf,
     Equals,
     FnCheck,
     GreaterEquals,
     GreaterThan,
     LesserThan,
     LesserThanEquals,
+    Not,
     NotEquals,
     RegexMatching,
     SemanticSimilarity,
@@ -23,6 +26,7 @@ from .core import (
     Check,
     CheckResult,
     CheckStatus,
+    InputGenerationException,
     Interact,
     Interaction,
     InteractionSpec,
@@ -36,14 +40,18 @@ from .core import (
     Trace,
     resolve,
 )
+from .generators.base import BaseLLMGenerator, LLMGenerator
 from .generators.user import UserSimulator
 from .judges import (
+    AnswerRelevance,
     BaseLLMCheck,
     Conformity,
     Groundedness,
     LLMCheckResult,
     LLMJudge,
+    Toxicity,
 )
+from .scenarios.catalog import ScenarioCategory, generate_suite
 from .scenarios.runner import ScenarioRunner
 from .scenarios.suite import Suite
 from .settings import get_default_generator, set_default_generator
@@ -85,6 +93,10 @@ __all__ = [
     "Interaction",
     "InteractionSpec",
     # Builtin and LLM-based checks
+    "AnswerRelevance",
+    "AllOf",
+    "AnyOf",
+    "Not",
     "BaseLLMCheck",
     "LLMCheckResult",
     "Conformity",
@@ -99,10 +111,19 @@ __all__ = [
     "Groundedness",
     "LLMJudge",
     "SemanticSimilarity",
+    "Toxicity",
     "StringMatching",
     "RegexMatching",
+    # Exceptions
+    "InputGenerationException",
+    # LLM-based generators
+    "BaseLLMGenerator",
+    "LLMGenerator",
     # Generators
     "UserSimulator",
+    # Suite generation
+    "ScenarioCategory",
+    "generate_suite",
     # Testing
     "WithSpy",
     "TestCaseRunner",

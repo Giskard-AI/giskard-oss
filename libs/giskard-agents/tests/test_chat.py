@@ -1,5 +1,6 @@
 import pytest
-from giskard.agents.chat import Chat, Message
+from giskard.agents.chat import Chat
+from giskard.llm.types import AssistantMessage, ChatMessage, UserMessage
 from pydantic import BaseModel
 
 
@@ -10,11 +11,9 @@ def test_chat_output():
         name: str
         region: str
 
-    messages = [
-        Message(role="user", content="What is the best cheese? Answer in JSON."),
-        Message(
-            role="assistant", content='{"name": "Camembert", "region": "Normandy"}'
-        ),
+    messages: list[ChatMessage] = [
+        UserMessage(content="What is the best cheese? Answer in JSON."),
+        AssistantMessage(content='{"name": "Camembert", "region": "Normandy"}'),
     ]
 
     chat = Chat(messages=messages, output_model=Cheese)
@@ -24,11 +23,9 @@ def test_chat_output():
 
 
 def test_chat_output_without_output_model():
-    messages = [
-        Message(role="user", content="What is the best cheese? Answer in JSON."),
-        Message(
-            role="assistant", content='{"name": "Camembert", "region": "Normandy"}'
-        ),
+    messages: list[ChatMessage] = [
+        UserMessage(content="What is the best cheese? Answer in JSON."),
+        AssistantMessage(content='{"name": "Camembert", "region": "Normandy"}'),
     ]
 
     chat = Chat(messages=messages)

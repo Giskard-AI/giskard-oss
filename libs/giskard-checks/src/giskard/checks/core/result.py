@@ -233,6 +233,10 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
         Total execution time in milliseconds.
     final_trace : TraceType
         Trace state after execution, containing all interactions that occurred.
+    multiple_runs : int
+        Configured upper bound on full scenario executions for this invocation.
+    runs_executed : int
+        How many full scenario executions ran before stopping (≤ ``multiple_runs``).
     status : ScenarioStatus
         Aggregated outcome of the scenario derived from its steps.
     passed : bool
@@ -249,6 +253,14 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
     steps: list["TestCaseResult"]  # TODO: rename to test_cases
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
     final_trace: TraceType = Field(..., description="Final trace state after execution")
+    multiple_runs: int = Field(
+        default=1,
+        description="Configured maximum full scenario executions for this invocation.",
+    )
+    runs_executed: int = Field(
+        default=1,
+        description="Full scenario executions that ran before stopping (at most multiple_runs).",
+    )
 
     @computed_field
     @property
@@ -311,7 +323,8 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
             yield repr(self.final_trace)
 
         yield Rule(
-            f"{_pluralize(len(self.steps), 'step')} in {self.duration_ms}ms",
+            f"{_pluralize(len(self.steps), 'step')} in {self.duration_ms}ms"
+            f" | runs: {self.runs_executed}/{self.multiple_runs}",
             style=f"{status['color']} bold",
         )
 

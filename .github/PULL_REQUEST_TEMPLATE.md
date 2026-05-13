@@ -17,6 +17,12 @@
 - [ ] 💥 Breaking change (fix or feature that would cause existing functionality to change)
 - [ ] 🔐 Security fix
 
+## Coding agents
+
+If this PR was opened by or with a coding agent, read **[AGENTS.md](https://github.com/Giskard-AI/giskard-oss/blob/main/AGENTS.md)** at the repository root first — **it is required** (setup, `make` commands, expedited agent PR workflow, etc.).
+
+**PR title:** agent-opened PRs **must** end the title with **`🤖🤖🤖🤖`** (exactly four robot emojis). Do not omit — that suffix is how the expedited agent PR workflow picks up the PR.
+
 ## Checklist
 
 <!-- Mark with an `x` all the checkboxes that apply (like `[x]`) -->

@@ -1,15 +1,14 @@
 import json
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
 
+from giskard.llm import chat
 from jinja2 import BaseLoader, StrictUndefined, nodes
 from jinja2.exceptions import TemplateNotFound
 from jinja2.ext import Extension
 from jinja2.loaders import FileSystemLoader, PrefixLoader
 from jinja2.sandbox import SandboxedEnvironment
 from pydantic import BaseModel
-
-from ..chat import Message, Role
 
 
 @runtime_checkable
@@ -66,10 +65,12 @@ class MessageExtension(Extension):
 
         return nodes.CallBlock(call_node, [], [], body).set_lineno(lineno)
 
-    async def _handle_message(self, role: Role, caller):
+    async def _handle_message(
+        self, role: Literal["user", "assistant", "system", "developer"], caller
+    ):
         """Handle a message block by rendering its content and storing it."""
         content = (await caller()).strip()
-        self.environment._collected_messages.append(Message(role=role, content=content))  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+        self.environment._collected_messages.append(chat.message(content, role))  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
         return ""
 
 

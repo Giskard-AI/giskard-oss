@@ -13,6 +13,14 @@ from .rate_limiter import (
     BaseRateLimiter,
     MinIntervalRateLimiter,
 )
+from .telemetry import (
+    disable_telemetry,
+    scoped_telemetry,
+    telemetry,
+    telemetry_capture,
+    telemetry_run_context,
+    telemetry_tag,
+)
 from .utils import NOT_PROVIDED, NotProvided, provide_not_none
 
 LEGACY_GISKARD_PACKAGE_NAME = "giskard"
@@ -43,4 +51,11 @@ __all__ = [
     # Limiter
     "MinIntervalRateLimiter",
     "BaseRateLimiter",
+    # Telemetry
+    "telemetry",
+    "disable_telemetry",
+    "scoped_telemetry",
+    "telemetry_capture",
+    "telemetry_run_context",
+    "telemetry_tag",
 ]

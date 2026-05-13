@@ -29,10 +29,14 @@ from contextlib import contextmanager
 from inspect import Signature
 from typing import Any, Callable, Literal, cast
 
-from griffe import Docstring, DocstringSectionKind
+from griffe import Docstring, DocstringOptions, DocstringSectionKind, GoogleOptions
 from griffe import Object as GriffeObject
 
 DocstringStyle = Literal["google", "numpy", "sphinx"]
+
+_PARSER_OPTIONS: dict[DocstringStyle, DocstringOptions] = {
+    "google": GoogleOptions(returns_named_value=False, returns_multiple_items=False)
+}
 
 
 def parse_docstring(
@@ -72,7 +76,7 @@ def parse_docstring(
         parser=docstring_style,
         parent=parent,
         # https://mkdocstrings.github.io/griffe/reference/docstrings/#google-options
-        parser_options={"returns_named_value": False, "returns_multiple_items": False},
+        parser_options=_PARSER_OPTIONS.get(docstring_style, None),
     )
     with _disable_griffe_logging():
         sections = docstring.parse()

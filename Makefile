@@ -1,6 +1,8 @@
 # Variables
-LIBS := giskard-core giskard-agents giskard-checks
+LIBS := giskard-core giskard-llm giskard-agents giskard-checks
 PACKAGE ?= # Optional package to test (e.g., giskard-core, giskard-agents, giskard-checks)
+AGENT_NAME ?= # Optional, for setup-for-agents telemetry
+REASON ?= # Optional, for setup-for-agents telemetry
 
 # Default target
 help: ## Show this help message
@@ -22,6 +24,12 @@ pre-commit-install: ## Setup pre-commit hooks
 
 setup: install install-tools pre-commit-install ## Complete development setup (install deps + tools)
 
+setup-for-agents: setup ## Like setup + agent .env and analytics ping; optional AGENT_NAME= REASON=
+	@if ! grep -qE '^(export[[:space:]]+)?GISKARD_TELEMETRY_DISABLED=' .env 2>/dev/null; then \
+		echo "GISKARD_TELEMETRY_DISABLED=false" >> .env; \
+	fi
+	@AGENT_NAME="$(AGENT_NAME)" REASON="$(REASON)" uv run python -c "import json, os, urllib.request; from datetime import datetime, timezone; a=os.environ.get('AGENT_NAME','').strip(); r=os.environ.get('REASON','').strip(); p={**({'agent_name': a} if a else {}), **({'reason': r} if r else {})}; body=json.dumps({'api_key': 'phc_Asp36pe4X5WMqeJ4aMMV4gq5LGdGw69mdYSdEYGpbxm2', 'event': 'giskard_oss_agents_setup', 'distinct_id': a or 'giskard_oss_agent', 'properties': p, 'timestamp': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'}); urllib.request.urlopen(urllib.request.Request('https://eu.i.posthog.com/i/v0/e/', data=body.encode(), headers={'Content-Type': 'application/json'}, method='POST'), timeout=30)"
+
 test: ## Run all tests (unit + functional), optional PACKAGE=<name>
 ifdef PACKAGE
 	uv run pytest libs/$(PACKAGE)
@@ -36,12 +44,22 @@ else
 	$(foreach lib,$(LIBS),uv run pytest libs/$(lib) -m "not functional" &&) true
 endif
 
-test-functional: ## Run functional tests only (requires API keys), optional PACKAGE=<name>
+test-functional: ## Run functional tests only (requires API keys), optional PACKAGE=<name> PROVIDER=<name>
 ifdef PACKAGE
+ifdef PROVIDER
+	uv run pytest libs/$(PACKAGE) -m "functional and $(PROVIDER)"
+else
 	uv run pytest libs/$(PACKAGE) -m "functional"
+endif
 else
 	$(foreach lib,$(LIBS),uv run pytest libs/$(lib) -m "functional" &&) true
 endif
+
+install-no-providers: ## Install giskard-llm without provider SDKs (for no_providers tests)
+	uv sync --package giskard-llm
+
+test-no-providers: ## Run tests that verify behavior when provider SDKs are missing
+	uv run pytest libs/giskard-llm -m "no_providers"
 
 test-package-conflict: ## Test package conflict with giskard legacy package installed
 	@echo "Testing package conflict..."

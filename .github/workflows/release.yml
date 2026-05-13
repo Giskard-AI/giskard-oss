@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - giskard-core
+          - giskard-llm
           - giskard-agents
           - giskard-checks
       bump_type:
@@ -68,7 +69,7 @@ jobs:
 
       - name: Generate app token
         id: app-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3
         with:
           app-id: ${{ vars.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -81,7 +82,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: false
           python-version: "3.12"
@@ -92,12 +93,22 @@ jobs:
       - name: Run checks
         run: make check
 
+      # OpenAI credentials; TEST_PROVIDER=openai makes libs/giskard-llm/tests/conftest.py
+      # skip non-OpenAI provider tests (bare is included via groups). Full `make test` still
+      # runs other workspace packages—only giskard-llm reads TEST_PROVIDER for now.
+      - name: Install OpenAI extras for functional tests
+        run: |
+          uv pip install "giskard-llm[openai]"
+          uv pip install "giskard-agents[openai]"
       - name: Run tests
         env:
-          TEST_MODEL: "gemini/gemini-2.0-flash"
-          TEST_EMBEDDING_MODEL: "gemini/gemini-embedding-001"
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: make test
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TEST_MODEL: "openai/gpt-4.1-nano"
+          TEST_PROVIDER: openai
+          TEST_LITELLM_MODEL: "openai/gpt-4.1-nano"
+          TEST_EMBEDDING_MODEL: "openai/text-embedding-3-small"
+        run: |
+          make test
 
       - name: Bump version
         id: bump

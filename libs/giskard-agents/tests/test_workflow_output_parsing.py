@@ -1,10 +1,10 @@
+from collections.abc import Sequence
 from typing import Any, override
 
 import pytest
 from giskard import agents
-from giskard.agents.chat import Message
 from giskard.agents.generators import BaseGenerator, GenerationParams
-from giskard.agents.generators.base import Response
+from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
 from pydantic import BaseModel, Field, ValidationError
 
 
@@ -25,10 +25,10 @@ class MockValidationGenerator(BaseGenerator):
     @override
     async def _call_model(
         self,
-        messages: list[Message],
+        messages: Sequence[ChatMessage],
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
+    ) -> CompletionResponse:
         if self.call_count >= len(self.responses):
             response_content = (
                 self.responses[-1]
@@ -40,9 +40,14 @@ class MockValidationGenerator(BaseGenerator):
 
         self.call_count += 1
 
-        return Response(
-            message=Message(role="assistant", content=response_content),
-            finish_reason="stop",
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content=response_content),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
         )
 
 

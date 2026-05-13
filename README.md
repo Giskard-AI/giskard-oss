@@ -35,6 +35,8 @@ pip install giskard
 
 Requires Python 3.12+.
 
+**Telemetry:** Libraries built on `giskard-core` (including `giskard-checks`) may send **optional, aggregated usage analytics** to help improve the product. No prompts, model outputs, or scenario text are included. See [what is collected and how to opt out](libs/giskard-core/README.md#telemetry).
+
 ______________________________________________________________________
 
 Giskard is an open-source Python library for **testing and evaluating agentic systems**. The v3 architecture is a modular set of focused packages — each carrying only the dependencies it needs — built from scratch to wrap anything: an LLM, a black-box agent, or a multi-step pipeline.
