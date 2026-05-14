@@ -150,9 +150,10 @@ class PrecisionAtK[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         return f"Precision@{self.k}"
 
     @override
+    @override
     def _score(self, relevant_ids: list[Any], retrieved_ids: list[Any]) -> float:
         hits = sum(_hits_at_k(relevant_ids, retrieved_ids, self.k))
-        return _safe_divide(float(hits), min(self.k, len(retrieved_ids)))
+        return _safe_divide(float(hits), self.k)
 
 
 @Check.register("hit_rate_at_k")
