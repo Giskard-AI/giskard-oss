@@ -13,12 +13,13 @@ from .interaction import Interaction
 from .trace import Trace
 
 
-def _infer_input_type(outputs: object) -> Any | None:
+def _infer_input_type(outputs: object) -> type | None:
     """Infer the input type from the first parameter annotation of a callable.
 
-    Returns any pydantic-compatible type except ``str``, which is the default
-    generator type. Returns ``None`` for non-callables and callables whose hints
-    cannot be resolved (e.g. forward references to undefined names).
+    Returns any pydantic-compatible type, including ``str``. Returns ``None``
+    for non-callables, callables with no annotation, and callables whose hints
+    cannot be resolved (e.g. forward references to undefined names) or whose
+    type is not supported by Pydantic.
     """
     if not callable(outputs):
         return None
