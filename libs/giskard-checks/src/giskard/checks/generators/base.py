@@ -59,7 +59,6 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
         self, trace: TraceType, input_type: Any | None = None
     ) -> AsyncGenerator[Any, TraceType]:
         T = input_type or str
-        TypeAdapter(T)
         prompt = self.get_prompt()
 
         if isinstance(prompt, TemplateReference):
