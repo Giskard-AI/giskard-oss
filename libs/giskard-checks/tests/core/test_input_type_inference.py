@@ -37,6 +37,34 @@ def test_infer_returns_base_model_type():
     assert _infer_input_type(target) is MyModel
 
 
+def test_infer_returns_list_type():
+    def target(input: list[str]) -> str:
+        return ", ".join(input)
+
+    assert _infer_input_type(target) == list[str]
+
+
+def test_infer_returns_int_type():
+    def target(input: int) -> str:
+        return str(input)
+
+    assert _infer_input_type(target) is int
+
+
+def test_infer_returns_dict_type():
+    def target(input: dict[str, Any]) -> str:
+        return str(input)
+
+    assert _infer_input_type(target) == dict[str, Any]
+
+
+def test_infer_returns_optional_base_model_type():
+    def target(input: MyModel | None) -> str:
+        return "" if input is None else input.content
+
+    assert _infer_input_type(target) == MyModel | None
+
+
 def test_infer_returns_none_for_forward_ref_that_cannot_resolve():
     def target(input: "UnresolvableType") -> str:  # noqa: F821 # pyright: ignore[reportUndefinedVariable]
         return str(input)
@@ -70,7 +98,7 @@ class RecordingTrace(Trace[str, str], frozen=True):
 
 @InputGenerator.register("recording_generator")
 class RecordingGenerator(InputGenerator[RecordingTrace]):
-    received_input_type: type | None = None
+    received_input_type: Any | None = None
 
     @override
     async def __call__(
@@ -106,3 +134,17 @@ async def test_interact_passes_none_input_type_for_str_annotated_target():
     agen = interact.generate(trace)
     await anext(agen)
     assert gen.received_input_type is None
+
+
+@pytest.mark.asyncio
+async def test_interact_forwards_list_input_type_to_generator():
+    gen = RecordingGenerator()
+
+    def target(inputs: list[str]) -> str:
+        return ", ".join(inputs)
+
+    interact = Interact(inputs=gen, outputs=target)
+    trace = RecordingTrace()
+    agen = interact.generate(trace)
+    await anext(agen)
+    assert gen.received_input_type == list[str]

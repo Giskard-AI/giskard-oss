@@ -5,7 +5,7 @@ from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow, TemplateReference
 from giskard.llm import chat
 from giskard.llm.types import ChatMessage
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, TypeAdapter, model_validator
 
 from ..core import Trace
 from ..core.exceptions import InputGenerationException
@@ -13,7 +13,7 @@ from ..core.input_generator import InputGenerator
 from ..core.mixin import WithGeneratorMixin
 
 
-class LLMGeneratorOutput[T: str | BaseModel](BaseModel):
+class LLMGeneratorOutput[T](BaseModel):
     goal_reached: bool = Field(
         ...,
         description="Whether the goal has been reached and no more messages are needed.",
@@ -56,9 +56,10 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
 
     @override
     async def __call__(
-        self, trace: TraceType, input_type: type[str | BaseModel] | None = None
+        self, trace: TraceType, input_type: Any | None = None
     ) -> AsyncGenerator[Any, TraceType]:
         T = input_type or str
+        TypeAdapter(T)
         prompt = self.get_prompt()
 
         if isinstance(prompt, TemplateReference):

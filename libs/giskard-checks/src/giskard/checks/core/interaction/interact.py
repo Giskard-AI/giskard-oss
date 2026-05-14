@@ -4,8 +4,7 @@ from typing import Any, cast, get_type_hints, override
 
 from giskard.checks.utils.injectable import ValueGenerator, ValueProvider
 from giskard.core.utils import NOT_PROVIDED, NotProvided
-from pydantic import BaseModel as PydanticBaseModel
-from pydantic import Field, PrivateAttr, model_validator
+from pydantic import Field, PrivateAttr, TypeAdapter, model_validator
 
 from ..input_generator import InputGenerator
 from ..types import GeneratorType, ProviderType
@@ -14,11 +13,11 @@ from .interaction import Interaction
 from .trace import Trace
 
 
-def _infer_input_type(outputs: object) -> type | None:
+def _infer_input_type(outputs: object) -> Any | None:
     """Infer the input type from the first parameter annotation of a callable.
 
-    Returns the type if it is a subclass of ``pydantic.BaseModel``, otherwise
-    ``None``.  Returns ``None`` for non-callables and callables whose hints
+    Returns any pydantic-compatible type except ``str``, which is the default
+    generator type. Returns ``None`` for non-callables and callables whose hints
     cannot be resolved (e.g. forward references to undefined names).
     """
     if not callable(outputs):
@@ -48,11 +47,13 @@ def _infer_input_type(outputs: object) -> type | None:
     if not param_hints:
         return None
     first_param_type = next(iter(param_hints.values()))
-    if isinstance(first_param_type, type) and issubclass(
-        first_param_type, PydanticBaseModel
-    ):
-        return first_param_type
-    return None
+    if first_param_type is str:
+        return None
+    try:
+        TypeAdapter(first_param_type)
+    except Exception:
+        return None
+    return first_param_type
 
 
 @InteractionSpec.register("interact")
