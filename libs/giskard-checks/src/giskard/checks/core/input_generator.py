@@ -20,9 +20,9 @@ class InputGenerator[TraceType: "Trace"](Discriminated):  # pyright: ignore[repo
     ) -> AsyncGenerator[T, TraceType]: ...
     @overload
     def __call__[T](
-        self, trace: TraceType, input_type: T
-    ) -> AsyncGenerator[Any, TraceType]: ...
+        self, trace: TraceType, input_type: type[T]
+    ) -> AsyncGenerator[T, TraceType]: ...
     def __call__(
-        self, trace: TraceType, input_type: Any | None = None
+        self, trace: TraceType, input_type: type[Any] | None = None
     ) -> AsyncGenerator[Any, TraceType]:
         raise NotImplementedError

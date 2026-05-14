@@ -4,7 +4,7 @@ from typing import Any, cast, get_type_hints, override
 
 from giskard.checks.utils.injectable import ValueGenerator, ValueProvider
 from giskard.core.utils import NOT_PROVIDED, NotProvided
-from pydantic import Field, PrivateAttr, TypeAdapter, model_validator
+from pydantic import Field, PrivateAttr, PydanticUserError, TypeAdapter, model_validator
 
 from ..input_generator import InputGenerator
 from ..types import GeneratorType, ProviderType
@@ -47,11 +47,11 @@ def _infer_input_type(outputs: object) -> Any | None:
     if not param_hints:
         return None
     first_param_type = next(iter(param_hints.values()))
-    if first_param_type is str:
-        return None
     try:
         TypeAdapter(first_param_type)
-    except Exception:
+    except (PydanticUserError, TypeError):
+        # PydanticUserError: Raised if the type is not supported by Pydantic
+        # TypeError: Raised if first_param_type isn't a valid "type" (e.g. an instance)
         return None
     return first_param_type
 

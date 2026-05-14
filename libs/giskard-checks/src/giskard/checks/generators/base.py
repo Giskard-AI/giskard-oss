@@ -5,7 +5,7 @@ from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow, TemplateReference
 from giskard.llm import chat
 from giskard.llm.types import ChatMessage
-from pydantic import BaseModel, Field, TypeAdapter, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from ..core import Trace
 from ..core.exceptions import InputGenerationException
@@ -56,7 +56,7 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
 
     @override
     async def __call__(
-        self, trace: TraceType, input_type: Any | None = None
+        self, trace: TraceType, input_type: type[Any] | None = None
     ) -> AsyncGenerator[Any, TraceType]:
         T = input_type or str
         prompt = self.get_prompt()
