@@ -14,6 +14,8 @@ RetrievalScoringStrategy = Literal["strict"]
 
 
 def _as_sequence(value: Any) -> list[Any]:
+    if value is None:
+        return []
     if isinstance(value, list):
         return value
     if isinstance(value, tuple | set):
