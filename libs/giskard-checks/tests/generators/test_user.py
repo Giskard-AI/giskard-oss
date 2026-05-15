@@ -1,47 +1,9 @@
-import json
-from typing import Any, Sequence, override
+from typing import Any
 
 import pytest
-from giskard.agents.generators.base import BaseGenerator, GenerationParams
-from giskard.checks import Interaction, Trace, UserSimulator
-from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
-from pydantic import Field
+from giskard.checks import Interaction, UserSimulator
 
-
-class MockGenerator(BaseGenerator):
-    """Mock generator for UserSimulator tests."""
-
-    responses: list[dict[str, Any]]
-    index: int = 0
-    calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
-
-    @override
-    async def _call_model(
-        self,
-        messages: Sequence[ChatMessage],
-        params: GenerationParams,
-        metadata: dict[str, Any] | None = None,
-    ) -> CompletionResponse:
-        self.calls.append(messages)
-        message = AssistantMessage(
-            content=json.dumps(self.responses[self.index]),
-        )
-        self.index += 1
-        return CompletionResponse(
-            choices=[Choice(message=message, finish_reason="stop", index=0)]
-        )
-
-
-class LLMTrace(Trace[str, str], frozen=True):
-    def _repr_prompt_(self) -> str:
-        if not self.interactions:
-            return "**No interactions yet**"
-        return "\n".join(
-            [
-                f"[user]: {interaction.inputs}\n[assistant]: {interaction.outputs}"
-                for interaction in self.interactions
-            ]
-        )
+from .conftest import LLMTrace, MockGenerator
 
 
 def _wrap_in_xml_tag(text: str, tag: str) -> str:

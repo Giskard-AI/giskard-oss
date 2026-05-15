@@ -1,77 +1,54 @@
-from collections.abc import AsyncGenerator
+from typing import Any, override
 
-from pydantic import BaseModel, Field
+from giskard.agents.workflow import TemplateReference
+from pydantic import Field
 
 from ..core import Trace
 from ..core.input_generator import InputGenerator
-from ..core.mixin import WithGeneratorMixin
-
-
-class UserSimulatorOutput(BaseModel):
-    goal_reached: bool = Field(
-        ...,
-        description="Whether the goal has been reached. Meaning that the persona's goal has been achieved and no more messages are needed.",
-    )
-    message: str | None = Field(
-        default=None,
-        description="The message that the user would send. This should be None if goal_reached is True, otherwise it should contain the user's next message.",
-    )
+from .base import BaseLLMGenerator
 
 
 @InputGenerator.register("user_simulator")
 class UserSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    InputGenerator[str, TraceType], WithGeneratorMixin
+    BaseLLMGenerator[TraceType]
 ):
     """User simulation with predefined or custom personas.
 
-    Accepts either a predefined persona name (e.g., "frustrated_customer") or a custom
-    persona description.
+    Accepts either a predefined persona name (e.g., "frustrated_customer") or
+    a custom persona description. Extends BaseLLMGenerator with a hardcoded
+    template and persona/context fields.
 
     Parameters
     ----------
     persona : str
-        Predefined persona name or custom persona description
+        Predefined persona name or custom persona description.
     context : str | None
-        Optional context to customize the persona's behavior
+        Optional context to customize the persona's behavior.
     max_steps : int
-        Maximum number of conversation turns (default: 3)
+        Maximum number of conversation turns (default: 3).
 
     Examples
     --------
-    Predefined persona:
-
     >>> simulator = UserSimulator(persona="frustrated_customer")
-
-    Custom persona with optional context:
-
     >>> simulator = UserSimulator(
     ...     persona="A polite elderly user who needs step-by-step guidance",
-    ...     context="Ask about using the mobile app"
+    ...     context="Ask about using the mobile app",
     ... )
     """
 
     persona: str = Field(
-        ..., description="Predefined persona name or custom description", min_length=1
+        ..., min_length=1, description="Predefined persona name or custom description."
     )
     context: str | None = Field(
-        default=None, description="Optional context to customize persona behavior"
+        default=None, description="Optional context to customize persona behavior."
     )
-    max_steps: int = Field(default=3, ge=0)
 
-    async def __call__(self, trace: TraceType) -> AsyncGenerator[str, TraceType]:
-        user_generator_workflow_ = (
-            self.generator.template("giskard.checks::generators/user_simulator.j2")
-            .with_inputs(persona=self.persona, context=self.context)
-            .with_output(UserSimulatorOutput)
+    @override
+    def get_prompt(self) -> TemplateReference:
+        return TemplateReference(
+            template_name="giskard.checks::generators/user_simulator.j2"
         )
 
-        step = 0
-        while step < self.max_steps:
-            chat = await user_generator_workflow_.with_inputs(history=trace).run()
-            output = chat.output
-
-            if output.goal_reached or not output.message:
-                return
-
-            trace = yield output.message
-            step += 1
+    @override
+    async def get_inputs(self, trace: TraceType) -> dict[str, Any]:
+        return {"history": trace, "persona": self.persona, "context": self.context}

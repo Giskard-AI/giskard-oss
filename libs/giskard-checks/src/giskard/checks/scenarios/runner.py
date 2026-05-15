@@ -96,6 +96,7 @@ class ScenarioRunner:
     ```python
     runner = ScenarioRunner()
     result = await runner.run(scenario)
+    result = await runner.run(scenario, target=my_sut, return_exception=True)
     ```
     """
 
