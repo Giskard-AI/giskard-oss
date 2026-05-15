@@ -5,8 +5,9 @@ Agent-focused notes for the **giskard-oss** monorepo. Human-oriented docs live i
 ## Project overview
 
 - **Stack:** Python 3.12+ (CI also exercises 3.13–3.14), [uv](https://docs.astral.sh/uv/) for env and runs, [Ruff](https://docs.astral.sh/ruff/) for lint/format, [basedpyright](https://github.com/DetachHead/basedpyright) for types.
-- **Layout:** Libraries under `libs/` — `giskard-core`, `giskard-agents`, `giskard-checks`. Work from the **repository root** unless a task is scoped to one package.
+- **Layout:** Libraries under `libs/` — `giskard-core`, `giskard-agents`, `giskard-checks`, `giskard-llm`. Work from the **repository root** unless a task is scoped to one package.
 - **Package-specific conventions:** See `libs/<package>/.cursor/rules/` (e.g. `giskard-checks` has project and development rules).
+- **Always invoke Python via `uv run`** — bare `python` or `pytest` will fail with `ModuleNotFoundError`.
 
 ## Setup
 
@@ -49,13 +50,20 @@ CI (`.github/workflows/ci.yml`) runs `make install install-tools`, then `make ch
 
 ## PR / change discipline
 
-- **Important:** this repo uses a custom process to **expedite agent PRs**. Always end agent-opened PR titles with `🤖🤖🤖🤖` (four robot emojis) so those PRs are picked up by that workflow—do not omit this suffix.
-- Prefer **minimal diffs**: implement only what was asked; avoid drive-by refactors and unrelated files.
-- After edits: **`make format`**, then **`make check`**, then **`make test-unit`** (or scoped `PACKAGE=...`).
-- Optional: `pre-commit run` if hooks are installed.
+**Pre-flight checklist** (run in order before opening or updating a PR):
 
-## Workspace rules (Cursor)
+```bash
+make format       # Ruff format + autofix
+make check        # lint, type-check, compat, security, licenses
+make test-unit    # or: make test-unit PACKAGE=giskard-checks
+```
 
-Repository-wide agent guardrails are in `.cursor/rules/guidelines.mdc` (no unsolicited features, preserve unrelated code, do not add high-maintenance “codemap” docs that duplicate rules/README).
+If `make check` fails with missing tools: run `make install && make install-tools` first.
+
+**Rules:**
+
+- End **agent-opened** PR titles with `🤖🤖🤖🤖` — required for the expedited-agent PR workflow. Do not omit.
+- Minimal diffs only: implement exactly what was asked; no drive-by refactors or unrelated file edits.
+- Do not add unsolicited features, architecture docs, or codemap files.
 
 This file follows the open [AGENTS.md](https://agents.md/) convention for coding agents.
