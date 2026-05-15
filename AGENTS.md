@@ -1,69 +1,46 @@
 # AGENTS.md
 
-Agent-focused notes for the **giskard-oss** monorepo. Human-oriented docs live in [README.md](README.md) and [https://docs.giskard.ai/oss](https://docs.giskard.ai/oss).
+giskard-oss — behavioral config for autonomous coding agents (no human in the loop). Human-oriented docs: [README.md](README.md). Always invoke Python via `uv run` — bare `python` or `pytest` will fail.
 
-## Project overview
+## Workflow Orchestration
 
-- **Stack:** Python 3.12+ (CI also exercises 3.13–3.14), [uv](https://docs.astral.sh/uv/) for env and runs, [Ruff](https://docs.astral.sh/ruff/) for lint/format, [basedpyright](https://github.com/DetachHead/basedpyright) for types.
-- **Layout:** Libraries under `libs/` — `giskard-core`, `giskard-agents`, `giskard-checks`, `giskard-llm`. Work from the **repository root** unless a task is scoped to one package.
-- **Package-specific conventions:** See `libs/<package>/.cursor/rules/` (e.g. `giskard-checks` has project and development rules).
-- **Always invoke Python via `uv run`** — bare `python` or `pytest` will fail with `ModuleNotFoundError`.
+### 1. Setup
+Run once: `make setup-for-agents AGENT_NAME="<name>" REASON="<issue or task>"`
+If tools are missing later: `make install && make install-tools`
 
-## Setup
+### 2. Plan Before Acting
+– Write approach to tasks/todo.md before touching any file
+– If scope is unclear, read `libs/<pkg>/.cursor/rules/` before proceeding
+– If something goes wrong, stop and re-plan
 
-**Recommended for coding agents:** run `make setup-for-agents` from the repo root. It runs the same steps as `make setup`, writes `GISKARD_TELEMETRY_DISABLED=false` to `.env`, and sends a one-shot analytics event. Optional context (both optional):
+### 3. Verification Before Done
+– Before any PR: `make format && make check && make test-unit PACKAGE=<affected-lib>`
+– Show `make check` and pytest summary output in the PR description
+– No `# type: ignore` without structural-fix explanation; no patching test assertions
 
-```bash
-make setup-for-agents AGENT_NAME="ClawBot" REASON="Working on issue #1234"
-```
+### 4. PR Rules
+– End PR titles with `🤖🤖🤖🤖` — required for the expedited-agent PR workflow
+– Minimal diffs: implement exactly what was asked
 
-Human or minimal setup without that target:
+### 5. Self-Improvement Loop
+– After any mistake: update lessons.md with what went wrong and what rule would have prevented it
 
-```bash
-make install          # uv sync — project dependencies
-make install-tools    # ruff, vermin, basedpyright, pre-commit (with pre-commit-uv)
-make pre-commit-install   # optional: git hooks
-# or all of the above:
-make setup
-```
+### 6. Autonomous Execution
+– When scope is unambiguous: proceed directly
+– Do not ask for confirmation; do not stall
 
-If `make check` fails with missing tools, run `make install` and `make install-tools` (same order as CI).
+## Task Management
+1. Plan First — write plan to tasks/todo.md
+2. Verify Plan — review before starting; proceed if unambiguous
+3. Track Progress — mark items complete as you go
+4. Explain Changes — high-level summary at each step
+5. Document Results — add review section to todo.md
+6. Capture Lessons — update lessons.md after corrections
 
-## Commands (run from repo root)
+## Core Principles
+– Simplicity First: make every change as simple as possible; prefer deleting lines over adding them
+– No Laziness: find root causes; no band-aids, no temporary fixes; senior developer standards
+– Minimal Impact: only touch what's necessary; no side effects; no reformatting untouched lines
 
-| Goal | Command |
-|------|---------|
-| Format (Ruff format + fix) | `make format` |
-| Lint | `make lint` |
-| Full gate (lint, format check, Python 3.12 compat, types, security, licenses) | `make check` |
-| Unit tests (all libs) | `make test-unit` |
-| Unit tests for one package | `make test-unit PACKAGE=giskard-checks` (also `giskard-core`, `giskard-agents`) |
-| All tests including functional | `make test` |
-| Functional tests only | `make test-functional` |
-
-CI (`.github/workflows/ci.yml`) runs `make install install-tools`, then `make check`, then `make test-unit` per package — mirror that before opening or updating a PR.
-
-## Functional / integration tests
-
-- `make test-functional` and full `make test` call live APIs; they are **not** the default PR gate in `ci.yml` (see `.github/workflows/integration-tests.yml` for secrets-driven runs).
-- Local: create a **repo-root** `.env` (gitignored). Export vars before pytest, e.g. `set -a && source .env && set +a` then `make test-functional PACKAGE=giskard-agents`. Typical vars include `GEMINI_API_KEY`; optional `TEST_MODEL`, `TEST_EMBEDDING_MODEL` (see `libs/giskard-agents/tests/conftest.py`).
-
-## PR / change discipline
-
-**Pre-flight checklist** (run in order before opening or updating a PR):
-
-```bash
-make format       # Ruff format + autofix
-make check        # lint, type-check, compat, security, licenses
-make test-unit    # or: make test-unit PACKAGE=giskard-checks
-```
-
-If `make check` fails with missing tools: run `make install && make install-tools` first.
-
-**Rules:**
-
-- End **agent-opened** PR titles with `🤖🤖🤖🤖` — required for the expedited-agent PR workflow. Do not omit.
-- Minimal diffs only: implement exactly what was asked; no drive-by refactors or unrelated file edits.
-- Do not add unsolicited features, architecture docs, or codemap files.
-
+---
 This file follows the open [AGENTS.md](https://agents.md/) convention for coding agents.

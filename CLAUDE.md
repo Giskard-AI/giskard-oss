@@ -1,44 +1,47 @@
 # CLAUDE.md
 
-Claude-specific notes for the **giskard-oss** monorepo. Human-oriented docs live in [README.md](README.md); agent-oriented operational notes live in [AGENTS.md](AGENTS.md).
+giskard-oss — behavioral config for Claude Code (interactive assistant with a human in the loop).
 
-## Project overview
+## Workflow Orchestration
 
-- **Stack:** Python 3.12+, [uv](https://docs.astral.sh/uv/) for env/runs, [Ruff](https://docs.astral.sh/ruff/) for lint/format, [basedpyright](https://github.com/DetachHead/basedpyright) for types.
-- **Layout:** Libraries under `libs/` — `giskard-core`, `giskard-agents`, `giskard-checks`, `giskard-llm`. Work from the repo root unless a task is strictly scoped to one package.
+### 1. Plan Mode Default
+– Enter plan mode for ANY non-trivial task (3+ steps or touches multiple libs)
+– Write the approach to tasks/todo.md before touching files
+– If something goes sideways, STOP and re-plan immediately
 
-## Setup
+### 2. Subagent Strategy
+– Use subagents to keep the main context window clean
+– One focused task per subagent
+– For complex cross-lib problems, spawn parallel subagents
 
-```bash
-make setup            # uv sync + install tools + pre-commit hooks
-# or, for coding agents:
-make setup-for-agents
-```
+### 3. Self-Improvement Loop
+– After ANY correction: update lessons.md
+– Write a rule that prevents the same mistake
+– Propose additions to CLAUDE.md in the format "Add rule: X"
 
-## Commands
+### 4. Verification Before Done
+– Never mark a task complete without proving it works
+– Run: `make format && make check && make test-unit PACKAGE=<affected-lib>`
+– Show actual output. Never assume tests pass.
+– Ask yourself: "Would a staff engineer approve this?"
 
-| Goal | Command |
-|------|---------|
-| Format | `make format` |
-| Lint | `make lint` |
-| Full gate | `make check` |
-| Unit tests (all) | `make test-unit` |
-| Unit tests (one package) | `make test-unit PACKAGE=giskard-checks` |
-| All tests | `make test` |
+### 5. Demand Elegance
+– Pause and ask "is there a more elegant solution?"
+– Skip for simple fixes — don't over-engineer
 
-Before opening or updating a PR: `make format && make check && make test-unit`.
+### 6. Autonomous Bug Fixing
+– When given a bug report with clear scope: just fix it
+– No `# type: ignore`, no patched test assertions — fix the root cause
 
-## PR discipline
+## Task Management
+1. Plan First — write plan to tasks/todo.md
+2. Verify Plan — check in before starting
+3. Track Progress — mark items complete as you go
+4. Explain Changes — high-level summary at each step
+5. Document Results — add review section to todo.md
+6. Capture Lessons — update lessons.md after corrections
 
-- End agent-opened PR titles with `🤖🤖🤖🤖` — required for the expedited-agent PR workflow.
-- Always run `uv run` (not bare `python` or `pytest`).
-
----
-
-## Core principles
-
-**Make every change as small as possible.** Prefer deleting lines over adding them. The best fix often removes code entirely.
-
-**Find the root cause.** No band-aids. If a symptom has an underlying cause, address that — not the symptom.
-
-**Only touch what's necessary.** No side effects. Leave every file you didn't need to change exactly as you found it.
+## Core Principles
+– Simplicity First: make every change as simple as possible; prefer deleting lines over adding them
+– No Laziness: find root causes; no band-aids, no temporary fixes; senior developer standards
+– Minimal Impact: only touch what's necessary; no side effects; no reformatting untouched lines
