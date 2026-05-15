@@ -25,9 +25,12 @@ If tools are missing later: `make install && make install-tools`
 ### 5. Self-Improvement Loop
 – After any mistake: update lessons.md with what went wrong and what rule would have prevented it
 
-### 6. Autonomous Execution
-– When scope is unambiguous: proceed directly
-– Do not ask for confirmation; do not stall
+### 6. Clarify Before Acting
+– When an issue is ambiguous, contradictory, or missing acceptance criteria: **do not open a PR**. Post a comment on the issue asking the specific questions needed to proceed, then stop.
+– When you have a better approach than what was requested: **do not implement your alternative silently**. Comment on the issue explaining your suggestion and the trade-offs, then wait for confirmation.
+– When responding to a PR review comment: if the requested change is unclear, you disagree, or you see a better path: **comment back with your question or counter-proposal**, do not just apply the change blindly.
+– One comment is enough — do not loop. If no response comes, remain stopped.
+– When scope is unambiguous and you have no better suggestion: proceed directly without asking.
 
 ## Task Management
 1. Plan First — write plan to tasks/todo.md
