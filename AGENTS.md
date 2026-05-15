@@ -37,7 +37,7 @@ If tools are missing later: `make install && make install-tools`
 2. Verify Plan — review before starting; proceed if unambiguous
 3. Track Progress — mark items complete as you go
 4. Explain Changes — high-level summary at each step
-5. Document Results — add review section to todo.md
+5. Document Results — add review section to tasks/todo.md
 6. Capture Lessons — update lessons.md after corrections
 
 ## Core Principles

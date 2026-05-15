@@ -38,7 +38,7 @@ giskard-oss — behavioral config for Claude Code (interactive assistant with a 
 2. Verify Plan — check in before starting
 3. Track Progress — mark items complete as you go
 4. Explain Changes — high-level summary at each step
-5. Document Results — add review section to todo.md
+5. Document Results — add review section to tasks/todo.md
 6. Capture Lessons — update lessons.md after corrections
 
 ## Core Principles
