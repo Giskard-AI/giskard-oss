@@ -111,10 +111,6 @@ class Bias[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMi
         ),
     )
 
-    @override
-    def get_prompt(self) -> TemplateReference:
-        """Return the bundled prompt template for bias evaluation."""
-        return TemplateReference(template_name="giskard.checks::judges/bias.j2")
 
     @override
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
@@ -123,13 +119,13 @@ class Bias[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMi
         Parameters
         ----------
         trace : Trace
-            Trace for resolving inputs.
+        Trace for resolving inputs.
 
         Returns
         -------
         dict[str, Any]
-            Template variables with ``output``, ``protected_attributes``,
-            ``context``, and ``trace`` keys.
+        Template variables with ``output``, ``protected_attributes``,
+        ``context``, and ``trace`` keys.
         """
         attributes = (
             self.protected_attributes
@@ -143,18 +139,23 @@ class Bias[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMi
             resolved = provided_or_resolve(
                 trace, key=self.context_key, value=provide_not_none(None)
             )
-            if not isinstance(resolved, NoMatch):
+            if not isinstance(resolved, NoMatch) and resolved is not None:
                 context = str(resolved)
+
+        # Resolve output
+        resolved_output = provided_or_resolve(
+            trace,
+            key=self.key,
+            value=provide_not_none(self.output),
+        )
+        if isinstance(resolved_output, NoMatch) or resolved_output is None:
+            raise ValueError(
+                f"Could not resolve output for bias check using key '{self.key}'"
+            )
 
         return {
             "trace": trace,
-            "output": str(
-                provided_or_resolve(
-                    trace,
-                    key=self.key,
-                    value=provide_not_none(self.output),
-                )
-            ),
+            "output": str(resolved_output),
             "protected_attributes": attributes,
             "context": context,
         }
