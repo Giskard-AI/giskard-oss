@@ -1,3 +1,5 @@
+import giskard.llm as llm
+from giskard.llm import ResponseFunctionToolCall
 from giskard.llm.types import (
     AssistantMessage,
     Choice,
@@ -8,6 +10,16 @@ from giskard.llm.types import (
     ToolCall,
     ToolCallFunction,
 )
+from giskard.llm.types import (
+    ResponseFunctionToolCall as TypesResponseFunctionToolCall,
+)
+
+
+def test_top_level_llm_exports_response_function_tool_call():
+    assert ResponseFunctionToolCall is TypesResponseFunctionToolCall
+    assert llm.ResponseFunctionToolCall is TypesResponseFunctionToolCall
+    assert "ResponseFunctionToolCall" in llm.__all__
+    assert "ResponseOutputFunctionCall" not in llm.__all__
 
 
 def test_completion_response_model_dump():
