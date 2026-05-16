@@ -9,7 +9,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'echo \"[SessionStart hook] PWD=$PWD, .venv exists=$([ -d .venv ] && echo yes || echo no)\" >> /tmp/claude-hook-debug.log 2>&1; [[ ! -d \"$PWD/.venv\" ]] && make -C \"$PWD\" setup >> /tmp/claude-hook-debug.log 2>&1 || true'",
+            "command": "bash -c '[[ ! -d \"$PWD/.venv\" ]] && make -C \"$PWD\" setup >&2 || true'",
+            "async": true,
             "statusMessage": "Running make setup..."
           }
         ]
