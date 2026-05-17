@@ -6,16 +6,18 @@ giskard-oss — behavioral config for Claude Code (interactive assistant with a 
 
 ### 1. Plan Mode Default
 – Enter plan mode for ANY non-trivial task (3+ steps or touches multiple libs)
-– Write the approach to tasks/todo.md before touching files
+– Brainstorm first (design → spec), then write an implementation plan
+– Save specs to `docs/superpowers/specs/`, plans to `docs/superpowers/plans/`
 – If something goes sideways, STOP and re-plan immediately
 
 ### 2. Subagent Strategy
 – Use subagents to keep the main context window clean
-– One focused task per subagent
-– For complex cross-lib problems, spawn parallel subagents
+– Fresh subagent per task; controller curates exactly the context each subagent needs
+– Two-stage review after each task: spec compliance first, then code quality
 
 ### 3. Self-Improvement Loop
 – After ANY correction: self-document the rule (naming, file headers, examples); only add to CLAUDE.md if it cannot be self-documented
+– When a correction changes what was implemented vs. what the plan says: update the plan file immediately so reviewers never see a mismatch
 
 ### 4. Verification Before Done
 – Never mark a task complete without proving it works
@@ -32,11 +34,11 @@ giskard-oss — behavioral config for Claude Code (interactive assistant with a 
 – No `# type: ignore`, no patched test assertions — fix the root cause
 
 ## Task Management
-1. Plan First — write plan to tasks/todo.md
+1. Brainstorm → Spec → Plan — save to `docs/superpowers/specs/` and `docs/superpowers/plans/`
 2. Verify Plan — check in before starting
 3. Track Progress — mark items complete as you go
 4. Explain Changes — high-level summary at each step
-5. Document Results — add review section to tasks/todo.md
+5. Document Results — add review section to the plan file
 6. Capture Lessons — update CLAUDE.md directly after corrections
 
 ## Core Principles
