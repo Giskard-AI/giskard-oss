@@ -34,7 +34,7 @@ giskard-oss — behavioral config for Claude Code (interactive assistant with a 
 – No `# type: ignore`, no patched test assertions — fix the root cause
 
 ## Task Management
-1. Brainstorm → Spec → Plan — save to `docs/superpowers/`
+1. Brainstorm → Spec → Plan — save to `docs/superpowers/specs/` and `docs/superpowers/plans/`
 2. Verify Plan — check in before starting
 3. Track Progress — mark items complete as you go
 4. Explain Changes — high-level summary at each step
