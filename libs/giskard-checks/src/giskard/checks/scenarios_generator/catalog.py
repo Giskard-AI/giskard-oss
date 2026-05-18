@@ -6,23 +6,26 @@ import numpy as np
 from ..core.interaction import Trace
 from ..core.scenario import Scenario
 from ..scenarios.suite import Suite
-from .adversarial_generator import AdversarialScenarioGenerator
 from .base import ScenarioGenerator
+from .registry import suite_generator_registry
 
-GENERATORS: list[ScenarioGenerator] = [
-    AdversarialScenarioGenerator(),
-]
+
+def _normalize_generators(
+    generators: list[ScenarioGenerator | type[ScenarioGenerator]],
+) -> list[ScenarioGenerator]:
+    return [g() if isinstance(g, type) else g for g in generators]
 
 
 async def _generate_scenarios(
     description: str,
     languages: list[str],
+    generators: list[ScenarioGenerator],
     max_scenarios: int | None = None,
     seed: int = 42,
 ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
     tasks = []
     async with TaskGroup() as task_group:
-        for generator in GENERATORS:
+        for generator in generators:
             tasks.append(
                 task_group.create_task(
                     generator.generate_scenario(description, languages)
@@ -31,14 +34,10 @@ async def _generate_scenarios(
 
     scenarios = [scenario for task in tasks for scenario in task.result()]
 
-    if max_scenarios is None:
+    if max_scenarios is None or max_scenarios >= len(scenarios):
         return scenarios
 
     rng = np.random.default_rng(seed)
-
-    if max_scenarios >= len(scenarios):
-        return scenarios
-
     return rng.choice(scenarios, size=max_scenarios, replace=False).tolist()
 
 
@@ -47,6 +46,14 @@ async def generate_suite(
     languages: list[str],
     max_scenarios: int | None = None,
     seed: int = 42,
+    generators: list[ScenarioGenerator | type[ScenarioGenerator]] | None = None,
 ) -> Suite[Any, Any]:
-    scenarios = await _generate_scenarios(description, languages, max_scenarios, seed)
+    resolved = (
+        _normalize_generators(generators)
+        if generators is not None
+        else suite_generator_registry.list()
+    )
+    scenarios = await _generate_scenarios(
+        description, languages, resolved, max_scenarios, seed
+    )
     return Suite(name="Scenarios", scenarios=scenarios)
