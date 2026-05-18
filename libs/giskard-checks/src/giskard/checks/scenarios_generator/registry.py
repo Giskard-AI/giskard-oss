@@ -3,7 +3,7 @@ from .base import ScenarioGenerator
 from .prompt_injection import PromptInjectionScenarioGenerator
 
 
-def _normalize(
+def normalize_generator(
     generator: ScenarioGenerator | type[ScenarioGenerator],
 ) -> ScenarioGenerator:
     if isinstance(generator, type):
@@ -16,7 +16,7 @@ class SuiteGeneratorRegistry:
         self._generators: list[ScenarioGenerator] = []
 
     def register(self, generator: ScenarioGenerator | type[ScenarioGenerator]) -> None:
-        instance = _normalize(generator)
+        instance = normalize_generator(generator)
         if any(instance == existing for existing in self._generators):
             raise ValueError(
                 f"{type(instance).__name__} is already registered with equivalent configuration"
@@ -26,7 +26,7 @@ class SuiteGeneratorRegistry:
     def unregister(
         self, generator: ScenarioGenerator | type[ScenarioGenerator]
     ) -> None:
-        instance = _normalize(generator)
+        instance = normalize_generator(generator)
         for i, existing in enumerate(self._generators):
             if instance == existing:
                 del self._generators[i]
