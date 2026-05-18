@@ -140,3 +140,9 @@ def test_suite_generator_registry_contains_builtin_generators():
     types = {type(g) for g in suite_generator_registry.list()}
     assert AdversarialScenarioGenerator in types
     assert PromptInjectionScenarioGenerator in types
+
+
+def test_suite_generator_registry_exported_from_top_level():
+    from giskard.checks import SuiteGeneratorRegistry, suite_generator_registry
+
+    assert isinstance(suite_generator_registry, SuiteGeneratorRegistry)
