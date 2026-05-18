@@ -123,3 +123,20 @@ def test_list_returns_copy():
     snapshot = registry.list()
     snapshot.clear()
     assert len(registry.list()) == 1
+
+
+# --- built-in generators ---
+
+
+def test_suite_generator_registry_contains_builtin_generators():
+    from giskard.checks.scenarios_generator.adversarial_generator import (
+        AdversarialScenarioGenerator,
+    )
+    from giskard.checks.scenarios_generator.prompt_injection import (
+        PromptInjectionScenarioGenerator,
+    )
+    from giskard.checks.scenarios_generator.registry import suite_generator_registry
+
+    types = {type(g) for g in suite_generator_registry.list()}
+    assert AdversarialScenarioGenerator in types
+    assert PromptInjectionScenarioGenerator in types

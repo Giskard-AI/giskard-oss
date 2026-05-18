@@ -1,4 +1,6 @@
+from .adversarial_generator import AdversarialScenarioGenerator
 from .base import ScenarioGenerator
+from .prompt_injection import PromptInjectionScenarioGenerator
 
 
 def _normalize(
@@ -39,3 +41,5 @@ class SuiteGeneratorRegistry:
 
 
 suite_generator_registry = SuiteGeneratorRegistry()
+suite_generator_registry.register(AdversarialScenarioGenerator)
+suite_generator_registry.register(PromptInjectionScenarioGenerator)
