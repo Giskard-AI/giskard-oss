@@ -59,6 +59,7 @@ class RuleGeneration(BaseModel):
 
 class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
     tags: ClassVar[list[str]] = [
+        "gsk:threat-type='harmful-content-generation'",
         "gsk:threat-type='misguidance-and-unauthorized-advice'",
     ]
 

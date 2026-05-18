@@ -32,7 +32,7 @@ class DatasetScenarioGenerator(ScenarioGenerator):
                 if not line:
                     continue
                 scenario = Scenario.model_validate_json(line)
-                scenario.with_annotations(
+                scenario = scenario.with_annotations(
                     {
                         **scenario.annotations,
                         "description": description,
