@@ -27,4 +27,6 @@ You will return a structured output with:
 - message: your next message to the agent. MUST be non-empty whenever goal_reached is false (especially on the first turn). May be None only when goal_reached is true.
 - schema_issue: set this (and leave message null) if the required output schema cannot produce a valid user message (e.g. no string-like field). Leave null otherwise.
 
+Generate the message in the following language: {{ trace.annotations.languages }}
+
 {{ _instr_output }}
