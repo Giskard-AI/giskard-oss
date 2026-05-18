@@ -51,7 +51,7 @@ async def generate_suite(
     resolved = (
         _normalize_generators(generators)
         if generators is not None
-        else suite_generator_registry.list()
+        else suite_generator_registry.generators()
     )
     scenarios = await _generate_scenarios(
         description, languages, resolved, max_scenarios, seed

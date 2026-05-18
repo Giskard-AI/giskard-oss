@@ -29,20 +29,20 @@ class _GenB(ScenarioGenerator):
 def test_register_bare_type_adds_instance():
     registry = SuiteGeneratorRegistry()
     registry.register(_GenA)
-    assert len(registry.list()) == 1
-    assert isinstance(registry.list()[0], _GenA)
+    assert len(registry.generators()) == 1
+    assert isinstance(registry.generators()[0], _GenA)
 
 
 def test_register_instance_adds_instance():
     registry = SuiteGeneratorRegistry()
     registry.register(_GenA())
-    assert len(registry.list()) == 1
+    assert len(registry.generators()) == 1
 
 
 def test_register_bare_type_equivalent_to_default_instance():
     registry = SuiteGeneratorRegistry()
     registry.register(_GenA)
-    assert registry.list()[0] == _GenA()
+    assert registry.generators()[0] == _GenA()
 
 
 def test_register_duplicate_bare_type_raises():
@@ -63,7 +63,7 @@ def test_register_different_parameterized_instances_both_succeed():
     registry = SuiteGeneratorRegistry()
     registry.register(_GenB(value=1))
     registry.register(_GenB(value=2))
-    assert len(registry.list()) == 2
+    assert len(registry.generators()) == 2
 
 
 def test_register_bare_type_same_as_default_param_raises():
@@ -87,14 +87,14 @@ def test_unregister_bare_type_removes_instance():
     registry = SuiteGeneratorRegistry()
     registry.register(_GenA)
     registry.unregister(_GenA)
-    assert registry.list() == []
+    assert registry.generators() == []
 
 
 def test_unregister_instance_removes_it():
     registry = SuiteGeneratorRegistry()
     registry.register(_GenA())
     registry.unregister(_GenA())
-    assert registry.list() == []
+    assert registry.generators() == []
 
 
 def test_unregister_not_registered_raises():
@@ -111,24 +111,24 @@ def test_clear_empties_registry():
     registry.register(_GenA)
     registry.register(_GenB)
     registry.clear()
-    assert registry.list() == []
+    assert registry.generators() == []
 
 
 def test_clear_on_empty_registry_is_noop():
     registry = SuiteGeneratorRegistry()
     registry.clear()
-    assert registry.list() == []
+    assert registry.generators() == []
 
 
-# --- list ---
+# --- generators ---
 
 
-def test_list_returns_copy():
+def test_generators_returns_copy():
     registry = SuiteGeneratorRegistry()
     registry.register(_GenA)
-    snapshot = registry.list()
+    snapshot = registry.generators()
     snapshot.clear()
-    assert len(registry.list()) == 1
+    assert len(registry.generators()) == 1
 
 
 # --- built-in generators ---
@@ -143,7 +143,7 @@ def test_suite_generator_registry_contains_builtin_generators():
     )
     from giskard.checks.scenarios_generator.registry import suite_generator_registry
 
-    types = {type(g) for g in suite_generator_registry.list()}
+    types = {type(g) for g in suite_generator_registry.generators()}
     assert AdversarialScenarioGenerator in types
     assert PromptInjectionScenarioGenerator in types
 

@@ -40,7 +40,7 @@ class SuiteGeneratorRegistry:
     def clear(self) -> None:
         self._generators.clear()
 
-    def list(self) -> list[ScenarioGenerator]:
+    def generators(self) -> list[ScenarioGenerator]:
         return list(self._generators)
 
 

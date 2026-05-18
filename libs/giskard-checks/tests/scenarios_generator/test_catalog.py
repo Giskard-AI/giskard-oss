@@ -22,7 +22,7 @@ class _StubGenerator(ScenarioGenerator):
 @pytest.fixture(autouse=True)
 def isolated_registry():
     """Snapshot and restore registry around each test."""
-    original = suite_generator_registry.list()
+    original = suite_generator_registry.generators()
     suite_generator_registry.clear()
     yield
     suite_generator_registry.clear()
