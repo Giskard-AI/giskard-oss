@@ -7,13 +7,13 @@ from ..core.interaction import Trace
 from ..core.scenario import Scenario
 from ..scenarios.suite import Suite
 from .base import ScenarioGenerator
-from .registry import normalize_generator, suite_generator_registry
+from .registry import _normalize_generator, suite_generator_registry
 
 
 def _normalize_generators(
     generators: list[ScenarioGenerator | type[ScenarioGenerator]],
 ) -> list[ScenarioGenerator]:
-    return [normalize_generator(g) for g in generators]
+    return [_normalize_generator(g) for g in generators]
 
 
 async def _generate_scenarios(

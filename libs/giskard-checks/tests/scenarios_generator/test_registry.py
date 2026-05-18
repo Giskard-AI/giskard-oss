@@ -74,6 +74,12 @@ def test_register_bare_type_same_as_default_param_raises():
         registry.register(_GenB(value=1))
 
 
+def test_register_non_generator_type_raises():
+    registry = SuiteGeneratorRegistry()
+    with pytest.raises(TypeError, match="ScenarioGenerator"):
+        registry.register(int)  # pyright: ignore[reportArgumentType]
+
+
 # --- unregister ---
 
 
