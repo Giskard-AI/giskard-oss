@@ -10,9 +10,10 @@ from giskard.checks.scenarios_generator.registry import suite_generator_registry
 
 
 class _StubGenerator(ScenarioGenerator):
-    """Returns a fixed single scenario for testing."""
+    """Returns a fixed number of scenarios for testing."""
 
     name: str = "stub"
+    scenario_count: int = 1
 
     async def generate_scenario(
         self,
@@ -21,7 +22,8 @@ class _StubGenerator(ScenarioGenerator):
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
-        return [Scenario(name=f"stub-{self.name}")]
+        n = max_scenarios if max_scenarios is not None else self.scenario_count
+        return [Scenario(name=f"stub-{self.name}-{i}") for i in range(n)]
 
 
 @pytest.fixture(autouse=True)
@@ -39,7 +41,7 @@ async def test_generate_suite_uses_registry_by_default():
     suite_generator_registry.register(_StubGenerator(name="a"))
     suite = await generate_suite("My chatbot", languages=["en"])
     assert len(suite.scenarios) == 1
-    assert suite.scenarios[0].name == "stub-a"
+    assert suite.scenarios[0].name == "stub-a-0"
 
 
 async def test_generate_suite_generators_override_bypasses_registry():
@@ -50,7 +52,7 @@ async def test_generate_suite_generators_override_bypasses_registry():
         generators=[_StubGenerator(name="override")],
     )
     assert len(suite.scenarios) == 1
-    assert suite.scenarios[0].name == "stub-override"
+    assert suite.scenarios[0].name == "stub-override-0"
 
 
 async def test_generate_suite_generators_bare_type_is_normalized():
@@ -60,7 +62,7 @@ async def test_generate_suite_generators_bare_type_is_normalized():
         generators=[_StubGenerator],
     )
     assert len(suite.scenarios) == 1
-    assert suite.scenarios[0].name == "stub-stub"
+    assert suite.scenarios[0].name == "stub-stub-0"
 
 
 async def test_generate_suite_empty_registry_returns_empty_suite():
@@ -75,7 +77,73 @@ async def test_generate_suite_empty_generators_override_returns_empty_suite():
 
 
 async def test_generate_suite_max_scenarios_limits_output():
-    suite_generator_registry.register(_StubGenerator(name="a"))
-    suite_generator_registry.register(_StubGenerator(name="b"))
-    suite = await generate_suite("My chatbot", languages=["en"], max_scenarios=1)
-    assert len(suite.scenarios) == 1
+    suite_generator_registry.register(_StubGenerator(name="a", scenario_count=5))
+    suite_generator_registry.register(_StubGenerator(name="b", scenario_count=5))
+    suite = await generate_suite("My chatbot", languages=["en"], max_scenarios=2)
+    assert len(suite.scenarios) == 2
+
+
+async def test_generate_suite_max_scenarios_distributed_across_generators():
+    """Budget is split across generators; each receives a non-negative count summing to max_scenarios."""
+    received: dict[str, int | None] = {}
+
+    class _TrackingGenerator(ScenarioGenerator):
+        name: str
+
+        async def generate_scenario(
+            self,
+            description: str,
+            languages: list[str],
+            max_scenarios: int | None = None,
+            rng: np.random.Generator | None = None,
+        ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+            received[self.name] = max_scenarios
+            n = max_scenarios if max_scenarios is not None else 0
+            return [Scenario(name=f"{self.name}-{i}") for i in range(n)]
+
+    await generate_suite(
+        "My chatbot",
+        languages=["en"],
+        generators=[_TrackingGenerator(name="x"), _TrackingGenerator(name="y")],
+        max_scenarios=4,
+        seed=42,
+    )
+    assert received["x"] is not None
+    assert received["y"] is not None
+    assert received["x"] + received["y"] == 4
+
+
+async def test_generate_suite_no_max_passes_none_to_generators():
+    """Without max_scenarios, generators receive max_scenarios=None."""
+    received: dict[str, int | None] = {}
+
+    class _TrackingGenerator(ScenarioGenerator):
+        name: str
+
+        async def generate_scenario(
+            self,
+            description: str,
+            languages: list[str],
+            max_scenarios: int | None = None,
+            rng: np.random.Generator | None = None,
+        ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+            received[self.name] = max_scenarios
+            return []
+
+    await generate_suite(
+        "My chatbot",
+        languages=["en"],
+        generators=[_TrackingGenerator(name="z")],
+    )
+    assert received["z"] is None
+
+
+async def test_generate_suite_registry_generators_not_mutated():
+    """The catalog must not mutate registered generator instances."""
+    gen = _StubGenerator(name="orig", scenario_count=3)
+    suite_generator_registry.register(gen)
+    original_count = gen.scenario_count
+
+    await generate_suite("My chatbot", languages=["en"], max_scenarios=1)
+
+    assert gen.scenario_count == original_count

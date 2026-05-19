@@ -23,22 +23,29 @@ async def _generate_scenarios(
     max_scenarios: int | None = None,
     seed: int = 42,
 ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+    rng = np.random.default_rng(seed)
+
     tasks = []
     async with TaskGroup() as task_group:
-        for generator in generators:
-            tasks.append(
-                task_group.create_task(
-                    generator.generate_scenario(description, languages)
-                )
+        if max_scenarios is not None and len(generators) > 0:
+            counts = rng.multinomial(
+                max_scenarios, np.ones(len(generators)) / len(generators)
             )
+            for generator, n in zip(generators, counts):
+                tasks.append(
+                    task_group.create_task(
+                        generator.generate_scenario(description, languages, int(n), rng)
+                    )
+                )
+        else:
+            for generator in generators:
+                tasks.append(
+                    task_group.create_task(
+                        generator.generate_scenario(description, languages)
+                    )
+                )
 
-    scenarios = [scenario for task in tasks for scenario in task.result()]
-
-    if max_scenarios is None or max_scenarios >= len(scenarios):
-        return scenarios
-
-    rng = np.random.default_rng(seed)
-    return rng.choice(scenarios, size=max_scenarios, replace=False).tolist()
+    return [scenario for task in tasks for scenario in task.result()]
 
 
 async def generate_suite(
