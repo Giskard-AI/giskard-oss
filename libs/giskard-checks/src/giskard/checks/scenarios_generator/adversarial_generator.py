@@ -12,6 +12,9 @@ from pydantic import BaseModel
 
 from .base import ScenarioGenerator
 
+DEFAULT_RULES_PER_CATEGORY = 5
+MAX_RULES_PER_CATEGORY = 10
+
 
 class AdversarialCategory(BaseModel):
     name: str
@@ -71,11 +74,22 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+        n_cats = len(ADVERSARIAL_CATEGORIES)
+
+        if max_scenarios is not None:
+            _rng = rng if rng is not None else np.random.default_rng()
+            raw_counts = _rng.multinomial(max_scenarios, np.ones(n_cats) / n_cats)
+            rules_per_cat = [min(int(n), MAX_RULES_PER_CATEGORY) for n in raw_counts]
+        else:
+            rules_per_cat = [DEFAULT_RULES_PER_CATEGORY] * n_cats
+
         tasks = {}
         async with TaskGroup() as task_group:
-            for category in ADVERSARIAL_CATEGORIES:
+            for category, num_rules in zip(ADVERSARIAL_CATEGORIES, rules_per_cat):
+                if num_rules == 0:
+                    continue
                 tasks[category.name] = task_group.create_task(
-                    self._generate_rules(category, description, 5)
+                    self._generate_rules(category, description, num_rules)
                 )
 
         return [
@@ -101,6 +115,7 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
                 }
             )
             for category in ADVERSARIAL_CATEGORIES
+            if category.name in tasks
             for rule in tasks[category.name].result()
         ]
 
@@ -112,23 +127,8 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
     async def _generate_rules(
         self, category: AdversarialCategory, description: str, num_rules: int
     ) -> list[str]:
-        """
-        Asynchronously generates a list of adversarial rules.
-
-        Parameters
-        ----------
-        num_rules : int
-            The number of adversarial rules to generate.
-
-        Returns
-        -------
-        list[str]
-            A list of strings, each representing a generated adversarial rule.
-        """
         rules: list[str] = []
 
-        # We try multiple times in case the model fails to generate the exact
-        # number of rules
         for _ in range(3):
             num_missing_rules = num_rules - len(rules)
 

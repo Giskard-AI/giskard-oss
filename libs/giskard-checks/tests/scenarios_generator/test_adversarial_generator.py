@@ -155,3 +155,66 @@ async def test_generate_scenario_makes_one_llm_call_per_category(
     assert isinstance(
         scenario_generator.generator, MockGenerator
     ) and scenario_generator.generator.index == len(ADVERSARIAL_CATEGORIES)
+
+
+# ---------------------------------------------------------------------------
+# generate_scenario — budget (max_scenarios)
+# ---------------------------------------------------------------------------
+
+
+async def test_generate_scenario_with_budget_skips_zero_rule_categories():
+    """Categories assigned 0 rules by multinomial are skipped (no LLM calls)."""
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    n_cats = len(ADVERSARIAL_CATEGORIES)
+    responses = [_rules_response(f"rule {i}") for i in range(n_cats)]
+    gen = AdversarialScenarioGenerator(generator=MockGenerator(responses=responses))
+    scenarios = await gen.generate_scenario(
+        description="A chatbot", languages=["en"], max_scenarios=1, rng=rng
+    )
+    # With budget=1, at most 1 scenario is generated
+    assert len(scenarios) <= 1
+    # Number of LLM calls equals number of non-zero-budget categories
+    assert isinstance(gen.generator, MockGenerator)
+    assert gen.generator.index < n_cats  # fewer calls than full run
+
+
+async def test_generate_scenario_with_budget_caps_rules_per_category():
+    """Rules per category are capped at MAX_RULES_PER_CATEGORY even if budget is large."""
+    from collections import Counter
+
+    import numpy as np
+    from giskard.checks.scenarios_generator.adversarial_generator import (
+        MAX_RULES_PER_CATEGORY,
+    )
+
+    n_cats = len(ADVERSARIAL_CATEGORIES)
+    rng = np.random.default_rng(42)
+    responses = [
+        _rules_response(*[f"rule {i}" for i in range(MAX_RULES_PER_CATEGORY)])
+    ] * n_cats
+    gen = AdversarialScenarioGenerator(generator=MockGenerator(responses=responses))
+    scenarios = await gen.generate_scenario(
+        description="A chatbot",
+        languages=["en"],
+        max_scenarios=n_cats * MAX_RULES_PER_CATEGORY * 2,  # way over cap
+        rng=rng,
+    )
+    cat_counts = Counter(s.annotations["category"]["name"] for s in scenarios)
+    for count in cat_counts.values():
+        assert count <= MAX_RULES_PER_CATEGORY
+
+
+async def test_generate_scenario_no_budget_uses_default_rules_per_category():
+    """Without a budget, DEFAULT_RULES_PER_CATEGORY rules are requested per category."""
+    from giskard.checks.scenarios_generator.adversarial_generator import (
+        DEFAULT_RULES_PER_CATEGORY,
+    )
+
+    n_cats = len(ADVERSARIAL_CATEGORIES)
+    rules = [f"rule {i}" for i in range(1, DEFAULT_RULES_PER_CATEGORY + 1)]
+    responses = [_rules_response(*rules)] * n_cats
+    gen = AdversarialScenarioGenerator(generator=MockGenerator(responses=responses))
+    scenarios = await gen.generate_scenario(description="A chatbot", languages=["en"])
+    assert len(scenarios) == n_cats * DEFAULT_RULES_PER_CATEGORY
