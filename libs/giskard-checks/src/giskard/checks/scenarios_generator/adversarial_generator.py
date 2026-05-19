@@ -8,7 +8,7 @@ from giskard.checks.core.mixin import WithGeneratorMixin
 from giskard.checks.core.scenario import Scenario
 from giskard.checks.generators import LLMGenerator
 from giskard.checks.judges import Conformity
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .base import ScenarioGenerator
 
@@ -76,7 +76,7 @@ class RuleGeneration(BaseModel):
             a single :class:`AdversarialCategory`.
     """
 
-    rules: list[str]
+    rules: list[str] = Field(min_length=1)
 
 
 class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
