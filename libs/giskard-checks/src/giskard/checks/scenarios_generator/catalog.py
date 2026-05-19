@@ -91,6 +91,9 @@ async def generate_suite(
         A :class:`~giskard.checks.scenarios.Suite` containing all generated
         scenarios, ready for execution.
     """
+    if max_scenarios is not None and max_scenarios < 0:
+        raise ValueError(f"max_scenarios must be non-negative, got {max_scenarios}")
+
     resolved = (
         _normalize_generators(generators)
         if generators is not None

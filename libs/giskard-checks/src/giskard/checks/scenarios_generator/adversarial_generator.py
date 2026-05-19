@@ -115,9 +115,12 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
         but random.  Each category is further capped at
         :data:`MAX_RULES_PER_CATEGORY`, so the actual output count may be
         lower than *max_scenarios* when the per-category cap is hit.
+        Categories allocated zero budget are skipped entirely (no LLM call or
+        scenario generation).
 
-        Rule generation is retried up to three times per category to reach the
-        allocated count; the final list is truncated if the LLM over-produces.
+        Rule generation is called up to three times in total per category to
+        reach the allocated count; the final list is truncated if the LLM
+        over-produces.
 
         Args:
             description: Natural-language description of the agent under test,

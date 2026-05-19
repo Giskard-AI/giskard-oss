@@ -4,7 +4,7 @@ from typing import Any, ClassVar
 import numpy as np
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 
 class ScenarioGenerator(BaseModel):
@@ -32,9 +32,12 @@ class ScenarioGenerator(BaseModel):
             max_scenarios: Upper bound on the number of scenarios to return.
                 ``None`` means no limit (generator-specific default applies).
             rng: Seeded NumPy random generator for reproducible sampling.
-                Callers should pass the *same* ``rng`` instance to every
-                generator so that the overall budget is drawn from one shared
-                stream.
+                When used in a multi-generator context (e.g., via
+                :func:`_generate_scenarios`), each generator receives an
+                independent child RNG spawned from this parent via ``rng.spawn()``.
+                This ensures statistical independence while maintaining
+                reproducibility. Direct callers typically pass a fresh generator
+                or ``None`` to let the implementation create one.
 
         Returns:
             A list of :class:`~giskard.checks.core.scenario.Scenario` objects
@@ -84,13 +87,22 @@ class DatasetScenarioGenerator(ScenarioGenerator):
             objects, ordered by their original dataset position.
         """
         path = _DATA_DIR / f"{self.dataset_name}.jsonl"
+
+        if not path.exists():
+            raise RuntimeError(
+                f"Dataset file not found: {path}. This may indicate a broken installation — try reinstalling the package."
+            )
+
         scenarios = []
         with path.open() as f:
-            for line in f:
+            for line_num, line in enumerate(f, start=1):
                 line = line.strip()
                 if not line:
                     continue
-                scenario = Scenario.model_validate_json(line)
+                try:
+                    scenario = Scenario.model_validate_json(line)
+                except ValidationError as e:
+                    raise ValueError(f"Malformed JSON in {path}:{line_num}: {e}") from e
                 scenario = scenario.with_annotations(
                     {
                         **scenario.annotations,

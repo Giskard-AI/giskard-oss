@@ -147,3 +147,9 @@ async def test_generate_suite_registry_generators_not_mutated():
     await generate_suite("My chatbot", languages=["en"], max_scenarios=1)
 
     assert gen.scenario_count == original_count
+
+
+async def test_generate_suite_negative_max_scenarios_raises_valueerror():
+    """max_scenarios < 0 raises ValueError."""
+    with pytest.raises(ValueError, match="max_scenarios must be non-negative, got -1"):
+        await generate_suite("My chatbot", languages=["en"], max_scenarios=-1)
