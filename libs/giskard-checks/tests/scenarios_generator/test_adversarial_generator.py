@@ -2,6 +2,7 @@ from collections import Counter
 
 import numpy as np
 import pytest
+from giskard.checks.core.interaction import Interact
 from giskard.checks.generators import LLMGenerator
 from giskard.checks.judges import Conformity
 from giskard.checks.scenarios_generator.adversarial_generator import (
@@ -132,7 +133,8 @@ async def test_generate_scenario_each_scenario_has_interact_and_check(
         assert len(scenario.steps) >= 1
         step = scenario.steps[0]
         assert len(step.interacts) == 1
-        assert isinstance(step.interacts[0], LLMGenerator)
+        assert isinstance(step.interacts[0], Interact)
+        assert isinstance(step.interacts[0].inputs, LLMGenerator)
         assert len(step.checks) == 1
         assert isinstance(step.checks[0], Conformity)
 

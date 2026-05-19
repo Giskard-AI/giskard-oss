@@ -31,10 +31,13 @@ async def _generate_scenarios(
             counts = rng.multinomial(
                 max_scenarios, np.ones(len(generators)) / len(generators)
             )
-            for generator, n in zip(generators, counts):
+            child_rngs = rng.spawn(len(generators))
+            for generator, n, child_rng in zip(generators, counts, child_rngs):
                 tasks.append(
                     task_group.create_task(
-                        generator.generate_scenario(description, languages, int(n), rng)
+                        generator.generate_scenario(
+                            description, languages, int(n), child_rng
+                        )
                     )
                 )
         else:
