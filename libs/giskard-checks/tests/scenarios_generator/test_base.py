@@ -1,17 +1,9 @@
-from typing import Any
-
 import numpy as np
-from giskard.checks.core.interaction import Trace
-from giskard.checks.core.scenario import Scenario
 from giskard.checks.scenarios_generator.base import DatasetScenarioGenerator
 
 
 class _StubDatasetGenerator(DatasetScenarioGenerator):
     dataset_name: str = "stub"
-
-
-def _make_scenarios(n: int) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
-    return [Scenario(name=f"s{i}") for i in range(n)]
 
 
 async def test_dataset_generator_no_budget_returns_all(tmp_path, monkeypatch):

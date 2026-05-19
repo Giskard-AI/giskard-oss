@@ -51,7 +51,7 @@ class DatasetScenarioGenerator(ScenarioGenerator):
                 scenarios.append(scenario)
 
         if max_scenarios is not None and max_scenarios < len(scenarios):
-            rng = rng or np.random.default_rng(42)
+            rng = rng if rng is not None else np.random.default_rng()
             indices = rng.choice(len(scenarios), size=max_scenarios, replace=False)
             scenarios = [scenarios[i] for i in sorted(indices)]
 
