@@ -1,6 +1,7 @@
 from asyncio import TaskGroup
 from typing import Any, ClassVar
 
+import numpy as np
 from giskard.agents import ChatWorkflow
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.mixin import WithGeneratorMixin
@@ -64,7 +65,11 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
     ]
 
     async def generate_scenario(
-        self, description: str, languages: list[str]
+        self,
+        description: str,
+        languages: list[str],
+        max_scenarios: int | None = None,
+        rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         tasks = {}
         async with TaskGroup() as task_group:

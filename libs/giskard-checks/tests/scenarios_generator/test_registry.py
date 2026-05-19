@@ -1,5 +1,6 @@
 from typing import Any
 
+import numpy as np
 import pytest
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
@@ -9,7 +10,11 @@ from giskard.checks.scenarios_generator.registry import SuiteGeneratorRegistry
 
 class _GenA(ScenarioGenerator):
     async def generate_scenario(
-        self, description: str, languages: list[str]
+        self,
+        description: str,
+        languages: list[str],
+        max_scenarios: int | None = None,
+        rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         return []
 
@@ -18,7 +23,11 @@ class _GenB(ScenarioGenerator):
     value: int = 1
 
     async def generate_scenario(
-        self, description: str, languages: list[str]
+        self,
+        description: str,
+        languages: list[str],
+        max_scenarios: int | None = None,
+        rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         return []
 
