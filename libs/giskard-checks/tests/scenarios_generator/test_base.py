@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 from giskard.checks.scenarios_generator.base import DatasetScenarioGenerator
 
@@ -97,3 +99,35 @@ async def test_dataset_generator_budget_reproducible(tmp_path, monkeypatch):
     result_a = await gen.generate_scenario("desc", ["en"], max_scenarios=3, rng=rng_a)
     result_b = await gen.generate_scenario("desc", ["en"], max_scenarios=3, rng=rng_b)
     assert [s.name for s in result_a] == [s.name for s in result_b]
+
+
+async def test_dataset_generator_missing_file_raises_runtime_error(monkeypatch):
+    """Pointing _DATA_DIR at a non-existent path raises RuntimeError with 'not found'."""
+    import giskard.checks.scenarios_generator.base as base_mod
+
+    monkeypatch.setattr(
+        base_mod, "_DATA_DIR", Path("/nonexistent/path/that/does/not/exist")
+    )
+    gen = _StubDatasetGenerator()
+    import pytest
+
+    with pytest.raises(RuntimeError, match="not found"):
+        await gen.generate_scenario("desc", ["en"])
+
+
+async def test_dataset_generator_malformed_jsonl_raises_value_error(
+    tmp_path, monkeypatch
+):
+    """A malformed JSONL line raises ValueError that includes the filename or line number."""
+    import giskard.checks.scenarios_generator.base as base_mod
+
+    stub_file = tmp_path / "stub.jsonl"
+    stub_file.write_text(
+        '{"name": "ok", "steps": [], "annotations": {}}\n{not valid json\n'
+    )
+    monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
+    gen = _StubDatasetGenerator()
+    import pytest
+
+    with pytest.raises(ValueError, match=r"stub\.jsonl|line 2"):
+        await gen.generate_scenario("desc", ["en"])

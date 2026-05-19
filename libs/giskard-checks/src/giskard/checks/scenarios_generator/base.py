@@ -32,12 +32,12 @@ class ScenarioGenerator(BaseModel):
             max_scenarios: Upper bound on the number of scenarios to return.
                 ``None`` means no limit (generator-specific default applies).
             rng: Seeded NumPy random generator for reproducible sampling.
-                When used in a multi-generator context (e.g., via
-                :func:`_generate_scenarios`), each generator receives an
-                independent child RNG spawned from this parent via ``rng.spawn()``.
-                This ensures statistical independence while maintaining
-                reproducibility. Direct callers typically pass a fresh generator
-                or ``None`` to let the implementation create one.
+                When used in a multi-generator context, each generator receives
+                an independent child RNG spawned from a shared parent via
+                ``rng.spawn()``, ensuring statistical independence while
+                maintaining reproducibility. Direct callers typically pass a
+                fresh generator or ``None`` to let the implementation create
+                one.
 
         Returns:
             A list of :class:`~giskard.checks.core.scenario.Scenario` objects

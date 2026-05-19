@@ -153,3 +153,47 @@ async def test_generate_suite_negative_max_scenarios_raises_valueerror():
     """max_scenarios < 0 raises ValueError."""
     with pytest.raises(ValueError, match="max_scenarios must be non-negative, got -1"):
         await generate_suite("My chatbot", languages=["en"], max_scenarios=-1)
+
+
+async def test_generate_suite_max_scenarios_zero_returns_empty():
+    """max_scenarios=0 is a valid no-op budget: returns an empty suite."""
+    suite_generator_registry.register(_StubGenerator(name="a", scenario_count=5))
+    suite = await generate_suite("My chatbot", languages=["en"], max_scenarios=0)
+    assert suite.scenarios == []
+
+
+async def test_generate_suite_reproducibility():
+    """Same seed produces identical per-generator scenario name allocation."""
+
+    class _TrackingGenerator(ScenarioGenerator):
+        name: str
+
+        async def generate_scenario(
+            self,
+            description: str,
+            languages: list[str],
+            max_scenarios: int | None = None,
+            rng: np.random.Generator | None = None,
+        ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+            return [
+                Scenario(name=f"{self.name}-{i}") for i in range(max_scenarios or 0)
+            ]
+
+    generators = [_TrackingGenerator(name="p"), _TrackingGenerator(name="q")]
+
+    suite_a = await generate_suite(
+        "My chatbot",
+        languages=["en"],
+        generators=generators,
+        max_scenarios=10,
+        seed=99,
+    )
+    suite_b = await generate_suite(
+        "My chatbot",
+        languages=["en"],
+        generators=generators,
+        max_scenarios=10,
+        seed=99,
+    )
+
+    assert [s.name for s in suite_a.scenarios] == [s.name for s in suite_b.scenarios]

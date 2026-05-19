@@ -1,4 +1,5 @@
 from asyncio import TaskGroup
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
@@ -11,7 +12,7 @@ from .registry import _normalize_generator, suite_generator_registry
 
 
 def _normalize_generators(
-    generators: list[ScenarioGenerator | type[ScenarioGenerator]],
+    generators: Sequence[ScenarioGenerator | type[ScenarioGenerator]],
 ) -> list[ScenarioGenerator]:
     return [_normalize_generator(g) for g in generators]
 
@@ -64,7 +65,7 @@ async def _generate_scenarios(
 async def generate_suite(
     description: str,
     languages: list[str],
-    generators: list[ScenarioGenerator | type[ScenarioGenerator]] | None = None,
+    generators: Sequence[ScenarioGenerator | type[ScenarioGenerator]] | None = None,
     max_scenarios: int | None = None,
     seed: int = 42,
 ) -> Suite[Any, Any]:
@@ -78,7 +79,7 @@ async def generate_suite(
     Args:
         description: Natural-language description of the agent under test.
         languages: BCP-47 language codes the agent is expected to handle.
-        generators: Explicit list of generator instances or classes to use.
+        generators: Sequence of generator instances or classes to use.
             When ``None``, all generators registered in
             :data:`~giskard.checks.scenarios_generator.registry.suite_generator_registry`
             are used.

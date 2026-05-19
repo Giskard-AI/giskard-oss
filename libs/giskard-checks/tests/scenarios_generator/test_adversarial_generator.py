@@ -2,6 +2,7 @@ from collections import Counter
 
 import numpy as np
 import pytest
+from giskard.agents import WorkflowError
 from giskard.checks.core.interaction import Interact
 from giskard.checks.generators import LLMGenerator
 from giskard.checks.judges import Conformity
@@ -71,6 +72,17 @@ async def test_generate_rules_stops_after_max_retries():
     rules = await gen._generate_rules(category, description="A chatbot", num_rules=5)
     assert len(rules) == 3
     assert isinstance(gen.generator, MockGenerator) and gen.generator.index == 3
+
+
+async def test_generate_rules_all_empty_raises_workflow_error():
+    """When the LLM always returns {rules: []}, Pydantic rejects it (min_length=1)
+    and the error propagates as WorkflowError."""
+    gen = AdversarialScenarioGenerator(
+        generator=MockGenerator(responses=[{"rules": []}, {"rules": []}, {"rules": []}])
+    )
+    category = AdversarialCategory(name="Test", description=None)
+    with pytest.raises(WorkflowError):
+        await gen._generate_rules(category, description="A chatbot", num_rules=3)
 
 
 # ---------------------------------------------------------------------------
@@ -218,3 +230,32 @@ async def test_generate_scenario_no_budget_uses_default_rules_per_category():
     gen = AdversarialScenarioGenerator(generator=MockGenerator(responses=responses))
     scenarios = await gen.generate_scenario(description="A chatbot", languages=["en"])
     assert len(scenarios) == n_cats * DEFAULT_RULES_PER_CATEGORY
+
+
+async def test_generate_scenario_rng_reproducibility():
+    """Same RNG seed produces identical per-category rule counts across two calls."""
+    n_cats = len(ADVERSARIAL_CATEGORIES)
+    max_rules = 10
+    # Enough canned responses for two full runs (each category may call the LLM once)
+    responses = [_rules_response(*[f"rule {i}" for i in range(max_rules)])] * (
+        n_cats * 2
+    )
+
+    def _make_gen() -> AdversarialScenarioGenerator:
+        return AdversarialScenarioGenerator(
+            generator=MockGenerator(responses=responses[:])
+        )
+
+    rng_a = np.random.default_rng(42)
+    rng_b = np.random.default_rng(42)
+
+    scenarios_a = await _make_gen().generate_scenario(
+        description="A chatbot", languages=["en"], max_scenarios=16, rng=rng_a
+    )
+    scenarios_b = await _make_gen().generate_scenario(
+        description="A chatbot", languages=["en"], max_scenarios=16, rng=rng_b
+    )
+
+    counts_a = Counter(s.annotations["category"]["name"] for s in scenarios_a)
+    counts_b = Counter(s.annotations["category"]["name"] for s in scenarios_b)
+    assert counts_a == counts_b
