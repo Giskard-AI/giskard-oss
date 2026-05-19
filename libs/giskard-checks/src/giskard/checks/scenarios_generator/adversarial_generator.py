@@ -74,6 +74,13 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+        """Generate adversarial scenarios across categories.
+
+        When max_scenarios is set, the budget is distributed across categories via
+        rng.multinomial. Each category is capped at MAX_RULES_PER_CATEGORY, so the
+        actual output count may be less than max_scenarios when the budget exceeds
+        len(ADVERSARIAL_CATEGORIES) * MAX_RULES_PER_CATEGORY.
+        """
         n_cats = len(ADVERSARIAL_CATEGORIES)
 
         if max_scenarios is not None:

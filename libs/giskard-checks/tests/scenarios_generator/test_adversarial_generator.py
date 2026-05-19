@@ -1,3 +1,6 @@
+from collections import Counter
+
+import numpy as np
 import pytest
 from giskard.checks.generators import LLMGenerator
 from giskard.checks.judges import Conformity
@@ -164,8 +167,6 @@ async def test_generate_scenario_makes_one_llm_call_per_category(
 
 async def test_generate_scenario_with_budget_skips_zero_rule_categories():
     """Categories assigned 0 rules by multinomial are skipped (no LLM calls)."""
-    import numpy as np
-
     rng = np.random.default_rng(0)
     n_cats = len(ADVERSARIAL_CATEGORIES)
     responses = [_rules_response(f"rule {i}") for i in range(n_cats)]
@@ -182,9 +183,6 @@ async def test_generate_scenario_with_budget_skips_zero_rule_categories():
 
 async def test_generate_scenario_with_budget_caps_rules_per_category():
     """Rules per category are capped at MAX_RULES_PER_CATEGORY even if budget is large."""
-    from collections import Counter
-
-    import numpy as np
     from giskard.checks.scenarios_generator.adversarial_generator import (
         MAX_RULES_PER_CATEGORY,
     )
