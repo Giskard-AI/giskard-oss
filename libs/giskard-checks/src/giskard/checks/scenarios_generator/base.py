@@ -8,6 +8,13 @@ from pydantic import BaseModel
 
 
 class ScenarioGenerator(BaseModel):
+    """Abstract base class for all scenario generators.
+
+    Subclasses must implement :meth:`generate_scenario`. The ``tags`` class
+    variable carries threat-classification metadata (e.g. OWASP LLM Top-10
+    tags) that downstream tooling can use to annotate or filter suites.
+    """
+
     tags: ClassVar[list[str]] = []
 
     async def generate_scenario(
@@ -17,6 +24,22 @@ class ScenarioGenerator(BaseModel):
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+        """Generate a list of test scenarios for the described agent.
+
+        Args:
+            description: Natural-language description of the agent under test.
+            languages: BCP-47 language codes the agent is expected to handle.
+            max_scenarios: Upper bound on the number of scenarios to return.
+                ``None`` means no limit (generator-specific default applies).
+            rng: Seeded NumPy random generator for reproducible sampling.
+                Callers should pass the *same* ``rng`` instance to every
+                generator so that the overall budget is drawn from one shared
+                stream.
+
+        Returns:
+            A list of :class:`~giskard.checks.core.scenario.Scenario` objects
+            ready to be collected into a :class:`~giskard.checks.scenarios.Suite`.
+        """
         raise NotImplementedError
 
 
@@ -24,6 +47,18 @@ _DATA_DIR = Path(__file__).parent / "data"
 
 
 class DatasetScenarioGenerator(ScenarioGenerator):
+    """Scenario generator backed by a static JSONL dataset.
+
+    Reads scenarios from ``<data_dir>/<dataset_name>.jsonl``, one JSON object
+    per line, and annotates each with the caller-supplied ``description`` and
+    ``languages``.  When ``max_scenarios`` is set and smaller than the dataset
+    size, a random subset is drawn without replacement using ``rng``.
+
+    Attributes:
+        dataset_name: Stem of the ``.jsonl`` file inside the package
+            ``data/`` directory (e.g. ``"prompt_injection"``).
+    """
+
     dataset_name: str
 
     async def generate_scenario(
@@ -33,6 +68,21 @@ class DatasetScenarioGenerator(ScenarioGenerator):
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+        """Load and optionally subsample scenarios from the bundled dataset.
+
+        Args:
+            description: Forwarded to each scenario's annotations so that
+                downstream judges know which agent is under test.
+            languages: Forwarded to each scenario's annotations.
+            max_scenarios: Maximum number of scenarios to return.  When
+                ``None``, the full dataset is returned.
+            rng: Random generator used for subset sampling.  A fresh
+                ``np.random.default_rng()`` is created if ``None``.
+
+        Returns:
+            A list of annotated :class:`~giskard.checks.core.scenario.Scenario`
+            objects, ordered by their original dataset position.
+        """
         path = _DATA_DIR / f"{self.dataset_name}.jsonl"
         scenarios = []
         with path.open() as f:

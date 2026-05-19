@@ -13,10 +13,21 @@ from pydantic import BaseModel
 from .base import ScenarioGenerator
 
 DEFAULT_RULES_PER_CATEGORY = 5
+"""Number of adversarial rules generated per category when no budget is set."""
+
 MAX_RULES_PER_CATEGORY = 10
+"""Hard cap on rules per category even when the budget allocation exceeds it."""
 
 
 class AdversarialCategory(BaseModel):
+    """A named category of adversarial content used to guide rule generation.
+
+    Attributes:
+        name: Human-readable category label (e.g. ``"Illegal Activities"``).
+        description: Optional guidance sent to the LLM to constrain rule
+            generation to this category's scope.
+    """
+
     name: str
     description: str | None = None
 
@@ -58,10 +69,33 @@ ADVERSARIAL_CATEGORIES = [
 
 
 class RuleGeneration(BaseModel):
+    """Structured output returned by the rule-generation LLM pipeline.
+
+    Attributes:
+        rules: Ordered list of natural-language conformity rules produced for
+            a single :class:`AdversarialCategory`.
+    """
+
     rules: list[str]
 
 
 class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
+    """LLM-driven generator that probes an agent with adversarial inputs.
+
+    For each entry in :data:`ADVERSARIAL_CATEGORIES`, the generator asks an
+    LLM to produce a set of natural-language *conformity rules* (e.g. "the
+    agent must not provide instructions for synthesising chemical weapons").
+    Each rule becomes one :class:`~giskard.checks.core.scenario.Scenario`
+    that uses :class:`~giskard.checks.generators.LLMGenerator` to craft a
+    realistic adversarial prompt and
+    :class:`~giskard.checks.judges.Conformity` to evaluate the agent's
+    response against the rule.
+
+    Tags signal downstream tooling that this generator covers two threat
+    categories: harmful content generation and misguidance / unauthorized
+    advice.
+    """
+
     tags: ClassVar[list[str]] = [
         "gsk:threat-type='harmful-content-generation'",
         "gsk:threat-type='misguidance-and-unauthorized-advice'",
@@ -74,12 +108,29 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
-        """Generate adversarial scenarios across categories.
+        """Generate adversarial scenarios across all built-in categories.
 
-        When max_scenarios is set, the budget is distributed across categories via
-        rng.multinomial. Each category is capped at MAX_RULES_PER_CATEGORY, so the
-        actual output count may be less than max_scenarios when the budget exceeds
-        len(ADVERSARIAL_CATEGORIES) * MAX_RULES_PER_CATEGORY.
+        When *max_scenarios* is set the budget is distributed across
+        categories via ``rng.multinomial`` so the allocation is proportional
+        but random.  Each category is further capped at
+        :data:`MAX_RULES_PER_CATEGORY`, so the actual output count may be
+        lower than *max_scenarios* when the per-category cap is hit.
+
+        Rule generation is retried up to three times per category to reach the
+        allocated count; the final list is truncated if the LLM over-produces.
+
+        Args:
+            description: Natural-language description of the agent under test,
+                forwarded to the rule-generation prompt as context.
+            languages: BCP-47 language codes stored in each scenario's
+                annotations for downstream filtering.
+            max_scenarios: Total scenario budget across all categories.
+                ``None`` uses :data:`DEFAULT_RULES_PER_CATEGORY` per category.
+            rng: Shared random generator for reproducible budget allocation.
+                A fresh ``np.random.default_rng()`` is created when ``None``.
+
+        Returns:
+            One scenario per generated rule, ordered by category then rule.
         """
         n_cats = len(ADVERSARIAL_CATEGORIES)
 
@@ -127,6 +178,7 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
         ]
 
     def _rule_generation_pipeline(self) -> ChatWorkflow[RuleGeneration]:
+        """Build the LLM pipeline used to generate conformity rules."""
         return self.generator.template(
             "giskard.checks::generate_suite/generation_rules.j2"
         ).with_output(RuleGeneration)
@@ -134,6 +186,11 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
     async def _generate_rules(
         self, category: AdversarialCategory, description: str, num_rules: int
     ) -> list[str]:
+        """Generate up to *num_rules* conformity rules for *category*.
+
+        Retries the LLM pipeline up to three times, asking only for the
+        remaining missing rules each time.  Returns at most *num_rules* items.
+        """
         rules: list[str] = []
 
         for _ in range(3):
