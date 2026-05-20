@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Any, Generic, Self, TypeVar
 
@@ -90,8 +91,9 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             | NotProvided
         ) = NOT_PROVIDED,
         return_exception: bool = False,
+        parallel: bool = False,
     ) -> SuiteResult:
-        """Run all scenarios in the suite serially.
+        """Run all scenarios in the suite.
 
         Parameters
         ----------
@@ -100,6 +102,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             overrides both the suite-level target and any scenario-level targets.
         return_exception : bool
             If True, return results even when exceptions occur instead of raising.
+        parallel : bool
+            If True, run all scenarios concurrently while preserving result order.
 
         Returns
         -------
@@ -130,17 +134,32 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
                 scenario_count=len(self.scenarios),
                 has_target=has_target,
             )
+            shape_props["parallel"] = parallel
             telemetry_capture(
                 "checks_suite_run_started",
                 properties=shape_props,
             )
 
             start_time = time.perf_counter()
-            for scenario in self.scenarios:
-                result = await scenario.run(
-                    target=target, return_exception=return_exception
-                )
-                results.append(result)
+            if parallel:
+                tasks: list[asyncio.Task[ScenarioResult[Trace[Any, Any]]]] = []
+                async with asyncio.TaskGroup() as task_group:
+                    for scenario in self.scenarios:
+                        tasks.append(
+                            task_group.create_task(
+                                scenario.run(
+                                    target=target,
+                                    return_exception=return_exception,
+                                )
+                            )
+                        )
+                results = [task.result() for task in tasks]
+            else:
+                for scenario in self.scenarios:
+                    result = await scenario.run(
+                        target=target, return_exception=return_exception
+                    )
+                    results.append(result)
             end_time = time.perf_counter()
 
             suite_result = SuiteResult(
