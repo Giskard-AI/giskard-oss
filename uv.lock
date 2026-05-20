@@ -898,6 +898,11 @@ dependencies = [
     { name = "rich" },
 ]
 
+[package.optional-dependencies]
+regorus = [
+    { name = "regorus" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "giskard-agents", editable = "libs/giskard-agents" },
@@ -908,8 +913,10 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.4.1,<3" },
     { name = "pydantic", specifier = ">=2.12,<3" },
     { name = "regex", specifier = ">=2026.1.15" },
+    { name = "regorus", marker = "extra == 'regorus'", git = "https://github.com/microsoft/regorus.git?subdirectory=bindings%2Fpython&rev=regorus-v0.9.1" },
     { name = "rich", specifier = ">=14.2.0,<16" },
 ]
+provides-extras = ["regorus"]
 
 [[package]]
 name = "giskard-core"
@@ -2491,6 +2498,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/86/c291bf740945acbf35ed7dbebf8e2eea2f3f78041f6bd7cdab80cb274dc0/regex-2026.4.4-cp314-cp314t-win_amd64.whl", hash = "sha256:5d354b18839328927832e2fa5f7c95b7a3ccc39e7a681529e1685898e6436d45", size = 285622, upload-time = "2026-04-03T20:56:23.641Z" },
     { url = "https://files.pythonhosted.org/packages/d5/e7/ec846d560ae6a597115153c02ca6138a7877a1748b2072d9521c10a93e58/regex-2026.4.4-cp314-cp314t-win_arm64.whl", hash = "sha256:af0384cb01a33600c49505c27c6c57ab0b27bf84a74e28524c92ca897ebdac9d", size = 275773, upload-time = "2026-04-03T20:56:26.07Z" },
 ]
+
+[[package]]
+name = "regorus"
+version = "0.9.1"
+source = { git = "https://github.com/microsoft/regorus.git?subdirectory=bindings%2Fpython&rev=regorus-v0.9.1#96360fa9d8e54c5890aa6b63274da6a64b7d3b34" }
 
 [[package]]
 name = "requests"
