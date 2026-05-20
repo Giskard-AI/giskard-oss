@@ -128,23 +128,13 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
         }
 
         if isinstance(raw_value, NoMatch):
-            details["value"] = raw_value
+            details["input"] = raw_value
             return CheckResult.failure(
                 message=f"No value found for key '{self.key}'.",
                 details=details,
             )
 
-        details["value"] = raw_value
         details["input"] = raw_value
-
-        try:
-            input_json = json.dumps(raw_value)
-        except (TypeError, ValueError) as err:
-            details["error"] = str(err)
-            return CheckResult.failure(
-                message=f"Value at key '{self.key}' is not JSON serializable: {err}",
-                details=details,
-            )
 
         try:
             regorus = importlib.import_module("regorus")
@@ -159,7 +149,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
             engine.add_policy(_POLICY_FILENAME, self.policy)
             if self.data:
                 engine.add_data(self.data)
-            engine.set_input_json(input_json)
+            engine.set_input(raw_value)
             rule_value = engine.eval_rule(self.rule)
         except RuntimeError as err:
             details["error"] = str(err)
