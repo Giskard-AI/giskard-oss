@@ -23,6 +23,7 @@ from .types import (
     EmbeddingUsage,
     FunctionCallOutputParam,
     FunctionDefParam,
+    ResponseFunctionToolCall,
     ResponseOutputItem,
     ResponseOutputText,
     ResponseResult,
@@ -66,7 +67,7 @@ __all__ = [
     # Types — Response
     "ResponseResult",
     "ResponseOutputText",
-    "ResponseOutputFunctionCall",
+    "ResponseFunctionToolCall",
     "ResponseOutputItem",
     # Errors
     "LLMError",

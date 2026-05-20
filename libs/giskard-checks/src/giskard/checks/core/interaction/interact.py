@@ -1,58 +1,16 @@
-import inspect
 from collections.abc import AsyncGenerator
-from typing import Any, cast, get_type_hints, override
+from typing import Any, cast, override
 
 from giskard.checks.utils.injectable import ValueGenerator, ValueProvider
 from giskard.core.utils import NOT_PROVIDED, NotProvided
-from pydantic import BaseModel as PydanticBaseModel
 from pydantic import Field, PrivateAttr, model_validator
 
+from ...utils.inference import _infer_input_type
 from ..input_generator import InputGenerator
 from ..types import GeneratorType, ProviderType
 from .base import InteractionSpec
 from .interaction import Interaction
 from .trace import Trace
-
-
-def _infer_input_type(outputs: object) -> type | None:
-    """Infer the input type from the first parameter annotation of a callable.
-
-    Returns the type if it is a subclass of ``pydantic.BaseModel``, otherwise
-    ``None``.  Returns ``None`` for non-callables and callables whose hints
-    cannot be resolved (e.g. forward references to undefined names).
-    """
-    if not callable(outputs):
-        return None
-    try:
-        hints = get_type_hints(outputs)
-    except TypeError:
-        hints = {}
-    except Exception:
-        return None
-    # Filter out the return annotation so we only look at parameter hints.
-    param_hints = {k: v for k, v in hints.items() if k != "return"}
-    # In Python 3.14+, get_type_hints on a callable instance (not a function/method/class)
-    # returns {} instead of raising TypeError. Fall back to inspecting __call__ directly.
-    if (
-        not param_hints
-        and not inspect.isfunction(outputs)
-        and not inspect.ismethod(outputs)
-        and not inspect.isclass(outputs)
-    ):
-        try:
-            call_hints = get_type_hints(type(outputs).__call__)
-            call_hints.pop("self", None)
-            param_hints = {k: v for k, v in call_hints.items() if k != "return"}
-        except Exception:
-            return None
-    if not param_hints:
-        return None
-    first_param_type = next(iter(param_hints.values()))
-    if isinstance(first_param_type, type) and issubclass(
-        first_param_type, PydanticBaseModel
-    ):
-        return first_param_type
-    return None
 
 
 @InteractionSpec.register("interact")

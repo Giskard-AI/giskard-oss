@@ -1,5 +1,5 @@
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, Any, overload
 
 from giskard.core import Discriminated, discriminated_base
 from pydantic import BaseModel
@@ -18,7 +18,11 @@ class InputGenerator[TraceType: "Trace"](Discriminated):  # pyright: ignore[repo
     def __call__[T: BaseModel](
         self, trace: TraceType, input_type: type[T]
     ) -> AsyncGenerator[T, TraceType]: ...
+    @overload
+    def __call__[T](
+        self, trace: TraceType, input_type: type[T]
+    ) -> AsyncGenerator[T, TraceType]: ...
     def __call__(
-        self, trace: TraceType, input_type: type[str | BaseModel] | None = None
-    ) -> AsyncGenerator[str | BaseModel, TraceType]:
+        self, trace: TraceType, input_type: type[Any] | None = None
+    ) -> AsyncGenerator[Any, TraceType]:
         raise NotImplementedError
