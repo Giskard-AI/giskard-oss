@@ -1,6 +1,6 @@
 import inspect
 from itertools import islice
-from typing import Any, get_type_hints
+from typing import Any, get_origin, get_type_hints
 
 from pydantic import PydanticUserError, TypeAdapter
 
@@ -53,7 +53,8 @@ def _infer_trace_type(target: object) -> type[Trace] | None:  # pyright: ignore[
         return None
     second_type = next(islice(param_hints.values(), 1, None))
     try:
-        if isinstance(second_type, type) and issubclass(second_type, Trace):
+        origin = get_origin(second_type) or second_type
+        if isinstance(origin, type) and issubclass(origin, Trace):
             return second_type
     except TypeError:
         pass
