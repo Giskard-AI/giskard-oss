@@ -37,6 +37,11 @@ on:
         required: false
         type: boolean
         default: true
+      run_functional_tests:
+        description: 'If true, functional/integration tests will run before release'
+        required: false
+        type: boolean
+        default: true
 
 permissions: {}
 
@@ -93,14 +98,19 @@ jobs:
       - name: Run checks
         run: make check
 
+      - name: Run unit tests
+        run: make test-unit
+
       # OpenAI credentials; TEST_PROVIDER=openai makes libs/giskard-llm/tests/conftest.py
       # skip non-OpenAI provider tests (bare is included via groups). Full `make test` still
       # runs other workspace packages—only giskard-llm reads TEST_PROVIDER for now.
       - name: Install OpenAI extras for functional tests
+        if: ${{ github.event.inputs.run_functional_tests == 'true' }}
         run: |
           uv pip install "giskard-llm[openai]"
           uv pip install "giskard-agents[openai]"
-      - name: Run tests
+      - name: Run functional tests
+        if: ${{ github.event.inputs.run_functional_tests == 'true' }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           TEST_MODEL: "openai/gpt-4.1-nano"
@@ -108,7 +118,7 @@ jobs:
           TEST_LITELLM_MODEL: "openai/gpt-4.1-nano"
           TEST_EMBEDDING_MODEL: "openai/text-embedding-3-small"
         run: |
-          make test
+          make test-functional
 
       - name: Bump version
         id: bump
