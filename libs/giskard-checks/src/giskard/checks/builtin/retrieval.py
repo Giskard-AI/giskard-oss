@@ -213,11 +213,11 @@ class NDCGAtK[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repor
         return dcg / idcg if idcg else 0.0
 
 
-@Check.register("inf_ap")
-class InfAP[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+@Check.register("average_precision")
+class AveragePrecision[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     RetrievalQualityCheck[InputType, OutputType, TraceType]
 ):
-    """Check that inferred average precision meets a minimum threshold.
+    """Check that average precision meets a minimum threshold.
 
     This strict implementation treats provided labels as the judged relevant set
     and computes average precision over the retrieved ranking.
@@ -226,7 +226,7 @@ class InfAP[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     @property
     @override
     def metric_name(self) -> str:
-        return "InfAP"
+        return "AveragePrecision"
 
     @override
     def _score(self, relevant_ids: list[Any], retrieved_ids: list[Any]) -> float:

@@ -25,7 +25,14 @@ from .comparison import (
 from .composition import AllOf, AnyOf, Not
 from .fn import FnCheck, from_fn
 from .json_valid import JsonValid
-from .retrieval import MRR, HitRateAtK, InfAP, NDCGAtK, PrecisionAtK, RecallAtK
+from .retrieval import (
+    MRR,
+    AveragePrecision,
+    HitRateAtK,
+    NDCGAtK,
+    PrecisionAtK,
+    RecallAtK,
+)
 from .semantic_similarity import SemanticSimilarity
 from .text_matching import RegexMatching, StringMatching
 
@@ -40,7 +47,7 @@ __all__ = [
     "HitRateAtK",
     "MRR",
     "NDCGAtK",
-    "InfAP",
+    "AveragePrecision",
     "JsonValid",
     "StringMatching",
     "RegexMatching",

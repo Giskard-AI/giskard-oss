@@ -3,10 +3,10 @@ from typing import Any
 import pytest
 from giskard.checks import (
     MRR,
+    AveragePrecision,
     Check,
     CheckStatus,
     HitRateAtK,
-    InfAP,
     Interaction,
     NDCGAtK,
     PrecisionAtK,
@@ -138,9 +138,9 @@ async def test_ndcg_at_k_is_ranking_sensitive():
     assert result.details["score"] == pytest.approx(0.693426, rel=1e-5)
 
 
-async def test_inf_ap_handles_sparse_labels():
+async def test_average_precision_handles_sparse_labels():
     trace = await _trace(["doc-2", "doc-4"], ["doc-1", "doc-2", "doc-3", "doc-4"])
-    check = InfAP(**_check_kwargs(threshold=0.5))
+    check = AveragePrecision(**_check_kwargs(threshold=0.5))
 
     result = await check.run(trace)
 
