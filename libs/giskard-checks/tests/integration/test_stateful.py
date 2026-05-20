@@ -15,6 +15,7 @@ from giskard.checks import (
     Trace,
     WithSpy,
 )
+from giskard.llm.types import ChatMessage, UserMessage
 from pydantic import BaseModel, Field, computed_field
 
 # Create mock agent
@@ -52,13 +53,13 @@ def generator() -> agents.Generator:
 
 
 @pytest.fixture
-def mock_agent(generator: agents.Generator) -> agents.ChatWorkflow[agents.Message]:
+def mock_agent(generator: agents.Generator) -> agents.ChatWorkflow[ChatMessage]:
     return generator.chat(message=system_prompt, role="system").with_tools(
         mock_apply_tool
     )
 
 
-class ConversationTraces(Trace[agents.Message, agents.Message], frozen=True):
+class ConversationTraces(Trace[ChatMessage, ChatMessage], frozen=True):
     @property
     def conversation_id(self) -> str | None:
         return (
@@ -69,7 +70,7 @@ class ConversationTraces(Trace[agents.Message, agents.Message], frozen=True):
 
     @computed_field
     @property
-    def messages(self) -> list[agents.Message]:
+    def messages(self) -> list[ChatMessage]:
         return [
             message
             for interaction in self.interactions
@@ -84,16 +85,16 @@ class ConversationTraces(Trace[agents.Message, agents.Message], frozen=True):
 
 @pytest.fixture(scope="function")
 def adapter(
-    mock_agent: agents.ChatWorkflow[agents.Message],
+    mock_agent: agents.ChatWorkflow[ChatMessage],
 ) -> Callable[
-    [agents.Message, ConversationTraces],
-    Awaitable[Interaction[agents.Message, agents.Message]],
+    [ChatMessage, ConversationTraces],
+    Awaitable[Interaction[ChatMessage, ChatMessage]],
 ]:
-    convs: dict[str, list[agents.Message]] = defaultdict(list)
+    convs: dict[str, list[ChatMessage]] = defaultdict(list)
 
     async def adapter(
-        message: agents.Message, trace: ConversationTraces
-    ) -> Interaction[agents.Message, agents.Message]:
+        message: ChatMessage, trace: ConversationTraces
+    ) -> Interaction[ChatMessage, ChatMessage]:
         conversation_id = trace.conversation_id or str(uuid.uuid4())
 
         convs[conversation_id].append(message)
@@ -114,8 +115,8 @@ def adapter(
 # tests
 async def test_single_message(
     adapter: Callable[
-        [agents.Message, Trace[agents.Message, agents.Message]],
-        Awaitable[agents.Message],
+        [ChatMessage, Trace[ChatMessage, ChatMessage]],
+        Awaitable[ChatMessage],
     ],
 ):
     result = await (
@@ -123,8 +124,7 @@ async def test_single_message(
         .add_interaction(
             WithSpy(
                 interaction_generator=Interact(
-                    inputs=agents.Message(
-                        role="user",
+                    inputs=UserMessage(
                         content="Hello, I want to apply for a job. My email is test@test.com and my message is 'Hello, I want to apply for a job.'",
                     ),
                     outputs=adapter,
@@ -190,13 +190,13 @@ class UserSimulatorOutput(BaseModel):
 async def test_user_simulator(
     generator: agents.Generator,
     adapter: Callable[
-        [agents.Message, ConversationTraces],
-        Awaitable[Interaction[agents.Message, agents.Message]],
+        [ChatMessage, ConversationTraces],
+        Awaitable[Interaction[ChatMessage, ChatMessage]],
     ],
 ):
     async def user_simulator(
         instructions: str, max_steps: int, trace: ConversationTraces
-    ) -> AsyncGenerator[agents.Message, ConversationTraces]:
+    ) -> AsyncGenerator[ChatMessage, ConversationTraces]:
         agent = generator.chat(
             message=USER_SIMULATOR_PROMPT, role="system", as_template=True
         ).with_output(UserSimulatorOutput)
@@ -210,7 +210,7 @@ async def test_user_simulator(
             if output.goal_reached or not output.message:
                 return
 
-            trace = yield agents.Message(role="user", content=output.message)
+            trace = yield UserMessage(content=output.message)
             current_step += 1
 
     result = await (

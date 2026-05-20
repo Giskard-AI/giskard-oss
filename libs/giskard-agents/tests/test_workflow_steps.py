@@ -2,11 +2,16 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-from giskard.agents.chat import Message
 from giskard.agents.generators import BaseGenerator
-from giskard.agents.generators.base import Response
-from giskard.agents.tools import Function, ToolCall, tool
+from giskard.agents.tools import tool
 from giskard.agents.workflow import ChatWorkflow, StepType
+from giskard.llm.types import (
+    AssistantMessage,
+    Choice,
+    CompletionResponse,
+    ToolCall,
+    ToolCallFunction,
+)
 
 
 @tool
@@ -26,21 +31,32 @@ async def test_steps_have_correct_step_type():
     gen = MagicMock(spec=BaseGenerator)
     gen.complete = AsyncMock(
         side_effect=[
-            Response(
-                message=Message(
-                    role="assistant",
-                    tool_calls=[
-                        ToolCall(
-                            id="tc_1",
-                            function=Function(name="echo", arguments='{"text": "hi"}'),
-                        )
-                    ],
-                ),
-                finish_reason="tool_calls",
+            CompletionResponse(
+                choices=[
+                    Choice(
+                        message=AssistantMessage(
+                            tool_calls=[
+                                ToolCall(
+                                    id="tc_1",
+                                    function=ToolCallFunction(
+                                        name="echo", arguments={"text": "hi"}
+                                    ),
+                                )
+                            ]
+                        ),
+                        finish_reason="stop",
+                        index=0,
+                    )
+                ]
             ),
-            Response(
-                message=Message(role="assistant", content="Done."),
-                finish_reason="stop",
+            CompletionResponse(
+                choices=[
+                    Choice(
+                        message=AssistantMessage(content="Done."),
+                        finish_reason="stop",
+                        index=0,
+                    )
+                ]
             ),
         ]
     )
@@ -65,9 +81,14 @@ async def test_step_type_completion_when_no_tools():
     """A simple completion without tools yields a single COMPLETION step."""
     gen = MagicMock(spec=BaseGenerator)
     gen.complete = AsyncMock(
-        return_value=Response(
-            message=Message(role="assistant", content="Hello!"),
-            finish_reason="stop",
+        return_value=CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content="Hello!"),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
         )
     )
 
@@ -84,9 +105,14 @@ async def test_run_returns_successful_chat():
     """run() returns a Chat with the assistant's response."""
     gen = MagicMock(spec=BaseGenerator)
     gen.complete = AsyncMock(
-        return_value=Response(
-            message=Message(role="assistant", content="World!"),
-            finish_reason="stop",
+        return_value=CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content="World!"),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
         )
     )
 

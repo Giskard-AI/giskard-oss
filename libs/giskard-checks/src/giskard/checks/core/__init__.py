@@ -1,4 +1,5 @@
 from .check import Check
+from .exceptions import InputGenerationException
 from .extraction import resolve
 from .interaction import Interact, Interaction, InteractionSpec, Trace
 from .result import (
@@ -27,5 +28,6 @@ __all__ = [
     "SuiteResult",
     "TestCaseResult",
     "TestCase",
+    "InputGenerationException",
     "resolve",
 ]

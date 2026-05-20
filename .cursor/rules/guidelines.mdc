@@ -15,3 +15,16 @@ Do not remove unrelated code, functionalities, or comments without explicit reas
 ## No CODEMAP
 
 Never generate architecture maps, codemap files, or similar high-maintenance documentation that duplicates what is already in cursor rules, docstrings, and README. These files go stale fast and create maintenance burden.
+
+## Root Causes, No Temporary Fixes
+
+Trace failures to their source before making a change. Do not:
+- Add `# type: ignore` / `# pyright: ignore` without first confirming no structural fix is possible.
+- Modify test assertions to force a pass — if a test reveals a real bug, fix the bug.
+- Add `try/except` to suppress exceptions that should be fixed.
+
+If the root cause is in a different library than where the symptom appears, say so before proposing a fix.
+
+## Minimal Scope
+
+Only touch files directly required by the task. Do not reformat untouched lines, rename unrelated variables, or add type annotations to code you didn't otherwise change. Propose nearby improvements separately and wait for approval.

@@ -4,23 +4,19 @@ import numpy as np
 import pytest
 from giskard.agents.embeddings.base import BaseEmbeddingModel, EmbeddingParams
 from giskard.agents.embeddings.litellm_embedding_model import LitellmEmbeddingModel
+from giskard.llm import EmbeddingData, EmbeddingResponse
 
 
-class MockEmbeddingResponse:
-    """Mock response from litellm aembedding."""
-
-    data: list[dict[str, list[float]]]
-
-    def __init__(self, embeddings: list[list[float]]):
-        self.data = [{"embedding": emb} for emb in embeddings]
+def _make_embedding_response(embeddings: list[list[float]]) -> EmbeddingResponse:
+    return EmbeddingResponse(
+        data=[EmbeddingData(embedding=emb, index=i) for i, emb in enumerate(embeddings)]
+    )
 
 
 @pytest.fixture
 def mock_embedding_response():
-    """Mock response from litellm aembedding."""
-    # Return a mock response with the expected structure
-    return MockEmbeddingResponse(
-        embeddings=[
+    return _make_embedding_response(
+        [
             [0.1, 0.2, 0.3],
             [0.4, 0.5, 0.6],
         ]
@@ -28,7 +24,7 @@ def mock_embedding_response():
 
 
 async def test_litellm_embedding_model_embed_with_mock(
-    mock_embedding_response: MockEmbeddingResponse,
+    mock_embedding_response: EmbeddingResponse,
 ) -> None:
     """Test embedding with a mock response."""
     model = LitellmEmbeddingModel(model="test-model")
@@ -49,6 +45,7 @@ async def test_litellm_embedding_model_embed_with_mock(
         assert np.isclose(embeddings[1], np.array([0.4, 0.5, 0.6])).all()
 
 
+@pytest.mark.google
 @pytest.mark.functional
 async def test_embedding_model_real_embedding(
     embedding_model: LitellmEmbeddingModel,
@@ -134,22 +131,17 @@ async def test_embed_with_multiple_batches() -> None:
     """Test that embed() correctly handles multiple batches."""
     model = LitellmEmbeddingModel(model="test-model")
 
-    # Create a mock that returns different embeddings for each call
     call_count = 0
 
     async def mock_aembedding_side_effect(
         **kwargs: dict[str, object],
-    ) -> MockEmbeddingResponse:
+    ) -> EmbeddingResponse:
         nonlocal call_count
         call_count += 1
-        # Return embeddings based on the batch
         input_list = kwargs.get("input", [])
         batch_size = len(input_list) if isinstance(input_list, list) else 0
-        return MockEmbeddingResponse(
-            embeddings=[
-                [float(i + call_count * 0.1) for i in range(3)]
-                for _ in range(batch_size)
-            ]
+        return _make_embedding_response(
+            [[float(i + call_count * 0.1) for i in range(3)] for _ in range(batch_size)]
         )
 
     with patch(
@@ -206,7 +198,7 @@ async def test_litellm_embedding_model_passes_params() -> None:
         params=EmbeddingParams(dimensions=768),
     )
 
-    mock_response = MockEmbeddingResponse(embeddings=[[0.1, 0.2, 0.3]])
+    mock_response = _make_embedding_response([[0.1, 0.2, 0.3]])
 
     with patch(
         "giskard.agents.embeddings.litellm_embedding_model.aembedding",
