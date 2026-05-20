@@ -221,7 +221,7 @@ async def test_suite_parallel_fail_fast_when_return_exception_is_false():
     suite.append(Scenario("slow").interact("slow"))
     suite.append(Scenario("boom").interact("boom"))
 
-    with pytest.raises(ExceptionGroup):
+    with pytest.raises(RuntimeError, match="boom"):
         await suite.run(parallel=True)
 
     assert started.is_set()

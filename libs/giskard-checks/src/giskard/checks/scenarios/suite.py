@@ -170,17 +170,20 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
                             return_exception=return_exception,
                         )
 
-                async with asyncio.TaskGroup() as task_group:
-                    tasks = [
-                        task_group.create_task(run_scenario(scenario))
-                        for scenario in self.scenarios
-                    ]
+                try:
+                    async with asyncio.TaskGroup() as task_group:
+                        tasks = [
+                            task_group.create_task(run_scenario(scenario))
+                            for scenario in self.scenarios
+                        ]
+                except* Exception as exc_group:
+                    if len(exc_group.exceptions) == 1:
+                        raise exc_group.exceptions[0] from None
+                    raise
                 results = [task.result() for task in tasks]
             else:
                 results = [
-                    await scenario.run(
-                        target=target, return_exception=return_exception
-                    )
+                    await scenario.run(target=target, return_exception=return_exception)
                     for scenario in self.scenarios
                 ]
             end_time = time.perf_counter()
