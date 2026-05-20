@@ -133,8 +133,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             shape_props = suite_shape_properties(
                 scenario_count=len(self.scenarios),
                 has_target=has_target,
+                parallel=parallel,
             )
-            shape_props["parallel"] = parallel
             telemetry_capture(
                 "checks_suite_run_started",
                 properties=shape_props,
@@ -142,24 +142,24 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
             start_time = time.perf_counter()
             if parallel:
-                tasks: list[asyncio.Task[ScenarioResult[Trace[Any, Any]]]] = []
                 async with asyncio.TaskGroup() as task_group:
-                    for scenario in self.scenarios:
-                        tasks.append(
-                            task_group.create_task(
-                                scenario.run(
-                                    target=target,
-                                    return_exception=return_exception,
-                                )
+                    tasks = [
+                        task_group.create_task(
+                            scenario.run(
+                                target=target,
+                                return_exception=return_exception,
                             )
                         )
+                        for scenario in self.scenarios
+                    ]
                 results = [task.result() for task in tasks]
             else:
-                for scenario in self.scenarios:
-                    result = await scenario.run(
+                results = [
+                    await scenario.run(
                         target=target, return_exception=return_exception
                     )
-                    results.append(result)
+                    for scenario in self.scenarios
+                ]
             end_time = time.perf_counter()
 
             suite_result = SuiteResult(
