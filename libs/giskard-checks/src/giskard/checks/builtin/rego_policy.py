@@ -1,7 +1,6 @@
 """Built-in check that evaluates Rego policies against trace data via regorus."""
 
 import importlib
-import json
 from typing import Any, override
 
 from pydantic import Field

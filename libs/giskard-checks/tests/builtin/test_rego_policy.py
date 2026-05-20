@@ -270,9 +270,7 @@ async def test_json_serializable_input_types(
     """JSONPath can target any JSON-serializable value passed via set_input_json."""
     pytest.importorskip("regorus")
     check = _check(policy=policy, key=key)
-    trace = await Trace.from_interactions(
-        Interaction(inputs="test", outputs=outputs)
-    )
+    trace = await Trace.from_interactions(Interaction(inputs="test", outputs=outputs))
 
     result = await check.run(trace)
 
@@ -318,4 +316,3 @@ async def test_invalid_policy_returns_error() -> None:
     assert result.status == CheckStatus.ERROR
     assert result.errored
     assert "error" in result.details
-
