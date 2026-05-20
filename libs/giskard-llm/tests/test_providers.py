@@ -146,16 +146,21 @@ def _make_openai_response_api_response(
 
 def _make_google_interaction_response(
     id: str = "int_001",
-    output_items: list[Any] | None = None,
+    steps: list[Any] | None = None,
     input_tokens: int = 8,
     output_tokens: int = 4,
 ):
     """Mock the Gemini Interactions API shape."""
-    if output_items is None:
-        output_items = [SimpleNamespace(type="text", text="Bonjour")]
+    if steps is None:
+        steps = [
+            SimpleNamespace(
+                type="model_output",
+                content=[SimpleNamespace(type="text", text="Bonjour")],
+            )
+        ]
     return SimpleNamespace(
         id=id,
-        outputs=output_items,
+        steps=steps,
         usage=SimpleNamespace(
             total_input_tokens=input_tokens,
             total_output_tokens=output_tokens,
@@ -544,7 +549,7 @@ async def test_google_respond_function_call(mock_errors):
         arguments={"city": "Tokyo"},
     )
     provider._client.aio.interactions.create = AsyncMock(
-        return_value=_make_google_interaction_response(output_items=[fc_item])
+        return_value=_make_google_interaction_response(steps=[fc_item])
     )
 
     resp = await provider.respond("gemini-2.0-flash", "Weather?")

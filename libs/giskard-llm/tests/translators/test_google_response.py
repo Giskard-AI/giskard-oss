@@ -2,14 +2,15 @@
 
 Request shape mirrors :meth:`giskard.llm.translators.google_response.GoogleResponseTranslator.to_google`.
 Each :class:`~giskard.llm.types.ResponseEasyInputMessage` and message item serializes to one
-``TurnParam`` (``content`` + ``role``); :class:`~giskard.llm.types.ResponseFunctionToolCall`
-matches assistant replay as a model turn whose ``content`` contains ``function_call`` (``id``, not top-level ``call_id``);
-:class:`~giskard.llm.types.ResponseFunctionCallOutput` becomes a **user** turn whose ``content`` contains ``function_result``.
+``StepParam`` (``content`` + ``type``); :class:`~giskard.llm.types.ResponseFunctionToolCall`
+matches assistant replay as a ``function_call`` step (``id``, not ``call_id``);
+:class:`~giskard.llm.types.ResponseFunctionCallOutput` becomes a ``function_result`` step.
 ``None`` from system/developer turns is dropped.
 
-**Role mapping** (Gemini Interactions ``TurnParam.role``): ``user`` stays ``user``;
-``assistant`` becomes ``model`` (same for :class:`~giskard.llm.types.ResponseOutputMessage`).
-:class:`~giskard.llm.types.ResponseOutputFunctionCall` is always ``model``.
+**Step mapping** (Gemini Interactions ``StepParam.type``): ``user`` becomes
+``user_input``; ``assistant`` becomes ``model_output`` (same for
+:class:`~giskard.llm.types.ResponseOutputMessage`).
+:class:`~giskard.llm.types.ResponseOutputFunctionCall` is ``function_call``.
 System and developer text is not emitted as turns: it is merged into ``system_instruction``.
 
 For **return** mapping -> :class:`~giskard.llm.types.ResponseResult`, see ``test_google_response_return.py``.
@@ -93,9 +94,11 @@ def _text_part(text: str) -> dict[str, str]:
     return {**_TEXT, "text": text}
 
 
-def _msg_turn(role: Literal["user", "model"], text: str) -> dict[str, object]:
-    """One ``ResponseEasyInputMessage`` serializes to a single Interactions turn dict."""
-    return {"content": [_text_part(text)], "role": role}
+def _msg_step(
+    step_type: Literal["user_input", "model_output"], text: str
+) -> dict[str, object]:
+    """One ``ResponseEasyInputMessage`` serializes to a single Interactions step dict."""
+    return {"content": [_text_part(text)], "type": step_type}
 
 
 def _model_function_call_turn(
@@ -103,32 +106,22 @@ def _model_function_call_turn(
 ) -> dict[str, object]:
     """Input ``ResponseFunctionToolCall`` matches assistant replay shape (Interactions API)."""
     return {
-        "content": [
-            {
-                "type": "function_call",
-                "id": call_id,
-                "name": name,
-                "arguments": arguments,
-            }
-        ],
-        "role": "model",
+        "type": "function_call",
+        "id": call_id,
+        "name": name,
+        "arguments": arguments,
     }
 
 
 def _user_function_result_turn(
     call_id: str, name: str, result: str
 ) -> dict[str, object]:
-    """``ResponseFunctionCallOutput`` → user turn with ``function_result`` content (Gemini API)."""
+    """``ResponseFunctionCallOutput`` -> ``function_result`` step (Gemini API)."""
     return {
-        "content": [
-            {
-                "type": "function_result",
-                "call_id": call_id,
-                "name": name,
-                "result": result,
-            }
-        ],
-        "role": "user",
+        "type": "function_result",
+        "call_id": call_id,
+        "name": name,
+        "result": result,
     }
 
 
@@ -146,7 +139,7 @@ def test_message_instruction_then_user(
     ]
     payload = GoogleResponseTranslator.to_google(_MODEL, items)
 
-    assert payload["input"] == [_msg_turn("user", "Hello.")]
+    assert payload["input"] == [_msg_step("user_input", "Hello.")]
     assert payload.get("system_instruction") == "You are helpful."
     validate_google_interaction_params(payload)
 
@@ -160,7 +153,7 @@ def test_message_system_then_developer_then_user():
     ]
     payload = GoogleResponseTranslator.to_google(_MODEL, items)
 
-    assert payload["input"] == [_msg_turn("user", "Hello.")]
+    assert payload["input"] == [_msg_step("user_input", "Hello.")]
     assert payload.get("system_instruction") == "You are helpful.\nApp version 2.0"
     validate_google_interaction_params(payload)
 
@@ -188,7 +181,7 @@ def test_message_two_instructions_then_user(
         ]
     payload = GoogleResponseTranslator.to_google(_MODEL, items)
 
-    assert payload["input"] == [_msg_turn("user", "Hello.")]
+    assert payload["input"] == [_msg_step("user_input", "Hello.")]
     assert (
         payload.get("system_instruction")
         == "First system instruction.\nSecond system instruction."
@@ -206,9 +199,9 @@ def test_message_user_assistant_user():
     payload = GoogleResponseTranslator.to_google(_MODEL, items)
 
     assert payload["input"] == [
-        _msg_turn("user", "First user."),
-        _msg_turn("model", "Assistant reply."),
-        _msg_turn("user", "Second user."),
+        _msg_step("user_input", "First user."),
+        _msg_step("model_output", "Assistant reply."),
+        _msg_step("user_input", "Second user."),
     ]
     assert "system_instruction" not in payload
     validate_google_interaction_params(payload)
@@ -223,7 +216,7 @@ def test_user_tool_call_and_result_with_tools():
         {"type": "function", **WEATHER_TOOL.function.model_dump()},
     ]
     assert payload.get("input") == [
-        _msg_turn("user", "What's the weather in Paris?"),
+        _msg_step("user_input", "What's the weather in Paris?"),
         _model_function_call_turn(TOOL_CALL_ID, "get_weather", {"city": "Paris"}),
         _user_function_result_turn(TOOL_CALL_ID, "get_weather", TOOL_RESULT_CONTENT),
     ]
@@ -240,7 +233,7 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
         {"type": "function", **GET_TIME_TOOL.function.model_dump()},
     ]
     assert payload.get("input") == [
-        _msg_turn("user", PARALLEL_USER_PROMPT),
+        _msg_step("user_input", PARALLEL_USER_PROMPT),
         _model_function_call_turn(
             TOOL_CALL_ID_WEATHER_PARALLEL,
             "get_weather",
@@ -275,8 +268,8 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
         {"type": "function", **GET_TIME_TOOL.function.model_dump()},
     ]
     assert payload.get("input") == [
-        _msg_turn("user", PARALLEL_USER_PROMPT),
-        _msg_turn("model", ASSISTANT_TEXT_WITH_PARALLEL_TOOLS),
+        _msg_step("user_input", PARALLEL_USER_PROMPT),
+        _msg_step("model_output", ASSISTANT_TEXT_WITH_PARALLEL_TOOLS),
         _model_function_call_turn(
             TOOL_CALL_ID_WEATHER_PARALLEL,
             "get_weather",
@@ -319,7 +312,7 @@ def test_assistant_message_mixed_output_text_and_refusal_maps_to_text_parts():
                 {"type": "text", "text": "Partial."},
                 {"type": "text", "text": "Stopped."},
             ],
-            "role": "model",
+            "type": "model_output",
         }
     ]
     validate_google_interaction_params(payload)
