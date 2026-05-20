@@ -1,47 +1,9 @@
-import json
-from typing import Any, override
+from typing import Any
 
 import pytest
-from giskard.agents.chat import Message
-from giskard.agents.generators._types import Response
-from giskard.agents.generators.base import BaseGenerator, GenerationParams
-from giskard.checks import Interaction, Trace, UserSimulator
-from pydantic import Field
+from giskard.checks import Interaction, UserSimulator
 
-
-class MockGenerator(BaseGenerator):
-    """Mock generator for UserSimulator tests."""
-
-    responses: list[dict[str, Any]]
-    index: int = 0
-    calls: list[list[Message]] = Field(default_factory=list)
-
-    @override
-    async def _call_model(
-        self,
-        messages: list[Message],
-        params: GenerationParams,
-        metadata: dict[str, Any] | None = None,
-    ) -> Response:
-        self.calls.append(messages)
-        message = Message(
-            role="assistant",
-            content=json.dumps(self.responses[self.index]),
-        )
-        self.index += 1
-        return Response(message=message, finish_reason="stop")
-
-
-class LLMTrace(Trace[str, str], frozen=True):
-    def _repr_prompt_(self) -> str:
-        if not self.interactions:
-            return "**No interactions yet**"
-        return "\n".join(
-            [
-                f"[user]: {interaction.inputs}\n[assistant]: {interaction.outputs}"
-                for interaction in self.interactions
-            ]
-        )
+from .conftest import LLMTrace, MockGenerator
 
 
 def _wrap_in_xml_tag(text: str, tag: str) -> str:
@@ -109,10 +71,10 @@ async def test_user_simulator_returns_messages_until_goal_reached():
     inputs = await anext(gen)
     assert inputs == "Hello, how are you?"
     assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
-        generator.calls[0][-1].content
+        generator.calls[0][-1].transcript
     )
     assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
-        generator.calls[0][-1].content
+        generator.calls[0][-1].transcript
     )
 
     trace = await trace.with_interaction(
@@ -123,10 +85,10 @@ async def test_user_simulator_returns_messages_until_goal_reached():
 
     assert len(generator.calls) == 2
     assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
-        generator.calls[1][-1].content
+        generator.calls[1][-1].transcript
     )
     assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
-        generator.calls[1][-1].content
+        generator.calls[1][-1].transcript
     )
 
 
@@ -148,10 +110,10 @@ async def test_user_simulator_returns_messages_until_max_steps():
     assert inputs == "Hello, how are you?"
     assert len(generator.calls) == 1
     assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
-        generator.calls[0][-1].content
+        generator.calls[0][-1].transcript
     )
     assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
-        generator.calls[0][-1].content
+        generator.calls[0][-1].transcript
     )
 
     trace = await trace.with_interaction(
@@ -179,10 +141,10 @@ async def test_user_simulator_multiple_steps():
     assert inputs == "Hello, how are you?"
     assert len(generator.calls) == 1
     assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
-        generator.calls[0][-1].content
+        generator.calls[0][-1].transcript
     )
     assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
-        generator.calls[0][-1].content
+        generator.calls[0][-1].transcript
     )
 
     trace = await trace.with_interaction(
@@ -193,10 +155,10 @@ async def test_user_simulator_multiple_steps():
 
     assert len(generator.calls) == 2
     assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
-        generator.calls[1][-1].content
+        generator.calls[1][-1].transcript
     )
     assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
-        generator.calls[1][-1].content
+        generator.calls[1][-1].transcript
     )
 
     trace = await trace.with_interaction(
@@ -207,8 +169,8 @@ async def test_user_simulator_multiple_steps():
 
     assert len(generator.calls) == 3
     assert _wrap_in_xml_tag(trace._repr_prompt_(), "history") in str(
-        generator.calls[2][-1].content
+        generator.calls[2][-1].transcript
     )
     assert _wrap_in_xml_tag(user_simulator.persona, "persona") in str(
-        generator.calls[2][-1].content
+        generator.calls[2][-1].transcript
     )

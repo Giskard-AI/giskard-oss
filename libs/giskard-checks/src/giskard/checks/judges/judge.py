@@ -1,8 +1,8 @@
 from typing import Self, override
 
-from giskard.agents.chat import Message
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import TemplateReference
+from giskard.llm.types import ChatMessage
 from pydantic import Field, model_validator
 
 from ..core import Trace
@@ -84,7 +84,7 @@ class LLMJudge[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     )
 
     @override
-    def get_prompt(self) -> str | Message | MessageTemplate | TemplateReference:
+    def get_prompt(self) -> str | ChatMessage | MessageTemplate | TemplateReference:
         if self.prompt is not None:
             return self.prompt
 

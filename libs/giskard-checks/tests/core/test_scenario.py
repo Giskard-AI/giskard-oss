@@ -19,6 +19,7 @@ from giskard.checks import (
     Trace,
     from_fn,
 )
+from giskard.checks.scenarios.runner import ScenarioRunner
 
 # Mock Components for Testing
 
@@ -405,6 +406,114 @@ class TestScenarioNormalCases:
 
 class TestScenarioEdgeCases:
     """Test edge cases for scenarios."""
+
+    async def test_scenario_level_multiple_runs_executes_all_when_each_passes(self):
+        """When each run passes, scenario-level multiple_runs runs that many full executions."""
+        calls = 0
+
+        def check_fn(trace: Trace[str, str]) -> CheckResult:
+            nonlocal calls
+            calls += 1
+            return CheckResult.success(message=f"attempt {calls} passed")
+
+        result = await (
+            Scenario("scenario_retries", multiple_runs=3).check(from_fn(check_fn)).run()
+        )
+
+        assert calls == 3
+        assert result.passed
+        assert result.multiple_runs == 3
+        assert result.runs_executed == 3
+        assert result.steps[0].results[0].message == "attempt 3 passed"
+
+    async def test_run_level_multiple_runs_overrides_scenario_default(self):
+        """Run-level multiple_runs takes precedence over the scenario default."""
+        calls = 0
+
+        def check_fn(trace: Trace[str, str]) -> CheckResult:
+            nonlocal calls
+            calls += 1
+            return CheckResult.success()
+
+        result = await (
+            Scenario("run_override", multiple_runs=5)
+            .check(from_fn(check_fn))
+            .run(multiple_runs=2)
+        )
+
+        assert calls == 2
+        assert result.passed
+        assert result.multiple_runs == 2
+        assert result.runs_executed == 2
+
+    async def test_scenario_runner_multiple_runs_override(self):
+        """ScenarioRunner.run accepts a run-level multiple_runs override."""
+        calls = 0
+
+        def check_fn(trace: Trace[str, str]) -> CheckResult:
+            nonlocal calls
+            calls += 1
+            return CheckResult.success()
+
+        scenario = Scenario("runner_override", multiple_runs=4).check(from_fn(check_fn))
+        result = await ScenarioRunner().run(scenario, multiple_runs=2)
+
+        assert calls == 2
+        assert result.passed
+        assert result.multiple_runs == 2
+        assert result.runs_executed == 2
+
+    async def test_multiple_runs_stops_on_first_failure(self):
+        """Repeated execution short-circuits on the first failed attempt."""
+        calls = 0
+
+        def check_fn(trace: Trace[str, str]) -> CheckResult:
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                return CheckResult.failure(message="attempt 2 failed")
+            return CheckResult.success(message=f"attempt {calls} passed")
+
+        result = await (
+            Scenario("stop_on_failure", multiple_runs=5).check(from_fn(check_fn)).run()
+        )
+
+        assert calls == 2
+        assert result.failed
+        assert result.multiple_runs == 5
+        assert result.runs_executed == 2
+        assert result.steps[0].results[0].message == "attempt 2 failed"
+
+    async def test_multiple_runs_uses_independent_trace_per_attempt(self):
+        """Each attempt starts from a fresh trace."""
+        observed_lengths: list[int] = []
+
+        def check_fn(trace: Trace[str, str]) -> CheckResult:
+            observed_lengths.append(len(trace.interactions))
+            return CheckResult.success()
+
+        result = await (
+            Scenario("fresh_trace", multiple_runs=3)
+            .interact("hello", "world")
+            .check(from_fn(check_fn))
+            .run()
+        )
+
+        assert result.passed
+        assert observed_lengths == [1, 1, 1]
+        assert len(result.final_trace.interactions) == 1
+
+    @pytest.mark.parametrize("value", [0, -1, "2", 1.5, True])
+    def test_scenario_multiple_runs_validation_errors(self, value):
+        """Scenario-level multiple_runs rejects invalid values."""
+        with pytest.raises(ValueError, match="multiple_runs"):
+            Scenario("invalid", multiple_runs=value)
+
+    @pytest.mark.parametrize("value", [0, -1, "2", 1.5, True])
+    async def test_run_multiple_runs_validation_errors(self, value):
+        """Run-level multiple_runs rejects invalid values."""
+        with pytest.raises(ValueError, match="multiple_runs"):
+            await Scenario("invalid_run").run(multiple_runs=value)
 
     async def test_scenario_with_empty_sequence(self):
         """Test scenario with empty sequence."""
@@ -1056,15 +1165,18 @@ class TestScenarioExtendAndSerialization:
     async def test_scenario_model_dump_validate_roundtrip(self):
         """Scenario with steps can be serialized and deserialized."""
         scenario = (
-            Scenario("serialize_test")
+            Scenario("serialize_test", multiple_runs=2)
             .interact("Hello", "Hi")
             .check(Equals(expected_value="Hi", key="trace.last.outputs"))
         )
         serialized = scenario.model_dump()
+        assert serialized["multiple_runs"] == 2
         restored = Scenario.model_validate(serialized)
+        assert restored.multiple_runs == 2
         result = await restored.run()
         assert result.passed
         assert result.scenario_name == "serialize_test"
+        assert result.multiple_runs == 2
 
     async def test_scenario_with_steps_constructor(self):
         """Scenario can be built with explicit Step objects."""

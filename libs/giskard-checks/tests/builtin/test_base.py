@@ -1,11 +1,11 @@
 import json
+from collections.abc import Sequence
 from typing import Any, override
 
 import pytest
-from giskard.agents.chat import Message
-from giskard.agents.generators._types import Response
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import BaseLLMCheck, Trace
+from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
 from pydantic import BaseModel, Field
 
 
@@ -13,28 +13,32 @@ class MockGenerator(BaseGenerator):
     score: float
     passed: bool
     reasoning: str
-    calls: list[list[Message]] = Field(default_factory=list)
+    calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
 
     @override
     async def _call_model(
         self,
-        messages: list[Message],
+        messages: Sequence[ChatMessage],
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
+    ) -> CompletionResponse:
         self.calls.append(messages)
-        return Response(
-            message=Message(
-                role="assistant",
-                content=json.dumps(
-                    {
-                        "score": self.score,
-                        "passed": self.passed,
-                        "reasoning": self.reasoning,
-                    }
-                ),
-            ),
-            finish_reason="stop",
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(
+                        content=json.dumps(
+                            {
+                                "score": self.score,
+                                "passed": self.passed,
+                                "reasoning": self.reasoning,
+                            }
+                        )
+                    ),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
         )
 
 
