@@ -1,60 +1,16 @@
-import inspect
 from collections.abc import AsyncGenerator
-from typing import Any, cast, get_type_hints, override
+from typing import Any, cast, override
 
 from giskard.checks.utils.injectable import ValueGenerator, ValueProvider
 from giskard.core.utils import NOT_PROVIDED, NotProvided
-from pydantic import Field, PrivateAttr, PydanticUserError, TypeAdapter, model_validator
+from pydantic import Field, PrivateAttr, model_validator
 
+from ...utils.inference import _infer_input_type
 from ..input_generator import InputGenerator
 from ..types import GeneratorType, ProviderType
 from .base import InteractionSpec
 from .interaction import Interaction
 from .trace import Trace
-
-
-def _infer_input_type(outputs: object) -> type | None:
-    """Infer the input type from the first parameter annotation of a callable.
-
-    Returns any pydantic-compatible type, including ``str``. Returns ``None``
-    for non-callables, callables with no annotation, and callables whose hints
-    cannot be resolved (e.g. forward references to undefined names) or whose
-    type is not supported by Pydantic.
-    """
-    if not callable(outputs):
-        return None
-    try:
-        hints = get_type_hints(outputs)
-    except TypeError:
-        hints = {}
-    except Exception:
-        return None
-    # Filter out the return annotation so we only look at parameter hints.
-    param_hints = {k: v for k, v in hints.items() if k != "return"}
-    # In Python 3.14+, get_type_hints on a callable instance (not a function/method/class)
-    # returns {} instead of raising TypeError. Fall back to inspecting __call__ directly.
-    if (
-        not param_hints
-        and not inspect.isfunction(outputs)
-        and not inspect.ismethod(outputs)
-        and not inspect.isclass(outputs)
-    ):
-        try:
-            call_hints = get_type_hints(type(outputs).__call__)
-            call_hints.pop("self", None)
-            param_hints = {k: v for k, v in call_hints.items() if k != "return"}
-        except Exception:
-            return None
-    if not param_hints:
-        return None
-    first_param_type = next(iter(param_hints.values()))
-    try:
-        TypeAdapter(first_param_type)
-    except (PydanticUserError, TypeError):
-        # PydanticUserError: Raised if the type is not supported by Pydantic
-        # TypeError: Raised if first_param_type isn't a valid "type" (e.g. an instance)
-        return None
-    return first_param_type
 
 
 @InteractionSpec.register("interact")
