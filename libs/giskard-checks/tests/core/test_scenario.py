@@ -25,31 +25,31 @@ from giskard.checks.scenarios.runner import ScenarioRunner
 
 
 @Check.register("mock_check")
-class MockCheck(Check[str, str, Trace[str, str]]):
+class MockCheck(Check[str, str, Trace[Interaction[str, str]]]):
     """Mock check component for testing scenarios."""
 
     name: str | None = None
     result: CheckResult
-    trace_received: Trace[str, str] | None = None
+    trace_received: Trace[Interaction[str, str]] | None = None
 
     @override
-    async def run(self, trace: Trace[str, str]) -> CheckResult:
+    async def run(self, trace: Trace[Interaction[str, str]]) -> CheckResult:
         """Execute the check."""
         self.trace_received = trace
         return self.result
 
 
 @InteractionSpec.register("mock_interaction")
-class MockInteractionSpec(InteractionSpec[str, str, Trace[str, str]]):
+class MockInteractionSpec(InteractionSpec[str, str, Trace[Interaction[str, str]]]):
     """Mock interaction spec component for testing scenarios."""
 
     interactions: list[Interaction[str, str]]
-    trace_received: Trace[str, str] | None = None
+    trace_received: Trace[Interaction[str, str]] | None = None
 
     @override
     async def generate(
-        self, trace: Trace[str, str]
-    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+        self, trace: Trace[Interaction[str, str]]
+    ) -> AsyncGenerator[Interaction[str, str], Trace[Interaction[str, str]]]:
         """Generate interactions."""
         self.trace_received = trace
         for interaction in self.interactions:
@@ -57,26 +57,26 @@ class MockInteractionSpec(InteractionSpec[str, str, Trace[str, str]]):
 
 
 @Check.register("failing_component")
-class FailingComponent(Check[str, str, Trace[str, str]]):
+class FailingComponent(Check[str, str, Trace[Interaction[str, str]]]):
     """Component that raises an exception during run()."""
 
     error_message: str = "Test error"
 
     @override
-    async def run(self, trace: Trace[str, str]) -> CheckResult:
+    async def run(self, trace: Trace[Interaction[str, str]]) -> CheckResult:
         """Raise an exception."""
         raise ValueError(self.error_message)
 
 
 @Check.register("named_failing_component")
-class NamedFailingComponent(Check[str, str, Trace[str, str]]):
+class NamedFailingComponent(Check[str, str, Trace[Interaction[str, str]]]):
     """Failing component with a configurable name for error messages."""
 
     name: str | None = "my_component"
     error_message: str = "Test error"
 
     @override
-    async def run(self, trace: Trace[str, str]) -> CheckResult:
+    async def run(self, trace: Trace[Interaction[str, str]]) -> CheckResult:
         """Raise an exception."""
         if trace.interactions:
             return CheckResult.success()
@@ -84,13 +84,13 @@ class NamedFailingComponent(Check[str, str, Trace[str, str]]):
 
 
 @InteractionSpec.register("generator_error_component")
-class GeneratorErrorComponent(InteractionSpec[str, str, Trace[str, str]]):
+class GeneratorErrorComponent(InteractionSpec[str, str, Trace[Interaction[str, str]]]):
     """Component whose generator raises an error after first yield."""
 
     @override
     async def generate(
-        self, trace: Trace[str, str]
-    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+        self, trace: Trace[Interaction[str, str]]
+    ) -> AsyncGenerator[Interaction[str, str], Trace[Interaction[str, str]]]:
         """Yield an interaction then raise an error on next iteration."""
         yield Interaction(inputs="test", outputs="result", metadata={})
         raise RuntimeError("Generator error")
@@ -411,7 +411,7 @@ class TestScenarioEdgeCases:
         """When each run passes, scenario-level multiple_runs runs that many full executions."""
         calls = 0
 
-        def check_fn(trace: Trace[str, str]) -> CheckResult:
+        def check_fn(trace: Trace[Interaction[str, str]]) -> CheckResult:
             nonlocal calls
             calls += 1
             return CheckResult.success(message=f"attempt {calls} passed")
@@ -430,7 +430,7 @@ class TestScenarioEdgeCases:
         """Run-level multiple_runs takes precedence over the scenario default."""
         calls = 0
 
-        def check_fn(trace: Trace[str, str]) -> CheckResult:
+        def check_fn(trace: Trace[Interaction[str, str]]) -> CheckResult:
             nonlocal calls
             calls += 1
             return CheckResult.success()
@@ -450,7 +450,7 @@ class TestScenarioEdgeCases:
         """ScenarioRunner.run accepts a run-level multiple_runs override."""
         calls = 0
 
-        def check_fn(trace: Trace[str, str]) -> CheckResult:
+        def check_fn(trace: Trace[Interaction[str, str]]) -> CheckResult:
             nonlocal calls
             calls += 1
             return CheckResult.success()
@@ -467,7 +467,7 @@ class TestScenarioEdgeCases:
         """Repeated execution short-circuits on the first failed attempt."""
         calls = 0
 
-        def check_fn(trace: Trace[str, str]) -> CheckResult:
+        def check_fn(trace: Trace[Interaction[str, str]]) -> CheckResult:
             nonlocal calls
             calls += 1
             if calls == 2:
@@ -488,7 +488,7 @@ class TestScenarioEdgeCases:
         """Each attempt starts from a fresh trace."""
         observed_lengths: list[int] = []
 
-        def check_fn(trace: Trace[str, str]) -> CheckResult:
+        def check_fn(trace: Trace[Interaction[str, str]]) -> CheckResult:
             observed_lengths.append(len(trace.interactions))
             return CheckResult.success()
 
@@ -571,7 +571,9 @@ class TestScenarioEdgeCases:
 
     async def test_scenario_with_multiple_consecutive_interactions(self):
         """Test scenario with multiple consecutive interaction specs."""
-        mock_interactions: list[InteractionSpec[str, str, Trace[str, str]]] = [
+        mock_interactions: list[
+            InteractionSpec[str, str, Trace[Interaction[str, str]]]
+        ] = [
             MockInteractionSpec(
                 interactions=[Interaction(inputs=str(i), outputs=str(i * 2))]
             )

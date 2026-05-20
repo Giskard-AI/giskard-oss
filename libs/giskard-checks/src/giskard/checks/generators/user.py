@@ -9,7 +9,7 @@ from .base import BaseLLMGenerator
 
 
 @InputGenerator.register("user_simulator")
-class UserSimulator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class UserSimulator[TraceType: Trace](
     BaseLLMGenerator[TraceType]
 ):
     """User simulation with predefined or custom personas.

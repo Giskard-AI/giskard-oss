@@ -37,8 +37,8 @@ class TestInteraction:
 
     async def test_interaction_with_inputs_generator(self):
         def inputs_generator(
-            trace: Trace[int, int],
-        ) -> Generator[int, Trace[int, int], None]:
+            trace: Trace[Interaction[int, int]],
+        ) -> Generator[int, Trace[Interaction[int, int]], None]:
             trace = yield 1
             trace = yield trace.interactions[-1].outputs + 1
             trace = yield trace.interactions[-1].outputs + 1
@@ -64,7 +64,7 @@ class TestInteraction:
             await generator.asend(Trace(interactions=[*trace.interactions, record]))
 
     async def test_interaction_with_inputs_generator_custom_trace(self):
-        class CustomTrace(Trace[int, int], frozen=True):
+        class CustomTrace(Trace[Interaction[int, int]], frozen=True):
             def outputs(self) -> int:
                 return self.interactions[-1].outputs if self.interactions else 0
 
@@ -124,7 +124,7 @@ class TestInteraction:
     async def test_inputs_fn_with_trace_param(self):
         """Test inputs as function with trace parameter."""
 
-        def get_input(trace: Trace[str, str]) -> str:
+        def get_input(trace: Trace[Interaction[str, str]]) -> str:
             count = len(trace.interactions)
             return f"message_{count}"
 
@@ -151,7 +151,7 @@ class TestInteraction:
     async def test_inputs_fn_with_provided_param_default(self):
         """Test inputs as function with trace and provided parameter with default."""
 
-        def get_input(trace: Trace[str, str], provided: int = 42) -> str:
+        def get_input(trace: Trace[Interaction[str, str]], provided: int = 42) -> str:
             count = len(trace.interactions)
             return f"message_{count}_{provided}"
 
@@ -189,7 +189,7 @@ class TestInteraction:
     async def test_inputs_async_fn_with_trace_param(self):
         """Test inputs as async function with trace parameter."""
 
-        async def get_input(trace: Trace[str, str]) -> str:
+        async def get_input(trace: Trace[Interaction[str, str]]) -> str:
             count = len(trace.interactions)
             return f"message_{count}"
 
@@ -271,8 +271,8 @@ class TestInteraction:
         """Test inputs as sync generator function with trace parameter."""
 
         def inputs_generator(
-            trace: Trace[int, int],
-        ) -> Generator[int, Trace[int, int], None]:
+            trace: Trace[Interaction[int, int]],
+        ) -> Generator[int, Trace[Interaction[int, int]], None]:
             count = len(trace.interactions)
             trace = yield count + 1
             trace = yield count + 2
@@ -307,8 +307,8 @@ class TestInteraction:
         """Test inputs as async generator function with trace parameter."""
 
         async def inputs_generator(
-            trace: Trace[int, int],
-        ) -> AsyncGenerator[int, Trace[int, int]]:
+            trace: Trace[Interaction[int, int]],
+        ) -> AsyncGenerator[int, Trace[Interaction[int, int]]]:
             count = len(trace.interactions)
             trace = yield count + 1
             trace = yield count + 2
@@ -503,7 +503,7 @@ class TestInteraction:
     async def test_outputs_fn_with_inputs_and_trace_params(self):
         """Test outputs as function with inputs and trace parameters."""
 
-        def get_output(inputs: str, trace: Trace[str, str]) -> str:
+        def get_output(inputs: str, trace: Trace[Interaction[str, str]]) -> str:
             count = len(trace.interactions)
             return f"echo_{count}: {inputs}"
 
@@ -538,7 +538,7 @@ class TestInteraction:
     async def test_outputs_fn_with_positional_only_inputs_and_trace_params(self):
         """Test outputs as function with positional-only inputs and trace parameters."""
 
-        def get_output(inputs: str, trace: Trace[str, str], /) -> str:
+        def get_output(inputs: str, trace: Trace[Interaction[str, str]], /) -> str:
             return f"[{len(trace.interactions)}] {inputs}"
 
         interaction = Interact(inputs="hello", outputs=get_output)
@@ -562,7 +562,9 @@ class TestInteraction:
     async def test_outputs_fn_with_provided_param_default(self):
         """Test outputs as function with inputs, trace, and provided parameter with default."""
 
-        def get_output(inputs: str, trace: Trace[str, str], multiplier: int = 2) -> str:
+        def get_output(
+            inputs: str, trace: Trace[Interaction[str, str]], multiplier: int = 2
+        ) -> str:
             count = len(trace.interactions)
             return f"echo_{count * multiplier}: {inputs}"
 
@@ -575,7 +577,7 @@ class TestInteraction:
     async def test_outputs_fn_with_provided_param_default_no_type_hint(self):
         """Test outputs as function with provided parameter with default, no type hints."""
 
-        def get_output(inputs, trace, multiplier=2):
+        def get_output(inputs, trace: Trace[Interaction[str, str]], multiplier=2):
             count = len(trace.interactions)
             return f"echo_{count * multiplier}: {inputs}"
 
@@ -599,7 +601,7 @@ class TestInteraction:
     async def test_outputs_async_fn_with_inputs_and_trace_params(self):
         """Test outputs as async function with inputs and trace parameters."""
 
-        async def get_output(inputs: str, trace: Trace[str, str]) -> str:
+        async def get_output(inputs: str, trace: Trace[Interaction[str, str]]) -> str:
             count = len(trace.interactions)
             return f"echo_{count}: {inputs}"
 
@@ -614,7 +616,7 @@ class TestInteraction:
     async def test_inputs_fn_with_unmapped_required_param_raises_error(self):
         """Test that inputs function with unmapped required parameter raises validation error."""
 
-        def get_input(trace: Trace[str, str], unmapped: str) -> str:
+        def get_input(trace: Trace[Interaction[str, str]], unmapped: str) -> str:
             return f"message_{unmapped}"
 
         # TypeError is raised directly (not wrapped because code only catches ValueError)
@@ -633,7 +635,9 @@ class TestInteraction:
         not in the injectable set cause TypeError when building Interact.
         """
 
-        def get_output(inputs: str, trace: Trace[str, str], unmapped: str) -> str:
+        def get_output(
+            inputs: str, trace: Trace[Interaction[str, str]], unmapped: str
+        ) -> str:
             return f"echo_{unmapped}: {inputs}"
 
         with pytest.raises(
@@ -671,7 +675,7 @@ class TestInteraction:
     async def test_inputs_fn_with_keyword_only_trace_param(self):
         """Test inputs as function with keyword-only trace parameter."""
 
-        def get_input(*, trace: Trace[str, str]) -> str:
+        def get_input(*, trace: Trace[Interaction[str, str]]) -> str:
             return f"message_{len(trace.interactions)}"
 
         interaction = Interact(inputs=get_input, outputs="hi")
@@ -684,7 +688,7 @@ class TestInteraction:
     ):
         """Test that keyword-only required params not in injectable set fail validation."""
 
-        def get_input(*, trace: Trace[str, str], unmapped: str) -> str:
+        def get_input(*, trace: Trace[Interaction[str, str]], unmapped: str) -> str:
             return f"message_{unmapped}_{len(trace.interactions)}"
 
         with pytest.raises(
@@ -744,7 +748,7 @@ class TestInteraction:
     async def test_inputs_fn_with_positional_only_trace_param(self):
         """Test inputs as function with positional-only trace parameter."""
 
-        def get_input(trace: Trace[str, str], /) -> str:
+        def get_input(trace: Trace[Interaction[str, str]], /) -> str:
             return f"message_{len(trace.interactions)}"
 
         interaction = Interact(inputs=get_input, outputs="hi")
@@ -755,7 +759,7 @@ class TestInteraction:
     async def test_inputs_fn_with_optional_trace_param_receives_trace(self):
         """Test that optional trace param still receives injected trace."""
 
-        def get_input(trace: Trace[str, str] | None = None) -> str:
+        def get_input(trace: Trace[Interaction[str, str]] | None = None) -> str:
             assert trace is not None
             return f"message_{len(trace.interactions)}"
 
@@ -767,7 +771,9 @@ class TestInteraction:
     async def test_outputs_fn_with_optional_trace_param_receives_trace(self):
         """Test that optional trace param still receives injected trace."""
 
-        def get_output(inputs: str, trace: Trace[str, str] | None = None) -> str:
+        def get_output(
+            inputs: str, trace: Trace[Interaction[str, str]] | None = None
+        ) -> str:
             assert trace is not None
             return f"[{len(trace.interactions)}] {inputs}"
 
@@ -781,7 +787,7 @@ class TestInteraction:
     async def test_combined_static_inputs_fn_outputs_with_trace(self):
         """Test static inputs with function outputs that use trace."""
 
-        def get_output(inputs: str, trace: Trace[str, str]) -> str:
+        def get_output(inputs: str, trace: Trace[Interaction[str, str]]) -> str:
             count = len(trace.interactions)
             return f"[{count}] {inputs}"
 
@@ -795,7 +801,7 @@ class TestInteraction:
     async def test_combined_fn_inputs_with_trace_static_outputs(self):
         """Test function inputs with trace and static outputs."""
 
-        def get_input(trace: Trace[str, str]) -> str:
+        def get_input(trace: Trace[Interaction[str, str]]) -> str:
             count = len(trace.interactions)
             return f"message_{count}"
 
@@ -809,11 +815,13 @@ class TestInteraction:
     async def test_combined_fn_inputs_with_provided_fn_outputs_with_provided(self):
         """Test function inputs with provided param and function outputs with provided param."""
 
-        def get_input(trace: Trace[str, str], offset: int = 10) -> str:
+        def get_input(trace: Trace[Interaction[str, str]], offset: int = 10) -> str:
             count = len(trace.interactions)
             return f"message_{count + offset}"
 
-        def get_output(inputs: str, trace: Trace[str, str], multiplier: int = 3) -> str:
+        def get_output(
+            inputs: str, trace: Trace[Interaction[str, str]], multiplier: int = 3
+        ) -> str:
             count = len(trace.interactions)
             return f"[{count * multiplier}] {inputs}"
 

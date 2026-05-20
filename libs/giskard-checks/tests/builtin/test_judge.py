@@ -48,7 +48,7 @@ class MockGenerator(BaseGenerator):
         )
 
 
-def serialization_roundtrip[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+def serialization_roundtrip[InputType, OutputType, TraceType: Trace](
     judge: LLMJudge[InputType, OutputType, TraceType],
 ) -> LLMJudge[InputType, OutputType, TraceType]:
     check = Check.model_validate(judge.model_dump())

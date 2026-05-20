@@ -7,11 +7,12 @@ from pydantic import Field
 from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
+from ..core.interaction import Interaction
 from .base import BaseLLMCheck
 
 
 @Check.register("answer_relevance")
-class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class AnswerRelevance[InputType, OutputType, TraceType: Trace](
     BaseLLMCheck[InputType, OutputType, TraceType]
 ):
     """LLM-based check that evaluates whether the model's answer is relevant to the question.
@@ -85,7 +86,9 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         )
 
     @override
-    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
+    async def get_inputs(
+        self, trace: Trace[Interaction[InputType, OutputType]]
+    ) -> dict[str, Any]:
         """Build template variables from resolved inputs.
 
         Parameters

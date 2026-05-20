@@ -30,7 +30,9 @@ async def test_sync_function_returns_false() -> None:
 async def test_async_function_returns_true() -> None:
     """Test FnCheck with async function returning True."""
 
-    async def async_fn(trace: Trace[dict[str, str], dict[str, str]]) -> bool:
+    async def async_fn(
+        trace: Trace[Interaction[dict[str, str], dict[str, str]]],
+    ) -> bool:
         return True
 
     check = FnCheck(fn=async_fn)
@@ -42,7 +44,9 @@ async def test_async_function_returns_true() -> None:
 async def test_async_function_returns_false() -> None:
     """Test FnCheck with async function returning False."""
 
-    async def async_fn(trace: Trace[dict[str, str], dict[str, str]]) -> bool:
+    async def async_fn(
+        trace: Trace[Interaction[dict[str, str], dict[str, str]]],
+    ) -> bool:
         return False
 
     check = FnCheck(fn=async_fn)
@@ -54,7 +58,7 @@ async def test_async_function_returns_false() -> None:
 async def test_sync_function_returns_check_result() -> None:
     """Test FnCheck with sync function returning CheckResult."""
 
-    def fn(trace: Trace[dict[str, str], dict[str, str]]) -> CheckResult:
+    def fn(trace: Trace[Interaction[dict[str, str], dict[str, str]]]) -> CheckResult:
         return CheckResult.success(message="Custom success message")
 
     check = FnCheck(fn=fn)
@@ -67,7 +71,9 @@ async def test_sync_function_returns_check_result() -> None:
 async def test_async_function_returns_check_result() -> None:
     """Test FnCheck with async function returning CheckResult."""
 
-    async def async_fn(trace: Trace[dict[str, str], dict[str, str]]) -> CheckResult:
+    async def async_fn(
+        trace: Trace[Interaction[dict[str, str], dict[str, str]]],
+    ) -> CheckResult:
         return CheckResult.failure(message="Custom failure message")
 
     check = FnCheck(fn=async_fn)
@@ -113,9 +119,9 @@ async def test_details() -> None:
 
 async def test_function_receives_trace() -> None:
     """Test that the function receives the trace correctly."""
-    received_trace: Trace[dict[str, str], dict[str, str]] | None = None
+    received_trace: Trace[Interaction[dict[str, str], dict[str, str]]] | None = None
 
-    def fn(trace: Trace[dict[str, str], dict[str, str]]) -> bool:
+    def fn(trace: Trace[Interaction[dict[str, str], dict[str, str]]]) -> bool:
         nonlocal received_trace
         received_trace = trace
         return True
@@ -188,7 +194,7 @@ async def test_from_fn_with_details() -> None:
 async def test_check_result_overrides_messages() -> None:
     """Test that CheckResult returned from function overrides success/failure messages."""
 
-    def fn(trace: Trace[str, str]) -> CheckResult:
+    def fn(trace: Trace[Interaction[str, str]]) -> CheckResult:
         return CheckResult.success(message="From function")
 
     check = FnCheck(
@@ -203,7 +209,7 @@ async def test_check_result_overrides_messages() -> None:
 async def test_check_result_with_details() -> None:
     """Test CheckResult with details from function."""
 
-    def fn(trace: Trace[str, str]) -> CheckResult:
+    def fn(trace: Trace[Interaction[str, str]]) -> CheckResult:
         return CheckResult.success(
             message="Success",
             details={"from_function": True},
@@ -230,7 +236,9 @@ async def test_invalid_return_type() -> None:
 async def test_invalid_async_return_type() -> None:
     """Test that invalid async return type raises TypeError."""
 
-    async def invalid_fn(trace: Trace[dict[str, str], dict[str, str]]) -> str:
+    async def invalid_fn(
+        trace: Trace[Interaction[dict[str, str], dict[str, str]]],
+    ) -> str:
         return "invalid"
 
     check = FnCheck(fn=invalid_fn)  # pyright: ignore[reportArgumentType]
@@ -242,7 +250,9 @@ async def test_invalid_async_return_type() -> None:
 async def test_complex_trace_usage() -> None:
     """Test function that uses trace data to make decision."""
 
-    def check_has_outputs(trace: Trace[dict[str, str], dict[str, str] | None]) -> bool:
+    def check_has_outputs(
+        trace: Trace[Interaction[dict[str, str], dict[str, str] | None]],
+    ) -> bool:
         if not trace.interactions:
             return False
         last_interaction = trace.interactions[-1]
@@ -251,14 +261,14 @@ async def test_complex_trace_usage() -> None:
     check = FnCheck(fn=check_has_outputs)
 
     # Test with trace that has outputs
-    trace_with_outputs = Trace[dict[str, str], dict[str, str] | None](
+    trace_with_outputs = Trace[Interaction[dict[str, str], dict[str, str] | None]](
         interactions=[Interaction(inputs={"q": "test"}, outputs={"a": "answer"})]
     )
     result = await check.run(trace_with_outputs)
     assert result.passed
 
     # Test with trace that has no outputs
-    trace_no_outputs = Trace[dict[str, str], dict[str, str] | None](
+    trace_no_outputs = Trace[Interaction[dict[str, str], dict[str, str] | None]](
         interactions=[Interaction(inputs={"q": "test"}, outputs=None)]
     )
     result = await check.run(trace_no_outputs)
@@ -272,7 +282,7 @@ async def test_complex_trace_usage() -> None:
 async def test_check_result_error_status() -> None:
     """Test function returning CheckResult with ERROR status."""
 
-    def fn(trace: Trace[str, str]) -> CheckResult:
+    def fn(trace: Trace[Interaction[str, str]]) -> CheckResult:
         return CheckResult.error(message="An error occurred")
 
     check = FnCheck(fn=fn)
@@ -285,7 +295,7 @@ async def test_check_result_error_status() -> None:
 async def test_check_result_skip_status() -> None:
     """Test function returning CheckResult with SKIP status."""
 
-    def fn(trace: Trace[str, str]) -> CheckResult:
+    def fn(trace: Trace[Interaction[str, str]]) -> CheckResult:
         return CheckResult.skip(message="Skipped due to precondition")
 
     check = FnCheck(fn=fn)

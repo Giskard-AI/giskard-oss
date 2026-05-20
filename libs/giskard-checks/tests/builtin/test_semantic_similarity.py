@@ -34,7 +34,7 @@ class MockEmbeddingModel(BaseEmbeddingModel):
         return result
 
 
-def serialization_roundtrip[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+def serialization_roundtrip[InputType, OutputType, TraceType: Trace](
     similarity: SemanticSimilarity[InputType, OutputType, TraceType],
 ) -> SemanticSimilarity[InputType, OutputType, TraceType]:
     check = Check.model_validate(similarity.model_dump())

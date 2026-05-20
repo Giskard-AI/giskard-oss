@@ -7,7 +7,7 @@ from ..core.interaction import Interaction, InteractionSpec
 
 
 @InteractionSpec.register("with_spy")
-class WithSpy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class WithSpy[InputType, OutputType, TraceType: Trace](
     InteractionSpec[InputType, OutputType, TraceType]
 ):
     interaction_generator: InteractionSpec[InputType, OutputType, TraceType]

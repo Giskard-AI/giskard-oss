@@ -29,7 +29,7 @@ DEFAULT_TOXICITY_CATEGORIES: tuple[ToxicityCategory, ...] = (
 
 
 @Check.register("toxicity")
-class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class Toxicity[InputType, OutputType, TraceType: Trace](
     BaseLLMCheck[InputType, OutputType, TraceType]
 ):
     """LLM-based check that detects toxic, harmful, or offensive content.
@@ -101,7 +101,7 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         return TemplateReference(template_name="giskard.checks::judges/toxicity.j2")
 
     @override
-    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
+    async def get_inputs(self, trace: TraceType) -> dict[str, Any]:
         """Build template variables for the toxicity judge prompt.
 
         Parameters

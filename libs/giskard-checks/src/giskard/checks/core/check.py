@@ -6,9 +6,7 @@ from .result import CheckResult
 
 
 @discriminated_base
-class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Discriminated
-):
+class Check[InputType, OutputType, TraceType: Trace](Discriminated):
     """Base class for checks.
 
     Subclasses should be registered using the @Check.register("kind") decorator

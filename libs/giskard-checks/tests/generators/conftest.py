@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from typing import Any, override
 
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
-from giskard.checks import Trace
+from giskard.checks import Interaction, Trace
 from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
 from pydantic import Field
 
@@ -30,7 +30,7 @@ class MockGenerator(BaseGenerator):
         )
 
 
-class LLMTrace(Trace[str, str], frozen=True):
+class LLMTrace(Trace[Interaction[str, str]], frozen=True):
     """Shared minimal Trace implementation for generator tests."""
 
     def _repr_prompt_(self) -> str:

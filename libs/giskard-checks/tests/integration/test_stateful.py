@@ -59,7 +59,7 @@ def mock_agent(generator: agents.Generator) -> agents.ChatWorkflow[ChatMessage]:
     )
 
 
-class ConversationTraces(Trace[ChatMessage, ChatMessage], frozen=True):
+class ConversationTraces(Trace[Interaction[ChatMessage, ChatMessage]], frozen=True):
     @property
     def conversation_id(self) -> str | None:
         return (
@@ -115,7 +115,7 @@ def adapter(
 # tests
 async def test_single_message(
     adapter: Callable[
-        [ChatMessage, Trace[ChatMessage, ChatMessage]],
+        [ChatMessage, Trace[Interaction[ChatMessage, ChatMessage]]],
         Awaitable[ChatMessage],
     ],
 ):

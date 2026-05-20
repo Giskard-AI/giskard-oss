@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 @discriminated_base
-class InputGenerator[TraceType: "Trace"](Discriminated):  # pyright: ignore[reportMissingTypeArgument]
+class InputGenerator[TraceType: "Trace"](Discriminated):
     @overload
     def __call__(
         self, trace: TraceType, input_type: type[str] | None = None

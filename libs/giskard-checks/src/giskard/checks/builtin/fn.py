@@ -21,9 +21,9 @@ The callable can be synchronous or asynchronous and must return either:
 
 
 @Check.register("fn")
-class FnCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]@
+class FnCheck[InputType, OutputType, TraceType: Trace](
     Check[InputType, OutputType, TraceType]
-):  # pyright: ignore[reportMissingTypeArgument]
+):
     """A `Check` whose logic is a Python callable.
 
     Parameters are modeled as pydantic fields. At runtime, the `run` method will
@@ -75,7 +75,7 @@ class FnCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repor
         )
 
 
-def from_fn[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+def from_fn[InputType, OutputType, TraceType: Trace](
     fn: Callable[
         [TraceType],
         Awaitable[bool | CheckResult] | bool | CheckResult,

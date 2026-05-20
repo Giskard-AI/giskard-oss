@@ -14,7 +14,7 @@ from .trace import Trace
 
 
 @InteractionSpec.register("interact")
-class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class Interact[InputType, OutputType, TraceType: Trace](
     InteractionSpec[InputType, OutputType, TraceType]
 ):
     """Defines how to interact with a system.

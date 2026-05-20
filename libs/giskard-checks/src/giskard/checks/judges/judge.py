@@ -11,7 +11,7 @@ from .base import BaseLLMCheck
 
 
 @Check.register("llm_judge")
-class LLMJudge[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class LLMJudge[InputType, OutputType, TraceType: Trace](
     BaseLLMCheck[InputType, OutputType, TraceType]
 ):
     """LLM-based check that evaluates interactions using a custom prompt.

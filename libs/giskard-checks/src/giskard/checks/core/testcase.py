@@ -14,7 +14,7 @@ from .interaction import Trace
 from .result import TestCaseResult
 
 
-class TestCase[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
+class TestCase[InputType, OutputType, TraceType: Trace](BaseModel):
     """Bundle a trace with a set of checks to execute.
 
     **Note**: For most use cases, the fluent API (`Scenario(...).interact().check()`) is

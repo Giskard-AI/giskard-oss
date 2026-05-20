@@ -20,7 +20,7 @@ class LLMCheckResult(BaseModel):
     passed: bool = Field(..., description="Whether the check passed or failed")
 
 
-class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class BaseLLMCheck[InputType, OutputType, TraceType: Trace](
     Check[InputType, OutputType, TraceType], WithGeneratorMixin
 ):
     """Abstract base class for LLM-based checks.

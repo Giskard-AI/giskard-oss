@@ -19,7 +19,7 @@ from ..core.result import CheckResult
 from ..utils.normalization import NormalizationForm, normalize_string
 
 
-class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class TextBasedCheck[InputType, OutputType, TraceType: Trace](
     Check[InputType, OutputType, TraceType], ABC
 ):
     """Base class for checks that validate text against a target value.
@@ -137,7 +137,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
 
 
 @Check.register("string_matching")
-class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class StringMatching[InputType, OutputType, TraceType: Trace](
     TextBasedCheck[InputType, OutputType, TraceType]
 ):
     """Check that validates if a keyword appears within a text string.
@@ -321,7 +321,7 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
 
 
 @Check.register("regex_matching")
-class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class RegexMatching[InputType, OutputType, TraceType: Trace](
     TextBasedCheck[InputType, OutputType, TraceType]
 ):
     r"""Check that validates if a regex pattern matches within text.

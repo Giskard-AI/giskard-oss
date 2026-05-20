@@ -57,7 +57,7 @@ def mock_agent(generator: agents.Generator) -> agents.ChatWorkflow[ChatMessage]:
     )
 
 
-class MessageTraces(Trace[Any, Any], frozen=True):
+class MessageTraces(Trace, frozen=True):
     @computed_field
     @property
     def messages(self) -> list[ChatMessage]:

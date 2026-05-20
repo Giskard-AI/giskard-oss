@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 from typing import Any, Literal, override
 
 import pytest
-from giskard.checks import Interact, Trace
+from giskard.checks import Interact, Interaction, Trace
 from giskard.checks.core.input_generator import InputGenerator
 from giskard.checks.core.interaction.interact import _infer_input_type
 from pydantic import BaseModel
@@ -115,7 +115,7 @@ def test_infer_returns_none_for_pydantic_incompatible_type():
 # --- Integration: Interact forwards input_type to InputGenerator ---
 
 
-class RecordingTrace(Trace[str, str], frozen=True):
+class RecordingTrace(Trace[Interaction[str, str]], frozen=True):
     def _repr_prompt_(self) -> str:
         return ""
 

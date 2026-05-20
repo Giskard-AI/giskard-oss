@@ -238,9 +238,9 @@ class TestTestCaseResult:
         """Test format_failures() with error results."""
 
         @Check.register("erroring_check_format_test")
-        class ErroringCheckFormat(Check[str, str, Trace[str, str]]):
+        class ErroringCheckFormat(Check[str, str, Trace[Interaction[str, str]]]):
             @override
-            async def run(self, trace: Trace[str, str]) -> CheckResult:
+            async def run(self, trace: Trace[Interaction[str, str]]) -> CheckResult:
                 raise ValueError("Test error")
 
         trace = await Trace.from_interactions(

@@ -1,5 +1,6 @@
 from typing import Any
 
+from giskard.llm.types import ChatMessage
 from pydantic import BaseModel, Field
 from rich.console import Console, ConsoleOptions, RenderResult
 
@@ -41,3 +42,13 @@ class Interaction[InputType, OutputType](BaseModel, frozen=True):
     ) -> RenderResult:
         yield "Inputs: " + repr(self.inputs)
         yield "Outputs: " + repr(self.outputs)
+
+
+class ChatInteraction(Interaction[list[ChatMessage], list[ChatMessage]], frozen=True):
+    """An immutable record of a single exchange in a chat."""
+
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        for message in self.inputs + self.outputs:
+            yield from message.__rich_console__(console, options)

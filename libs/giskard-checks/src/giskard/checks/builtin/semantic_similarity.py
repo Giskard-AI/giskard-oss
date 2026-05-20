@@ -44,7 +44,7 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 
 @Check.register("semantic_similarity")
-class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class SemanticSimilarity[InputType, OutputType, TraceType: Trace](
     Check[InputType, OutputType, TraceType], WithEmbeddingMixin
 ):
     """Check that validates semantic similarity between outputs and reference text.

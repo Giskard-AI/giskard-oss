@@ -10,7 +10,7 @@ from .result import ScenarioResult
 from .types import GeneratorType, ProviderType
 
 
-class Step[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
+class Step[InputType, OutputType, TraceType: Trace](BaseModel):
     """A scenario step: a sequence of interactions followed by checks.
 
     Each step corresponds to one TestCase at runtime: interactions are applied
@@ -27,7 +27,7 @@ class Step[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: igno
     )
 
 
-class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
+class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):
     """A scenario composed of steps, each containing interacts and checks.
 
     A scenario executes steps sequentially, maintaining a shared trace that

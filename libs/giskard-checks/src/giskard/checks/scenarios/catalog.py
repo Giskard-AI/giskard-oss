@@ -18,7 +18,7 @@ class ScenarioCategory(str, Enum):
 
 def _load_scenarios(
     category: ScenarioCategory,
-) -> list[Scenario[str, Any, Trace[str, Any]]]:
+) -> list[Scenario[str, Any, Trace]]:
     path = _DATA_DIR / f"{category.value}.jsonl"
     scenarios = []
     with path.open() as f:
@@ -61,7 +61,7 @@ def generate_suite(
         A Suite with all selected scenarios, no target bound.
     """
     selected = categories if categories is not None else list(ScenarioCategory)
-    all_scenarios: list[Scenario[str, Any, Trace[str, Any]]] = []
+    all_scenarios: list[Scenario[str, Any, Trace]] = []
     for category in selected:
         all_scenarios.extend(_load_scenarios(category))
 

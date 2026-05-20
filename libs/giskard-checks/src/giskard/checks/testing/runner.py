@@ -16,7 +16,7 @@ from ..core.testcase import TestCase
 async def _run_check[
     InputType,
     OutputType,
-    TraceType: Trace,  # pyright: ignore[reportMissingTypeArgument]
+    TraceType: Trace,
 ](
     trace: TraceType,
     check: Check[InputType, OutputType, TraceType],
@@ -57,7 +57,7 @@ class TestCaseRunner:
         pass
 
     @scoped_telemetry
-    async def run[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    async def run[InputType, OutputType, TraceType: Trace](
         self,
         test_case: TestCase[InputType, OutputType, TraceType],
         return_exception: bool = False,

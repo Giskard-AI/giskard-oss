@@ -9,7 +9,7 @@ from .base import BaseLLMCheck
 
 
 @Check.register("conformity")
-class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class Conformity[InputType, OutputType, TraceType: Trace](
     BaseLLMCheck[InputType, OutputType, TraceType]
 ):
     """LLM-based check that validates a trace against a given rule.
@@ -49,7 +49,7 @@ class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
         return TemplateReference(template_name="giskard.checks::judges/conformity.j2")
 
     @override
-    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
+    async def get_inputs(self, trace: TraceType) -> dict[str, Any]:
         """Build template variables from the trace."""
         return {
             "rule": self.rule,

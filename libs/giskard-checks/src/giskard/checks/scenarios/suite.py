@@ -1,5 +1,5 @@
 import time
-from typing import Any, Generic, Self, TypeVar
+from typing import Generic, Self, TypeVar
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
 from giskard.core.utils import NOT_PROVIDED, NotProvided
@@ -49,12 +49,12 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     """
 
     name: str = Field(..., description="Suite name")
-    scenarios: list[Scenario[InputType, OutputType, Trace[Any, Any]]] = Field(
+    scenarios: list[Scenario[InputType, OutputType, Trace]] = Field(
         default_factory=list, description="Scenarios in the suite"
     )
     target: (
         ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, Trace[Any, Any]], OutputType]
+        | ProviderType[[InputType, Trace], OutputType]
         | NotProvided
     ) = Field(
         default=NOT_PROVIDED,
@@ -63,7 +63,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
     def append(
         self,
-        scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
+        scenario: Scenario[InputType, OutputType, Trace],
     ) -> Self:
         """Add a scenario to the suite.
 
@@ -85,7 +85,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         target: (
             ProviderType[[InputType], OutputType]
             | ProviderType[
-                [InputType, Trace[Any, Any]], OutputType
+                [InputType, Trace], OutputType
             ]  # Trace[Any, Any] because scenarios in suite have different TraceType
             | NotProvided
         ) = NOT_PROVIDED,
@@ -117,7 +117,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         result_v2 = await suite.run(target=my_sut_v2)
         ```
         """
-        results: list[ScenarioResult[Trace[Any, Any]]] = []
+        results: list[ScenarioResult[Trace]] = []
 
         target = target if not isinstance(target, NotProvided) else self.target
         has_target = not isinstance(target, NotProvided)

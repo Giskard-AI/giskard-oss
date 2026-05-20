@@ -11,7 +11,7 @@ from ..core.result import CheckResult
 from ..utils.normalization import NormalizationForm, normalize_data
 
 
-class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](
     ABC, Check[InputType, OutputType, TraceType]
 ):
     """Base class for comparison checks.
@@ -126,7 +126,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
 
 
 @Check.register("lesser_than")
-class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values are less than an expected value.
@@ -169,7 +169,7 @@ class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyri
 
 
 @Check.register("greater_than")
-class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values are greater than an expected value.
@@ -212,7 +212,7 @@ class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyr
 
 
 @Check.register("lesser_than_equals")
-class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values are less than or equal to an expected value.
@@ -255,7 +255,7 @@ class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  
 
 
 @Check.register("greater_than_equals")
-class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values are greater than or equal to an expected value.
@@ -298,7 +298,7 @@ class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # p
 
 
 @Check.register("equals")
-class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values equal an expected value.
@@ -341,7 +341,7 @@ class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright:
 
 
 @Check.register("not_equals")
-class NotEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+class NotEquals[InputType, OutputType, TraceType: Trace, ExpectedType](
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values do not equal an expected value.

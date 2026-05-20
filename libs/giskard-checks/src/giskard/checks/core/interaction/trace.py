@@ -1,14 +1,29 @@
-from typing import Any, Self
+from collections.abc import Sequence
+from typing import Any, Generic, Self
 
-from pydantic import BaseModel, Field, computed_field
+from giskard.llm.types import (
+    ChatMessage,
+    ChatMessageParam,
+    DeveloperMessage,
+    SystemMessage,
+    UserMessage,
+)
+from pydantic import BaseModel, Field, TypeAdapter, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.rule import Rule
+from typing_extensions import TypeVar
 
 from ..protocols import InteractionGenerator
-from .interaction import Interaction
+from .interaction import ChatInteraction, Interaction
+
+InteractionType = TypeVar(
+    "InteractionType",
+    bound=Interaction[Any, Any],
+    default=Interaction[Any, Any],
+)
 
 
-class Trace[InputType, OutputType](BaseModel, frozen=True):
+class Trace(BaseModel, Generic[InteractionType], frozen=True):
     """Immutable history of interactions in a scenario.
 
     A trace accumulates all interactions that have occurred during scenario
@@ -31,7 +46,7 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     Examples
     --------
-    >>> trace = Trace[str, str](interactions=[
+    >>> trace = Trace[Interaction[str, str]](interactions=[
     ...    Interaction(inputs="Hello", outputs="Hi there!"),
     ...    Interaction(inputs="How are you?", outputs="I'm doing well, thanks!"),
     ... ])
@@ -51,7 +66,7 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     ['Hi there!', "I'm doing well, thanks!"]
     """
 
-    interactions: list[Interaction[InputType, OutputType]] = Field(default_factory=list)
+    interactions: list[InteractionType] = Field(default_factory=list)
 
     annotations: dict[str, Any] = Field(
         default_factory=dict,
@@ -60,7 +75,7 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     @computed_field
     @property
-    def last(self) -> Interaction[InputType, OutputType] | None:
+    def last(self) -> InteractionType | None:
         """The last interaction in the trace, or None if the trace is empty.
 
         This computed field is equivalent to `interactions[-1]` when interactions exist.
@@ -85,15 +100,13 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     @classmethod
     async def from_interactions(
         cls,
-        *interactions: Interaction[InputType, OutputType]
-        | InteractionGenerator[Interaction[InputType, OutputType], Self],
+        *interactions: InteractionType | InteractionGenerator[InteractionType, Self],
     ) -> Self:
         return await cls().with_interactions(*interactions)
 
     async def with_interactions(
         self,
-        *interactions: Interaction[InputType, OutputType]
-        | InteractionGenerator[Interaction[InputType, OutputType], Self],
+        *interactions: InteractionType | InteractionGenerator[InteractionType, Self],
     ) -> Self:
         trace = self
 
@@ -104,10 +117,7 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     async def with_interaction(
         self,
-        interaction: (
-            Interaction[InputType, OutputType]
-            | InteractionGenerator[Interaction[InputType, OutputType], Self]
-        ),
+        interaction: (InteractionType | InteractionGenerator[InteractionType, Self]),
     ) -> Self:
         if isinstance(interaction, Interaction):
             return self.model_copy(
@@ -134,4 +144,52 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     ) -> RenderResult:
         for idx, interaction in enumerate(self.interactions):
             yield Rule(f"Interaction {idx + 1}", style="bold")
+            yield from interaction.__rich_console__(console, options)
+
+
+_INPUT_MESSAGE_TYPE = SystemMessage | DeveloperMessage | UserMessage
+_CHAT_MESSAGES_TYPE_ADAPTER = TypeAdapter(list[ChatMessage])
+
+
+class ChatTrace(Trace[ChatInteraction], frozen=True):
+    """A trace for a Giskard LLM."""
+
+    @property
+    def messages(self) -> list[ChatMessage]:
+        return [
+            message
+            for interaction in self.interactions
+            for message in interaction.inputs + interaction.outputs
+        ]
+
+    @classmethod
+    def from_messages(cls, messages: Sequence[ChatMessage | ChatMessageParam]) -> Self:
+        interactions = []
+        inputs = []
+        outputs = []
+
+        messages = _CHAT_MESSAGES_TYPE_ADAPTER.validate_python(messages)
+        for message in messages:
+            if isinstance(message, _INPUT_MESSAGE_TYPE):
+                if outputs:
+                    interactions.append(ChatInteraction(inputs=inputs, outputs=outputs))
+                    inputs = []
+                    outputs = []
+                inputs.append(message)
+            else:
+                outputs.append(message)
+
+        if inputs or outputs:
+            interactions.append(ChatInteraction(inputs=inputs, outputs=outputs))
+
+        return cls(interactions=interactions)
+
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        if not self.interactions:
+            yield "[dim italic]No messages yet[/dim italic]"
+            return
+
+        for interaction in self.interactions:
             yield from interaction.__rich_console__(console, options)

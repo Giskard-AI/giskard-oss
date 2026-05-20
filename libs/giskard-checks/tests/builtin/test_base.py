@@ -4,7 +4,7 @@ from typing import Any, override
 
 import pytest
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
-from giskard.checks import BaseLLMCheck, Trace
+from giskard.checks import BaseLLMCheck, Interaction, Trace
 from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
 from pydantic import BaseModel, Field
 
@@ -49,7 +49,7 @@ class TestBaseLLMCheck:
             passed: bool
             reasoning: str
 
-        class CustomLLMCheck(BaseLLMCheck[str, str, Trace[str, str]]):
+        class CustomLLMCheck(BaseLLMCheck[str, str, Trace[Interaction[str, str]]]):
             @override
             def get_prompt(self) -> str:
                 return "What is the score?"

@@ -8,7 +8,7 @@ from ..core.result import CheckResult, CheckStatus
 
 
 @Check.register("all_of")
-class AllOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class AllOf[InputType, OutputType, TraceType: Trace](
     Check[InputType, OutputType, TraceType]
 ):
     """Passes only when **all** inner checks pass (short-circuits on first failure).
@@ -67,7 +67,7 @@ class AllOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
 
 
 @Check.register("any_of")
-class AnyOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class AnyOf[InputType, OutputType, TraceType: Trace](
     Check[InputType, OutputType, TraceType]
 ):
     """Passes when **at least one** inner check passes (short-circuits on first pass).
@@ -141,7 +141,7 @@ class AnyOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
 
 
 @Check.register("not")
-class Not[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class Not[InputType, OutputType, TraceType: Trace](
     Check[InputType, OutputType, TraceType]
 ):
     """Inverts the result of an inner check.

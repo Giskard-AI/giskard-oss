@@ -220,7 +220,7 @@ class ScenarioStatus(str, Enum):
     SKIP = "skip"
 
 
-class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ignore[reportMissingTypeArgument]
+class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):
     """Result of executing an entire scenario.
 
     Attributes

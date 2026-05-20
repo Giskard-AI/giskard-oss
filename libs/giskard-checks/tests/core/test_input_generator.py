@@ -2,12 +2,12 @@ from collections.abc import AsyncGenerator
 from typing import Any, override
 
 import pytest
-from giskard.checks import Trace
+from giskard.checks import Interaction, Trace
 from giskard.checks.core.input_generator import InputGenerator
 from pydantic import BaseModel
 
 
-class ConcreteTrace(Trace[str, str], frozen=True):
+class ConcreteTrace(Trace[Interaction[str, str]], frozen=True):
     def _repr_prompt_(self) -> str:
         return ""
 

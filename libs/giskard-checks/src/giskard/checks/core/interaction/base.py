@@ -7,9 +7,7 @@ from .trace import Trace
 
 
 @discriminated_base
-class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Discriminated
-):
+class InteractionSpec[InputType, OutputType, TraceType: Trace](Discriminated):
     """Base class for interaction specifications that generate interactions.
 
     An interaction spec produces one or more `Interaction` objects by yielding

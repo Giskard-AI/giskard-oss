@@ -11,7 +11,7 @@ from .base import BaseLLMCheck
 
 
 @Check.register("groundedness")
-class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+class Groundedness[InputType, OutputType, TraceType: Trace](
     BaseLLMCheck[InputType, OutputType, TraceType]
 ):
     """LLM-based check that validates answers are grounded in context.
@@ -68,7 +68,7 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         return TemplateReference(template_name="giskard.checks::judges/groundedness.j2")
 
     @override
-    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
+    async def get_inputs(self, trace: TraceType) -> dict[str, str]:
         """Build template variables from resolved inputs.
 
         Parameters

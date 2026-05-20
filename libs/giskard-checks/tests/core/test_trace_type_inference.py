@@ -1,4 +1,5 @@
 import pytest
+from giskard.checks.core.interaction.interaction import Interaction
 from giskard.checks.core.interaction.trace import Trace
 from giskard.checks.core.scenario import Scenario
 from giskard.checks.scenarios.runner import _resolve_trace_type
@@ -6,11 +7,11 @@ from giskard.checks.utils.inference import _infer_trace_type
 from giskard.core.utils import NOT_PROVIDED
 
 
-class MyTrace(Trace[str, str], frozen=True):
+class MyTrace(Trace[Interaction[str, str]], frozen=True):
     pass
 
 
-class OtherTrace(Trace[str, str], frozen=True):
+class OtherTrace(Trace[Interaction[str, str]], frozen=True):
     pass
 
 
@@ -40,11 +41,11 @@ def test_infer_trace_type_returns_subclass_when_second_param_is_trace_subclass()
 
 
 def test_infer_trace_type_returns_base_trace_when_second_param_is_base_trace():
-    def target(inputs: str, trace: Trace[str, str]) -> str:
+    def target(inputs: str, trace: Trace[Interaction[str, str]]) -> str:
         return inputs
 
     result = _infer_trace_type(target)
-    assert result is Trace[str, str]
+    assert result is Trace[Interaction[str, str]]
 
 
 def test_infer_trace_type_works_for_callable_instance():
