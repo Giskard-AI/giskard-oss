@@ -182,7 +182,7 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
 
     def _rule_generation_pipeline(self) -> ChatWorkflow[RuleGeneration]:
         """Build the LLM pipeline used to generate conformity rules."""
-        return self.generator.template(
+        return self._generator.template(
             "giskard.checks::generate_suite/generation_rules.j2"
         ).with_output(RuleGeneration)
 
