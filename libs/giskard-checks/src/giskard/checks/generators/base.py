@@ -62,12 +62,12 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
         prompt = self.get_prompt()
 
         if isinstance(prompt, TemplateReference):
-            workflow = self.generator.template(prompt.template_name).with_output(
+            workflow = self._generator.template(prompt.template_name).with_output(
                 LLMGeneratorOutput[T]
             )
         else:
             workflow = ChatWorkflow(
-                generator=self.generator,
+                generator=self._generator,
                 messages=[prompt],
             ).with_output(LLMGeneratorOutput[T])
 

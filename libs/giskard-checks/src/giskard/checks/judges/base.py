@@ -73,7 +73,7 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         if isinstance(prompt, str):
             prompt = MessageTemplate(role="user", content_template=prompt)
 
-        return ChatWorkflow(generator=self.generator, messages=[prompt])
+        return ChatWorkflow(generator=self._generator, messages=[prompt])
 
     @override
     async def run(self, trace: TraceType) -> CheckResult:
