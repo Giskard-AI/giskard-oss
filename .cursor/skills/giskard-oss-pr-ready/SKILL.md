@@ -48,6 +48,16 @@ If checks fail from missing tools, run **`make install`** and **`make install-to
 
    Use valid shell assignments in `.env` (e.g. `GEMINI_API_KEY=...`). If you point `TEST_MODEL` / `TEST_EMBEDDING_MODEL` at another provider, add whatever API keys that provider expects (LiteLLM / the underlying SDK).
 
+## Verification gate
+
+Before declaring a branch merge-ready, include the following evidence in your response:
+
+1. Last line(s) of `make check` output — must show no errors.
+2. Pytest summary from `make test-unit` — e.g. `52 passed, 0 failed`.
+3. If any step was skipped or failed, state it explicitly.
+
+"It should pass" is not evidence. Show actual output.
+
 ## Library-specific rules
 
 For package conventions (API patterns, tests layout), read `libs/<package>/.cursor/rules/`. Makefile targets are always invoked from the repository root as listed above.

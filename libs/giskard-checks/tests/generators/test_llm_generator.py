@@ -156,6 +156,40 @@ async def test_llm_generator_produces_base_model_when_input_type_provided():
 
 
 @pytest.mark.asyncio
+async def test_llm_generator_yields_list_when_input_type_is_list():
+    mock_gen = MockGenerator(
+        responses=[
+            {
+                "goal_reached": False,
+                "schema_issue": None,
+                "message": ["hello", "there"],
+            },
+        ]
+    )
+    gen = LLMGenerator(generator=mock_gen, prompt="Say hello.", max_steps=1)
+    trace = LLMTrace()
+    agen = gen(trace, input_type=list[str])
+    msg = await anext(agen)
+    assert msg == ["hello", "there"]
+    assert isinstance(msg, list)
+
+
+@pytest.mark.asyncio
+async def test_llm_generator_yields_int_when_input_type_is_int():
+    mock_gen = MockGenerator(
+        responses=[
+            {"goal_reached": False, "schema_issue": None, "message": 7},
+        ]
+    )
+    gen = LLMGenerator(generator=mock_gen, prompt="Pick a number.", max_steps=1)
+    trace = LLMTrace()
+    agen = gen(trace, input_type=int)
+    msg = await anext(agen)
+    assert msg == 7
+    assert isinstance(msg, int)
+
+
+@pytest.mark.asyncio
 async def test_llm_generator_raises_on_schema_issue():
     mock_gen = MockGenerator(
         responses=[

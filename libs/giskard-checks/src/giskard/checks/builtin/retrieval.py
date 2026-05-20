@@ -14,6 +14,8 @@ RetrievalScoringStrategy = Literal["strict"]
 
 
 def _as_sequence(value: Any) -> list[Any]:
+    if value is None:
+        return []
     if isinstance(value, list):
         return value
     if isinstance(value, tuple | set):
@@ -150,7 +152,7 @@ class PrecisionAtK[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     @override
     def _score(self, relevant_ids: list[Any], retrieved_ids: list[Any]) -> float:
         hits = sum(_hits_at_k(relevant_ids, retrieved_ids, self.k))
-        return _safe_divide(float(hits), min(self.k, len(retrieved_ids)))
+        return _safe_divide(float(hits), self.k)
 
 
 @Check.register("hit_rate_at_k")

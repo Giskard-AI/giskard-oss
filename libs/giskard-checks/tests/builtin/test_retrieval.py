@@ -66,6 +66,16 @@ async def test_precision_at_k_partial_overlap_passes_threshold():
     assert result.details["score"] == pytest.approx(2 / 3)
 
 
+async def test_precision_at_k_uses_k_as_denominator_for_short_result_lists():
+    trace = await _trace(["doc-1", "doc-2"], ["doc-1"])
+    check = PrecisionAtK(k=3, **_check_kwargs(threshold=0.3))
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["score"] == pytest.approx(1 / 3)
+
+
 async def test_duplicate_retrieved_ids_do_not_inflate_recall():
     trace = await _trace(["doc-1", "doc-2"], ["doc-1", "doc-1", "doc-3"])
     check = RecallAtK(k=3, **_check_kwargs(threshold=0.5))
@@ -88,6 +98,18 @@ async def test_hit_rate_at_k_empty_retrieved_ids_fails():
 
 async def test_hit_rate_at_k_empty_relevant_ids_passes_zero_threshold():
     trace = await _trace([], ["doc-1"])
+    check = HitRateAtK(k=3, **_check_kwargs(threshold=0.0))
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["score"] == 0.0
+
+
+async def test_none_retrieved_ids_are_treated_as_empty():
+    trace = await Trace.from_interactions(
+        Interaction(inputs={"relevant_ids": ["doc-1"]}, outputs={"retrieved_ids": None})
+    )
     check = HitRateAtK(k=3, **_check_kwargs(threshold=0.0))
 
     result = await check.run(trace)

@@ -196,4 +196,4 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         list[np.ndarray]
             List of embedding vectors, one for each input text.
         """
-        return await self.embedding_model.embed(texts)
+        return await self._embedding_model.embed(texts)

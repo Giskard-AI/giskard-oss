@@ -13,7 +13,7 @@ from ..core.input_generator import InputGenerator
 from ..core.mixin import WithGeneratorMixin
 
 
-class LLMGeneratorOutput[T: str | BaseModel](BaseModel):
+class LLMGeneratorOutput[T](BaseModel):
     goal_reached: bool = Field(
         ...,
         description="Whether the goal has been reached and no more messages are needed.",
@@ -56,18 +56,18 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
 
     @override
     async def __call__(
-        self, trace: TraceType, input_type: type[str | BaseModel] | None = None
+        self, trace: TraceType, input_type: type[Any] | None = None
     ) -> AsyncGenerator[Any, TraceType]:
         T = input_type or str
         prompt = self.get_prompt()
 
         if isinstance(prompt, TemplateReference):
-            workflow = self.generator.template(prompt.template_name).with_output(
+            workflow = self._generator.template(prompt.template_name).with_output(
                 LLMGeneratorOutput[T]
             )
         else:
             workflow = ChatWorkflow(
-                generator=self.generator,
+                generator=self._generator,
                 messages=[prompt],
             ).with_output(LLMGeneratorOutput[T])
 
