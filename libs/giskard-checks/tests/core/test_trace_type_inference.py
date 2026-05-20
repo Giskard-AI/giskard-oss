@@ -10,9 +10,6 @@ class OtherTrace(Trace[str, str], frozen=True):
     pass
 
 
-# --- _infer_trace_type unit tests ---
-
-
 def test_infer_trace_type_returns_none_for_non_callable():
     assert _infer_trace_type("not a callable") is None
 
@@ -43,8 +40,7 @@ def test_infer_trace_type_returns_base_trace_when_second_param_is_base_trace():
         return inputs
 
     result = _infer_trace_type(target)
-    assert result is not None
-    assert issubclass(result, Trace)
+    assert result is Trace[str, str]
 
 
 def test_infer_trace_type_works_for_callable_instance():
