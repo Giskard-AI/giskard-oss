@@ -11,6 +11,7 @@ dependencies = [
     "giskard-agents>=1.0.2b2",
     "jinja2>=3.1.6,<4",
     "giskard-core>=1.0.1b3,<2",
+    "jsonschema>=4.23.0,<5",
     "numpy>=2.4.1,<3",
     "regex>=2026.1.15",
     "rich>=14.2.0,<16",
