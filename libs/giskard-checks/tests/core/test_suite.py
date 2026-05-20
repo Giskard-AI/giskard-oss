@@ -257,3 +257,38 @@ async def test_suite_parallel_telemetry_includes_flag(monkeypatch):
     assert events[0][1]["parallel"] is True
     assert events[1][0] == "checks_suite_run_finished"
     assert events[1][1]["parallel"] is True
+
+
+@pytest.mark.asyncio
+async def test_suite_parallel_respects_max_concurrency():
+    active_runs = 0
+    peak_runs = 0
+
+    async def tracked_target(inputs):
+        nonlocal active_runs, peak_runs
+        active_runs += 1
+        peak_runs = max(peak_runs, active_runs)
+        try:
+            await asyncio.sleep(0.05)
+            return inputs
+        finally:
+            active_runs -= 1
+
+    suite = Suite(name="parallel_limit_suite", target=tracked_target)
+    suite.append(Scenario("a").interact("a"))
+    suite.append(Scenario("b").interact("b"))
+    suite.append(Scenario("c").interact("c"))
+
+    result = await suite.run(parallel=True, max_concurrency=2)
+
+    assert result.passed_count == 3
+    assert peak_runs == 2
+
+
+@pytest.mark.asyncio
+async def test_suite_parallel_rejects_invalid_max_concurrency():
+    suite = Suite(name="invalid_parallel_limit_suite", target=lambda inputs: inputs)
+    suite.append(Scenario("a").interact("a"))
+
+    with pytest.raises(ValueError, match="max_concurrency must be greater than 0"):
+        await suite.run(parallel=True, max_concurrency=0)

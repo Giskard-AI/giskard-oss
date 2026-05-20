@@ -92,6 +92,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         ) = NOT_PROVIDED,
         return_exception: bool = False,
         parallel: bool = False,
+        max_concurrency: int | None = None,
     ) -> SuiteResult:
         """Run all scenarios in the suite.
 
@@ -104,6 +105,9 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             If True, return results even when exceptions occur instead of raising.
         parallel : bool
             If True, run all scenarios concurrently while preserving result order.
+        max_concurrency : int | None
+            Optional upper bound on concurrent scenario runs when ``parallel=True``.
+            Must be a positive integer when provided.
 
         Returns
         -------
@@ -126,6 +130,9 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         target = target if not isinstance(target, NotProvided) else self.target
         has_target = not isinstance(target, NotProvided)
 
+        if max_concurrency is not None and max_concurrency < 1:
+            raise ValueError("max_concurrency must be greater than 0")
+
         with telemetry_run_context():
             telemetry_tag("giskard_component", "suite")
             telemetry_tag("giskard_operation", "suite_run")
@@ -142,14 +149,30 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
             start_time = time.perf_counter()
             if parallel:
+                semaphore = (
+                    asyncio.Semaphore(max_concurrency)
+                    if max_concurrency is not None
+                    else None
+                )
+
+                async def run_scenario(
+                    scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
+                ) -> ScenarioResult[Trace[Any, Any]]:
+                    if semaphore is None:
+                        return await scenario.run(
+                            target=target,
+                            return_exception=return_exception,
+                        )
+
+                    async with semaphore:
+                        return await scenario.run(
+                            target=target,
+                            return_exception=return_exception,
+                        )
+
                 async with asyncio.TaskGroup() as task_group:
                     tasks = [
-                        task_group.create_task(
-                            scenario.run(
-                                target=target,
-                                return_exception=return_exception,
-                            )
-                        )
+                        task_group.create_task(run_scenario(scenario))
                         for scenario in self.scenarios
                     ]
                 results = [task.result() for task in tasks]
