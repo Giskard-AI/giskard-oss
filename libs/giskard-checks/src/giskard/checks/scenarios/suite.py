@@ -1,5 +1,6 @@
 import asyncio
 import time
+from contextlib import nullcontext
 from typing import Any, Generic, Self, TypeVar
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
@@ -130,7 +131,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         target = target if not isinstance(target, NotProvided) else self.target
         has_target = not isinstance(target, NotProvided)
 
-        if max_concurrency is not None and max_concurrency < 1:
+        if parallel and max_concurrency is not None and max_concurrency < 1:
             raise ValueError("max_concurrency must be greater than 0")
 
         with telemetry_run_context():
@@ -152,18 +153,12 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
                 semaphore = (
                     asyncio.Semaphore(max_concurrency)
                     if max_concurrency is not None
-                    else None
+                    else nullcontext()
                 )
 
                 async def run_scenario(
                     scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
                 ) -> ScenarioResult[Trace[Any, Any]]:
-                    if semaphore is None:
-                        return await scenario.run(
-                            target=target,
-                            return_exception=return_exception,
-                        )
-
                     async with semaphore:
                         return await scenario.run(
                             target=target,
@@ -178,7 +173,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
                         ]
                 except* Exception as exc_group:
                     if len(exc_group.exceptions) == 1:
-                        raise exc_group.exceptions[0] from None
+                        raise exc_group.exceptions[0]
                     raise
                 results = [task.result() for task in tasks]
             else:

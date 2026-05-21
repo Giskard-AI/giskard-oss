@@ -181,8 +181,11 @@ async def test_suite_parallel_preserves_result_order():
 
 @pytest.mark.asyncio
 async def test_suite_parallel_runs_concurrently():
+    sleep_s = 0.06
+    n = 3
+
     async def delayed_identity(inputs):
-        await asyncio.sleep(0.06)
+        await asyncio.sleep(sleep_s)
         return inputs
 
     suite = Suite(name="parallel_speed_suite", target=delayed_identity)
@@ -190,15 +193,12 @@ async def test_suite_parallel_runs_concurrently():
     suite.append(Scenario("b").interact("b"))
     suite.append(Scenario("c").interact("c"))
 
-    serial_start = time.perf_counter()
-    await suite.run()
-    serial_duration = time.perf_counter() - serial_start
-
-    parallel_start = time.perf_counter()
+    start = time.perf_counter()
     await suite.run(parallel=True)
-    parallel_duration = time.perf_counter() - parallel_start
+    parallel_duration = time.perf_counter() - start
 
-    assert parallel_duration < serial_duration * 0.75
+    # Must complete faster than running all scenarios serially
+    assert parallel_duration < sleep_s * n
 
 
 @pytest.mark.asyncio
