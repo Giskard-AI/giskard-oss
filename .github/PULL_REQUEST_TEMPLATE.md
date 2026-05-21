@@ -27,8 +27,8 @@ Autonomous agents with no human in the loop must read **[AUTONOMOUS.md](https://
 
 <!-- Mark with an `x` all the checkboxes that apply (like `[x]`) -->
 
-- [ ] I've read the [`CODE_OF_CONDUCT.md`](https://github.com/Giskard-AI/ai-inspector/blob/master/CODE_OF_CONDUCT.md) document.
-- [ ] I've read the [`CONTRIBUTING.md`](https://github.com/Giskard-AI/ai-inspector/blob/master/CONTRIBUTING.md) guide.
+- [ ] I've read the [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) document.
+- [ ] I've read the [`CONTRIBUTING.md`](../CONTRIBUTING.md) guide.
 - [ ] I've written tests for all new methods and classes that I created.
 - [ ] I've written the docstring in NumPy format for all the methods and classes that I created or modified.
 - [ ] I've updated the `uv.lock` running `uv lock` (only applicable when `pyproject.toml` has been
