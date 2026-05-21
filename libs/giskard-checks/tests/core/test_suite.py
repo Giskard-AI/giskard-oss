@@ -1,3 +1,7 @@
+import asyncio
+import time
+from contextlib import nullcontext
+
 import pytest
 from giskard.checks import Equals, Scenario, Suite
 
@@ -150,3 +154,141 @@ async def test_suite_append_chaining():
     assert len(result.results) == 2
     assert result.results[0].scenario_name == "a"
     assert result.results[1].scenario_name == "b"
+
+
+@pytest.mark.asyncio
+async def test_suite_parallel_preserves_result_order():
+    delays = {"first": 0.09, "second": 0.01, "third": 0.05}
+
+    async def delayed_identity(inputs):
+        await asyncio.sleep(delays[inputs])
+        return inputs
+
+    suite = Suite(name="parallel_order_suite", target=delayed_identity)
+    suite.append(Scenario("first").interact("first"))
+    suite.append(Scenario("second").interact("second"))
+    suite.append(Scenario("third").interact("third"))
+
+    result = await suite.run(parallel=True)
+
+    assert [scenario.scenario_name for scenario in result.results] == [
+        "first",
+        "second",
+        "third",
+    ]
+    assert result.passed_count == 3
+
+
+@pytest.mark.asyncio
+async def test_suite_parallel_runs_concurrently():
+    sleep_s = 0.06
+    n = 3
+
+    async def delayed_identity(inputs):
+        await asyncio.sleep(sleep_s)
+        return inputs
+
+    suite = Suite(name="parallel_speed_suite", target=delayed_identity)
+    suite.append(Scenario("a").interact("a"))
+    suite.append(Scenario("b").interact("b"))
+    suite.append(Scenario("c").interact("c"))
+
+    start = time.perf_counter()
+    await suite.run(parallel=True)
+    parallel_duration = time.perf_counter() - start
+
+    # Must complete faster than running all scenarios serially
+    assert parallel_duration < sleep_s * n
+
+
+@pytest.mark.asyncio
+async def test_suite_parallel_fail_fast_when_return_exception_is_false():
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def flaky_target(inputs):
+        if inputs == "boom":
+            raise RuntimeError("boom")
+        started.set()
+        try:
+            await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+        return inputs
+
+    suite = Suite(name="parallel_fail_fast_suite", target=flaky_target)
+    suite.append(Scenario("slow").interact("slow"))
+    suite.append(Scenario("boom").interact("boom"))
+
+    with pytest.raises(RuntimeError, match="boom"):
+        await suite.run(parallel=True)
+
+    assert started.is_set()
+    assert cancelled.is_set()
+
+
+@pytest.mark.asyncio
+async def test_suite_parallel_telemetry_includes_flag(monkeypatch):
+    events = []
+
+    def capture(event, *, properties):
+        events.append((event, properties))
+
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite.telemetry_capture",
+        capture,
+    )
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite.telemetry_run_context",
+        nullcontext,
+    )
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite.telemetry_tag",
+        lambda *args, **kwargs: None,
+    )
+
+    suite = Suite(name="telemetry_suite", target=lambda inputs: inputs)
+    suite.append(Scenario("a").interact("hello"))
+
+    await suite.run(parallel=True)
+
+    assert events[0][0] == "checks_suite_run_started"
+    assert events[0][1]["parallel"] is True
+    assert events[1][0] == "checks_suite_run_finished"
+    assert events[1][1]["parallel"] is True
+
+
+@pytest.mark.asyncio
+async def test_suite_parallel_respects_max_concurrency():
+    active_runs = 0
+    peak_runs = 0
+
+    async def tracked_target(inputs):
+        nonlocal active_runs, peak_runs
+        active_runs += 1
+        peak_runs = max(peak_runs, active_runs)
+        try:
+            await asyncio.sleep(0.05)
+            return inputs
+        finally:
+            active_runs -= 1
+
+    suite = Suite(name="parallel_limit_suite", target=tracked_target)
+    suite.append(Scenario("a").interact("a"))
+    suite.append(Scenario("b").interact("b"))
+    suite.append(Scenario("c").interact("c"))
+
+    result = await suite.run(parallel=True, max_concurrency=2)
+
+    assert result.passed_count == 3
+    assert peak_runs == 2
+
+
+@pytest.mark.asyncio
+async def test_suite_parallel_rejects_invalid_max_concurrency():
+    suite = Suite(name="invalid_parallel_limit_suite", target=lambda inputs: inputs)
+    suite.append(Scenario("a").interact("a"))
+
+    with pytest.raises(ValueError, match="max_concurrency must be greater than 0"):
+        await suite.run(parallel=True, max_concurrency=0)
