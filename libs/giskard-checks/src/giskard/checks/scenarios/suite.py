@@ -126,8 +126,6 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         result_v2 = await suite.run(target=my_sut_v2)
         ```
         """
-        results: list[ScenarioResult[Trace[Any, Any]]] = []
-
         target = target if not isinstance(target, NotProvided) else self.target
         has_target = not isinstance(target, NotProvided)
 
@@ -150,37 +148,11 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
             start_time = time.perf_counter()
             if parallel:
-                semaphore = (
-                    asyncio.Semaphore(max_concurrency)
-                    if max_concurrency is not None
-                    else nullcontext()
+                results = await self._run_parallel(
+                    target, return_exception, max_concurrency
                 )
-
-                async def run_scenario(
-                    scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
-                ) -> ScenarioResult[Trace[Any, Any]]:
-                    async with semaphore:
-                        return await scenario.run(
-                            target=target,
-                            return_exception=return_exception,
-                        )
-
-                try:
-                    async with asyncio.TaskGroup() as task_group:
-                        tasks = [
-                            task_group.create_task(run_scenario(scenario))
-                            for scenario in self.scenarios
-                        ]
-                except* Exception as exc_group:
-                    if len(exc_group.exceptions) == 1:
-                        raise exc_group.exceptions[0]
-                    raise
-                results = [task.result() for task in tasks]
             else:
-                results = [
-                    await scenario.run(target=target, return_exception=return_exception)
-                    for scenario in self.scenarios
-                ]
+                results = await self._run_serial(target, return_exception)
             end_time = time.perf_counter()
 
             suite_result = SuiteResult(
@@ -201,3 +173,43 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             )
 
         return suite_result
+
+    async def _run_serial(
+        self,
+        target: Any,
+        return_exception: bool,
+    ) -> list[ScenarioResult[Trace[Any, Any]]]:
+        return [
+            await scenario.run(target=target, return_exception=return_exception)
+            for scenario in self.scenarios
+        ]
+
+    async def _run_parallel(
+        self,
+        target: Any,
+        return_exception: bool,
+        max_concurrency: int | None,
+    ) -> list[ScenarioResult[Trace[Any, Any]]]:
+        semaphore = (
+            asyncio.Semaphore(max_concurrency) if max_concurrency else nullcontext()
+        )
+
+        async def run_scenario(
+            scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
+        ) -> ScenarioResult[Trace[Any, Any]]:
+            async with semaphore:
+                return await scenario.run(
+                    target=target, return_exception=return_exception
+                )
+
+        try:
+            async with asyncio.TaskGroup() as task_group:
+                tasks = [
+                    task_group.create_task(run_scenario(scenario))
+                    for scenario in self.scenarios
+                ]
+        except* Exception as exc_group:
+            if len(exc_group.exceptions) == 1:
+                raise exc_group.exceptions[0]
+            raise
+        return [task.result() for task in tasks]
