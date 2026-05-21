@@ -146,7 +146,7 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
         for interaction in self.interactions:
             step_index = interaction.metadata.get("step_index", 0)
-            if not isinstance(step_index, int) or isinstance(step_index, bool):
+            if type(step_index) is not int:
                 step_index = 0
 
             if current_step_index != step_index:

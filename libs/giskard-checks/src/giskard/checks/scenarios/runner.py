@@ -6,6 +6,7 @@ updated Trace objects via the async generator protocol.
 """
 
 import time
+from collections.abc import AsyncGenerator
 from typing import Any, cast
 
 from giskard.core import (
@@ -18,7 +19,8 @@ from giskard.core import (
 
 from .._telemetry_props import scenario_shape_properties
 from ..core import Trace
-from ..core.interaction import Interact
+from ..core.interaction import Interact, InteractionSpec
+from ..core.interaction.interaction import Interaction
 from ..core.result import CheckResult, ScenarioResult, TestCaseResult
 from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
@@ -87,30 +89,59 @@ def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
     return cast(type[TraceType], inferred if inferred is not None else Trace)
 
 
-def _tag_interactions_with_step_index[TraceType: Trace[Any, Any]](
-    trace: TraceType,
+def _tag_interaction_with_step_index[InputType, OutputType](
+    interaction: Interaction[InputType, OutputType],
     *,
     step_index: int,
-    previous_count: int,
-) -> TraceType:
-    if len(trace.interactions) <= previous_count:
-        return trace
+) -> Interaction[InputType, OutputType]:
+    return interaction.model_copy(
+        update={
+            "metadata": {
+                **interaction.metadata,
+                "step_index": step_index,
+            }
+        }
+    )
 
-    interactions = [
-        *trace.interactions[:previous_count],
-        *(
-            interaction.model_copy(
-                update={
-                    "metadata": {
-                        **interaction.metadata,
-                        "step_index": step_index,
-                    }
-                }
-            )
-            for interaction in trace.interactions[previous_count:]
-        )
+
+class _StepIndexedInteractionSpec[InputType, OutputType, TraceType: Trace[Any, Any]]:
+    def __init__(
+        self,
+        interact: InteractionSpec[InputType, OutputType, TraceType],
+        *,
+        step_index: int,
+    ) -> None:
+        self._interact = interact
+        self._step_index = step_index
+
+    async def generate(
+        self, trace: TraceType
+    ) -> AsyncGenerator[Interaction[InputType, OutputType], TraceType]:
+        generator = self._interact.generate(trace)
+
+        try:
+            interaction = await anext(generator)
+            while True:
+                trace = yield _tag_interaction_with_step_index(
+                    interaction,
+                    step_index=self._step_index,
+                )
+                interaction = await generator.asend(trace)
+        except StopAsyncIteration:
+            return
+        finally:
+            await generator.aclose()
+
+
+def _bind_step_index[InputType, OutputType, TraceType: Trace[Any, Any]](
+    step: Step[InputType, OutputType, TraceType],
+    *,
+    step_index: int,
+) -> list[_StepIndexedInteractionSpec[InputType, OutputType, TraceType]]:
+    return [
+        _StepIndexedInteractionSpec(interact, step_index=step_index)
+        for interact in step.interacts
     ]
-    return cast(TraceType, trace.model_copy(update={"interactions": interactions}))
 
 
 class ScenarioRunner:
@@ -176,12 +207,8 @@ class ScenarioRunner:
         )
 
         for step_index, step in enumerate(steps):
-            previous_count = len(trace.interactions)
-            trace = await trace.with_interactions(*step.interacts)
-            trace = _tag_interactions_with_step_index(
-                trace,
-                step_index=step_index,
-                previous_count=previous_count,
+            trace = await trace.with_interactions(
+                *_bind_step_index(step, step_index=step_index)
             )
 
             test_case = TestCase(
