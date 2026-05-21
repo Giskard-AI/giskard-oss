@@ -65,9 +65,11 @@ def suite_shape_properties(
     *,
     scenario_count: int,
     has_target: bool,
+    parallel: bool = False,
 ) -> dict[str, Any]:
     return {
         "integration": "giskard-checks",
         "scenario_count": scenario_count,
         "has_target": has_target,
+        "parallel": parallel,
     }
