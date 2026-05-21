@@ -6,7 +6,7 @@ Additionally, it is helpful if you help us spread the word by mentioning the lib
 
 If you choose to contribute, please be mindful to respect our [code of conduct](CODE_OF_CONDUCT.md).
 
-**Coding agents and similar automation:** read **[AGENTS.md](AGENTS.md)** at the repository root before you work in this repo or open pull requests. It is the authoritative guide for agent setup, commands, and PR requirements (including how agent PRs are handled).
+**Important for autonomous agents:** autonomous agents with no human in the loop must read **[AUTONOMOUS.md](AUTONOMOUS.md)** before working in this repo or opening a PR.
 
 ## The different ways you can contribute to Giskard!
 
