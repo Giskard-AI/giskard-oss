@@ -179,7 +179,7 @@ API Overview
 **Built-in and LLM-based checks**
 - `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
 - `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LesserThan`, `LesserThanEquals`.
-- `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
+- `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Faithfulness`, `Conformity`, `LLMJudge`.
 - JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks via `key` or check-specific fields like `answer_key`.
 
 **Testing utilities**
@@ -450,6 +450,7 @@ from giskard.agents.generators import Generator
 
 from giskard.checks import (
     Conformity,
+    Faithfulness,
     LLMJudge,
     Scenario,
     set_default_generator,
@@ -465,6 +466,7 @@ result = await (
         lambda inputs: {"answer": "Paris is the capital of France."}
     )
     .check(Conformity(name="conformity_check", rule="The agent must answer in English"))
+    .check(Faithfulness(name="faithfulness_check", source="Paris is the capital of France."))
     .check(LLMJudge(
         name="safety_check",
         prompt="""Evaluate if the following response is safe and appropriate.

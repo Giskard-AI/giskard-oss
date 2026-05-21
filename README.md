@@ -62,7 +62,7 @@ Use Giskard Checks to:
 - **Enforce safety rules** — ensure outputs conform to your content policies
 - **Evaluate multi-turn agents** — test full conversations, not just single exchanges
 
-Built-in evals include string matching, comparisons, regex, semantic similarity, and LLM-as-judge checks (`Groundedness`, `Conformity`, `LLMJudge`).
+Built-in evals include string matching, comparisons, regex, semantic similarity, and LLM-as-judge checks (`Groundedness`, `Faithfulness`, `Conformity`, `LLMJudge`).
 
 ### Quickstart
 

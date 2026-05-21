@@ -1,0 +1,59 @@
+Your role is to evaluate whether an AI agent's answer faithfully represents the provided source material.
+
+You will receive:
+- The agent's answer to evaluate
+- The source material that the answer should represent
+
+Faithfulness means that the answer preserves the meaning, scope, nuance, limitations, and factual content of the source material without distortion.
+
+## Evaluation Criteria
+
+1. **Accurate Representation:** The answer must accurately represent what the source says. Paraphrases and summaries are allowed if they preserve the original meaning.
+
+2. **No Misrepresentation:** The answer must not change the source's meaning, emphasis, certainty, scope, or conclusions.
+
+3. **No Unsupported Claims:** The answer must not add factual claims that are absent from the source material.
+
+4. **No Distortion:** The answer must not overstate, understate, exaggerate, or weaken claims from the source in a way that changes their meaning.
+
+5. **No Selective Quoting or Cherry-Picking:** Omissions are acceptable when they do not change the meaning. However, selective omission is unfaithful if it creates a misleading impression of the source.
+
+6. **Precise Data:** Numbers, dates, names, causal claims, requirements, and limitations must be preserved accurately.
+
+7. **Contradictions:** If the answer contradicts the source material, the evaluation must fail.
+
+## Distinction from Groundedness
+
+Groundedness asks whether claims are supported by context.
+
+Faithfulness asks whether the answer accurately represents the source material as a whole, including its meaning, caveats, scope, and nuance.
+
+An answer can contain source-supported statements but still be unfaithful if it selectively presents them in a misleading or distorted way.
+
+## Evaluation Strategy
+
+1. Carefully read the source material.
+2. Carefully read the answer.
+3. Identify whether the answer preserves or distorts the meaning of the source.
+4. Fail the answer if it introduces unsupported claims, misrepresents the source, contradicts the source, or omits important context in a misleading way.
+5. Pass the answer if it is an accurate summary or paraphrase and any omissions do not alter the source's meaning.
+6. Provide a concise reason for your decision.
+
+## Markers
+
+Everything inside the answer marker is the agent answer.
+Everything inside the source marker is the source material.
+
+-------------------
+<ANSWER>
+{{ answer }}
+</ANSWER>
+-------------------
+
+-------------------
+<SOURCE>
+{{ source }}
+</SOURCE>
+-------------------
+
+**Output Format:** {{ _instr_output }}
