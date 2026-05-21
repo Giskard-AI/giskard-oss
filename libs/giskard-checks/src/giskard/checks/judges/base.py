@@ -1,4 +1,5 @@
-from typing import Any, override
+from collections import Counter
+from typing import Any, Literal, override
 
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow, TemplateReference
@@ -34,7 +35,22 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     generator : BaseGenerator
         Generator for LLM evaluation. Defaults to the global
         default generator if not specified.
+    num_runs : int
+        Number of times to execute the LLM-based evaluation.
+    consensus : Literal["majority", "unanimous", "any"]
+        Strategy used to aggregate multiple runs into a final result.
     """
+
+    num_runs: int = Field(
+        default=1,
+        ge=1,
+        strict=True,
+        description="Number of times to execute the LLM evaluation.",
+    )
+    consensus: Literal["majority", "unanimous", "any"] = Field(
+        default="majority",
+        description="Strategy used to aggregate multiple runs into a final result.",
+    )
 
     @property
     def output_type(self) -> type[BaseModel] | None:
@@ -91,9 +107,23 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         CheckResult
             The result of the check evaluation.
         """
-        workflow = await self._build_workflow(trace)
-
         inputs = await self.get_inputs(trace)
+        results = [
+            await self._run_once(trace, inputs=inputs) for _ in range(self.num_runs)
+        ]
+
+        if self.num_runs == 1:
+            return results[0]
+
+        return self._aggregate_results(results)
+
+    async def _run_once(
+        self,
+        trace: TraceType,
+        *,
+        inputs: dict[str, Any],
+    ) -> CheckResult:
+        workflow = await self._build_workflow(trace)
         workflow = workflow.with_inputs(**inputs)
 
         if self.output_type is not None:
@@ -102,6 +132,53 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         chat = await workflow.run()
 
         return await self._handle_output(chat.output, inputs, trace)
+
+    def _aggregate_results(self, results: list[CheckResult]) -> CheckResult:
+        passed_count = sum(result.passed for result in results)
+        non_pass_count = len(results) - passed_count
+
+        if self.consensus == "unanimous":
+            consensus_passed = passed_count == len(results)
+        elif self.consensus == "any":
+            consensus_passed = passed_count >= 1
+        else:
+            consensus_passed = passed_count > non_pass_count
+
+        representative = (
+            self._select_pass_result(results)
+            if consensus_passed
+            else self._select_non_pass_result(results)
+        )
+        status_counts = Counter(result.status.value for result in results)
+
+        return representative.model_copy(
+            update={
+                "details": {
+                    **representative.details,
+                    "runs": results,
+                    "num_runs": self.num_runs,
+                    "consensus": self.consensus,
+                    "consensus_passed": consensus_passed,
+                    "status_counts": dict(status_counts),
+                }
+            }
+        )
+
+    @staticmethod
+    def _select_pass_result(results: list[CheckResult]) -> CheckResult:
+        return next((result for result in results if result.passed), results[0])
+
+    @staticmethod
+    def _select_non_pass_result(results: list[CheckResult]) -> CheckResult:
+        for predicate in (
+            lambda result: result.failed,
+            lambda result: result.errored,
+            lambda result: result.skipped,
+        ):
+            match = next((result for result in results if predicate(result)), None)
+            if match is not None:
+                return match
+        return results[0]
 
     async def get_inputs(self, trace: TraceType) -> dict[str, Any]:
         """Get template inputs for the LLM prompt.
