@@ -1,6 +1,7 @@
 """Built-in check that evaluates Rego policies against trace data via regorus."""
 
 import importlib
+import json
 from typing import Any, override
 
 from pydantic import Field
@@ -13,7 +14,7 @@ from ..core.result import CheckResult
 _REGORUS_INSTALL_HINT = (
     "The regorus dependency is required to run RegoPolicy. "
     "Install it with: pip install 'giskard-checks[regorus]' "
-    "(requires a Rust toolchain to build from source)."
+    "(installs the celine-regorus PyPI wheel; imports as regorus)."
 )
 
 _POLICY_FILENAME = "giskard_policy.rego"
@@ -60,7 +61,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
     Extracts the OPA ``input`` document from the trace via JSONPath, merges
     optional static ``data``, and evaluates a boolean ``rule``. Requires the
     optional ``regorus`` extra (``pip install 'giskard-checks[regorus]'``,
-    built from the microsoft/regorus git repository; needs a Rust toolchain).
+    installs ``celine-regorus`` from PyPI; ``import regorus`` at runtime).
 
     The evaluated rule must return a boolean, be undefined (fail), or raise an
     error if it returns another type.
@@ -136,6 +137,15 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
         details["input"] = raw_value
 
         try:
+            input_json = json.dumps(raw_value)
+        except (TypeError, ValueError) as err:
+            details["error"] = str(err)
+            return CheckResult.failure(
+                message=f"Value at key '{self.key}' is not JSON serializable: {err}",
+                details=details,
+            )
+
+        try:
             regorus = importlib.import_module("regorus")
         except ImportError:
             return CheckResult.error(
@@ -148,7 +158,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
             engine.add_policy(_POLICY_FILENAME, self.policy)
             if self.data:
                 engine.add_data(self.data)
-            engine.set_input(raw_value)
+            engine.set_input_json(input_json)
             rule_value = engine.eval_rule(self.rule)
         except RuntimeError as err:
             details["error"] = str(err)

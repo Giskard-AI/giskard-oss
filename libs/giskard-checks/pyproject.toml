@@ -18,10 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-regorus = ["regorus"]
-
-[tool.uv.sources]
-regorus = { git = "https://github.com/microsoft/regorus.git", subdirectory = "bindings/python", rev = "regorus-v0.9.1" }
+regorus = ["celine-regorus>=0.9.1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]
@@ -30,7 +27,7 @@ asyncio_mode = "auto"
 pythonpath = ["src"]
 markers = [
     "integration: integration tests that are skipped unless --run-integration is provided",
-    "regorus: tests requiring the optional regorus dependency (built from git)",
+    "regorus: tests requiring the optional regorus dependency (celine-regorus)",
 ]
 
 [tool.ruff.lint]
