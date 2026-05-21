@@ -87,7 +87,7 @@ def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
     return cast(type[TraceType], inferred if inferred is not None else Trace)
 
 
-def _tag_interactions_with_step_index[InputType, OutputType, TraceType: Trace[Any, Any]](
+def _tag_interactions_with_step_index[TraceType: Trace[Any, Any]](
     trace: TraceType,
     *,
     step_index: int,
@@ -96,18 +96,20 @@ def _tag_interactions_with_step_index[InputType, OutputType, TraceType: Trace[An
     if len(trace.interactions) <= previous_count:
         return trace
 
-    interactions = list(trace.interactions[:previous_count])
-    interactions.extend(
-        interaction.model_copy(
-            update={
-                "metadata": {
-                    **interaction.metadata,
-                    "step_index": step_index,
+    interactions = [
+        *trace.interactions[:previous_count],
+        *(
+            interaction.model_copy(
+                update={
+                    "metadata": {
+                        **interaction.metadata,
+                        "step_index": step_index,
+                    }
                 }
-            }
+            )
+            for interaction in trace.interactions[previous_count:]
         )
-        for interaction in trace.interactions[previous_count:]
-    )
+    ]
     return cast(TraceType, trace.model_copy(update={"interactions": interactions}))
 
 
