@@ -1,9 +1,11 @@
 import asyncio
 import time
 from contextlib import nullcontext
+from types import SimpleNamespace
 
 import pytest
 from giskard.checks import Equals, Scenario, Suite
+from giskard.checks.scenarios import suite as suite_module
 
 
 @pytest.fixture
@@ -182,7 +184,6 @@ async def test_suite_parallel_preserves_result_order():
 @pytest.mark.asyncio
 async def test_suite_parallel_runs_concurrently():
     sleep_s = 0.06
-    n = 3
 
     async def delayed_identity(inputs):
         await asyncio.sleep(sleep_s)
@@ -193,12 +194,15 @@ async def test_suite_parallel_runs_concurrently():
     suite.append(Scenario("b").interact("b"))
     suite.append(Scenario("c").interact("c"))
 
-    start = time.perf_counter()
-    await suite.run(parallel=True)
-    parallel_duration = time.perf_counter() - start
+    serial_start = time.perf_counter()
+    await suite.run()
+    serial_duration = time.perf_counter() - serial_start
 
-    # Must complete faster than running all scenarios serially
-    assert parallel_duration < sleep_s * n
+    parallel_start = time.perf_counter()
+    await suite.run(parallel=True)
+    parallel_duration = time.perf_counter() - parallel_start
+
+    assert parallel_duration < serial_duration
 
 
 @pytest.mark.asyncio
@@ -292,3 +296,131 @@ async def test_suite_parallel_rejects_invalid_max_concurrency():
 
     with pytest.raises(ValueError, match="max_concurrency must be greater than 0"):
         await suite.run(parallel=True, max_concurrency=0)
+
+
+def test_suite_live_progress_requires_tty(monkeypatch):
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite.sys.stdout",
+        SimpleNamespace(isatty=lambda: False),
+    )
+
+    assert suite_module._should_render_live_progress(True) is False
+
+
+@pytest.mark.asyncio
+async def test_suite_live_progress_disabled_when_verbose_is_false(monkeypatch):
+    reporter_states = []
+
+    class FakeReporter:
+        def __init__(self, suite_name, total, *, enabled):
+            reporter_states.append((suite_name, total, enabled))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        async def record(self, result):
+            return None
+
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite.sys.stdout",
+        SimpleNamespace(isatty=lambda: True),
+    )
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite._SuiteProgressReporter", FakeReporter
+    )
+
+    suite = Suite(name="quiet_suite", target=lambda inputs: inputs)
+    suite.append(Scenario("a").interact("a"))
+
+    await suite.run(verbose=False)
+
+    assert reporter_states == [("quiet_suite", 1, False)]
+
+
+@pytest.mark.asyncio
+async def test_suite_live_progress_records_serial_statuses(monkeypatch):
+    recorded_statuses = []
+
+    class FakeReporter:
+        def __init__(self, suite_name, total, *, enabled):
+            assert suite_name == "serial_progress_suite"
+            assert total == 2
+            assert enabled is True
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        async def record(self, result):
+            recorded_statuses.append(result.status)
+
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite.sys.stdout",
+        SimpleNamespace(isatty=lambda: True),
+    )
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite._SuiteProgressReporter", FakeReporter
+    )
+
+    suite = Suite(name="serial_progress_suite")
+    suite.append(Scenario("pass").interact("a", "a"))
+    suite.append(
+        Scenario("fail")
+        .interact("b", "c")
+        .check(Equals(expected_value="b", key="trace.last.outputs"))
+    )
+
+    await suite.run()
+
+    assert recorded_statuses == ["pass", "fail"]
+
+
+@pytest.mark.asyncio
+async def test_suite_live_progress_records_parallel_completion_order(monkeypatch):
+    completed_names = []
+
+    class FakeReporter:
+        def __init__(self, suite_name, total, *, enabled):
+            assert suite_name == "parallel_progress_suite"
+            assert total == 3
+            assert enabled is True
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        async def record(self, result):
+            completed_names.append(result.scenario_name)
+
+    async def delayed_identity(inputs):
+        await asyncio.sleep({"slow": 0.2, "fast": 0.01, "mid": 0.08}[inputs])
+        return inputs
+
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite.sys.stdout",
+        SimpleNamespace(isatty=lambda: True),
+    )
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite._SuiteProgressReporter", FakeReporter
+    )
+
+    suite = Suite(name="parallel_progress_suite", target=delayed_identity)
+    suite.append(Scenario("slow").interact("slow"))
+    suite.append(Scenario("fast").interact("fast"))
+    suite.append(Scenario("mid").interact("mid"))
+
+    result = await suite.run(parallel=True)
+
+    assert [scenario.scenario_name for scenario in result.results] == [
+        "slow",
+        "fast",
+        "mid",
+    ]
+    assert completed_names == ["fast", "mid", "slow"]

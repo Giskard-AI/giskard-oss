@@ -1,4 +1,5 @@
 import asyncio
+import sys
 import time
 from contextlib import nullcontext
 from typing import Any, Generic, Self, TypeVar
@@ -6,15 +7,69 @@ from typing import Any, Generic, Self, TypeVar
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
+from rich.console import Console, Group
+from rich.live import Live
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
+from rich.text import Text
 
 from .._telemetry_props import suite_shape_properties
 from ..core.interaction import Trace
-from ..core.result import ScenarioResult, SuiteResult
+from ..core.result import STATUS_MAPPING, ScenarioResult, SuiteResult
 from ..core.scenario import Scenario
 from ..core.types import ProviderType
 
 InputType = TypeVar("InputType", infer_variance=True)
 OutputType = TypeVar("OutputType", infer_variance=True)
+
+
+def _should_render_live_progress(verbose: bool) -> bool:
+    return verbose and sys.stdout.isatty()
+
+
+class _SuiteProgressReporter:
+    def __init__(self, suite_name: str, total: int, *, enabled: bool) -> None:
+        self._enabled = enabled
+        self._lock = asyncio.Lock()
+        self._symbols = Text()
+        self._progress: Progress | None = None
+        self._task_id: int | None = None
+        self._live: Live | None = None
+
+        if not enabled:
+            return
+
+        self._progress = Progress(
+            TextColumn(f'Running suite "{suite_name}"'),
+            BarColumn(),
+            MofNCompleteColumn(),
+            console=Console(file=sys.stdout),
+        )
+        self._task_id = self._progress.add_task("suite", total=total)
+        self._live = Live(
+            Group(self._progress, self._symbols),
+            console=self._progress.console,
+            refresh_per_second=10,
+        )
+
+    def __enter__(self) -> "_SuiteProgressReporter":
+        if self._live is not None:
+            self._live.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if self._live is not None:
+            self._live.__exit__(exc_type, exc, tb)
+
+    async def record(self, result: ScenarioResult[Trace[Any, Any]]) -> None:
+        if not self._enabled or self._progress is None or self._task_id is None:
+            return
+
+        async with self._lock:
+            status = STATUS_MAPPING[result.status]
+            self._symbols.append(status["symbol"], style=status["color"])
+            self._progress.advance(self._task_id)
+            if self._live is not None:
+                self._live.update(Group(self._progress, self._symbols), refresh=True)
 
 
 class Suite(BaseModel, Generic[InputType, OutputType]):
@@ -94,6 +149,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
+        verbose: bool = True,
     ) -> SuiteResult:
         """Run all scenarios in the suite.
 
@@ -109,6 +165,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         max_concurrency : int | None
             Optional upper bound on concurrent scenario runs when ``parallel=True``.
             Must be a positive integer when provided.
+        verbose : bool
+            If True, emit live terminal progress when stdout is a TTY.
 
         Returns
         -------
@@ -147,12 +205,18 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             )
 
             start_time = time.perf_counter()
-            if parallel:
-                results = await self._run_parallel(
-                    target, return_exception, max_concurrency
-                )
-            else:
-                results = await self._run_serial(target, return_exception)
+            reporter = _SuiteProgressReporter(
+                self.name,
+                len(self.scenarios),
+                enabled=_should_render_live_progress(verbose),
+            )
+            with reporter:
+                if parallel:
+                    results = await self._run_parallel(
+                        target, return_exception, max_concurrency, reporter
+                    )
+                else:
+                    results = await self._run_serial(target, return_exception, reporter)
             end_time = time.perf_counter()
 
             suite_result = SuiteResult(
@@ -178,17 +242,23 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         self,
         target: Any,
         return_exception: bool,
+        reporter: _SuiteProgressReporter,
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
-        return [
-            await scenario.run(target=target, return_exception=return_exception)
-            for scenario in self.scenarios
-        ]
+        results = []
+        for scenario in self.scenarios:
+            result = await scenario.run(
+                target=target, return_exception=return_exception
+            )
+            await reporter.record(result)
+            results.append(result)
+        return results
 
     async def _run_parallel(
         self,
         target: Any,
         return_exception: bool,
         max_concurrency: int | None,
+        reporter: _SuiteProgressReporter,
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
         semaphore = (
             asyncio.Semaphore(max_concurrency) if max_concurrency else nullcontext()
@@ -198,9 +268,11 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
         ) -> ScenarioResult[Trace[Any, Any]]:
             async with semaphore:
-                return await scenario.run(
+                result = await scenario.run(
                     target=target, return_exception=return_exception
                 )
+            await reporter.record(result)
+            return result
 
         try:
             async with asyncio.TaskGroup() as task_group:
