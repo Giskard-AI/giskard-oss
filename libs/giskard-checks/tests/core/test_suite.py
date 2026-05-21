@@ -1,9 +1,19 @@
 import asyncio
-import time
+import io
+import sys
 from contextlib import nullcontext
 
 import pytest
 from giskard.checks import Equals, Scenario, Suite
+
+
+class RecordingStdout(io.StringIO):
+    def __init__(self, *, is_tty: bool):
+        super().__init__()
+        self._is_tty = is_tty
+
+    def isatty(self):
+        return self._is_tty
 
 
 @pytest.fixture
@@ -183,22 +193,27 @@ async def test_suite_parallel_preserves_result_order():
 async def test_suite_parallel_runs_concurrently():
     sleep_s = 0.06
     n = 3
+    active_runs = 0
+    peak_runs = 0
 
     async def delayed_identity(inputs):
-        await asyncio.sleep(sleep_s)
-        return inputs
+        nonlocal active_runs, peak_runs
+        active_runs += 1
+        peak_runs = max(peak_runs, active_runs)
+        try:
+            await asyncio.sleep(sleep_s)
+            return inputs
+        finally:
+            active_runs -= 1
 
     suite = Suite(name="parallel_speed_suite", target=delayed_identity)
     suite.append(Scenario("a").interact("a"))
     suite.append(Scenario("b").interact("b"))
     suite.append(Scenario("c").interact("c"))
 
-    start = time.perf_counter()
     await suite.run(parallel=True)
-    parallel_duration = time.perf_counter() - start
 
-    # Must complete faster than running all scenarios serially
-    assert parallel_duration < sleep_s * n
+    assert peak_runs == n
 
 
 @pytest.mark.asyncio
@@ -292,3 +307,75 @@ async def test_suite_parallel_rejects_invalid_max_concurrency():
 
     with pytest.raises(ValueError, match="max_concurrency must be greater than 0"):
         await suite.run(parallel=True, max_concurrency=0)
+
+
+@pytest.mark.asyncio
+async def test_suite_run_reports_live_progress_when_stdout_is_tty(monkeypatch):
+    stdout = RecordingStdout(is_tty=True)
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    suite = Suite(name="progress_suite")
+    suite.append(Scenario("pass").interact("pass", "pass"))
+    suite.append(
+        Scenario("fail")
+        .interact("fail", "actual")
+        .check(Equals(expected_value="expected", key="trace.last.outputs"))
+    )
+
+    await suite.run()
+
+    output = stdout.getvalue()
+    assert 'Running suite "progress_suite"' in output
+    assert "2/2" in output
+    assert "." in output
+    assert "F" in output
+
+
+@pytest.mark.asyncio
+async def test_suite_run_suppresses_live_progress_when_not_tty(monkeypatch):
+    stdout = RecordingStdout(is_tty=False)
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    suite = Suite(name="quiet_suite")
+    suite.append(Scenario("pass").interact("pass", "pass"))
+
+    await suite.run()
+
+    assert stdout.getvalue() == ""
+
+
+@pytest.mark.asyncio
+async def test_suite_run_suppresses_live_progress_when_verbose_false(monkeypatch):
+    stdout = RecordingStdout(is_tty=True)
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    suite = Suite(name="quiet_suite")
+    suite.append(Scenario("pass").interact("pass", "pass"))
+
+    await suite.run(verbose=False)
+
+    assert stdout.getvalue() == ""
+
+
+@pytest.mark.asyncio
+async def test_suite_run_writes_status_symbol_before_next_serial_scenario(
+    monkeypatch,
+):
+    stdout = RecordingStdout(is_tty=True)
+    monkeypatch.setattr(sys, "stdout", stdout)
+    output_before_second_start = None
+
+    def target(inputs):
+        nonlocal output_before_second_start
+        if inputs == "second":
+            output_before_second_start = stdout.getvalue()
+        return inputs
+
+    suite = Suite(name="incremental_suite", target=target)
+    suite.append(Scenario("first").interact("first"))
+    suite.append(Scenario("second").interact("second"))
+
+    await suite.run()
+
+    assert output_before_second_start is not None
+    assert "." in output_before_second_start

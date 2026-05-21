@@ -1,20 +1,75 @@
 import asyncio
+import sys
 import time
 from contextlib import nullcontext
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, Generic, Self, TypeVar, cast
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
+from rich.console import Console
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TaskID, TextColumn
+from rich.text import Text
 
 from .._telemetry_props import suite_shape_properties
 from ..core.interaction import Trace
-from ..core.result import ScenarioResult, SuiteResult
+from ..core.result import STATUS_MAPPING, ScenarioResult, SuiteResult
 from ..core.scenario import Scenario
 from ..core.types import ProviderType
 
 InputType = TypeVar("InputType", infer_variance=True)
 OutputType = TypeVar("OutputType", infer_variance=True)
+
+
+class _SuiteProgressReporter:
+    def __init__(self, suite_name: str, total: int, verbose: bool) -> None:
+        self._suite_name = suite_name
+        self._total = total
+        self._enabled = verbose and total > 0 and sys.stdout.isatty()
+        self._console: Console | None = None
+        self._progress: Progress | None = None
+        self._task_id: TaskID | None = None
+        self._printed_symbols = False
+
+    def __enter__(self) -> Self:
+        if not self._enabled:
+            return self
+
+        self._console = Console(file=sys.stdout)
+        self._progress = Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TextColumn("{task.percentage:>3.0f}%"),
+            console=self._console,
+        )
+        self._progress.__enter__()
+        self._task_id = self._progress.add_task(
+            f'Running suite "{self._suite_name}"',
+            total=self._total,
+        )
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
+        if self._progress is None:
+            return
+
+        self._progress.__exit__(exc_type, exc, traceback)
+        if self._printed_symbols and self._console is not None:
+            self._console.print()
+
+    def record(self, result: ScenarioResult[Trace[Any, Any]]) -> None:
+        if self._progress is None or self._task_id is None:
+            return
+
+        status = STATUS_MAPPING[result.status]
+        self._progress.console.print(
+            Text(status["symbol"], style=status["color"]),
+            end="",
+        )
+        self._progress.advance(self._task_id)
+        self._progress.console.file.flush()
+        self._printed_symbols = True
 
 
 class Suite(BaseModel, Generic[InputType, OutputType]):
@@ -94,6 +149,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
+        verbose: bool = True,
     ) -> SuiteResult:
         """Run all scenarios in the suite.
 
@@ -109,6 +165,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         max_concurrency : int | None
             Optional upper bound on concurrent scenario runs when ``parallel=True``.
             Must be a positive integer when provided.
+        verbose : bool
+            If True, show live progress while running in an interactive terminal.
 
         Returns
         -------
@@ -147,12 +205,24 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             )
 
             start_time = time.perf_counter()
-            if parallel:
-                results = await self._run_parallel(
-                    target, return_exception, max_concurrency
-                )
-            else:
-                results = await self._run_serial(target, return_exception)
+            with _SuiteProgressReporter(
+                self.name,
+                len(self.scenarios),
+                verbose,
+            ) as progress:
+                if parallel:
+                    results = await self._run_parallel(
+                        target,
+                        return_exception,
+                        max_concurrency,
+                        progress,
+                    )
+                else:
+                    results = await self._run_serial(
+                        target,
+                        return_exception,
+                        progress,
+                    )
             end_time = time.perf_counter()
 
             suite_result = SuiteResult(
@@ -178,38 +248,54 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         self,
         target: Any,
         return_exception: bool,
+        progress: _SuiteProgressReporter,
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
-        return [
-            await scenario.run(target=target, return_exception=return_exception)
-            for scenario in self.scenarios
-        ]
+        results = []
+        for scenario in self.scenarios:
+            result = await scenario.run(
+                target=target,
+                return_exception=return_exception,
+            )
+            progress.record(result)
+            results.append(result)
+        return results
 
     async def _run_parallel(
         self,
         target: Any,
         return_exception: bool,
         max_concurrency: int | None,
+        progress: _SuiteProgressReporter,
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
         semaphore = (
             asyncio.Semaphore(max_concurrency) if max_concurrency else nullcontext()
         )
 
         async def run_scenario(
+            index: int,
             scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
-        ) -> ScenarioResult[Trace[Any, Any]]:
+        ) -> tuple[int, ScenarioResult[Trace[Any, Any]]]:
             async with semaphore:
-                return await scenario.run(
+                result = await scenario.run(
                     target=target, return_exception=return_exception
                 )
+                return index, result
 
+        results: list[ScenarioResult[Trace[Any, Any]] | None] = [None] * len(
+            self.scenarios
+        )
         try:
             async with asyncio.TaskGroup() as task_group:
                 tasks = [
-                    task_group.create_task(run_scenario(scenario))
-                    for scenario in self.scenarios
+                    task_group.create_task(run_scenario(index, scenario))
+                    for index, scenario in enumerate(self.scenarios)
                 ]
+                for task in asyncio.as_completed(tasks):
+                    index, result = await task
+                    results[index] = result
+                    progress.record(result)
         except* Exception as exc_group:
             if len(exc_group.exceptions) == 1:
                 raise exc_group.exceptions[0]
             raise
-        return [task.result() for task in tasks]
+        return [cast(ScenarioResult[Trace[Any, Any]], result) for result in results]
