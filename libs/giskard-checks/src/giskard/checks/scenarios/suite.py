@@ -29,7 +29,6 @@ def _should_render_live_progress(verbose: bool) -> bool:
 class _SuiteProgressReporter:
     def __init__(self, suite_name: str, total: int, *, enabled: bool) -> None:
         self._enabled = enabled
-        self._lock = asyncio.Lock()
         self._symbols = Text()
         self._progress: Progress | None = None
         self._task_id: int | None = None
@@ -39,12 +38,15 @@ class _SuiteProgressReporter:
             return
 
         self._progress = Progress(
-            TextColumn(f'Running suite "{suite_name}"'),
+            TextColumn(),
             BarColumn(),
             MofNCompleteColumn(),
             console=Console(file=sys.stdout),
         )
-        self._task_id = self._progress.add_task("suite", total=total)
+        self._task_id = self._progress.add_task(
+            f'Running suite "{suite_name}"',
+            total=total,
+        )
         self._live = Live(
             Group(self._progress, self._symbols),
             console=self._progress.console,
@@ -64,12 +66,9 @@ class _SuiteProgressReporter:
         if not self._enabled or self._progress is None or self._task_id is None:
             return
 
-        async with self._lock:
-            status = STATUS_MAPPING[result.status]
-            self._symbols.append(status["symbol"], style=status["color"])
-            self._progress.advance(self._task_id)
-            if self._live is not None:
-                self._live.update(Group(self._progress, self._symbols), refresh=True)
+        status = STATUS_MAPPING[result.status]
+        self._symbols.append(status["symbol"], style=status["color"])
+        self._progress.advance(self._task_id)
 
 
 class Suite(BaseModel, Generic[InputType, OutputType]):
