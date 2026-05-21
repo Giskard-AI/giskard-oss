@@ -87,6 +87,30 @@ def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
     return cast(type[TraceType], inferred if inferred is not None else Trace)
 
 
+def _tag_interactions_with_step_index[InputType, OutputType, TraceType: Trace[Any, Any]](
+    trace: TraceType,
+    *,
+    step_index: int,
+    previous_count: int,
+) -> TraceType:
+    if len(trace.interactions) <= previous_count:
+        return trace
+
+    interactions = list(trace.interactions[:previous_count])
+    interactions.extend(
+        interaction.model_copy(
+            update={
+                "metadata": {
+                    **interaction.metadata,
+                    "step_index": step_index,
+                }
+            }
+        )
+        for interaction in trace.interactions[previous_count:]
+    )
+    return cast(TraceType, trace.model_copy(update={"interactions": interactions}))
+
+
 class ScenarioRunner:
     """Execute scenarios by running their steps sequentially.
 
@@ -149,8 +173,14 @@ class ScenarioRunner:
             properties=shape_props,
         )
 
-        for step in steps:
+        for step_index, step in enumerate(steps):
+            previous_count = len(trace.interactions)
             trace = await trace.with_interactions(*step.interacts)
+            trace = _tag_interactions_with_step_index(
+                trace,
+                step_index=step_index,
+                previous_count=previous_count,
+            )
 
             test_case = TestCase(
                 trace=trace,

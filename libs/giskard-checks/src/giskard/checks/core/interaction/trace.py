@@ -127,7 +127,35 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
             if generator is not None:
                 await generator.aclose()
 
-    # TODO def steps() -> list[list[Interaction[InputType, OutputType]]]: # Index based
+    def steps(self) -> list[list[Interaction[InputType, OutputType]]]:
+        """Return interactions grouped by logical scenario step.
+
+        Step grouping is derived from the ``step_index`` value stored in each
+        interaction's ``metadata``. Interactions recorded without a
+        ``step_index`` are treated as belonging to step ``0``. The helper
+        preserves interaction order within each step and emits groups in the
+        order the step indices first appear in the trace.
+
+        Returns
+        -------
+        list[list[Interaction[InputType, OutputType]]]
+            Interactions grouped by logical step. Empty traces return ``[]``.
+        """
+        grouped: list[list[Interaction[InputType, OutputType]]] = []
+        current_step_index: int | None = None
+
+        for interaction in self.interactions:
+            step_index = interaction.metadata.get("step_index", 0)
+            if not isinstance(step_index, int) or isinstance(step_index, bool):
+                step_index = 0
+
+            if current_step_index != step_index:
+                grouped.append([])
+                current_step_index = step_index
+
+            grouped[-1].append(interaction)
+
+        return grouped
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
