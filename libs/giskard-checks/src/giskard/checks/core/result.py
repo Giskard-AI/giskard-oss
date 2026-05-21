@@ -347,6 +347,11 @@ class TestCaseResult(BaseResult, frozen=True):
         Check results produced during the test case execution.
     duration_ms : int
         Total execution time in milliseconds.
+    trace_index : int | None
+        0-based index, in the scenario's final trace, of the last interaction
+        this step added before its checks ran. ``None`` when the step added no
+        interactions (e.g. skipped). Consumers (such as the Giskard Hub upload
+        flow) use this to attribute check results to a specific interaction.
     status : TestCaseStatus
         Aggregated outcome of the test case derived from its results.
     passed : bool
@@ -361,6 +366,13 @@ class TestCaseResult(BaseResult, frozen=True):
 
     results: list[CheckResult] = Field(..., description="Check results for each run")
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
+    trace_index: int | None = Field(
+        default=None,
+        description=(
+            "0-based index of the last trace interaction added by this step's "
+            "interacts before checks ran; None when no interactions were added."
+        ),
+    )
 
     @computed_field
     @property
@@ -552,6 +564,17 @@ class SuiteResult(BaseResult, frozen=True):
         from ..export.junit import to_junit_xml
 
         return to_junit_xml(self, path=path)
+
+    def to_hub_format(self) -> dict[str, Any]:
+        """Convert the suite result into a JSON-serializable Giskard Hub payload.
+
+        The returned dict can be passed directly to
+        :meth:`giskard_hub.HubClient.evaluations.upload` to upload the suite
+        result to the Hub.
+        """
+        from ..export.hub import to_hub_format
+
+        return to_hub_format(self)
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions

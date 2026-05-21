@@ -139,12 +139,14 @@ class ScenarioRunner:
 
         for step in steps:
             trace = await trace.with_interactions(*step.interacts)
+            trace_index = len(trace.interactions) - 1 if trace.interactions else None
 
             test_case = TestCase(
                 trace=trace,
                 checks=step.checks,
             )
             step_result = await test_case.run(return_exception)
+            step_result = step_result.model_copy(update={"trace_index": trace_index})
             steps_results.append(step_result)
 
             # Stop on first failure
