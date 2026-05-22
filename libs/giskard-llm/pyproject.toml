@@ -32,6 +32,7 @@ markers = [
     "anthropic: tests requiring the anthropic SDK",
     "azure: tests requiring the openai SDK (Azure OpenAI)",
     "azure_ai: tests requiring the openai SDK (Azure AI Foundry)",
+    "azure_foundry_v1: tests requiring the openai SDK (Azure Foundry OpenAI v1)",
     "functional: functional tests making real API calls",
     "no_providers: tests that run without any provider SDK installed",
 ]

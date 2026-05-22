@@ -64,6 +64,39 @@ response = await client.acompletion("anthropic-relaxed/claude-3-5-haiku-latest",
 | `azure_ai/` | `openai` | `AZURE_AI_API_KEY`, `AZURE_AI_ENDPOINT` | yes | model-dependent | `base_url`, `http_client`, `default_headers` |
 
 
+## Azure Foundry OpenAI v1
+
+Azure Foundry OpenAI v1 endpoints are OpenAI-compatible. Configure them with
+the `openai` provider and the Azure `/openai/v1/` base URL. Use Azure
+deployment names as the chat, response, and embedding model names.
+
+```python
+from giskard.llm import LLMClient
+
+client = LLMClient()
+client.configure(
+    "foundry-v1",
+    provider="openai",
+    api_key="os.environ/AZURE_OPENAI_API_KEY", # pragma: allowlist secret
+    base_url="https://example.openai.azure.com/openai/v1/",
+)
+
+chat = await client.acompletion(
+    "foundry-v1/gpt-4.1-mini",
+    [{"role": "user", "content": "Write one sentence."}],
+)
+response = await client.aresponse("foundry-v1/gpt-4.1-mini", "Write one sentence.")
+embedding = await client.aembedding(
+    "foundry-v1/text-embedding-3-small",
+    ["Text to embed."],
+)
+```
+
+Use `azure/` for classic Azure OpenAI deployments that require `api_version`.
+Use `azure_ai/` for the existing Azure AI Foundry compatibility path. Do not
+use `azure_ai/` for new OpenAI v1 endpoints unless you intentionally need that
+legacy endpoint behavior.
+
 ## Custom transport and headers
 
 Use `http_client` to provide a caller-owned async HTTP client, for example

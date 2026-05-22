@@ -258,6 +258,22 @@ def test_openai_provider_forwards_transport_config():
     assert kwargs["default_headers"] == default_headers
 
 
+def test_openai_provider_supports_azure_foundry_v1_base_url():
+    with patch("giskard.llm.providers.openai._import_openai") as mock_import:
+        sdk = MagicMock()
+        mock_import.return_value = sdk
+
+        OpenAIProvider(
+            api_key="k",
+            base_url="https://example.openai.azure.com/openai/v1/",
+        )
+
+    kwargs = sdk.AsyncOpenAI.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["base_url"] == "https://example.openai.azure.com/openai/v1/"
+    assert "api_version" not in kwargs
+
+
 def test_azure_openai_provider_forwards_transport_config(monkeypatch):
     http_client = object()
     default_headers = {"x-test": "1"}

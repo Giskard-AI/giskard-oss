@@ -36,6 +36,12 @@ Provider-specific kwargs:
     - ``timeout``: request timeout in seconds
     - ``http_client``: caller-owned async HTTP client passed to the SDK; not closed by giskard-llm
     - ``default_headers``: extra headers merged into every SDK request
+
+Azure Foundry OpenAI v1:
+    Azure Foundry OpenAI v1 endpoints are OpenAI-compatible and should use
+    this provider with ``base_url`` set to the Azure ``/openai/v1/`` endpoint.
+    The ``model`` argument remains the Azure deployment name for completions,
+    Responses API calls, and embeddings.
 """
 
 # pyright: reportAttributeAccessIssue=false
