@@ -38,7 +38,7 @@ class _SuiteProgressReporter:
             return
 
         self._progress = Progress(
-            TextColumn(),
+            TextColumn("{task.description}"),
             BarColumn(),
             MofNCompleteColumn(),
             console=Console(file=sys.stdout),
