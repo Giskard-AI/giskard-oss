@@ -35,12 +35,16 @@ Provider-specific kwargs:
     - ``base_url``: Azure AI Foundry **resource endpoint** URL (typically
       ``https://<resource>.services.ai.azure.com``). If callers still pass a URL
       that only appends legacy ``/models``, that suffix is stripped for Foundry hosts.
+    - ``timeout``: request timeout in seconds
+    - ``http_client``: caller-owned async HTTP client passed to the SDK; not closed by giskard-llm
+    - ``default_headers``: extra headers merged into every SDK request
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false, reportMissingSuperCall=false
 
 import logging
 import os
+from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 
@@ -85,6 +89,8 @@ class AzureAIProvider(OpenAIProvider):
         api_key: str | None = None,
         base_url: str | None = None,
         timeout: float | None = None,
+        http_client: Any | None = None,
+        default_headers: Mapping[str, str] | None = None,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:
@@ -108,5 +114,7 @@ class AzureAIProvider(OpenAIProvider):
                 azure_endpoint=resolved_endpoint,
                 api_version=resolved_version,
                 timeout=timeout,
+                http_client=http_client,
+                default_headers=default_headers,
             )
         )

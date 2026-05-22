@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from giskard.llm.errors import BadRequestError, LLMError, RateLimitError
 from giskard.llm.providers.anthropic import AnthropicProvider
+from giskard.llm.providers.azure_ai import AzureAIProvider
+from giskard.llm.providers.azure_openai import AzureOpenAIProvider
 from giskard.llm.providers.base import (
     CompletionProvider,
     EmbeddingProvider,
@@ -227,6 +229,190 @@ async def test_openai_embedding(mock_import):
     resp = await provider.embed("text-embedding-3-small", ["hello", "world"])
     assert len(resp.data) == 2
     assert resp.data[0].embedding == [0.1, 0.2]
+
+
+# -- Provider transport configuration -----------------------------------------
+
+
+def test_openai_provider_forwards_transport_config():
+    http_client = object()
+    default_headers = {"x-test": "1"}
+
+    with patch("giskard.llm.providers.openai._import_openai") as mock_import:
+        sdk = MagicMock()
+        mock_import.return_value = sdk
+
+        OpenAIProvider(
+            api_key="k",
+            base_url="https://example.test/v1",
+            timeout=12,
+            http_client=http_client,
+            default_headers=default_headers,
+        )
+
+    kwargs = sdk.AsyncOpenAI.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["base_url"] == "https://example.test/v1"
+    assert kwargs["timeout"] == 12
+    assert kwargs["http_client"] is http_client
+    assert kwargs["default_headers"] == default_headers
+
+
+def test_azure_openai_provider_forwards_transport_config(monkeypatch):
+    http_client = object()
+    default_headers = {"x-test": "1"}
+    monkeypatch.delenv("AZURE_API_KEY", raising=False)
+    monkeypatch.delenv("AZURE_API_BASE", raising=False)
+    monkeypatch.delenv("AZURE_API_VERSION", raising=False)
+
+    with patch("openai.AsyncAzureOpenAI") as mock_client:
+        AzureOpenAIProvider(
+            api_key="k",
+            base_url="https://azure.test",
+            api_version="2024-10-21",
+            timeout=12,
+            http_client=http_client,
+            default_headers=default_headers,
+        )
+
+    kwargs = mock_client.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["azure_endpoint"] == "https://azure.test"
+    assert kwargs["api_version"] == "2024-10-21"
+    assert kwargs["timeout"] == 12
+    assert kwargs["http_client"] is http_client
+    assert kwargs["default_headers"] == default_headers
+
+
+def test_azure_ai_provider_forwards_transport_config(monkeypatch):
+    http_client = object()
+    default_headers = {"x-ms-useragent": "giskard-llm"}
+    monkeypatch.delenv("AZURE_AI_ENDPOINT", raising=False)
+    monkeypatch.delenv("AZURE_AI_API_VERSION", raising=False)
+
+    with patch("openai.AsyncAzureOpenAI") as mock_client:
+        AzureAIProvider(
+            api_key="k",
+            base_url="https://dev.services.ai.azure.com/models",
+            timeout=12,
+            http_client=http_client,
+            default_headers=default_headers,
+        )
+
+    kwargs = mock_client.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["azure_endpoint"] == "https://dev.services.ai.azure.com"
+    assert kwargs["api_version"] == "2024-10-21"
+    assert kwargs["timeout"] == 12
+    assert kwargs["http_client"] is http_client
+    assert kwargs["default_headers"] == default_headers
+
+
+def test_anthropic_provider_forwards_transport_config():
+    http_client = object()
+    default_headers = {"x-test": "1"}
+
+    with patch("giskard.llm.providers.anthropic._import_anthropic") as mock_import:
+        sdk = MagicMock()
+        mock_import.return_value = sdk
+
+        AnthropicProvider(
+            api_key="k",
+            base_url="https://anthropic.test",
+            timeout=12,
+            http_client=http_client,
+            default_headers=default_headers,
+        )
+
+    kwargs = sdk.AsyncAnthropic.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["base_url"] == "https://anthropic.test"
+    assert kwargs["timeout"] == 12
+    assert kwargs["http_client"] is http_client
+    assert kwargs["default_headers"] == default_headers
+
+
+def test_google_provider_builds_http_options_from_transport_config(monkeypatch):
+    http_client = object()
+    default_headers = {"x-test": "1"}
+
+    class FakeHttpOptions:
+        def __init__(self, httpxAsyncClient=None, headers=None):
+            self.httpx_async_client = httpxAsyncClient
+            self.headers = headers
+
+        @classmethod
+        def model_validate(cls, value):
+            return value if isinstance(value, cls) else cls(**value)
+
+        def model_copy(self, update=None):
+            copied = type(self)(
+                httpxAsyncClient=self.httpx_async_client,
+                headers=self.headers,
+            )
+            for key, value in (update or {}).items():
+                setattr(copied, key, value)
+            return copied
+
+    sdk = MagicMock()
+    types = MagicMock(HttpOptions=FakeHttpOptions)
+    monkeypatch.setattr("giskard.llm.providers.google._import_genai", lambda: sdk)
+    monkeypatch.setattr(
+        "giskard.llm.providers.google._import_genai_types", lambda: types
+    )
+
+    GoogleProvider(
+        api_key="k",
+        http_client=http_client,
+        default_headers=default_headers,
+    )
+
+    kwargs = sdk.Client.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["http_options"].httpx_async_client is http_client
+    assert kwargs["http_options"].headers == default_headers
+
+
+def test_google_provider_preserves_explicit_http_options_and_fills_missing(monkeypatch):
+    explicit_client = object()
+    fallback_client = object()
+    fallback_headers = {"x-fallback": "1"}
+
+    class FakeHttpOptions:
+        def __init__(self, httpxAsyncClient=None, headers=None):
+            self.httpx_async_client = httpxAsyncClient
+            self.headers = headers
+
+        @classmethod
+        def model_validate(cls, value):
+            return value if isinstance(value, cls) else cls(**value)
+
+        def model_copy(self, update=None):
+            copied = type(self)(
+                httpxAsyncClient=self.httpx_async_client,
+                headers=self.headers,
+            )
+            for key, value in (update or {}).items():
+                setattr(copied, key, value)
+            return copied
+
+    sdk = MagicMock()
+    types = MagicMock(HttpOptions=FakeHttpOptions)
+    monkeypatch.setattr("giskard.llm.providers.google._import_genai", lambda: sdk)
+    monkeypatch.setattr(
+        "giskard.llm.providers.google._import_genai_types", lambda: types
+    )
+
+    GoogleProvider(
+        api_key="k",
+        http_client=fallback_client,
+        default_headers=fallback_headers,
+        http_options=FakeHttpOptions(httpxAsyncClient=explicit_client),
+    )
+
+    options = sdk.Client.call_args.kwargs["http_options"]
+    assert options.httpx_async_client is explicit_client
+    assert options.headers == fallback_headers
 
 
 # -- Error mapping completeness ------------------------------------------------

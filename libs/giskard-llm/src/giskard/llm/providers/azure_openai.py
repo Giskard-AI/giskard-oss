@@ -26,12 +26,15 @@ Supported features:
 Provider-specific kwargs:
     - ``api_version``: Azure API version (default: ``2024-10-21``)
     - ``base_url``: Azure endpoint URL
+    - ``http_client``: caller-owned async HTTP client passed to the SDK; not closed by giskard-llm
+    - ``default_headers``: extra headers merged into every SDK request
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false, reportMissingSuperCall=false
 
 import logging
 import os
+from collections.abc import Mapping
 from typing import Any
 
 from ..errors import ProviderNotAvailableError
@@ -52,6 +55,8 @@ class AzureOpenAIProvider(OpenAIProvider):
         base_url: str | None = None,
         api_version: str | None = None,
         timeout: float | None = None,
+        http_client: Any | None = None,
+        default_headers: Mapping[str, str] | None = None,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:
@@ -75,5 +80,7 @@ class AzureOpenAIProvider(OpenAIProvider):
                 azure_endpoint=resolved_base,
                 api_version=resolved_version,
                 timeout=timeout,
+                http_client=http_client,
+                default_headers=default_headers,
             )
         )

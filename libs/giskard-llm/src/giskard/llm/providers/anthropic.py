@@ -41,12 +41,14 @@ Provider-specific kwargs (configure-time):
     - ``merge_system``: if True, concatenate multiple system messages instead of raising
     - ``base_url``: custom API endpoint
     - ``timeout``: request timeout in seconds
+    - ``http_client``: caller-owned async HTTP client passed to the SDK; not closed by giskard-llm
+    - ``default_headers``: extra headers merged into every SDK request
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, NoReturn
 
 from pydantic import TypeAdapter, ValidationError
@@ -99,6 +101,8 @@ class AnthropicProvider:
         base_url: str | None = None,
         timeout: float | None = None,
         merge_system: bool = False,
+        http_client: Any | None = None,
+        default_headers: Mapping[str, str] | None = None,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:
@@ -108,7 +112,13 @@ class AnthropicProvider:
         anthropic = _import_anthropic()
         self._merge_system = merge_system
         self._client = anthropic.AsyncAnthropic(
-            **compact(api_key=api_key, base_url=base_url, timeout=timeout)
+            **compact(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=timeout,
+                http_client=http_client,
+                default_headers=default_headers,
+            )
         )
 
     def _map_error(self, e: Exception) -> NoReturn:
