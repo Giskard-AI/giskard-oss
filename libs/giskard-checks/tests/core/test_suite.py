@@ -332,6 +332,20 @@ async def test_suite_run_reports_live_progress_when_stdout_is_tty(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_suite_run_progress_handles_braces_in_suite_name(monkeypatch):
+    stdout = RecordingStdout(is_tty=True)
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    suite = Suite(name="progress {suite}")
+    suite.append(Scenario("pass").interact("pass", "pass"))
+
+    result = await suite.run()
+
+    assert result.passed_count == 1
+    assert 'Running suite "progress {suite}"' in stdout.getvalue()
+
+
+@pytest.mark.asyncio
 async def test_suite_run_suppresses_live_progress_when_not_tty(monkeypatch):
     stdout = RecordingStdout(is_tty=False)
     monkeypatch.setattr(sys, "stdout", stdout)
