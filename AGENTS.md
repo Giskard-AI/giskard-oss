@@ -33,6 +33,9 @@ giskard-oss — behavioral config for interactive coding assistants with a human
 – When given a bug report with clear scope: just fix it
 – No `# type: ignore`, no patched test assertions — fix the root cause
 
+### 7. Commit Hygiene
+– Use Conventional Commits for every commit message (for example, `fix(llm): update google interactions translator`)
+
 ## Task Management
 1. Brainstorm → Spec → Plan — save to the repo's established planning docs, preferably `docs/specs/` and `docs/plans/`
 2. Verify Plan — check in before starting
