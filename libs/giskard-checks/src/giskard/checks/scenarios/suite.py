@@ -2,7 +2,7 @@ import asyncio
 import sys
 import time
 from contextlib import nullcontext
-from typing import Any, Generic, Self, TypeVar, cast
+from typing import Any, Generic, Self, TypeVar
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
 from giskard.core.utils import NOT_PROVIDED, NotProvided
@@ -272,30 +272,23 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         )
 
         async def run_scenario(
-            index: int,
             scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
-        ) -> tuple[int, ScenarioResult[Trace[Any, Any]]]:
+        ) -> ScenarioResult[Trace[Any, Any]]:
             async with semaphore:
                 result = await scenario.run(
                     target=target, return_exception=return_exception
                 )
-                return index, result
+            progress.record(result)
+            return result
 
-        results: list[ScenarioResult[Trace[Any, Any]] | None] = [None] * len(
-            self.scenarios
-        )
         try:
             async with asyncio.TaskGroup() as task_group:
                 tasks = [
-                    task_group.create_task(run_scenario(index, scenario))
-                    for index, scenario in enumerate(self.scenarios)
+                    task_group.create_task(run_scenario(scenario))
+                    for scenario in self.scenarios
                 ]
-                for task in asyncio.as_completed(tasks):
-                    index, result = await task
-                    results[index] = result
-                    progress.record(result)
         except* Exception as exc_group:
             if len(exc_group.exceptions) == 1:
                 raise exc_group.exceptions[0]
             raise
-        return [cast(ScenarioResult[Trace[Any, Any]], result) for result in results]
+        return [task.result() for task in tasks]
