@@ -5,6 +5,7 @@ from .base import BaseLLMCheck, LLMCheckResult
 from .conformity import Conformity
 from .groundedness import Groundedness
 from .judge import LLMJudge
+from .pii_detection import PIIDetection
 from .toxicity import Toxicity
 
 __all__ = [
@@ -14,5 +15,6 @@ __all__ = [
     "Conformity",
     "Groundedness",
     "LLMJudge",
+    "PIIDetection",
     "Toxicity",
 ]

@@ -50,6 +50,7 @@ from .judges import (
     Groundedness,
     LLMCheckResult,
     LLMJudge,
+    PIIDetection,
     Toxicity,
 )
 from .scenarios.catalog import ScenarioCategory, generate_suite
@@ -112,6 +113,7 @@ __all__ = [
     "from_fn",
     "Groundedness",
     "LLMJudge",
+    "PIIDetection",
     "SemanticSimilarity",
     "Toxicity",
     "StringMatching",
