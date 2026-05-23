@@ -134,3 +134,59 @@ class PIIDetection[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             ),
             "categories": self.categories,
         }
+
+    @override
+    async def _handle_output(
+        self,
+        output_value: Any,
+        template_inputs: dict[str, Any],
+        trace: TraceType,
+    ) -> "CheckResult":
+        """Convert LLM output to CheckResult while avoiding leaking full traces.
+
+        The base implementation stores `template_inputs` verbatim in
+        `CheckResult.details`. For a PII-focused check that may expose
+        sensitive content, we sanitize the inputs before persisting them.
+
+        The sanitized payload preserves the evaluated `output` and the
+        `categories` list while replacing the full trace with a minimal
+        summary (interaction count and a short preview of the last input).
+        """
+        # Build a minimal, non-sensitive summary of the trace
+        trace_summary: dict[str, Any] = {}
+        try:
+            interactions = getattr(trace, "interactions", None)
+            trace_summary["interaction_count"] = len(interactions) if interactions is not None else None
+            last = getattr(trace, "last", None)
+            last_inputs = getattr(last, "inputs", None)
+            trace_summary["last_inputs_preview"] = (
+                str(last_inputs)[:200] if last_inputs is not None else None
+            )
+        except Exception:
+            trace_summary = {"interaction_count": None, "last_inputs_preview": None}
+
+        sanitized_inputs = {
+            "output": template_inputs.get("output"),
+            "categories": template_inputs.get("categories"),
+            "trace_summary": trace_summary,
+        }
+
+        # Delegate to same success/failure shape as BaseLLMCheck but with sanitized inputs
+        from ..core.result import CheckResult
+
+        if hasattr(output_value, "passed"):
+            reason = getattr(output_value, "reason", None)
+            if getattr(output_value, "passed"):
+                return CheckResult.success(
+                    message=reason or "Check passed",
+                    details={"reason": reason, "inputs": sanitized_inputs},
+                )
+            else:
+                return CheckResult.failure(
+                    message=reason or "Check failed",
+                    details={"reason": reason, "inputs": sanitized_inputs},
+                )
+
+        raise NotImplementedError(
+            f"Custom output type {type(output_value)} requires overriding _handle_output"
+        )

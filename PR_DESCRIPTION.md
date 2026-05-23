@@ -137,7 +137,7 @@ libs/giskard-checks/src/giskard/checks/__init__.py (MODIFIED)
 - [x] Follows existing Toxicity check architecture exactly
 - [x] Type-safe implementation with Literal types
 - [x] Complete docstring with examples
-- [x] Comprehensive test coverage (22 tests)
+- [x] Comprehensive test coverage (19 tests)
 - [x] All new tests pass
 - [x] No regressions in existing tests
 - [x] Serialization round-trip verified
