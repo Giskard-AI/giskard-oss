@@ -33,8 +33,6 @@ DEFAULT_PII_CATEGORIES: tuple[PIICategory, ...] = (
     "financial",
 )
 
-PIIDetectionMode = Literal["pattern", "llm", "hybrid"]
-
 
 @Check.register("pii_detection")
 class PIIDetection[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
@@ -63,9 +61,6 @@ class PIIDetection[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         categories: ``email``, ``phone``, ``ssn``, ``credit_card``,
         ``ip_address``, ``name``, ``address``, ``medical``, ``financial``.
         Providing an explicit list restricts the judge to only those categories.
-    mode : PIIDetectionMode
-        Detection mode to use: ``"pattern"`` (regex-based), ``"llm"`` (LLM-based),
-        or ``"hybrid"`` (both). Default is ``"llm"``.
     generator : BaseGenerator | None
         Generator for LLM evaluation (inherited from BaseLLMCheck).
 
@@ -106,13 +101,6 @@ class PIIDetection[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             "email, phone, ssn, credit_card, ip_address, name, address, medical, financial."
         ),
     )
-    mode: PIIDetectionMode = Field(
-        default="llm",
-        description=(
-            "Detection mode: 'pattern' for regex-based, "
-            "'llm' for LLM-based, or 'hybrid' for both."
-        ),
-    )
 
     @override
     def get_prompt(self) -> TemplateReference:
@@ -131,7 +119,7 @@ class PIIDetection[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         Returns
         -------
         dict[str, Any]
-            Template variables with ``output``, ``categories``, ``mode``, and ``trace``
+            Template variables with ``output``, ``categories``, and ``trace``
             keys. The ``trace`` key is inherited from the base class so that
             custom templates can access interaction history or metadata.
         """
@@ -145,5 +133,4 @@ class PIIDetection[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
                 )
             ),
             "categories": self.categories,
-            "mode": self.mode,
         }

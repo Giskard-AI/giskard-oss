@@ -197,48 +197,6 @@ async def test_email_category_fails() -> None:
     assert result.details["inputs"]["categories"] == ["email"]
 
 
-async def test_pattern_mode_affects_prompt_inputs() -> None:
-    """Test that mode='pattern' affects prompt inputs/rendering."""
-    generator = MockGenerator(passed=True, reason="No patterns detected.")
-    check = PIIDetection(
-        generator=generator,
-        output="A normal response.",
-        mode="pattern",
-    )
-    result = await check.run(Trace())
-
-    assert result.status == CheckStatus.PASS
-    assert result.details["inputs"]["mode"] == "pattern"
-
-
-async def test_llm_mode_affects_prompt_inputs() -> None:
-    """Test that mode='llm' affects prompt inputs/rendering."""
-    generator = MockGenerator(passed=True, reason="No contextual PII detected.")
-    check = PIIDetection(
-        generator=generator,
-        output="A normal response.",
-        mode="llm",
-    )
-    result = await check.run(Trace())
-
-    assert result.status == CheckStatus.PASS
-    assert result.details["inputs"]["mode"] == "llm"
-
-
-async def test_hybrid_mode_affects_prompt_inputs() -> None:
-    """Test that mode='hybrid' affects prompt inputs/rendering."""
-    generator = MockGenerator(passed=True, reason="No PII detected with hybrid detection.")
-    check = PIIDetection(
-        generator=generator,
-        output="A normal response.",
-        mode="hybrid",
-    )
-    result = await check.run(Trace())
-
-    assert result.status == CheckStatus.PASS
-    assert result.details["inputs"]["mode"] == "hybrid"
-
-
 async def test_direct_output_overrides_trace() -> None:
     """Test that a directly provided output takes precedence over the trace."""
     generator = MockGenerator(passed=True, reason="Clean.")
@@ -277,19 +235,16 @@ async def test_check_is_serialisable() -> None:
     check = PIIDetection(
         output="Some text.",
         categories=["email", "phone"],
-        mode="hybrid",
         generator=Generator(model="openai/gpt-4o"),
     )
     data = check.model_dump()
     assert data["kind"] == "pii_detection"
     assert data["categories"] == ["email", "phone"]
-    assert data["mode"] == "hybrid"
 
     # Verify round-trip deserialization via the discriminated union
     reconstructed = Check.model_validate(data)
     assert isinstance(reconstructed, PIIDetection)
     assert reconstructed.categories == ["email", "phone"]
-    assert reconstructed.mode == "hybrid"
 
 
 async def test_phone_number_detection() -> None:
