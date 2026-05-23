@@ -16,10 +16,6 @@ This PR implements a complete `PIIDetection` check for detecting personally iden
 
 **Features:**
 - **9 PII Categories**: email, phone, SSN, credit card, IP address, name, address, medical info, financial info
-- **3 Detection Modes**: 
-  - `"pattern"` - Regex-based detection for structured PII
-  - `"llm"` (default) - LLM-based contextual detection
-  - `"hybrid"` - Combined approach
 - **Configurable Categories**: Filter to specific PII types via `categories` parameter
 - **Custom Extraction**: Support for custom output paths via `output_key` parameter
 - **Serialization**: Full Pydantic support for `Check.model_validate()` round-trip
@@ -29,7 +25,6 @@ This PR implements a complete `PIIDetection` check for detecting personally iden
 **Jinja2 Template** (`libs/giskard-checks/src/giskard/checks/prompts/judges/pii_detection.j2`)
 - Comprehensive explanations of all PII categories with examples
 - Clear guidance for structured and contextual PII detection
-- Detection mode-aware instructions
 - Standard JSON output format (`passed` + `reason`)
 - Follows existing judge prompt conventions
 
@@ -46,11 +41,6 @@ Core functionality:
 Category coverage:
 - Individual tests for all 9 PII categories (email, phone, SSN, credit card, IP address, name, address, medical, financial)
 - Category filtering validation
-
-Mode testing:
-- Pattern mode functionality
-- LLM mode functionality
-- Hybrid mode functionality
 
 Edge cases:
 - Direct output overrides trace output
