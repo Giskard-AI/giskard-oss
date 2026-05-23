@@ -11,7 +11,7 @@ This PR implements a complete `PIIDetection` check for detecting personally iden
 **PIIDetection Check Class** (`libs/giskard-checks/src/giskard/checks/judges/pii_detection.py`)
 - LLM-based judge check extending `BaseLLMCheck`
 - Registration name: `"pii_detection"`
-- Full type safety with Literal types for categories and modes
+- Full type safety with Literal types for categories
 - Complete docstring with usage examples
 
 **Features:**
@@ -30,7 +30,7 @@ This PR implements a complete `PIIDetection` check for detecting personally iden
 
 ### ✅ Comprehensive Test Suite
 
-**22 Test Cases** (`libs/giskard-checks/tests/builtin/test_pii_detection.py`)
+**19 Test Cases** (`libs/giskard-checks/tests/builtin/test_pii_detection.py`)
 
 Core functionality:
 - Clean content passes the check
@@ -55,7 +55,7 @@ Edge cases:
 
 ## Validation
 
-✅ **All 22 new tests pass**
+✅ **All 19 new tests pass**
 ```
 libs/giskard-checks/tests/builtin/test_pii_detection.py::test_clean_content_passes PASSED
 libs/giskard-checks/tests/builtin/test_pii_detection.py::test_pii_content_fails PASSED
@@ -93,11 +93,10 @@ check = PIIDetection(
     generator=Generator(model="openai/gpt-4o"),
 )
 
-# Or with custom configuration
+# Or with custom categories
 check = PIIDetection(
     output="Response to evaluate for PII",
     categories=["email", "phone", "ssn"],
-    mode="hybrid",
     generator=Generator(model="openai/gpt-4o"),
 )
 
@@ -118,14 +117,13 @@ scenario = (
 libs/giskard-checks/src/giskard/checks/judges/pii_detection.py (NEW)
 ├── PIICategory type alias (9 categories)
 ├── DEFAULT_PII_CATEGORIES tuple
-├── PIIDetectionMode type alias (3 modes)
 └── PIIDetection class (126 lines)
 
 libs/giskard-checks/src/giskard/checks/prompts/judges/pii_detection.j2 (NEW)
 └── Comprehensive Jinja2 template (110 lines)
 
 libs/giskard-checks/tests/builtin/test_pii_detection.py (NEW)
-└── 22 async test functions (400+ lines)
+└── 19 async test functions (400+ lines)
 
 libs/giskard-checks/src/giskard/checks/judges/__init__.py (MODIFIED)
 └── Added PIIDetection import and export
