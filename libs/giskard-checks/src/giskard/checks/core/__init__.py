@@ -1,5 +1,9 @@
 from .check import Check
-from .exceptions import InputGenerationException
+from .exceptions import (
+    InputGenerationException,
+    OptionalDependencyError,
+    require_optional,
+)
 from .extraction import resolve
 from .interaction import Interact, Interaction, InteractionSpec, Trace
 from .result import (
@@ -29,5 +33,7 @@ __all__ = [
     "TestCaseResult",
     "TestCase",
     "InputGenerationException",
+    "OptionalDependencyError",
+    "require_optional",
     "resolve",
 ]
