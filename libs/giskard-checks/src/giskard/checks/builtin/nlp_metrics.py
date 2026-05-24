@@ -151,7 +151,14 @@ class Sentiment[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
 
         textblob = require_optional("textblob", "nlp", feature="the Sentiment check")
 
-        polarity = float(textblob.TextBlob(text).sentiment.polarity)
+        try:
+            polarity = float(textblob.TextBlob(text).sentiment.polarity)
+        except LookupError as exc:
+            raise LookupError(
+                "TextBlob's sentiment analysis requires NLTK corpora that are "
+                "not available in this environment. Run: "
+                "python -m textblob.download_corpora"
+            ) from exc
         label = _polarity_to_label(polarity)
 
         details = {
