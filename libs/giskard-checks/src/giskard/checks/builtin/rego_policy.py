@@ -2,9 +2,10 @@
 
 import importlib
 import json
-from typing import Any, override
+import warnings
+from typing import Any, Self, override
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr, model_validator
 
 from ..core import Trace
 from ..core.check import Check
@@ -18,6 +19,10 @@ _REGORUS_INSTALL_HINT = (
 )
 
 _POLICY_FILENAME = "giskard_policy.rego"
+_VALIDATION_SKIPPED_WARNING = (
+    "RegoPolicy validation skipped: optional dependency 'regorus' is not installed. "
+    "Install it with: pip install 'giskard-checks[regorus]'."
+)
 
 
 def _result_from_boolean_rule(
@@ -83,7 +88,15 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
     --------
     >>> from giskard.checks import RegoPolicy
     >>> check = RegoPolicy(
-    ...     policy='''package giskard\\n\\ndefault allow = false\\n\\nallow if {\\n    input.role == "admin"\\n}''',
+    ...     policy='''
+    ... package giskard
+    ...
+    ... default allow = false
+    ...
+    ... allow if {
+    ...     input.role == "admin"
+    ... }
+    ... ''',
     ...     rule="data.giskard.allow",
     ... )
     """
@@ -101,6 +114,51 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
         default_factory=dict,
         description="Static data document merged into the policy engine.",
     )
+
+    _engine: Any | None = PrivateAttr(default=None)
+
+    def _compile_engine(self, regorus: Any) -> Any:
+        """Load policy and data into a regorus engine and cache it."""
+        engine = regorus.Engine()  # pyright: ignore[reportAttributeAccessIssue]
+        engine.add_policy(_POLICY_FILENAME, self.policy)
+        if self.data:
+            engine.add_data(self.data)
+        self._engine = engine
+        return engine
+
+    def _get_engine(self, regorus: Any) -> Any:
+        if self._engine is None:
+            return self._compile_engine(regorus)
+        return self._engine
+
+    @model_validator(mode="after")
+    def _validate_rule_path(self) -> Self:
+        """Validate the rule path and (optionally) the policy syntax.
+
+        If `regorus` is installed, this validator parses the provided policy (and
+        loads `data`) to surface syntax errors at instantiation time. If `regorus`
+        is not installed, validation is skipped and a warning is emitted; runtime
+        evaluation will still fail if `regorus` is missing.
+        """
+        if not self.rule.startswith("data."):
+            raise ValueError("Rule path must start with 'data.'.")
+
+        try:
+            regorus = importlib.import_module("regorus")
+        except ImportError:
+            warnings.warn(
+                _VALIDATION_SKIPPED_WARNING,
+                category=RuntimeWarning,
+                stacklevel=2,
+            )
+            return self
+
+        try:
+            self._compile_engine(regorus)
+        except RuntimeError as err:
+            raise ValueError(f"Invalid Rego policy or data: {err}") from err
+
+        return self
 
     @override
     async def run(self, trace: TraceType) -> CheckResult:
@@ -154,10 +212,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
             )
 
         try:
-            engine = regorus.Engine()  # pyright: ignore[reportAttributeAccessIssue]
-            engine.add_policy(_POLICY_FILENAME, self.policy)
-            if self.data:
-                engine.add_data(self.data)
+            engine = self._get_engine(regorus)
             engine.set_input_json(input_json)
             rule_value = engine.eval_rule(self.rule)
         except RuntimeError as err:

@@ -1,3 +1,5 @@
+import importlib.util
+
 import pytest
 from giskard.core import disable_telemetry
 
@@ -27,9 +29,15 @@ def pytest_collection_modifyitems(
     skip_integration = pytest.mark.skip(
         reason="Pass --run-integration to include integration tests."
     )
+    skip_regorus = pytest.mark.skip(
+        reason="regorus not installed (pip install 'giskard-checks[regorus]')",
+    )
+    regorus_available = importlib.util.find_spec("regorus") is not None
     for item in items:
         if "integration" in item.keywords:
             item.add_marker(skip_integration)
+        if not regorus_available and "regorus" in item.keywords:
+            item.add_marker(skip_regorus)
 
 
 def pytest_sessionfinish(session, exitstatus):

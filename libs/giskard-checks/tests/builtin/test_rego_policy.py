@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 from giskard.checks import Check, CheckStatus, Interaction, RegoPolicy, Trace
+from pydantic import ValidationError
 
 BOOLEAN_POLICY = """\
 package giskard
@@ -81,7 +82,6 @@ async def test_serialization_round_trip() -> None:
 
 @pytest.mark.regorus
 async def test_allow_passes() -> None:
-    pytest.importorskip("regorus")
     check = _check()
     trace = await Trace.from_interactions(
         Interaction(inputs="test", outputs={"role": "admin"})
@@ -96,7 +96,6 @@ async def test_allow_passes() -> None:
 
 @pytest.mark.regorus
 async def test_deny_fails() -> None:
-    pytest.importorskip("regorus")
     check = _check()
     trace = await Trace.from_interactions(
         Interaction(inputs="test", outputs={"role": "user"})
@@ -111,7 +110,6 @@ async def test_deny_fails() -> None:
 
 @pytest.mark.regorus
 async def test_undefined_rule_fails() -> None:
-    pytest.importorskip("regorus")
     policy = """\
 package giskard
 
@@ -135,7 +133,6 @@ allow if {
 
 @pytest.mark.regorus
 async def test_non_boolean_rule_returns_error() -> None:
-    pytest.importorskip("regorus")
     policy = """\
 package giskard
 
@@ -268,7 +265,6 @@ async def test_json_serializable_input_types(
     expected_input: Any,
 ) -> None:
     """JSONPath can target any JSON-serializable value passed via set_input_json."""
-    pytest.importorskip("regorus")
     check = _check(policy=policy, key=key)
     trace = await Trace.from_interactions(Interaction(inputs="test", outputs=outputs))
 
@@ -280,7 +276,6 @@ async def test_json_serializable_input_types(
 
 @pytest.mark.regorus
 async def test_data_document_used() -> None:
-    pytest.importorskip("regorus")
     policy = """\
 package giskard
 
@@ -305,14 +300,5 @@ allow if {
 
 @pytest.mark.regorus
 async def test_invalid_policy_returns_error() -> None:
-    pytest.importorskip("regorus")
-    check = _check(policy=INVALID_POLICY)
-    trace = await Trace.from_interactions(
-        Interaction(inputs="test", outputs={"role": "admin"})
-    )
-
-    result = await check.run(trace)
-
-    assert result.status == CheckStatus.ERROR
-    assert result.errored
-    assert "error" in result.details
+    with pytest.raises(ValidationError, match="Invalid Rego policy or data"):
+        _check(policy=INVALID_POLICY)
