@@ -25,9 +25,11 @@ if TYPE_CHECKING:
     from google.genai._interactions.types import (
         GenerationConfigParam,
         Interaction,
+        ModelOutputStepParam,
+        StepParam,
         TextContentParam,
         ToolParam,
-        TurnParam,
+        UserInputStepParam,
         interaction_create_params,
     )
     from httpx import Timeout as httpxTimeout
@@ -51,8 +53,6 @@ PROVIDER = "google"
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "timeout", "response_format"})
 
 
-_ROLE_MAP = {"user": "user", "assistant": "model"}
-
 logger = logging.getLogger(__name__)
 
 
@@ -68,6 +68,15 @@ def serialize_tool_def(tool: ToolDef, _info: SerializationInfo) -> "ToolParam":
 
 def _text_content(text: str) -> "TextContentParam":
     return {"type": "text", "text": text}
+
+
+def _message_step(
+    role: Literal["user", "assistant"],
+    content: Iterable["TextContentParam"],
+) -> "UserInputStepParam | ModelOutputStepParam":
+    if role == "user":
+        return {"content": content, "type": "user_input"}
+    return {"content": content, "type": "model_output"}
 
 
 @ResponseInputText.register_serializer(_PROVIDER)
@@ -94,75 +103,59 @@ def serialize_output_refusal(
 @ResponseEasyInputMessage.register_serializer(_PROVIDER)
 def serialize_easy_input_message(
     model: ResponseEasyInputMessage, info: SerializationInfo
-) -> "TurnParam | None":
+) -> "StepParam | None":
     if model.role == "developer" or model.role == "system":
         return None
 
     if isinstance(model.content, str):
-        return {
-            "content": [_text_content(model.content)],
-            "role": _ROLE_MAP[model.role],
-        }
+        return _message_step(model.role, [_text_content(model.content)])
 
     content = [
         cast("TextContentParam", cast(object, item.model_dump(context=info.context)))
         for item in model.content
     ]
-    return {"content": content, "role": _ROLE_MAP[model.role]}
+    return _message_step(model.role, content)
 
 
 @ResponseOutputMessage.register_serializer(_PROVIDER)
 def serialize_output_message(
     model: ResponseOutputMessage, info: SerializationInfo
-) -> "TurnParam":
+) -> "StepParam":
     if isinstance(model.content, str):
-        return {
-            "content": [_text_content(model.content)],
-            "role": _ROLE_MAP[model.role],
-        }
+        return _message_step(model.role, [_text_content(model.content)])
 
     content = [
         cast("TextContentParam", cast(object, item.model_dump(context=info.context)))
         for item in model.content
     ]
-    return {"content": content, "role": _ROLE_MAP[model.role]}
+    return _message_step(model.role, content)
 
 
 @ResponseFunctionToolCall.register_serializer(_PROVIDER)
 def serialize_output_function_call(
     model: ResponseFunctionToolCall, _info: SerializationInfo
-) -> "TurnParam":
+) -> "StepParam":
     return {
-        "content": [
-            {
-                "type": "function_call",
-                "id": model.call_id,
-                "name": model.name,
-                "arguments": deserialize_arguments(model.arguments),
-            }
-        ],
-        "role": "model",
+        "type": "function_call",
+        "id": model.call_id,
+        "name": model.name,
+        "arguments": deserialize_arguments(model.arguments),
     }
 
 
 @ResponseFunctionCallOutput.register_serializer(_PROVIDER)
 def serialize_output_function_call_output(
     model: ResponseFunctionCallOutput, _info: SerializationInfo
-) -> "TurnParam":
+) -> "StepParam":
     if model.name is None:
         # We cannot compute name from call_id alone since function calls are not guaranteed to be in the input.
         raise ValueError("name is required for function calls")
 
     return {
-        "content": [
-            {
-                "type": "function_result",
-                "call_id": model.call_id,
-                "name": model.name,
-                "result": model.output,
-            }
-        ],
-        "role": "user",
+        "type": "function_result",
+        "call_id": model.call_id,
+        "name": model.name,
+        "result": model.output,
     }
 
 
@@ -279,13 +272,16 @@ class GoogleResponseTranslator:
     @staticmethod
     def from_google(raw: "Interaction", model: str) -> ResponseResult:
         outputs: list[ResponseOutputItem] = []
-        for item in raw.outputs or []:
-            if item.type == "text":
-                outputs.append(
-                    ResponseOutputMessage(
-                        content=[ResponseOutputText(text=item.text)], role="assistant"
-                    )
-                )
+        for item in raw.steps or []:
+            if item.type == "model_output":
+                for content in item.content or []:
+                    if content.type == "text":
+                        outputs.append(
+                            ResponseOutputMessage(
+                                content=[ResponseOutputText(text=content.text)],
+                                role="assistant",
+                            )
+                        )
             elif item.type == "function_call":
                 outputs.append(
                     ResponseFunctionToolCall(
