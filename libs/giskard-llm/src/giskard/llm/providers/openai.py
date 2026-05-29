@@ -48,7 +48,7 @@ Azure Foundry OpenAI v1:
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -77,6 +77,9 @@ from ..types import (
     ToolDefParam,
 )
 from ..utils import compact
+
+if TYPE_CHECKING:
+    from httpx import AsyncClient
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +110,7 @@ class OpenAIProvider:
         api_key: str | None = None,
         base_url: str | None = None,
         timeout: float | None = None,
-        http_client: Any | None = None,
+        http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
         **_kwargs: Any,
     ) -> None:

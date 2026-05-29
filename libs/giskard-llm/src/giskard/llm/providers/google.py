@@ -55,7 +55,7 @@ Provider-specific kwargs:
 import logging
 import os
 from collections.abc import Mapping, Sequence
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -82,6 +82,10 @@ from ..types import (
     ToolDef,
     ToolDefParam,
 )
+
+if TYPE_CHECKING:
+    from google.genai.types import HttpOptions, HttpOptionsOrDict
+    from httpx import AsyncClient
 
 _CHAT_MESSAGES_TYPE_ADAPTER = TypeAdapter(Sequence[ChatMessage])
 _TOOL_DEFS_TYPE_ADAPTER = TypeAdapter(Sequence[ToolDef] | None)
@@ -125,10 +129,10 @@ def _import_genai_errors() -> Any:
 
 
 def _build_http_options(
-    http_options: Any | None,
-    http_client: Any | None,
+    http_options: "HttpOptionsOrDict | None",
+    http_client: "AsyncClient | None",
     default_headers: Mapping[str, str] | None,
-) -> Any | None:
+) -> "HttpOptions | None":
     if http_options is None and http_client is None and default_headers is None:
         return None
 
@@ -139,12 +143,27 @@ def _build_http_options(
             headers=default_headers,
         )
 
-    options = genai_types.HttpOptions.model_validate(http_options)
+    try:
+        options = genai_types.HttpOptions.model_validate(http_options)
+    except Exception as exc:
+        raise ValueError(f"google provider: invalid http_options - {exc}") from exc
     updates: dict[str, Any] = {}
-    if http_client is not None and options.httpx_async_client is None:
-        updates["httpx_async_client"] = http_client
-    if default_headers is not None and options.headers is None:
-        updates["headers"] = default_headers
+    if http_client is not None:
+        if options.httpx_async_client is None:
+            updates["httpx_async_client"] = http_client
+        else:
+            logger.warning(
+                "google provider: http_client kwarg ignored because http_options "
+                "already sets httpxAsyncClient"
+            )
+    if default_headers is not None:
+        if options.headers is None:
+            updates["headers"] = default_headers
+        else:
+            logger.warning(
+                "google provider: default_headers kwarg ignored because http_options "
+                "already sets headers"
+            )
 
     return options.model_copy(update=updates) if updates else options
 
@@ -167,9 +186,9 @@ class GoogleProvider:
     def __init__(
         self,
         api_key: str | None = None,
-        http_client: Any | None = None,
+        http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
-        http_options: Any | None = None,
+        http_options: "HttpOptionsOrDict | None" = None,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:

@@ -45,12 +45,15 @@ Provider-specific kwargs:
 import logging
 import os
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse, urlunparse
 
 from ..errors import ProviderNotAvailableError
 from ..utils import compact
 from .openai import OpenAIProvider
+
+if TYPE_CHECKING:
+    from httpx import AsyncClient
 
 logger = logging.getLogger(__name__)
 
@@ -89,18 +92,19 @@ class AzureAIProvider(OpenAIProvider):
         api_key: str | None = None,
         base_url: str | None = None,
         timeout: float | None = None,
-        http_client: Any | None = None,
+        http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
         **_kwargs: Any,
     ) -> None:
-        if _kwargs:
-            logger.warning(
-                "%s provider: ignoring unknown kwargs: %s", PROVIDER, sorted(_kwargs)
-            )
         try:
             import openai
         except ImportError as exc:
             raise ProviderNotAvailableError(PROVIDER, "openai", extra="azure") from exc
+
+        if _kwargs:
+            logger.warning(
+                "%s provider: ignoring unknown kwargs: %s", PROVIDER, sorted(_kwargs)
+            )
 
         resolved_key = api_key or os.environ.get("AZURE_AI_API_KEY")
         resolved_endpoint = _normalize_azure_ai_endpoint(

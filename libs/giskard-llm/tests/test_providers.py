@@ -2,7 +2,7 @@
 
 import json
 from types import SimpleNamespace
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -24,6 +24,10 @@ from giskard.llm.types import (
     TextContent,
     ToolCall,
 )
+
+if TYPE_CHECKING:
+    from google.genai.types import HttpOptionsOrDict
+    from httpx import AsyncClient
 
 # -- Helpers -------------------------------------------------------------------
 
@@ -251,7 +255,7 @@ def test_openai_provider_forwards_transport_config():
             api_key="k",
             base_url="https://example.test/v1",
             timeout=12,
-            http_client=http_client,
+            http_client=cast("AsyncClient", http_client),
             default_headers=default_headers,
         )
 
@@ -292,7 +296,7 @@ def test_azure_openai_provider_forwards_transport_config(monkeypatch):
             base_url="https://azure.test",
             api_version="2024-10-21",
             timeout=12,
-            http_client=http_client,
+            http_client=cast("AsyncClient", http_client),
             default_headers=default_headers,
         )
 
@@ -316,7 +320,7 @@ def test_azure_ai_provider_forwards_transport_config(monkeypatch):
             api_key="k",
             base_url="https://dev.services.ai.azure.com/models",
             timeout=12,
-            http_client=http_client,
+            http_client=cast("AsyncClient", http_client),
             default_headers=default_headers,
         )
 
@@ -341,7 +345,7 @@ def test_anthropic_provider_forwards_transport_config():
             api_key="k",
             base_url="https://anthropic.test",
             timeout=12,
-            http_client=http_client,
+            http_client=cast("AsyncClient", http_client),
             default_headers=default_headers,
         )
 
@@ -353,38 +357,47 @@ def test_anthropic_provider_forwards_transport_config():
     assert kwargs["default_headers"] == default_headers
 
 
-def test_google_provider_builds_http_options_from_transport_config(monkeypatch):
-    http_client = object()
-    default_headers = {"x-test": "1"}
+class _FakeHttpOptions:
+    def __init__(self, httpxAsyncClient=None, headers=None):
+        self.httpx_async_client = httpxAsyncClient
+        self.headers = headers
 
-    class FakeHttpOptions:
-        def __init__(self, httpxAsyncClient=None, headers=None):
-            self.httpx_async_client = httpxAsyncClient
-            self.headers = headers
+    @classmethod
+    def model_validate(cls, value):
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, dict):
+            return cls(**value)
+        raise ValueError(f"Cannot validate {type(value)}")
 
-        @classmethod
-        def model_validate(cls, value):
-            return value if isinstance(value, cls) else cls(**value)
+    def model_copy(self, update=None):
+        copied = type(self)(
+            httpxAsyncClient=self.httpx_async_client,
+            headers=self.headers,
+        )
+        for key, value in (update or {}).items():
+            setattr(copied, key, value)
+        return copied
 
-        def model_copy(self, update=None):
-            copied = type(self)(
-                httpxAsyncClient=self.httpx_async_client,
-                headers=self.headers,
-            )
-            for key, value in (update or {}).items():
-                setattr(copied, key, value)
-            return copied
 
+def _patch_google_sdk(monkeypatch):
     sdk = MagicMock()
-    types = MagicMock(HttpOptions=FakeHttpOptions)
+    types = MagicMock(HttpOptions=_FakeHttpOptions)
     monkeypatch.setattr("giskard.llm.providers.google._import_genai", lambda: sdk)
     monkeypatch.setattr(
         "giskard.llm.providers.google._import_genai_types", lambda: types
     )
+    return sdk
+
+
+def test_google_provider_builds_http_options_from_transport_config(monkeypatch):
+    http_client = object()
+    default_headers = {"x-test": "1"}
+    sdk = _patch_google_sdk(monkeypatch)
 
     GoogleProvider(
         api_key="k",
-        http_client=http_client,
+        http_client=cast("AsyncClient", http_client),
         default_headers=default_headers,
     )
 
@@ -394,46 +407,66 @@ def test_google_provider_builds_http_options_from_transport_config(monkeypatch):
     assert kwargs["http_options"].headers == default_headers
 
 
+def test_google_provider_no_transport_kwargs_passes_no_http_options(monkeypatch):
+    sdk = _patch_google_sdk(monkeypatch)
+
+    GoogleProvider(api_key="k")
+
+    kwargs = sdk.Client.call_args.kwargs
+    assert "http_options" not in kwargs or kwargs["http_options"] is None
+
+
 def test_google_provider_preserves_explicit_http_options_and_fills_missing(monkeypatch):
     explicit_client = object()
     fallback_client = object()
     fallback_headers = {"x-fallback": "1"}
-
-    class FakeHttpOptions:
-        def __init__(self, httpxAsyncClient=None, headers=None):
-            self.httpx_async_client = httpxAsyncClient
-            self.headers = headers
-
-        @classmethod
-        def model_validate(cls, value):
-            return value if isinstance(value, cls) else cls(**value)
-
-        def model_copy(self, update=None):
-            copied = type(self)(
-                httpxAsyncClient=self.httpx_async_client,
-                headers=self.headers,
-            )
-            for key, value in (update or {}).items():
-                setattr(copied, key, value)
-            return copied
-
-    sdk = MagicMock()
-    types = MagicMock(HttpOptions=FakeHttpOptions)
-    monkeypatch.setattr("giskard.llm.providers.google._import_genai", lambda: sdk)
-    monkeypatch.setattr(
-        "giskard.llm.providers.google._import_genai_types", lambda: types
-    )
+    sdk = _patch_google_sdk(monkeypatch)
 
     GoogleProvider(
         api_key="k",
-        http_client=fallback_client,
+        http_client=cast("AsyncClient", fallback_client),
         default_headers=fallback_headers,
-        http_options=FakeHttpOptions(httpxAsyncClient=explicit_client),
+        http_options=_FakeHttpOptions(httpxAsyncClient=explicit_client),  # pyright: ignore[reportArgumentType]
     )
 
     options = sdk.Client.call_args.kwargs["http_options"]
     assert options.httpx_async_client is explicit_client
     assert options.headers == fallback_headers
+
+
+def test_google_provider_warns_when_http_options_conflicts_with_convenience_kwargs(
+    monkeypatch, caplog
+):
+    explicit_client = object()
+    explicit_headers = {"x-explicit": "1"}
+    conflicting_client = object()
+    conflicting_headers = {"x-conflict": "1"}
+    sdk = _patch_google_sdk(monkeypatch)
+
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="giskard.llm.providers.google"):
+        GoogleProvider(
+            api_key="k",
+            http_client=cast("AsyncClient", conflicting_client),
+            default_headers=conflicting_headers,
+            http_options=_FakeHttpOptions(
+                httpxAsyncClient=explicit_client, headers=explicit_headers
+            ),  # pyright: ignore[reportArgumentType]
+        )
+
+    options = sdk.Client.call_args.kwargs["http_options"]
+    assert options.httpx_async_client is explicit_client
+    assert options.headers == explicit_headers
+    assert any("http_client" in r.message for r in caplog.records)
+    assert any("default_headers" in r.message for r in caplog.records)
+
+
+def test_google_provider_raises_for_invalid_http_options(monkeypatch):
+    _patch_google_sdk(monkeypatch)
+
+    with pytest.raises(ValueError, match="invalid http_options"):
+        GoogleProvider(api_key="k", http_options=cast("HttpOptionsOrDict", object()))
 
 
 # -- Error mapping completeness ------------------------------------------------
