@@ -58,6 +58,7 @@ class LiteLLMGenerator(BaseGenerator):
 
     def model_post_init(self, __context: Any) -> None:
         """Fail fast if litellm is not installed."""
+        super().model_post_init(__context)
         _import_litellm()
 
     @override
