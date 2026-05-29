@@ -2,9 +2,9 @@
 
 - The first two tests run on every install: they verify pure-Python code with
   no optional dependency.
-- The third test uses pytest.skipif to guard against litellm being present;
-  it verifies that importing the LiteLLM generator module does not raise even
-  when litellm is absent (import is guarded inside the module).
+- The last two use pytest.skipif to guard against litellm being present;
+  they verify that the module imports safely and that instantiation raises
+  ImportError with a helpful message when litellm is absent.
 """
 
 import importlib.util
@@ -31,6 +31,16 @@ def test_core_public_api_is_accessible():
     reason="litellm is installed; this test verifies behavior when it is absent",
 )
 def test_litellm_generator_module_import_does_not_raise():
-    # The LiteLLMGenerator module guards its litellm import inside the class body,
-    # so importing the module itself must not raise even without litellm installed.
+    # After the lazy-import refactor, importing the module is safe even without litellm.
     from giskard.agents.generators import litellm_generator  # noqa: F401
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("litellm") is not None,
+    reason="litellm is installed; InstantiationError would not be raised",
+)
+def test_litellm_generator_raises_import_error_on_instantiation():
+    from giskard.agents.generators.litellm_generator import LiteLLMGenerator
+
+    with pytest.raises(ImportError, match="giskard-agents\\[litellm\\]"):
+        LiteLLMGenerator(model="gemini/gemini-2.0-flash")

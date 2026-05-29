@@ -41,7 +41,7 @@ async def test_litellm_generator_completion(mock_litellm_response: Any) -> None:
 
     generator = LiteLLMGenerator(model="gemini/gemini-2.0-flash")
     with patch(
-        "giskard.agents.generators.litellm_generator.acompletion",
+        "litellm.acompletion",
         return_value=mock_litellm_response,
     ) as mock_acompletion:
         response = await generator.complete(
@@ -61,7 +61,7 @@ async def test_litellm_generator_forwards_params(mock_litellm_response: Any) -> 
 
     generator = LiteLLMGenerator(model="test-model").with_params(temperature=0.3)
     with patch(
-        "giskard.agents.generators.litellm_generator.acompletion",
+        "litellm.acompletion",
         return_value=mock_litellm_response,
     ) as mock_acompletion:
         await generator.complete(
