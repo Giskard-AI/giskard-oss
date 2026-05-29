@@ -11,12 +11,6 @@ from .base import ScenarioGenerator
 from .registry import _normalize_generator, suite_generator_registry
 
 
-def _normalize_generators(
-    generators: Sequence[ScenarioGenerator | type[ScenarioGenerator]],
-) -> list[ScenarioGenerator]:
-    return [_normalize_generator(g) for g in generators]
-
-
 async def _generate_scenarios(
     description: str,
     languages: list[str],
@@ -96,7 +90,7 @@ async def generate_suite(
         raise ValueError(f"max_scenarios must be non-negative, got {max_scenarios}")
 
     resolved = (
-        _normalize_generators(generators)
+        [_normalize_generator(g) for g in generators]
         if generators is not None
         else suite_generator_registry.generators()
     )

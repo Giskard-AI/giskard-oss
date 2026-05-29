@@ -90,13 +90,13 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
             for attempt in range(self.max_retries + 1):
                 try:
                     result = await workflow.with_inputs(**inputs).run()
-                    output = result.output
-                    if not output.schema_issue:
+                    candidate = result.output
+                    if not candidate.schema_issue:
+                        output = candidate
                         break
                     last_exc = InputGenerationException(
-                        f"schema issue at turn {step}, attempt {attempt + 1}: {output.schema_issue}"
+                        f"schema issue at turn {step}, attempt {attempt + 1}: {candidate.schema_issue}"
                     )
-                    output = None
                 except WorkflowError as exc:
                     cause = exc.__cause__
                     is_refusal = isinstance(cause, ModelRefusalError)

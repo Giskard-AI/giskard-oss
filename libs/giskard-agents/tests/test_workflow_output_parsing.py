@@ -243,10 +243,11 @@ async def test_output_model_zero_retries():
     assert generator.call_count == 1
 
 
-class RefusingGenerator(BaseGenerator):
-    """Returns a refusal choice (finish_reason='refusal', message.refusal set)."""
+class RefusalGenerator(BaseGenerator):
+    """Returns a refusal response; finish_reason controls which detection path triggers."""
 
     refusal_text: str = "I can't help with that."
+    finish_reason: str = "refusal"
 
     @override
     async def _call_model(
@@ -259,30 +260,7 @@ class RefusingGenerator(BaseGenerator):
             choices=[
                 Choice(
                     message=AssistantMessage(refusal=self.refusal_text),
-                    finish_reason="refusal",
-                    index=0,
-                )
-            ]
-        )
-
-
-class MessageRefusalGenerator(BaseGenerator):
-    """Sets message.refusal but uses finish_reason='stop' (some providers behave this way)."""
-
-    refusal_text: str = "I can't help with that."
-
-    @override
-    async def _call_model(
-        self,
-        messages: Sequence[ChatMessage],
-        params: GenerationParams,
-        metadata: dict[str, Any] | None = None,
-    ) -> CompletionResponse:
-        return CompletionResponse(
-            choices=[
-                Choice(
-                    message=AssistantMessage(refusal=self.refusal_text),
-                    finish_reason="stop",
+                    finish_reason=self.finish_reason,
                     index=0,
                 )
             ]
@@ -291,7 +269,7 @@ class MessageRefusalGenerator(BaseGenerator):
 
 async def test_refusal_finish_reason_wraps_model_refusal_error():
     """finish_reason='refusal' surfaces as WorkflowError whose cause is ModelRefusalError."""
-    workflow = agents.ChatWorkflow(generator=RefusingGenerator())
+    workflow = agents.ChatWorkflow(generator=RefusalGenerator())
 
     with pytest.raises(agents.errors.WorkflowError) as exc_info:
         await (
@@ -305,7 +283,7 @@ async def test_refusal_finish_reason_wraps_model_refusal_error():
 
 async def test_refusal_message_field_wraps_model_refusal_error():
     """message.refusal set (without finish_reason='refusal') also raises ModelRefusalError."""
-    workflow = agents.ChatWorkflow(generator=MessageRefusalGenerator())
+    workflow = agents.ChatWorkflow(generator=RefusalGenerator(finish_reason="stop"))
 
     with pytest.raises(agents.errors.WorkflowError) as exc_info:
         await (
@@ -320,9 +298,7 @@ async def test_refusal_message_field_wraps_model_refusal_error():
 async def test_model_refusal_error_carries_refusal_text():
     """The model's refusal message is preserved on the ModelRefusalError."""
     refusal_msg = "I cannot assist with this request."
-    workflow = agents.ChatWorkflow(
-        generator=RefusingGenerator(refusal_text=refusal_msg)
-    )
+    workflow = agents.ChatWorkflow(generator=RefusalGenerator(refusal_text=refusal_msg))
 
     with pytest.raises(agents.errors.WorkflowError) as exc_info:
         await (
