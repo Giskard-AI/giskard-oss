@@ -1,10 +1,89 @@
 # libs/giskard-checks/tests/generators/test_llm_generator.py
+import json
+from collections.abc import Sequence
+from typing import Any, override
+
 import pytest
+from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import InputGenerationException, Interaction, Scenario
 from giskard.checks.generators.base import LLMGenerator, LLMGeneratorOutput
+from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
 from pydantic import BaseModel
 
 from .conftest import LLMTrace, MockGenerator
+
+
+class _RefusingGenerator(BaseGenerator):
+    """Returns finish_reason='refusal' for the first N calls, then valid JSON."""
+
+    refuse_times: int = 1
+    valid_response: dict[str, Any]
+    _calls: int = 0
+
+    @override
+    async def _call_model(
+        self,
+        messages: Sequence[ChatMessage],
+        params: GenerationParams,
+        metadata: dict[str, Any] | None = None,
+    ) -> CompletionResponse:
+        self._calls += 1
+        if self._calls <= self.refuse_times:
+            return CompletionResponse(
+                choices=[
+                    Choice(
+                        message=AssistantMessage(refusal="I can't help with that."),
+                        finish_reason="refusal",
+                        index=0,
+                    )
+                ]
+            )
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content=json.dumps(self.valid_response)),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
+        )
+
+
+class _FakeAzurePolicyError(Exception):
+    """Mimics an Azure content-policy BadRequestError (status_code=400, invalid_request_error)."""
+
+    status_code: int = 400
+
+    def __str__(self) -> str:
+        return "invalid_request_error: This request has been flagged for potentially high-risk content."
+
+
+class _PolicyBlockGenerator(BaseGenerator):
+    """Raises an Azure-style policy error for the first N calls, then returns valid JSON."""
+
+    block_times: int = 1
+    valid_response: dict[str, Any]
+    _calls: int = 0
+
+    @override
+    async def _call_model(
+        self,
+        messages: Sequence[ChatMessage],
+        params: GenerationParams,
+        metadata: dict[str, Any] | None = None,
+    ) -> CompletionResponse:
+        self._calls += 1
+        if self._calls <= self.block_times:
+            raise _FakeAzurePolicyError()
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content=json.dumps(self.valid_response)),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
+        )
 
 
 def test_llm_generator_requires_prompt_or_prompt_path():
@@ -196,10 +275,12 @@ async def test_llm_generator_raises_on_schema_issue():
             {"goal_reached": False, "schema_issue": "no string field", "message": None},
         ]
     )
-    gen = LLMGenerator(generator=mock_gen, prompt="Say something.", max_steps=3)
+    gen = LLMGenerator(
+        generator=mock_gen, prompt="Say something.", max_steps=3, max_retries=0
+    )
     trace = LLMTrace()
     agen = gen(trace, input_type=UserMessage)
-    with pytest.raises(InputGenerationException, match="schema issue: no string field"):
+    with pytest.raises(InputGenerationException, match="generation failed at turn 0"):
         await anext(agen)
 
 
@@ -308,12 +389,11 @@ async def test_full_chain_llm_generator_raises_on_schema_issue():
         prompt="Ask about the product.\n{{ _instr_output }}",
         max_steps=5,
         as_template=True,
+        max_retries=0,
     )
     scenario = Scenario(name="test").interact(inputs=llm_gen, outputs=agent_target)
 
-    with pytest.raises(
-        InputGenerationException, match="schema issue: no string-like field in schema"
-    ):
+    with pytest.raises(InputGenerationException, match="generation failed at turn 0"):
         await scenario.run()
 
     assert len(mock_gen.calls) == 1
@@ -363,3 +443,78 @@ async def test_full_chain_llm_generator_does_not_render_template_when_as_templat
         str(LLMGeneratorOutput[UserMessage].model_json_schema())
         not in first_message_content
     )
+
+
+# --- Retry logic: model refusals and policy blocks ---
+
+
+_VALID_STR_RESPONSE: dict[str, Any] = {
+    "goal_reached": False,
+    "schema_issue": None,
+    "message": "Hello",
+}
+
+
+@pytest.mark.asyncio
+async def test_llm_generator_retries_model_refusal_and_succeeds():
+    """A model refusal is retried; the generator succeeds on the next attempt."""
+    gen = _RefusingGenerator(
+        refuse_times=1,
+        valid_response=_VALID_STR_RESPONSE,
+    )
+    llm_gen = LLMGenerator(generator=gen, prompt="Say hello.", max_retries=1)
+    trace = LLMTrace()
+    msg = await anext(llm_gen(trace))
+    assert msg == "Hello"
+    assert gen._calls == 2
+
+
+@pytest.mark.asyncio
+async def test_llm_generator_raises_after_all_model_refusal_retries_exhausted():
+    """When every attempt is refused, InputGenerationException is raised."""
+    gen = _RefusingGenerator(
+        refuse_times=99,
+        valid_response=_VALID_STR_RESPONSE,
+    )
+    llm_gen = LLMGenerator(generator=gen, prompt="Say hello.", max_retries=1)
+    trace = LLMTrace()
+    with pytest.raises(InputGenerationException, match="generation failed"):
+        await anext(llm_gen(trace))
+    assert gen._calls == 2  # 1 initial + 1 retry
+
+
+@pytest.mark.asyncio
+async def test_llm_generator_retries_azure_policy_block_and_succeeds():
+    """An Azure-style content-policy block is retried; succeeds on the next attempt."""
+    gen = _PolicyBlockGenerator(
+        block_times=1,
+        valid_response=_VALID_STR_RESPONSE,
+    )
+    llm_gen = LLMGenerator(generator=gen, prompt="Say hello.", max_retries=1)
+    trace = LLMTrace()
+    msg = await anext(llm_gen(trace))
+    assert msg == "Hello"
+    assert gen._calls == 2
+
+
+@pytest.mark.asyncio
+async def test_llm_generator_does_not_retry_unrelated_workflow_errors():
+    """WorkflowErrors not caused by a refusal or policy block propagate immediately."""
+
+    class _AlwaysFailGenerator(BaseGenerator):
+        @override
+        async def _call_model(
+            self,
+            messages: Sequence[ChatMessage],
+            params: GenerationParams,
+            metadata: dict[str, Any] | None = None,
+        ) -> CompletionResponse:
+            raise RuntimeError("Unexpected infrastructure failure.")
+
+    from giskard.agents.errors import WorkflowError
+
+    gen = _AlwaysFailGenerator()
+    llm_gen = LLMGenerator(generator=gen, prompt="Say hello.", max_retries=2)
+    trace = LLMTrace()
+    with pytest.raises(WorkflowError):
+        await anext(llm_gen(trace))

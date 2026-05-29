@@ -107,6 +107,16 @@ class AssistantMessage(_BaseModel):
     tool_calls: Sequence[ToolCall] | None = None
 
     @property
+    def is_refusal(self) -> bool:
+        if self.refusal is not None:
+            return True
+
+        if self.content is not None and not isinstance(self.content, str):
+            return any(isinstance(c, RefusalContent) for c in self.content or [])
+
+        return False
+
+    @property
     def text(self) -> str | None:
         texts = [
             text

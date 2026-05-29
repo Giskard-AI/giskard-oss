@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 from typing import Any, Self, override
 
+from giskard.agents.errors.workflow_errors import ModelRefusalError, WorkflowError
 from giskard.agents.templates import MessageTemplate
 from giskard.agents.workflow import ChatWorkflow, TemplateReference
 from giskard.llm import chat
@@ -45,6 +46,15 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
     """
 
     max_steps: int = Field(default=3, ge=0)
+    max_retries: int = Field(
+        default=2,
+        ge=0,
+        description=(
+            "Maximum number of retry attempts per turn when the model refuses "
+            "(schema_issue) or the request is blocked by a provider policy (WorkflowError). "
+            "Does not affect transient network retries handled by the completion middleware."
+        ),
+    )
 
     def get_prompt(self) -> ChatMessage | TemplateReference | MessageTemplate:
         """Return the prompt. Subclasses must override."""
@@ -74,11 +84,34 @@ class BaseLLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeAr
         step = 0
         while step < self.max_steps:
             inputs = await self.get_inputs(trace)
-            result = await workflow.with_inputs(**inputs).run()
-            output = result.output
+            last_exc: Exception | None = None
+            output: LLMGeneratorOutput[Any] | None = None
 
-            if output.schema_issue:
-                raise InputGenerationException(f"schema issue: {output.schema_issue}")
+            for attempt in range(self.max_retries + 1):
+                try:
+                    result = await workflow.with_inputs(**inputs).run()
+                    candidate = result.output
+                    if not candidate.schema_issue:
+                        output = candidate
+                        break
+                    last_exc = InputGenerationException(
+                        f"schema issue at turn {step}, attempt {attempt + 1}: {candidate.schema_issue}"
+                    )
+                except WorkflowError as exc:
+                    cause = exc.__cause__
+                    is_refusal = isinstance(cause, ModelRefusalError)
+                    is_policy_block = getattr(
+                        cause, "status_code", None
+                    ) == 400 and "invalid_request_error" in str(cause)
+                    if not (is_refusal or is_policy_block):
+                        raise
+                    last_exc = exc
+            else:
+                raise InputGenerationException(
+                    f"generation failed at turn {step} after {self.max_retries + 1} attempt(s)"
+                ) from last_exc
+
+            assert output is not None
             if output.goal_reached or not output.message:
                 return
 

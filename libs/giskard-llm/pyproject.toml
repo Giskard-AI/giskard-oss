@@ -1,6 +1,6 @@
 [project]
 name = "giskard-llm"
-version = "1.0.0b2"
+version = "1.0.0b3"
 description = "Lightweight LLM routing layer over native provider SDKs"
 readme = "README.md"
 license = { text = "MIT" }
@@ -12,7 +12,7 @@ dependencies = [
 
 [project.optional-dependencies]
 openai = ["openai>=1.30,<3"]
-google = ["google-genai>=1.0,<2"]
+google = ["google-genai>=2.0,<3"]
 anthropic = ["anthropic>=0.40,<1"]
 azure = ["giskard-llm[openai]"]  # alias: azure/ and azure_ai/ use the openai SDK
 all = ["giskard-llm[openai,google,anthropic]"]
@@ -32,6 +32,7 @@ markers = [
     "anthropic: tests requiring the anthropic SDK",
     "azure: tests requiring the openai SDK (Azure OpenAI)",
     "azure_ai: tests requiring the openai SDK (Azure AI Foundry)",
+    "azure_foundry_v1: tests requiring the openai SDK (Azure Foundry OpenAI v1)",
     "functional: functional tests making real API calls",
     "no_providers: tests that run without any provider SDK installed",
 ]

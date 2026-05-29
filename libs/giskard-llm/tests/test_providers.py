@@ -2,12 +2,14 @@
 
 import json
 from types import SimpleNamespace
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from giskard.llm.errors import BadRequestError, LLMError, RateLimitError
 from giskard.llm.providers.anthropic import AnthropicProvider
+from giskard.llm.providers.azure_ai import AzureAIProvider
+from giskard.llm.providers.azure_openai import AzureOpenAIProvider
 from giskard.llm.providers.base import (
     CompletionProvider,
     EmbeddingProvider,
@@ -22,6 +24,10 @@ from giskard.llm.types import (
     TextContent,
     ToolCall,
 )
+
+if TYPE_CHECKING:
+    from google.genai.types import HttpOptionsOrDict
+    from httpx import AsyncClient
 
 # -- Helpers -------------------------------------------------------------------
 
@@ -146,16 +152,21 @@ def _make_openai_response_api_response(
 
 def _make_google_interaction_response(
     id: str = "int_001",
-    output_items: list[Any] | None = None,
+    steps: list[Any] | None = None,
     input_tokens: int = 8,
     output_tokens: int = 4,
 ):
     """Mock the Gemini Interactions API shape."""
-    if output_items is None:
-        output_items = [SimpleNamespace(type="text", text="Bonjour")]
+    if steps is None:
+        steps = [
+            SimpleNamespace(
+                type="model_output",
+                content=[SimpleNamespace(type="text", text="Bonjour")],
+            )
+        ]
     return SimpleNamespace(
         id=id,
-        outputs=output_items,
+        steps=steps,
         usage=SimpleNamespace(
             total_input_tokens=input_tokens,
             total_output_tokens=output_tokens,
@@ -227,6 +238,235 @@ async def test_openai_embedding(mock_import):
     resp = await provider.embed("text-embedding-3-small", ["hello", "world"])
     assert len(resp.data) == 2
     assert resp.data[0].embedding == [0.1, 0.2]
+
+
+# -- Provider transport configuration -----------------------------------------
+
+
+def test_openai_provider_forwards_transport_config():
+    http_client = object()
+    default_headers = {"x-test": "1"}
+
+    with patch("giskard.llm.providers.openai._import_openai") as mock_import:
+        sdk = MagicMock()
+        mock_import.return_value = sdk
+
+        OpenAIProvider(
+            api_key="k",
+            base_url="https://example.test/v1",
+            timeout=12,
+            http_client=cast("AsyncClient", http_client),
+            default_headers=default_headers,
+        )
+
+    kwargs = sdk.AsyncOpenAI.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["base_url"] == "https://example.test/v1"
+    assert kwargs["timeout"] == 12
+    assert kwargs["http_client"] is http_client
+    assert kwargs["default_headers"] == default_headers
+
+
+def test_openai_provider_supports_azure_foundry_v1_base_url():
+    with patch("giskard.llm.providers.openai._import_openai") as mock_import:
+        sdk = MagicMock()
+        mock_import.return_value = sdk
+
+        OpenAIProvider(
+            api_key="k",
+            base_url="https://example.openai.azure.com/openai/v1/",
+        )
+
+    kwargs = sdk.AsyncOpenAI.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["base_url"] == "https://example.openai.azure.com/openai/v1/"
+    assert "api_version" not in kwargs
+
+
+def test_azure_openai_provider_forwards_transport_config(monkeypatch):
+    http_client = object()
+    default_headers = {"x-test": "1"}
+    monkeypatch.delenv("AZURE_API_KEY", raising=False)
+    monkeypatch.delenv("AZURE_API_BASE", raising=False)
+    monkeypatch.delenv("AZURE_API_VERSION", raising=False)
+
+    with patch("openai.AsyncAzureOpenAI") as mock_client:
+        AzureOpenAIProvider(
+            api_key="k",
+            base_url="https://azure.test",
+            api_version="2024-10-21",
+            timeout=12,
+            http_client=cast("AsyncClient", http_client),
+            default_headers=default_headers,
+        )
+
+    kwargs = mock_client.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["azure_endpoint"] == "https://azure.test"
+    assert kwargs["api_version"] == "2024-10-21"
+    assert kwargs["timeout"] == 12
+    assert kwargs["http_client"] is http_client
+    assert kwargs["default_headers"] == default_headers
+
+
+def test_azure_ai_provider_forwards_transport_config(monkeypatch):
+    http_client = object()
+    default_headers = {"x-ms-useragent": "giskard-llm"}
+    monkeypatch.delenv("AZURE_AI_ENDPOINT", raising=False)
+    monkeypatch.delenv("AZURE_AI_API_VERSION", raising=False)
+
+    with patch("openai.AsyncAzureOpenAI") as mock_client:
+        AzureAIProvider(
+            api_key="k",
+            base_url="https://dev.services.ai.azure.com/models",
+            timeout=12,
+            http_client=cast("AsyncClient", http_client),
+            default_headers=default_headers,
+        )
+
+    kwargs = mock_client.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["azure_endpoint"] == "https://dev.services.ai.azure.com"
+    assert kwargs["api_version"] == "2024-10-21"
+    assert kwargs["timeout"] == 12
+    assert kwargs["http_client"] is http_client
+    assert kwargs["default_headers"] == default_headers
+
+
+def test_anthropic_provider_forwards_transport_config():
+    http_client = object()
+    default_headers = {"x-test": "1"}
+
+    with patch("giskard.llm.providers.anthropic._import_anthropic") as mock_import:
+        sdk = MagicMock()
+        mock_import.return_value = sdk
+
+        AnthropicProvider(
+            api_key="k",
+            base_url="https://anthropic.test",
+            timeout=12,
+            http_client=cast("AsyncClient", http_client),
+            default_headers=default_headers,
+        )
+
+    kwargs = sdk.AsyncAnthropic.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["base_url"] == "https://anthropic.test"
+    assert kwargs["timeout"] == 12
+    assert kwargs["http_client"] is http_client
+    assert kwargs["default_headers"] == default_headers
+
+
+class _FakeHttpOptions:
+    def __init__(self, httpxAsyncClient=None, headers=None):
+        self.httpx_async_client = httpxAsyncClient
+        self.headers = headers
+
+    @classmethod
+    def model_validate(cls, value):
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, dict):
+            return cls(**value)
+        raise ValueError(f"Cannot validate {type(value)}")
+
+    def model_copy(self, update=None):
+        copied = type(self)(
+            httpxAsyncClient=self.httpx_async_client,
+            headers=self.headers,
+        )
+        for key, value in (update or {}).items():
+            setattr(copied, key, value)
+        return copied
+
+
+def _patch_google_sdk(monkeypatch):
+    sdk = MagicMock()
+    types = MagicMock(HttpOptions=_FakeHttpOptions)
+    monkeypatch.setattr("giskard.llm.providers.google._import_genai", lambda: sdk)
+    monkeypatch.setattr(
+        "giskard.llm.providers.google._import_genai_types", lambda: types
+    )
+    return sdk
+
+
+def test_google_provider_builds_http_options_from_transport_config(monkeypatch):
+    http_client = object()
+    default_headers = {"x-test": "1"}
+    sdk = _patch_google_sdk(monkeypatch)
+
+    GoogleProvider(
+        api_key="k",
+        http_client=cast("AsyncClient", http_client),
+        default_headers=default_headers,
+    )
+
+    kwargs = sdk.Client.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["http_options"].httpx_async_client is http_client
+    assert kwargs["http_options"].headers == default_headers
+
+
+def test_google_provider_no_transport_kwargs_passes_no_http_options(monkeypatch):
+    sdk = _patch_google_sdk(monkeypatch)
+
+    GoogleProvider(api_key="k")
+
+    kwargs = sdk.Client.call_args.kwargs
+    assert "http_options" not in kwargs or kwargs["http_options"] is None
+
+
+def test_google_provider_preserves_explicit_http_options_and_fills_missing(monkeypatch):
+    explicit_client = object()
+    fallback_client = object()
+    fallback_headers = {"x-fallback": "1"}
+    sdk = _patch_google_sdk(monkeypatch)
+
+    GoogleProvider(
+        api_key="k",
+        http_client=cast("AsyncClient", fallback_client),
+        default_headers=fallback_headers,
+        http_options=_FakeHttpOptions(httpxAsyncClient=explicit_client),  # pyright: ignore[reportArgumentType]
+    )
+
+    options = sdk.Client.call_args.kwargs["http_options"]
+    assert options.httpx_async_client is explicit_client
+    assert options.headers == fallback_headers
+
+
+def test_google_provider_warns_when_http_options_conflicts_with_convenience_kwargs(
+    monkeypatch, caplog
+):
+    explicit_client = object()
+    explicit_headers = {"x-explicit": "1"}
+    conflicting_client = object()
+    conflicting_headers = {"x-conflict": "1"}
+    sdk = _patch_google_sdk(monkeypatch)
+
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="giskard.llm.providers.google"):
+        GoogleProvider(
+            api_key="k",
+            http_client=cast("AsyncClient", conflicting_client),
+            default_headers=conflicting_headers,
+            http_options=_FakeHttpOptions(
+                httpxAsyncClient=explicit_client, headers=explicit_headers
+            ),  # pyright: ignore[reportArgumentType]
+        )
+
+    options = sdk.Client.call_args.kwargs["http_options"]
+    assert options.httpx_async_client is explicit_client
+    assert options.headers == explicit_headers
+    assert any("http_client" in r.message for r in caplog.records)
+    assert any("default_headers" in r.message for r in caplog.records)
+
+
+def test_google_provider_raises_for_invalid_http_options(monkeypatch):
+    _patch_google_sdk(monkeypatch)
+
+    with pytest.raises(ValueError, match="invalid http_options"):
+        GoogleProvider(api_key="k", http_options=cast("HttpOptionsOrDict", object()))
 
 
 # -- Error mapping completeness ------------------------------------------------
@@ -544,7 +784,7 @@ async def test_google_respond_function_call(mock_errors):
         arguments={"city": "Tokyo"},
     )
     provider._client.aio.interactions.create = AsyncMock(
-        return_value=_make_google_interaction_response(output_items=[fc_item])
+        return_value=_make_google_interaction_response(steps=[fc_item])
     )
 
     resp = await provider.respond("gemini-2.0-flash", "Weather?")
