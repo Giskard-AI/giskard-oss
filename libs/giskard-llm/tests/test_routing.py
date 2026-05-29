@@ -260,3 +260,42 @@ async def test_client_aresponse_unsupported_raises(mock_create):
     client = LLMClient()
     with pytest.raises(UnsupportedOperationError, match="does not support"):
         await client.aresponse("openai/gpt-4o", "Hello")
+
+
+@patch("giskard.llm.routing._create_provider")
+async def test_client_routes_azure_foundry_v1_through_openai_provider(
+    mock_create, monkeypatch
+):
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "resolved-key")
+    mock_provider = MagicMock()
+    mock_provider.complete = AsyncMock(return_value=MagicMock(choices=[]))
+    mock_provider.embed = AsyncMock(return_value=MagicMock(data=[]))
+    mock_provider.respond = AsyncMock(return_value=MagicMock(id="resp_1"))
+    mock_create.return_value = mock_provider
+
+    client = LLMClient()
+    client.configure(
+        "foundry-v1",
+        provider="openai",
+        api_key="os.environ/AZURE_OPENAI_API_KEY",  # pragma: allowlist secret
+        base_url="https://example.openai.azure.com/openai/v1/",
+    )
+
+    await client.acompletion(
+        "foundry-v1/gpt-4.1-mini", [{"role": "user", "content": "Hi"}]
+    )
+    await client.aembedding("foundry-v1/text-embedding-3-small", ["hello"])
+    await client.aresponse("foundry-v1/gpt-4.1-mini", "Hello")
+
+    mock_create.assert_called_once_with(
+        "openai",
+        api_key="resolved-key",
+        base_url="https://example.openai.azure.com/openai/v1/",
+    )
+    mock_provider.complete.assert_called_once_with(
+        "gpt-4.1-mini", [{"role": "user", "content": "Hi"}], tools=None
+    )
+    mock_provider.embed.assert_called_once_with("text-embedding-3-small", ["hello"])
+    mock_provider.respond.assert_called_once_with(
+        "gpt-4.1-mini", "Hello", instructions=None, previous_id=None, tools=None
+    )

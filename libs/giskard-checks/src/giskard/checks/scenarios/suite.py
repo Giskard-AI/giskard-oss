@@ -1,4 +1,6 @@
+import asyncio
 import time
+from contextlib import nullcontext
 from typing import Any, Generic, Self, TypeVar
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
@@ -90,8 +92,10 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             | NotProvided
         ) = NOT_PROVIDED,
         return_exception: bool = False,
+        parallel: bool = False,
+        max_concurrency: int | None = None,
     ) -> SuiteResult:
-        """Run all scenarios in the suite serially.
+        """Run all scenarios in the suite.
 
         Parameters
         ----------
@@ -100,6 +104,11 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             overrides both the suite-level target and any scenario-level targets.
         return_exception : bool
             If True, return results even when exceptions occur instead of raising.
+        parallel : bool
+            If True, run all scenarios concurrently while preserving result order.
+        max_concurrency : int | None
+            Optional upper bound on concurrent scenario runs when ``parallel=True``.
+            Must be a positive integer when provided.
 
         Returns
         -------
@@ -117,10 +126,11 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         result_v2 = await suite.run(target=my_sut_v2)
         ```
         """
-        results: list[ScenarioResult[Trace[Any, Any]]] = []
-
         target = target if not isinstance(target, NotProvided) else self.target
         has_target = not isinstance(target, NotProvided)
+
+        if parallel and max_concurrency is not None and max_concurrency < 1:
+            raise ValueError("max_concurrency must be greater than 0")
 
         with telemetry_run_context():
             telemetry_tag("giskard_component", "suite")
@@ -129,6 +139,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             shape_props = suite_shape_properties(
                 scenario_count=len(self.scenarios),
                 has_target=has_target,
+                parallel=parallel,
             )
             telemetry_capture(
                 "checks_suite_run_started",
@@ -136,11 +147,12 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             )
 
             start_time = time.perf_counter()
-            for scenario in self.scenarios:
-                result = await scenario.run(
-                    target=target, return_exception=return_exception
+            if parallel:
+                results = await self._run_parallel(
+                    target, return_exception, max_concurrency
                 )
-                results.append(result)
+            else:
+                results = await self._run_serial(target, return_exception)
             end_time = time.perf_counter()
 
             suite_result = SuiteResult(
@@ -161,3 +173,43 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             )
 
         return suite_result
+
+    async def _run_serial(
+        self,
+        target: Any,
+        return_exception: bool,
+    ) -> list[ScenarioResult[Trace[Any, Any]]]:
+        return [
+            await scenario.run(target=target, return_exception=return_exception)
+            for scenario in self.scenarios
+        ]
+
+    async def _run_parallel(
+        self,
+        target: Any,
+        return_exception: bool,
+        max_concurrency: int | None,
+    ) -> list[ScenarioResult[Trace[Any, Any]]]:
+        semaphore = (
+            asyncio.Semaphore(max_concurrency) if max_concurrency else nullcontext()
+        )
+
+        async def run_scenario(
+            scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
+        ) -> ScenarioResult[Trace[Any, Any]]:
+            async with semaphore:
+                return await scenario.run(
+                    target=target, return_exception=return_exception
+                )
+
+        try:
+            async with asyncio.TaskGroup() as task_group:
+                tasks = [
+                    task_group.create_task(run_scenario(scenario))
+                    for scenario in self.scenarios
+                ]
+        except* Exception as exc_group:
+            if len(exc_group.exceptions) == 1:
+                raise exc_group.exceptions[0]
+            raise
+        return [task.result() for task in tasks]

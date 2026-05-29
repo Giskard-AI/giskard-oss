@@ -13,6 +13,8 @@ from giskard.llm.errors import BadRequestError
 from giskard.llm.types import ToolDefParam
 from pydantic import BaseModel
 
+from .helpers import azure_foundry_v1_base_url
+
 pytestmark = pytest.mark.functional
 
 # -- Provider parametrization -------------------------------------------------
@@ -27,6 +29,9 @@ _MODELS = {
     ),
     "azure": os.getenv("TEST_AZURE_MODEL", "azure/gpt-4.1-nano"),
     "azure_ai": os.getenv("TEST_AZURE_AI_MODEL", "azure_ai/gpt-4.1-nano"),
+    "azure_foundry_v1": os.getenv(
+        "TEST_AZURE_FOUNDRY_V1_MODEL", "azure_foundry_v1/gpt-4.1-nano"
+    ),
 }
 
 # `bare` intentionally has no entry: it exercises the no-prefix path where
@@ -47,6 +52,11 @@ _CONFIGURE_PARAMS = {  # pragma: allowlist secret
         "api_key": "os.environ/AZURE_AI_API_KEY",
         "base_url": "os.environ/AZURE_AI_ENDPOINT",
     },
+    "azure_foundry_v1": {
+        "provider": "openai",
+        "api_key": "os.environ/AZURE_AI_API_KEY",  # pragma: allowlist secret
+        "base_url": azure_foundry_v1_base_url(),
+    },
 }
 
 _PROVIDER_MARKS = {
@@ -57,6 +67,7 @@ _PROVIDER_MARKS = {
     "anthropic": pytest.mark.anthropic,
     "azure": pytest.mark.azure,
     "azure_ai": pytest.mark.azure_ai,
+    "azure_foundry_v1": pytest.mark.azure_foundry_v1,
 }
 
 _PROVIDER_PARAMS = [
