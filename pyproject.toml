@@ -60,15 +60,17 @@ markers = [
 ]
 
 [dependency-groups]
-dev = [
-    "anthropic>=0.96.0",
-    "google-genai>=2.0",
-    "ipykernel==7.2.0",
-    "openai>=2.24.0",
-    "pip-audit==2.10.0",
-    "pylint-pydantic==0.4.1",
+test = [
     "pytest==9.0.3",
     "pytest-asyncio==1.3.0",
-    "pytest-cov>=6.1,<8",
-    "pytest-timeout>=2.4.0",
+    "pytest-cov==6.1.0",
+    "pytest-timeout==2.4.0",
+]
+dev = [
+    { include-group = "test" },
+    "giskard-llm[openai,google,anthropic]>=1.0.0a1",
+    "giskard-agents[litellm]>=1.0.0a1",
+    "ipykernel==7.2.0",
+    "pip-audit==2.10.0",
+    "pylint-pydantic==0.4.1",
 ]
