@@ -143,12 +143,27 @@ def _build_http_options(
             headers=default_headers,
         )
 
-    options = genai_types.HttpOptions.model_validate(http_options)
+    try:
+        options = genai_types.HttpOptions.model_validate(http_options)
+    except Exception as exc:
+        raise ValueError(f"google provider: invalid http_options - {exc}") from exc
     updates: dict[str, Any] = {}
-    if http_client is not None and options.httpx_async_client is None:
-        updates["httpx_async_client"] = http_client
-    if default_headers is not None and options.headers is None:
-        updates["headers"] = default_headers
+    if http_client is not None:
+        if options.httpx_async_client is None:
+            updates["httpx_async_client"] = http_client
+        else:
+            logger.warning(
+                "google provider: http_client kwarg ignored because http_options "
+                "already sets httpxAsyncClient"
+            )
+    if default_headers is not None:
+        if options.headers is None:
+            updates["headers"] = default_headers
+        else:
+            logger.warning(
+                "google provider: default_headers kwarg ignored because http_options "
+                "already sets headers"
+            )
 
     return options.model_copy(update=updates) if updates else options
 

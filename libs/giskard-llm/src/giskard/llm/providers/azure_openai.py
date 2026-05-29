@@ -62,14 +62,15 @@ class AzureOpenAIProvider(OpenAIProvider):
         default_headers: Mapping[str, str] | None = None,
         **_kwargs: Any,
     ) -> None:
-        if _kwargs:
-            logger.warning(
-                "%s provider: ignoring unknown kwargs: %s", PROVIDER, sorted(_kwargs)
-            )
         try:
             import openai
         except ImportError as exc:
             raise ProviderNotAvailableError(PROVIDER, "openai") from exc
+
+        if _kwargs:
+            logger.warning(
+                "%s provider: ignoring unknown kwargs: %s", PROVIDER, sorted(_kwargs)
+            )
 
         resolved_key = api_key or os.environ.get("AZURE_API_KEY")
         resolved_base = base_url or os.environ.get("AZURE_API_BASE")
