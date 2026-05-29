@@ -84,7 +84,7 @@ from ..types import (
 )
 
 if TYPE_CHECKING:
-    from google.genai.types import HttpOptions
+    from google.genai.types import HttpOptions, HttpOptionsOrDict
     from httpx import AsyncClient
 
 _CHAT_MESSAGES_TYPE_ADAPTER = TypeAdapter(Sequence[ChatMessage])
@@ -129,7 +129,7 @@ def _import_genai_errors() -> Any:
 
 
 def _build_http_options(
-    http_options: "HttpOptions | None",
+    http_options: "HttpOptionsOrDict | None",
     http_client: "AsyncClient | None",
     default_headers: Mapping[str, str] | None,
 ) -> "HttpOptions | None":
@@ -173,7 +173,7 @@ class GoogleProvider:
         api_key: str | None = None,
         http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
-        http_options: "HttpOptions | None" = None,
+        http_options: "HttpOptionsOrDict | None" = None,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:
