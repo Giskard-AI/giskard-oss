@@ -55,7 +55,7 @@ Provider-specific kwargs:
 import logging
 import os
 from collections.abc import Mapping, Sequence
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -82,6 +82,10 @@ from ..types import (
     ToolDef,
     ToolDefParam,
 )
+
+if TYPE_CHECKING:
+    from google.genai.types import HttpOptions
+    from httpx import AsyncClient
 
 _CHAT_MESSAGES_TYPE_ADAPTER = TypeAdapter(Sequence[ChatMessage])
 _TOOL_DEFS_TYPE_ADAPTER = TypeAdapter(Sequence[ToolDef] | None)
@@ -125,10 +129,10 @@ def _import_genai_errors() -> Any:
 
 
 def _build_http_options(
-    http_options: Any | None,
-    http_client: Any | None,
+    http_options: "HttpOptions | None",
+    http_client: "AsyncClient | None",
     default_headers: Mapping[str, str] | None,
-) -> Any | None:
+) -> "HttpOptions | None":
     if http_options is None and http_client is None and default_headers is None:
         return None
 
@@ -167,9 +171,9 @@ class GoogleProvider:
     def __init__(
         self,
         api_key: str | None = None,
-        http_client: Any | None = None,
+        http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
-        http_options: Any | None = None,
+        http_options: "HttpOptions | None" = None,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:

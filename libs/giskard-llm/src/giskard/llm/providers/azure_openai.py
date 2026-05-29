@@ -35,11 +35,14 @@ Provider-specific kwargs:
 import logging
 import os
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..errors import ProviderNotAvailableError
 from ..utils.compact import compact
 from .openai import OpenAIProvider
+
+if TYPE_CHECKING:
+    from httpx import AsyncClient
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +58,7 @@ class AzureOpenAIProvider(OpenAIProvider):
         base_url: str | None = None,
         api_version: str | None = None,
         timeout: float | None = None,
-        http_client: Any | None = None,
+        http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
         **_kwargs: Any,
     ) -> None:
