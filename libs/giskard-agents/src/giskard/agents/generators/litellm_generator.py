@@ -19,7 +19,7 @@ from .base import BaseGenerator
 from .middleware import CompletionMiddleware, RetryMiddleware, RetryPolicy
 
 if TYPE_CHECKING:
-    from litellm import ModelResponse  # pyright: ignore[reportMissingImports]
+    from litellm import ModelResponse
     from openai.types.chat.chat_completion_message_param import (
         ChatCompletionMessageParam,
     )
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 def _import_litellm() -> Any:
     try:
-        import litellm  # pyright: ignore[reportMissingImports]
+        import litellm
 
         return litellm
     except ImportError as exc:
