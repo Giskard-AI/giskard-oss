@@ -6,6 +6,8 @@ import pytest
 from giskard.llm import LLMClient
 from giskard.llm.errors import UnsupportedOperationError
 
+from .helpers import azure_foundry_v1_base_url
+
 pytestmark = pytest.mark.functional
 
 # -- Provider parametrization -------------------------------------------------
@@ -16,6 +18,10 @@ _EMBEDDING_MODELS = {
     "azure": os.getenv("TEST_AZURE_EMBEDDING_MODEL", "azure/text-embedding-3-small"),
     "azure_ai": os.getenv(
         "TEST_AZURE_AI_EMBEDDING_MODEL", "azure_ai/text-embedding-3-small"
+    ),
+    "azure_foundry_v1": os.getenv(
+        "TEST_AZURE_FOUNDRY_V1_EMBEDDING_MODEL",
+        "azure_foundry_v1/text-embedding-3-small",
     ),
 }
 
@@ -33,6 +39,11 @@ _CONFIGURE_PARAMS = {  # pragma: allowlist secret
         "api_key": "os.environ/AZURE_AI_API_KEY",
         "base_url": "os.environ/AZURE_AI_ENDPOINT",
     },
+    "azure_foundry_v1": {
+        "provider": "openai",
+        "api_key": "os.environ/AZURE_AI_API_KEY",  # pragma: allowlist secret
+        "base_url": azure_foundry_v1_base_url(),
+    },
 }
 
 _PROVIDER_MARKS = {
@@ -40,6 +51,7 @@ _PROVIDER_MARKS = {
     "google": pytest.mark.google,
     "azure": pytest.mark.azure,
     "azure_ai": pytest.mark.azure_ai,
+    "azure_foundry_v1": pytest.mark.azure_foundry_v1,
 }
 
 

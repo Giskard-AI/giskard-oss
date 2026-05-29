@@ -3,7 +3,7 @@
 This is the Interactions (response) path. For **request** translation (``to_google``), see
 ``test_google_response.py``; for **generateContent** returns, see ``test_google_chat_return.py``.
 
-``outputs`` and usage: see Gemini / GenAI Interactions response shape in the
+``steps`` and usage: see Gemini / GenAI Interactions response shape in the
 ``google.genai`` interactions types.
 """
 
@@ -20,8 +20,9 @@ from giskard.llm.types import (
     ResponseOutputText,
 )
 from google.genai._interactions.types import (
-    FunctionCallContent,
+    FunctionCallStep,
     Interaction,
+    ModelOutputStep,
     TextContent,
     Usage,
 )
@@ -33,7 +34,7 @@ _FIXED_DT = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
 
 def _interaction(
-    outputs: list[object],
+    steps: list[object],
     *,
     usage: object | None = None,
 ) -> Interaction:
@@ -44,7 +45,7 @@ def _interaction(
             created=_FIXED_DT,
             updated=_FIXED_DT,
             status="completed",
-            outputs=outputs,
+            steps=steps,
             usage=usage,
         )
     return Interaction.model_construct(
@@ -52,14 +53,19 @@ def _interaction(
         created=_FIXED_DT,
         updated=_FIXED_DT,
         status="completed",
-        outputs=outputs,
+        steps=steps,
     )
 
 
 def test_from_google_text_output():
-    """``type: text`` outputs become a :class:`ResponseOutputMessage` with ``ResponseOutputText``."""
+    """``model_output`` text becomes a :class:`ResponseOutputMessage` with ``ResponseOutputText``."""
     raw = _interaction(
-        [TextContent(type="text", text="Hello from Interactions.")],
+        [
+            ModelOutputStep(
+                type="model_output",
+                content=[TextContent(type="text", text="Hello from Interactions.")],
+            )
+        ],
         usage=Usage(
             total_input_tokens=3,
             total_output_tokens=4,
@@ -84,16 +90,23 @@ def test_from_google_text_output():
 
 def test_from_google_omit_usage():
     """``usage`` may be absent; ``from_google`` leaves ``ResponseResult.usage`` empty."""
-    raw = _interaction([TextContent(type="text", text="no usage")])
+    raw = _interaction(
+        [
+            ModelOutputStep(
+                type="model_output",
+                content=[TextContent(type="text", text="no usage")],
+            )
+        ]
+    )
     out = GoogleResponseTranslator.from_google(raw, _MODEL)
     assert out.usage is None
 
 
 def test_from_google_function_call():
-    """``function_call`` content maps to :class:`ResponseOutputFunctionCall`."""
+    """``function_call`` step maps to :class:`ResponseOutputFunctionCall`."""
     raw = _interaction(
         [
-            FunctionCallContent(
+            FunctionCallStep(
                 type="function_call",
                 id="fc_1",
                 name="get_weather",
@@ -111,12 +124,18 @@ def test_from_google_function_call():
 
 
 def test_from_google_text_then_text_then_function():
-    """Multiple ``outputs`` list entries preserve order; each text is a ``ResponseOutputMessage``."""
+    """Multiple ``steps`` list entries preserve order; each model text is a ``ResponseOutputMessage``."""
     raw = _interaction(
         [
-            TextContent(type="text", text="A"),
-            TextContent(type="text", text="B"),
-            FunctionCallContent(
+            ModelOutputStep(
+                type="model_output",
+                content=[TextContent(type="text", text="A")],
+            ),
+            ModelOutputStep(
+                type="model_output",
+                content=[TextContent(type="text", text="B")],
+            ),
+            FunctionCallStep(
                 type="function_call",
                 id="c2",
                 name="f",
