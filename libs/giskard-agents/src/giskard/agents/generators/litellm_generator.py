@@ -56,6 +56,10 @@ class LiteLLMGenerator(BaseGenerator):
     )
     retry_policy: RetryPolicy | None = Field(default_factory=RetryPolicy)
 
+    def model_post_init(self, __context: Any) -> None:
+        """Fail fast if litellm is not installed."""
+        _import_litellm()
+
     @override
     def _create_retry_middleware(self) -> LiteLLMRetryMiddleware | None:
         if self.retry_policy is None:
