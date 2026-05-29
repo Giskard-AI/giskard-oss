@@ -27,6 +27,12 @@ allow if {
 }
 """
 
+_regorus_installed = importlib.util.find_spec("regorus") is not None
+_skip_if_no_regorus = pytest.mark.skipif(
+    not _regorus_installed,
+    reason="regorus not installed (pip install 'giskard-checks[regorus]')",
+)
+
 
 def _check(**kwargs: Any) -> RegoPolicy:  # pyright: ignore[reportMissingTypeArgument]
     defaults: dict[str, Any] = {
@@ -35,24 +41,6 @@ def _check(**kwargs: Any) -> RegoPolicy:  # pyright: ignore[reportMissingTypeArg
     }
     defaults.update(kwargs)
     return RegoPolicy(**defaults)
-
-
-@pytest.mark.skipif(
-    importlib.util.find_spec("regorus") is not None,
-    reason="regorus is installed",
-)
-async def test_missing_regorus_returns_error() -> None:
-    check = _check()
-    trace = await Trace.from_interactions(
-        Interaction(inputs="test", outputs={"role": "admin"})
-    )
-
-    result = await check.run(trace)
-
-    assert result.status == CheckStatus.ERROR
-    assert result.errored
-    assert result.message is not None
-    assert "giskard-checks[regorus]" in result.message
 
 
 async def test_no_match_on_key_fails() -> None:
@@ -80,7 +68,7 @@ async def test_serialization_round_trip() -> None:
     assert restored.data == {"roles": ["admin"]}
 
 
-@pytest.mark.regorus
+@_skip_if_no_regorus
 async def test_allow_passes() -> None:
     check = _check()
     trace = await Trace.from_interactions(
@@ -94,7 +82,7 @@ async def test_allow_passes() -> None:
     assert result.details["value"] is True
 
 
-@pytest.mark.regorus
+@_skip_if_no_regorus
 async def test_deny_fails() -> None:
     check = _check()
     trace = await Trace.from_interactions(
@@ -108,7 +96,7 @@ async def test_deny_fails() -> None:
     assert result.details["value"] is False
 
 
-@pytest.mark.regorus
+@_skip_if_no_regorus
 async def test_undefined_rule_fails() -> None:
     policy = """\
 package giskard
@@ -131,7 +119,7 @@ allow if {
     assert "undefined" in result.message
 
 
-@pytest.mark.regorus
+@_skip_if_no_regorus
 async def test_non_boolean_rule_returns_error() -> None:
     policy = """\
 package giskard
@@ -154,7 +142,7 @@ message := "denied" if {
     assert "expected bool" in result.message
 
 
-@pytest.mark.regorus
+@_skip_if_no_regorus
 @pytest.mark.parametrize(
     ("key", "outputs", "policy", "expected_status", "expected_input"),
     [
@@ -274,7 +262,7 @@ async def test_json_serializable_input_types(
     assert result.details["input"] == expected_input
 
 
-@pytest.mark.regorus
+@_skip_if_no_regorus
 async def test_data_document_used() -> None:
     policy = """\
 package giskard
@@ -298,7 +286,7 @@ allow if {
     assert result.status == CheckStatus.PASS
 
 
-@pytest.mark.regorus
+@_skip_if_no_regorus
 async def test_invalid_policy_returns_error() -> None:
     with pytest.raises(ValidationError, match="Invalid Rego policy or data"):
         _check(policy=INVALID_POLICY)

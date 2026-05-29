@@ -27,7 +27,6 @@ asyncio_mode = "auto"
 pythonpath = ["src"]
 markers = [
     "integration: integration tests that are skipped unless --run-integration is provided",
-    "regorus: tests requiring the optional regorus dependency (celine-regorus)",
 ]
 
 [tool.ruff.lint]
