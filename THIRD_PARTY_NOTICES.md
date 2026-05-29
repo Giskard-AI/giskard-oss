@@ -17,20 +17,29 @@ Find a list of packages below
 |✔|aiohappyeyeballs|
 |✔|aiohttp|
 |✔|aiosignal|
+|✔|annotated-doc|
 |✔|annotated-types|
+|✔|anthropic|
 |✔|anyio|
 |✔|attrs|
+|✔|backoff|
 |✔|certifi|
+|✔|cffi|
 |✔|charset-normalizer|
 |✔|click|
 |✔|colorama|
+|✔|cryptography|
 |✔|distro|
+|✔|docstring-parser|
 |✔|fastuuid|
 |✔|filelock|
 |✔|frozenlist|
 |✔|fsspec|
+|✔|google-auth|
+|✔|google-genai|
 |✔|griffe|
-|✔|grpcio|
+|✔|griffecli|
+|✔|griffelib|
 |✔|h11|
 |✔|hf-xet|
 |✔|httpcore|
@@ -45,19 +54,27 @@ Find a list of packages below
 |✔|jsonschema-specifications|
 |✔|litellm|
 |✔|logfire-api|
+|✔|markdown-it-py|
 |✔|markupsafe|
+|✔|mdurl|
 |✔|multidict|
+|✔|numpy|
 |✔|openai|
 |✔|packaging|
-|✔|ply|
+|✔|posthog|
 |✔|propcache|
+|✔|pyasn1|
+|✔|pyasn1-modules|
+|✔|pycparser|
 |✔|pydantic|
 |✔|pydantic-core|
+|✔|pygments|
 |✔|python-dotenv|
 |✔|pyyaml|
 |✔|referencing|
 |✔|regex|
 |✔|requests|
+|✔|rich|
 |✔|rpds-py|
 |✔|shellingham|
 |✔|sniffio|
@@ -65,14 +82,15 @@ Find a list of packages below
 |✔|tiktoken|
 |✔|tokenizers|
 |✔|tqdm|
-|✔|typer-slim|
+|✔|typer|
 |✔|typing-extensions|
 |✔|typing-inspection|
 |✔|urllib3|
+|✔|websockets|
 |✔|yarl|
 |✔|zipp|
 
-### aiohappyeyeballs-2.6.1
+### aiohappyeyeballs-2.6.2
 
 - HomePage: UNKNOWN
 - Author: J. Nick Koston
@@ -80,7 +98,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### aiohttp-3.13.3
+### aiohttp-3.13.5
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -96,6 +114,14 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
+### annotated-doc-0.0.4
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: MIT
+- Compatible: True
+- Size: -1
+
 ### annotated-types-0.7.0
 
 - HomePage: UNKNOWN
@@ -104,7 +130,15 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### anyio-4.12.1
+### anthropic-0.105.2
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: MIT LICENSE
+- Compatible: True
+- Size: -1
+
+### anyio-4.13.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -120,6 +154,14 @@ Find a list of packages below
 - Compatible: True
 - Size: 202960
 
+### backoff-2.2.1
+
+- HomePage: https://github.com/litl/backoff
+- Author: Bob Green
+- License: MIT LICENSE
+- Compatible: True
+- Size: -1
+
 ### certifi-2025.8.3
 
 - HomePage: https://github.com/certifi/python-certifi
@@ -127,6 +169,14 @@ Find a list of packages below
 - License: MOZILLA PUBLIC LICENSE 2.0 _MPL 2.0_
 - Compatible: True
 - Size: 294877
+
+### cffi-2.0.0
+
+- HomePage: UNKNOWN
+- Author: Armin Rigo, Maciej Fijalkowski
+- License: MIT
+- Compatible: True
+- Size: -1
 
 ### charset-normalizer-3.4.3
 
@@ -136,7 +186,7 @@ Find a list of packages below
 - Compatible: True
 - Size: 826776
 
-### click-8.3.1
+### click-8.4.1
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -152,11 +202,27 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
+### cryptography-48.0.0
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: APACHE-2.0;; BSD-3-CLAUSE
+- Compatible: True
+- Size: -1
+
 ### distro-1.9.0
 
 - HomePage: https://github.com/python-distro/distro
 - Author: Nir Cohen
 - License: APACHE SOFTWARE LICENSE
+- Compatible: True
+- Size: -1
+
+### docstring-parser-0.18.0
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: MIT LICENSE
 - Compatible: True
 - Size: -1
 
@@ -168,11 +234,11 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### filelock-3.20.3
+### filelock-3.29.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
-- License: UNLICENSE
+- License: MIT
 - Compatible: True
 - Size: -1
 
@@ -184,7 +250,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### fsspec-2026.1.0
+### fsspec-2026.4.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -192,7 +258,23 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### griffe-1.15.0
+### google-auth-2.53.0
+
+- HomePage: https://github.com/googleapis/google-auth-library-python
+- Author: Google Cloud Platform
+- License: APACHE SOFTWARE LICENSE
+- Compatible: True
+- Size: -1
+
+### google-genai-2.7.0
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: APACHE-2.0
+- Compatible: True
+- Size: -1
+
+### griffe-2.0.2
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -200,11 +282,19 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### grpcio-1.76.0
+### griffecli-2.0.2
 
-- HomePage: https://grpc.io
-- Author: The gRPC Authors
-- License: APACHE SOFTWARE LICENSE
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: ISC
+- Compatible: True
+- Size: -1
+
+### griffelib-2.0.2
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: ISC
 - Compatible: True
 - Size: -1
 
@@ -216,7 +306,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### hf-xet-1.2.0
+### hf-xet-1.5.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -240,7 +330,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### huggingface-hub-1.3.2
+### huggingface-hub-1.17.0
 
 - HomePage: https://github.com/huggingface/huggingface_hub
 - Author: Hugging Face, Inc.
@@ -256,7 +346,7 @@ Find a list of packages below
 - Compatible: True
 - Size: 349141
 
-### importlib-metadata-8.7.1
+### importlib-metadata-8.9.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -272,15 +362,15 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### jiter-0.12.0
+### jiter-0.15.0
 
 - HomePage: https://github.com/pydantic/jiter/
 - Author: UNKNOWN
-- License: MIT LICENSE
+- License: MIT
 - Compatible: True
 - Size: -1
 
-### jsonpath-ng-1.7.0
+### jsonpath-ng-1.8.0
 
 - HomePage: https://github.com/h2non/jsonpath-ng
 - Author: Tomas Aparicio
@@ -304,21 +394,29 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### litellm-1.81.0
+### litellm-1.86.2
 
 - HomePage: UNKNOWN
 - Author: BerriAI
-- License: MIT LICENSE
+- License: MIT
 - Compatible: True
 - Size: -1
 
-### logfire-api-4.19.0
+### logfire-api-4.34.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
 - License: MIT
 - Compatible: True
 - Size: -1
+
+### markdown-it-py-4.0.0
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: MIT LICENSE
+- Compatible: True
+- Size: 223857
 
 ### markupsafe-3.0.3
 
@@ -328,7 +426,15 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### multidict-6.7.0
+### mdurl-0.1.2
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: MIT LICENSE
+- Compatible: True
+- Size: 22522
+
+### multidict-6.7.1
 
 - HomePage: https://github.com/aio-libs/multidict
 - Author: Andrew Svetlov
@@ -336,7 +442,15 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### openai-2.15.0
+### numpy-2.4.6
+
+- HomePage: UNKNOWN
+- Author: Travis E. Oliphant et al.
+- License: 0BSD;; BSD-3-CLAUSE;; CC0-1.0;; MIT;; ZLIB
+- Compatible: True
+- Size: -1
+
+### openai-2.38.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -352,15 +466,15 @@ Find a list of packages below
 - Compatible: True
 - Size: 236486
 
-### ply-3.11
+### posthog-7.16.2
 
-- HomePage: http://www.dabeaz.com/ply/
-- Author: David Beazley
-- License: BSD
+- HomePage: https://github.com/posthog/posthog-python
+- Author: Posthog
+- License: MIT LICENSE
 - Compatible: True
 - Size: -1
 
-### propcache-0.4.1
+### propcache-0.5.2
 
 - HomePage: https://github.com/aio-libs/propcache
 - Author: Andrew Svetlov
@@ -368,7 +482,31 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### pydantic-2.12.5
+### pyasn1-0.6.3
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: BSD-2-CLAUSE
+- Compatible: True
+- Size: -1
+
+### pyasn1-modules-0.4.2
+
+- HomePage: https://github.com/pyasn1/pyasn1-modules
+- Author: Ilya Etingof
+- License: BSD LICENSE
+- Compatible: True
+- Size: -1
+
+### pycparser-3.0
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: BSD-3-CLAUSE
+- Compatible: True
+- Size: -1
+
+### pydantic-2.13.4
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -376,15 +514,23 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### pydantic-core-2.41.5
+### pydantic-core-2.46.4
 
-- HomePage: https://github.com/pydantic/pydantic-core
+- HomePage: https://github.com/pydantic/pydantic
 - Author: UNKNOWN
 - License: MIT
 - Compatible: True
 - Size: -1
 
-### python-dotenv-1.2.1
+### pygments-2.19.2
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: BSD LICENSE
+- Compatible: True
+- Size: 4467170
+
+### python-dotenv-1.2.2
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -408,7 +554,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### regex-2026.1.15
+### regex-2026.5.9
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -424,7 +570,15 @@ Find a list of packages below
 - Compatible: True
 - Size: 202504
 
-### rpds-py-0.30.0
+### rich-14.1.0
+
+- HomePage: https://github.com/Textualize/rich
+- Author: Will McGugan
+- License: MIT LICENSE
+- Compatible: True
+- Size: 954426
+
+### rpds-py-2026.5.1
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -448,7 +602,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### tenacity-9.1.2
+### tenacity-9.1.4
 
 - HomePage: https://github.com/jd/tenacity
 - Author: Julien Danjou
@@ -456,7 +610,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### tiktoken-0.12.0
+### tiktoken-0.13.0
 
 - HomePage: UNKNOWN
 - Author: Shantanu Jain
@@ -464,7 +618,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### tokenizers-0.22.2
+### tokenizers-0.23.1
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -472,15 +626,15 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### tqdm-4.67.1
+### tqdm-4.67.3
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
-- License: MIT LICENSE;; MOZILLA PUBLIC LICENSE 2.0 _MPL 2.0_
+- License: MIT;; MPL-2.0
 - Compatible: True
 - Size: -1
 
-### typer-slim-0.21.1
+### typer-0.25.1
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -512,15 +666,23 @@ Find a list of packages below
 - Compatible: True
 - Size: 421374
 
-### yarl-1.22.0
+### websockets-16.0
 
-- HomePage: https://github.com/aio-libs/yarl
-- Author: Andrew Svetlov
-- License: APACHE SOFTWARE LICENSE
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: BSD-3-CLAUSE
 - Compatible: True
 - Size: -1
 
-### zipp-3.23.0
+### yarl-1.24.2
+
+- HomePage: https://github.com/aio-libs/yarl
+- Author: Andrew Svetlov
+- License: APACHE-2.0
+- Compatible: True
+- Size: -1
+
+### zipp-4.1.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
