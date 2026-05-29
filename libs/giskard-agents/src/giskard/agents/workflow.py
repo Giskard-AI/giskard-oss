@@ -224,8 +224,8 @@ class _StepRunner:
 
         # If the model refused to generate content, raise a ModelRefusalError
         choice = response.choices[0]
-        if choice.finish_reason == "refusal" or choice.message.refusal is not None:
-            raise ModelRefusalError(refusal=choice.message.refusal)
+        if choice.finish_reason == "refusal" or choice.message.refusal:
+            raise ModelRefusalError(refusal=choice.message.text)
 
         # Attempt the parsing to raise ValidationError if output is not compatible
         output_model.model_validate_json(choice.message.text or "")
