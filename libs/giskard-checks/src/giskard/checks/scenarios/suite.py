@@ -94,6 +94,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
+        max_loggable_failures: int = 20,
     ) -> SuiteResult:
         """Run all scenarios in the suite.
 
@@ -109,6 +110,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         max_concurrency : int | None
             Optional upper bound on concurrent scenario runs when ``parallel=True``.
             Must be a positive integer when provided.
+        max_loggable_failures : int
+            Maximum number of failed or errored scenarios to expand in the rich report.
 
         Returns
         -------
@@ -158,7 +161,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             suite_result = SuiteResult(
                 results=results,
                 duration_ms=int((end_time - start_time) * 1000),
-                max_loggable_failures=20,
+                max_loggable_failures=max_loggable_failures,
             )
 
             telemetry_capture(
