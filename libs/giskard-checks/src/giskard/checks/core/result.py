@@ -493,6 +493,8 @@ class SuiteResult(BaseResult, frozen=True):
         Scenario results produced during the suite execution.
     duration_ms : int
         Total execution time in milliseconds.
+    n_loggable_failures : int
+        Maximum number of failures/errors to display in detailed output (default 20).
     passed_count : int
         Number of scenarios that passed.
     failed_count : int
@@ -509,6 +511,10 @@ class SuiteResult(BaseResult, frozen=True):
         ..., description="List of scenario results"
     )
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
+    n_loggable_failures: int = Field(
+        default=20,
+        description="Maximum number of failures/errors to display in detailed output.",
+    )
 
     @computed_field
     @property
@@ -568,7 +574,7 @@ class SuiteResult(BaseResult, frozen=True):
         failures_and_errors = self.failures_and_errors
 
         if failures_and_errors:
-            n_loggable_failures = 20  # TODO: make this configurable
+            n_loggable_failures = self.n_loggable_failures
 
             # Details
             yield Rule("FAILURES", characters="=", style="grey")
