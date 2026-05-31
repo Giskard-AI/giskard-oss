@@ -99,6 +99,7 @@ def _sample_suite_result() -> SuiteResult:
             ),
         ],
         duration_ms=420,
+        max_loggable_failures=20,
     )
 
 
@@ -226,6 +227,7 @@ def test_failed_scenario_with_mixed_check_statuses_is_still_a_failure() -> None:
             )
         ],
         duration_ms=50,
+        max_loggable_failures=20,
     )
 
     root = ET.fromstring(to_junit_xml(suite_result))

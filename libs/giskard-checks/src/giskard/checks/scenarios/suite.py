@@ -158,6 +158,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             suite_result = SuiteResult(
                 results=results,
                 duration_ms=int((end_time - start_time) * 1000),
+                max_loggable_failures=20,
             )
 
             telemetry_capture(

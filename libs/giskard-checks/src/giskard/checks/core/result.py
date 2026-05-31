@@ -509,6 +509,11 @@ class SuiteResult(BaseResult, frozen=True):
         ..., description="List of scenario results"
     )
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
+    max_loggable_failures: int = Field(
+        default=20,
+        ge=0,
+        description="Maximum number of failed or errored scenarios to expand in the rich report.",
+    )
 
     @computed_field
     @property
@@ -568,7 +573,7 @@ class SuiteResult(BaseResult, frozen=True):
         failures_and_errors = self.failures_and_errors
 
         if failures_and_errors:
-            n_loggable_failures = 20  # TODO: make this configurable
+            n_loggable_failures = self.max_loggable_failures
 
             # Details
             yield Rule("FAILURES", characters="=", style="grey")
