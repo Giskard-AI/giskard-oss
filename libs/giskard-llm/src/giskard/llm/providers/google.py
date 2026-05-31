@@ -44,14 +44,18 @@ Supported features:
 
 Provider-specific kwargs:
     - ``safety_settings``: override default safety settings
+    - ``http_client``: caller-owned async HTTP client passed through ``HttpOptions``; not closed by giskard-llm
+    - ``default_headers``: extra headers passed through ``HttpOptions``
+    - ``http_options``: advanced ``google.genai.types.HttpOptions`` override;
+      explicit fields are preserved over convenience kwargs
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 import logging
 import os
-from collections.abc import Sequence
-from typing import Any, NoReturn
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -78,6 +82,10 @@ from ..types import (
     ToolDef,
     ToolDefParam,
 )
+
+if TYPE_CHECKING:
+    from google.genai.types import HttpOptions, HttpOptionsOrDict
+    from httpx import AsyncClient
 
 _CHAT_MESSAGES_TYPE_ADAPTER = TypeAdapter(Sequence[ChatMessage])
 _TOOL_DEFS_TYPE_ADAPTER = TypeAdapter(Sequence[ToolDef] | None)
@@ -120,6 +128,46 @@ def _import_genai_errors() -> Any:
         raise ProviderNotAvailableError(PROVIDER, "google-genai") from exc
 
 
+def _build_http_options(
+    http_options: "HttpOptionsOrDict | None",
+    http_client: "AsyncClient | None",
+    default_headers: Mapping[str, str] | None,
+) -> "HttpOptions | None":
+    if http_options is None and http_client is None and default_headers is None:
+        return None
+
+    genai_types = _import_genai_types()
+    if http_options is None:
+        return genai_types.HttpOptions(
+            httpxAsyncClient=http_client,
+            headers=default_headers,
+        )
+
+    try:
+        options = genai_types.HttpOptions.model_validate(http_options)
+    except Exception as exc:
+        raise ValueError(f"google provider: invalid http_options - {exc}") from exc
+    updates: dict[str, Any] = {}
+    if http_client is not None:
+        if options.httpx_async_client is None:
+            updates["httpx_async_client"] = http_client
+        else:
+            logger.warning(
+                "google provider: http_client kwarg ignored because http_options "
+                "already sets httpxAsyncClient"
+            )
+    if default_headers is not None:
+        if options.headers is None:
+            updates["headers"] = default_headers
+        else:
+            logger.warning(
+                "google provider: default_headers kwarg ignored because http_options "
+                "already sets headers"
+            )
+
+    return options.model_copy(update=updates) if updates else options
+
+
 def _import_interactions_errors() -> Any:
     try:
         from google.genai import _interactions
@@ -138,6 +186,9 @@ class GoogleProvider:
     def __init__(
         self,
         api_key: str | None = None,
+        http_client: "AsyncClient | None" = None,
+        default_headers: Mapping[str, str] | None = None,
+        http_options: "HttpOptionsOrDict | None" = None,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:
@@ -150,7 +201,14 @@ class GoogleProvider:
             or os.environ.get("GEMINI_API_KEY")
             or os.environ.get("GOOGLE_API_KEY")
         )
-        self._client = genai.Client(api_key=resolved_key)
+        self._client = genai.Client(
+            api_key=resolved_key,
+            http_options=_build_http_options(
+                http_options=http_options,
+                http_client=http_client,
+                default_headers=default_headers,
+            ),
+        )
 
     def _map_error(self, e: Exception) -> NoReturn:
         """Map a ``google.genai`` SDK exception to the giskard error hierarchy.
