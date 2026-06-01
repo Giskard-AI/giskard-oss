@@ -110,6 +110,15 @@ class TestSuiteResultNLoggableFailures:
         # With 25 failures and limit of 3, we should see "... and 22 more"
         assert "... and 22 more" in output
 
+    def test_negative_limit_is_rejected(self) -> None:
+        """Passing a negative n_loggable_failures should raise a validation error."""
+        with pytest.raises(ValueError, match="greater than or equal to 0"):
+            SuiteResult(
+                results=[],
+                duration_ms=0,
+                n_loggable_failures=-1,
+            )
+
     def test_limit_exceeds_failures_no_ellipsis(self) -> None:
         """When failures are fewer than the limit, no '... and N more' line."""
         scenarios = [_make_failing_scenario(f"scenario_{i}") for i in range(5)]

@@ -513,7 +513,8 @@ class SuiteResult(BaseResult, frozen=True):
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
     n_loggable_failures: int = Field(
         default=20,
-        description="Maximum number of failures/errors to display in detailed output.",
+        ge=0,
+        description="Maximum number of failures/errors to display in detailed output (must be >= 0).",
     )
 
     @computed_field

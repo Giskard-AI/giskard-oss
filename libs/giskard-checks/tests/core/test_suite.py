@@ -292,3 +292,42 @@ async def test_suite_parallel_rejects_invalid_max_concurrency():
 
     with pytest.raises(ValueError, match="max_concurrency must be greater than 0"):
         await suite.run(parallel=True, max_concurrency=0)
+
+
+def test_suite_passes_n_loggable_failures_to_result():
+    """Suite.n_loggable_failures should be passed through to SuiteResult."""
+    suite = Suite(
+        name="custom_limit_suite",
+        target=lambda inputs: inputs,
+        n_loggable_failures=5,
+    )
+    assert suite.n_loggable_failures == 5
+
+
+def test_suite_n_loggable_failures_default():
+    """Default n_loggable_failures on Suite should be 20."""
+    suite = Suite(name="default_limit_suite")
+    assert suite.n_loggable_failures == 20
+
+
+def test_suite_rejects_negative_n_loggable_failures():
+    """Suite should reject negative n_loggable_failures."""
+    with pytest.raises(ValueError, match="greater than or equal to 0"):
+        Suite(
+            name="negative_limit_suite",
+            n_loggable_failures=-1,
+        )
+
+
+@pytest.mark.asyncio
+async def test_suite_run_passes_n_loggable_failures():
+    """Suite.run() should pass n_loggable_failures to the SuiteResult."""
+    suite = Suite(
+        name="pass_through_suite",
+        target=lambda inputs: inputs,
+        n_loggable_failures=3,
+    )
+    suite.append(Scenario("a").interact("hello"))
+
+    result = await suite.run()
+    assert result.n_loggable_failures == 3

@@ -33,6 +33,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         List of scenarios to execute.
     target : Any | NotProvided
         Optional suite-level target SUT.
+    n_loggable_failures : int
+        Maximum number of failures/errors to display in detailed output (default 20, must be >= 0).
 
     Examples
     --------
@@ -61,6 +63,11 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     ) = Field(
         default=NOT_PROVIDED,
         description="Suite-level target SUT that will override any scenario-level target.",
+    )
+    n_loggable_failures: int = Field(
+        default=20,
+        ge=0,
+        description="Maximum number of failures/errors to display in detailed suite output (must be >= 0).",
     )
 
     def append(
@@ -158,6 +165,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             suite_result = SuiteResult(
                 results=results,
                 duration_ms=int((end_time - start_time) * 1000),
+                n_loggable_failures=self.n_loggable_failures,
             )
 
             telemetry_capture(
