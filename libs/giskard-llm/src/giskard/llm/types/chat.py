@@ -18,9 +18,9 @@ class _TextualizableContentProtocol(Protocol):
 
 
 def _extract_text(
-    content: str
-    | Sequence[_TextualizableContentProtocol | _TextContentProtocol]
-    | None,
+    content: (
+        str | Sequence[_TextualizableContentProtocol | _TextContentProtocol] | None
+    ),
 ) -> str | None:
     if isinstance(content, str) or content is None:
         return content
@@ -36,6 +36,9 @@ def _extract_text(
 class TextContent(_BaseModel):
     type: Literal["text"] = "text"
     text: str
+    thought_signature: bytes | None = Field(
+        default=None, exclude=True, repr=False
+    )  # Gemini-specific
 
 
 class RefusalContent(_BaseModel):
@@ -61,9 +64,9 @@ class ToolCall(_BaseModel):
     type: Literal["function"] = "function"
     id: str
     function: ToolCallFunction
-    # Gemini 3 returns a thought_signature per tool call that must be replayed on the
-    # next turn. Excluded from dumps; the Google translator reads it off the object.
-    thought_signature: bytes | None = Field(default=None, exclude=True, repr=False)
+    thought_signature: bytes | None = Field(
+        default=None, exclude=True, repr=False
+    )  # Gemini-specific
 
 
 class SystemMessage(_BaseModel):

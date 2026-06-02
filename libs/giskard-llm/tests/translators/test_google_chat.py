@@ -399,6 +399,35 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
     validate_google_contents(payload["contents"])
 
 
+def test_assistant_text_thought_signature_is_replayed():
+    """A captured text-part ``thought_signature`` is replayed verbatim."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="Hi."),
+        AssistantMessage(
+            content=[
+                TextContent(
+                    text="Thinking about it.",
+                    thought_signature=b"text-signature-bytes",
+                )
+            ],
+        ),
+    ]
+    payload = GoogleChatTranslator.to_google(_MODEL, messages)
+    assert payload["contents"] == [
+        {"role": "user", "parts": [{"text": "Hi."}]},
+        {
+            "role": "model",
+            "parts": [
+                {
+                    "text": "Thinking about it.",
+                    "thought_signature": b"text-signature-bytes",
+                }
+            ],
+        },
+    ]
+    validate_google_contents(payload["contents"])
+
+
 def test_tool_call_thought_signature_is_replayed():
     """A captured ``thought_signature`` is replayed verbatim, not the skip sentinel."""
     messages: list[ChatMessage] = [

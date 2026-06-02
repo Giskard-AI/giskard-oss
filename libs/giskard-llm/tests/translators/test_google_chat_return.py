@@ -164,6 +164,33 @@ def test_from_google_function_call_without_signature_is_none():
     assert tool_calls[0].thought_signature is None
 
 
+def test_from_google_text_part_captures_thought_signature():
+    """A text part's ``thought_signature`` is captured on the text content."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": "Let me think step by step.",
+                                "thought_signature": b"text-signature-bytes",
+                            },
+                        ]
+                    }
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].message.content == [
+        TextContent(
+            text="Let me think step by step.",
+            thought_signature=b"text-signature-bytes",
+        )
+    ]
+
+
 def test_from_google_empty_candidates():
     """No `candidates` yields an empty `choices` list; only `model` is set."""
     raw = _raw({"candidates": []})

@@ -80,7 +80,10 @@ def _text_content(text: str) -> "PartDict":
 def serialize_text_content(
     content: TextContent, _info: SerializationInfo
 ) -> "PartDict":
-    return _text_content(content.text)
+    part = _text_content(content.text)
+    if content.thought_signature is not None:
+        part["thought_signature"] = content.thought_signature
+    return part
 
 
 @RefusalContent.register_serializer(_PROVIDER)
@@ -326,7 +329,7 @@ class GoogleChatTranslator:
         part: "Part", num_messages: int, part_index: int
     ) -> CompletionContent | ToolCall:
         if part.text is not None:
-            return TextContent(text=part.text)
+            return TextContent(text=part.text, thought_signature=part.thought_signature)
         if part.function_call is not None:
             fc = part.function_call
             return ToolCall(
