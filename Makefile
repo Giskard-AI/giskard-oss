@@ -58,6 +58,16 @@ endif
 install-no-providers: ## Install giskard-llm without provider SDKs (for no_providers tests)
 	uv sync --package giskard-llm
 
+install-minimal: ## Install with test group only (no provider SDKs, all packages)
+	uv sync --only-group test
+
+test-unit-minimal: ## Run unit tests on minimal deps (no provider SDKs), optional PACKAGE=<name>
+ifdef PACKAGE
+	uv run pytest libs/$(PACKAGE) -m "not functional"
+else
+	$(foreach lib,$(LIBS),uv run pytest libs/$(lib) -m "not functional" &&) true
+endif
+
 test-no-providers: ## Run tests that verify behavior when provider SDKs are missing
 	uv run pytest libs/giskard-llm -m "no_providers"
 
