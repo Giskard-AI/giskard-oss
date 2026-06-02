@@ -100,6 +100,13 @@ class RetrievalQualityCheck[InputType, OutputType, TraceType: Trace](  # pyright
 
         relevant_list = _as_sequence(relevant_ids)
         retrieved_list = _as_sequence(retrieved_ids)
+
+        if not relevant_list:
+            return CheckResult.skip(
+                message="No relevant IDs labelled; retrieval quality is undefined.",
+                details=details,
+            )
+
         score = self._score(relevant_list, retrieved_list)
         details["score"] = score
 

@@ -96,14 +96,13 @@ async def test_hit_rate_at_k_empty_retrieved_ids_fails():
     assert result.details["score"] == 0.0
 
 
-async def test_hit_rate_at_k_empty_relevant_ids_passes_zero_threshold():
+async def test_empty_relevant_ids_is_skipped():
     trace = await _trace([], ["doc-1"])
     check = HitRateAtK(k=3, **_check_kwargs(threshold=0.0))
 
     result = await check.run(trace)
 
-    assert result.status == CheckStatus.PASS
-    assert result.details["score"] == 0.0
+    assert result.status == CheckStatus.SKIP
 
 
 async def test_none_retrieved_ids_are_treated_as_empty():
