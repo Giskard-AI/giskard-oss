@@ -1,6 +1,8 @@
 from collections.abc import Sequence
 from typing import Literal, Protocol
 
+from pydantic import Field
+
 from ._base import ArgumentDict, _BaseModel
 
 # -- Utility functions -------------------------------------------------------------
@@ -59,6 +61,9 @@ class ToolCall(_BaseModel):
     type: Literal["function"] = "function"
     id: str
     function: ToolCallFunction
+    # Gemini 3 returns a thought_signature per tool call that must be replayed on the
+    # next turn. Excluded from dumps; the Google translator reads it off the object.
+    thought_signature: bytes | None = Field(default=None, exclude=True, repr=False)
 
 
 class SystemMessage(_BaseModel):

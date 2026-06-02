@@ -111,6 +111,59 @@ def test_from_google_text_and_function_call():
     assert msg.tool_calls[0].function.arguments == {"city": "Paris"}
 
 
+def test_from_google_function_call_captures_thought_signature():
+    """A ``function_call`` part's ``thought_signature`` is captured on the tool call."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "function_call": {
+                                    "name": "get_weather",
+                                    "args": {"city": "Paris"},
+                                },
+                                "thought_signature": b"real-signature-bytes",
+                            },
+                        ]
+                    }
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    tool_calls = out.choices[0].message.tool_calls
+    assert tool_calls is not None
+    assert tool_calls[0].thought_signature == b"real-signature-bytes"
+
+
+def test_from_google_function_call_without_signature_is_none():
+    """A ``function_call`` part with no signature leaves ``thought_signature`` unset."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "function_call": {
+                                    "name": "get_weather",
+                                    "args": {"city": "Paris"},
+                                }
+                            },
+                        ]
+                    }
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    tool_calls = out.choices[0].message.tool_calls
+    assert tool_calls is not None
+    assert tool_calls[0].thought_signature is None
+
+
 def test_from_google_empty_candidates():
     """No `candidates` yields an empty `choices` list; only `model` is set."""
     raw = _raw({"candidates": []})
