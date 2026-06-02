@@ -138,7 +138,7 @@ async def test_ndcg_at_k_is_ranking_sensitive():
     assert result.details["score"] == pytest.approx(0.693426, rel=1e-5)
 
 
-async def test_average_precision_handles_sparse_labels():
+async def test_average_precision_interleaved_relevant_docs():
     trace = await _trace(["doc-2", "doc-4"], ["doc-1", "doc-2", "doc-3", "doc-4"])
     check = AveragePrecision(**_check_kwargs(threshold=0.5))
 
@@ -146,6 +146,18 @@ async def test_average_precision_handles_sparse_labels():
 
     assert result.status == CheckStatus.PASS
     assert result.details["score"] == pytest.approx(0.5)
+
+
+async def test_average_precision_normalizes_by_relevant_count():
+    trace = await _trace(
+        ["doc-2", "doc-4", "doc-5"], ["doc-1", "doc-2", "doc-3", "doc-4"]
+    )
+    check = AveragePrecision(**_check_kwargs(threshold=0.3))
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["score"] == pytest.approx(1 / 3)
 
 
 async def test_retrieval_check_reports_missing_relevant_ids_key():

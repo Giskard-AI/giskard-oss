@@ -217,11 +217,7 @@ class NDCGAtK[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repor
 class AveragePrecision[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     RetrievalQualityCheck[InputType, OutputType, TraceType]
 ):
-    """Check that average precision meets a minimum threshold.
-
-    This strict implementation treats provided labels as the judged relevant set
-    and computes average precision over the retrieved ranking.
-    """
+    """Check that average precision meets a minimum threshold."""
 
     @property
     @override
