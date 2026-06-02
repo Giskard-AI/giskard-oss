@@ -182,7 +182,6 @@ async def test_suite_parallel_preserves_result_order():
 @pytest.mark.asyncio
 async def test_suite_parallel_runs_concurrently():
     sleep_s = 0.06
-    n = 3
 
     async def delayed_identity(inputs):
         await asyncio.sleep(sleep_s)
@@ -193,12 +192,15 @@ async def test_suite_parallel_runs_concurrently():
     suite.append(Scenario("b").interact("b"))
     suite.append(Scenario("c").interact("c"))
 
-    start = time.perf_counter()
-    await suite.run(parallel=True)
-    parallel_duration = time.perf_counter() - start
+    serial_start = time.perf_counter()
+    await suite.run()
+    serial_duration = time.perf_counter() - serial_start
 
-    # Must complete faster than running all scenarios serially
-    assert parallel_duration < sleep_s * n
+    parallel_start = time.perf_counter()
+    await suite.run(parallel=True)
+    parallel_duration = time.perf_counter() - parallel_start
+
+    assert parallel_duration < serial_duration
 
 
 @pytest.mark.asyncio
@@ -285,10 +287,22 @@ async def test_suite_parallel_respects_max_concurrency():
     assert peak_runs == 2
 
 
+@pytest.mark.parametrize(
+    ("max_concurrency", "expected_error"),
+    [
+        (0, ValueError),
+        (-1, ValueError),
+        (True, TypeError),
+        (1.5, TypeError),
+        ("2", TypeError),
+    ],
+)
 @pytest.mark.asyncio
-async def test_suite_parallel_rejects_invalid_max_concurrency():
+async def test_suite_parallel_rejects_invalid_max_concurrency(
+    max_concurrency, expected_error
+):
     suite = Suite(name="invalid_parallel_limit_suite", target=lambda inputs: inputs)
     suite.append(Scenario("a").interact("a"))
 
-    with pytest.raises(ValueError, match="max_concurrency must be greater than 0"):
-        await suite.run(parallel=True, max_concurrency=0)
+    with pytest.raises(expected_error, match="max_concurrency must be a positive integer"):
+        await suite.run(parallel=True, max_concurrency=max_concurrency)
