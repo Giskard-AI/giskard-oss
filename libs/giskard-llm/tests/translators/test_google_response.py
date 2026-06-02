@@ -47,7 +47,7 @@ from .tool_turn_fixtures import (
     google_response_user_two_parallel_tool_calls_and_results,
 )
 
-_MODEL = "gemini-2.0-flash"
+_MODEL = "gemini-3.5-flash"
 
 
 def _message(

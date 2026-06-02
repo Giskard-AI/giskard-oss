@@ -17,7 +17,7 @@ from google.genai import types
 
 pytestmark = pytest.mark.google
 
-_MODEL = "gemini-2.0-flash"
+_MODEL = "gemini-3.5-flash"
 
 
 def _raw(data: dict[str, object]) -> types.GenerateContentResponse:

@@ -33,7 +33,7 @@ from .tool_turn_fixtures import (
     user_two_parallel_tool_calls_two_results,
 )
 
-_MODEL = "gemini-2.0-flash"
+_MODEL = "gemini-3.5-flash"
 
 
 def test_single_user_message():
