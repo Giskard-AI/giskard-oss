@@ -288,21 +288,23 @@ async def test_suite_parallel_respects_max_concurrency():
 
 
 @pytest.mark.parametrize(
-    ("max_concurrency", "expected_error"),
+    ("parallel", "max_concurrency", "expected_error"),
     [
-        (0, ValueError),
-        (-1, ValueError),
-        (True, TypeError),
-        (1.5, TypeError),
-        ("2", TypeError),
+        (False, 0, ValueError),
+        (False, True, TypeError),
+        (True, 0, ValueError),
+        (True, -1, ValueError),
+        (True, True, TypeError),
+        (True, 1.5, TypeError),
+        (True, "2", TypeError),
     ],
 )
 @pytest.mark.asyncio
 async def test_suite_parallel_rejects_invalid_max_concurrency(
-    max_concurrency, expected_error
+    parallel, max_concurrency, expected_error
 ):
     suite = Suite(name="invalid_parallel_limit_suite", target=lambda inputs: inputs)
     suite.append(Scenario("a").interact("a"))
 
     with pytest.raises(expected_error, match="max_concurrency must be a positive integer"):
-        await suite.run(parallel=True, max_concurrency=max_concurrency)
+        await suite.run(parallel=parallel, max_concurrency=max_concurrency)

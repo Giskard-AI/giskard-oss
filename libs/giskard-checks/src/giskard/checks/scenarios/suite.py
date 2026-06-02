@@ -129,7 +129,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         target = target if not isinstance(target, NotProvided) else self.target
         has_target = not isinstance(target, NotProvided)
 
-        if parallel and max_concurrency is not None:
+        if max_concurrency is not None:
             if isinstance(max_concurrency, bool) or not isinstance(max_concurrency, int):
                 raise TypeError("max_concurrency must be a positive integer")
             if max_concurrency < 1:
