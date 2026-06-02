@@ -18,7 +18,7 @@ def _as_sequence(value: Any) -> list[Any]:
         return []
     if isinstance(value, list):
         return value
-    if isinstance(value, tuple | set):
+    if isinstance(value, tuple):
         return list(value)
     return [value]
 
