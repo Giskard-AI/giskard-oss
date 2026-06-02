@@ -34,6 +34,7 @@ def _extract_text(
 class TextContent(_BaseModel):
     type: Literal["text"] = "text"
     text: str
+    thought_signature: str | None = None
 
 
 class RefusalContent(_BaseModel):
@@ -105,16 +106,6 @@ class AssistantMessage(_BaseModel):
     content: str | Sequence[CompletionContent] | None = None
     refusal: str | None = None
     tool_calls: Sequence[ToolCall] | None = None
-
-    @property
-    def is_refusal(self) -> bool:
-        if self.refusal is not None:
-            return True
-
-        if self.content is not None and not isinstance(self.content, str):
-            return any(isinstance(c, RefusalContent) for c in self.content or [])
-
-        return False
 
     @property
     def text(self) -> str | None:
