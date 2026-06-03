@@ -52,9 +52,13 @@ from .judges import (
     LLMJudge,
     Toxicity,
 )
-from .scenarios.catalog import ScenarioCategory, generate_suite
 from .scenarios.runner import ScenarioRunner
 from .scenarios.suite import Suite
+from .scenarios_generator.catalog import generate_suite
+from .scenarios_generator.registry import (
+    SuiteGeneratorRegistry,
+    suite_generator_registry,
+)
 from .settings import get_default_generator, set_default_generator
 from .testing import WithSpy
 from .testing.runner import TestCaseRunner
@@ -124,8 +128,9 @@ __all__ = [
     # Generators
     "UserSimulator",
     # Suite generation
-    "ScenarioCategory",
     "generate_suite",
+    "SuiteGeneratorRegistry",
+    "suite_generator_registry",
     # Testing
     "WithSpy",
     "TestCaseRunner",
