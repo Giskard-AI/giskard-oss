@@ -65,7 +65,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [giskard-llm, giskard-agents]
+        package: [giskard-llm, giskard-agents, giskard-checks]
     env:
       PACKAGE: ${{ matrix.package }}
     steps:

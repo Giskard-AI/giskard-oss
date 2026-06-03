@@ -242,6 +242,16 @@ filecache = [
 ]
 
 [[package]]
+name = "celine-regorus"
+version = "0.9.1.post20260227075446"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/a1/87996627c5101893c9c9474e9098b4525a975de44bd912bec4f38c1d2976/celine_regorus-0.9.1.post20260227075446-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:cd6aa6b84f99ca0497e3e0ee318a86a88310e885bec5a0b0535a4ef6bd6f4568", size = 3350311 },
+    { url = "https://files.pythonhosted.org/packages/7a/bc/5f92f4fd5dbd301a76b632cba577bc20a3251d0453c7934faa6369945079/celine_regorus-0.9.1.post20260227075446-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:653f95d5b3d3c85f51dd697400dfbfcba5479c2c9c33b7e6916ee7b0319940fc", size = 3184722 },
+    { url = "https://files.pythonhosted.org/packages/58/93/df79bcce2c4fc027c0f794a497c9e1ccebe85bb2f9d75eaa146331e23e5b/celine_regorus-0.9.1.post20260227075446-cp310-abi3-manylinux_2_34_x86_64.whl", hash = "sha256:b1b5cd141ad6029b5e9e668b803516efc909aabbf3f3e480636f54fee56e5309", size = 3643096 },
+]
+
+[[package]]
 name = "certifi"
 version = "2026.2.25"
 source = { registry = "https://pypi.org/simple" }
@@ -800,6 +810,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "giskard-agents", extra = ["litellm"] },
+    { name = "giskard-checks", extra = ["regorus"] },
     { name = "giskard-llm", extra = ["anthropic", "google", "openai"] },
     { name = "ipykernel" },
     { name = "pip-audit" },
@@ -827,6 +838,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "giskard-agents", extras = ["litellm"], editable = "libs/giskard-agents" },
+    { name = "giskard-checks", extras = ["regorus"], editable = "libs/giskard-checks" },
     { name = "giskard-llm", extras = ["openai", "google", "anthropic"], editable = "libs/giskard-llm" },
     { name = "ipykernel", specifier = "==7.2.0" },
     { name = "pip-audit", specifier = "==2.10.0" },
@@ -911,8 +923,14 @@ dependencies = [
     { name = "rich" },
 ]
 
+[package.optional-dependencies]
+regorus = [
+    { name = "celine-regorus" },
+]
+
 [package.metadata]
 requires-dist = [
+    { name = "celine-regorus", marker = "extra == 'regorus'", specifier = ">=0.9.1" },
     { name = "giskard-agents", editable = "libs/giskard-agents" },
     { name = "giskard-core", editable = "libs/giskard-core" },
     { name = "jinja2", specifier = ">=3.1.6,<4" },
@@ -923,6 +941,7 @@ requires-dist = [
     { name = "regex", specifier = ">=2026.1.15" },
     { name = "rich", specifier = ">=14.2.0,<16" },
 ]
+provides-extras = ["regorus"]
 
 [[package]]
 name = "giskard-core"
