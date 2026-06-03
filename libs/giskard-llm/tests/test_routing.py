@@ -17,8 +17,8 @@ from giskard.llm.routing import (
     "model_str, expected",
     [
         ("openai/gpt-4o", ("openai", "gpt-4o")),
-        ("google/gemini-2.0-flash", ("google", "gemini-2.0-flash")),
-        ("gemini/gemini-2.0-flash", ("gemini", "gemini-2.0-flash")),
+        ("google/gemini-3.5-flash", ("google", "gemini-3.5-flash")),
+        ("gemini/gemini-3.5-flash", ("gemini", "gemini-3.5-flash")),
         ("anthropic/claude-opus-4-6", ("anthropic", "claude-opus-4-6")),
         ("azure/gpt-4o", ("azure", "gpt-4o")),
         ("azure_ai/gpt-4o", ("azure_ai", "gpt-4o")),
