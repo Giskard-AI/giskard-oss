@@ -26,6 +26,7 @@ from .composition import AllOf, AnyOf, Not
 from .fn import FnCheck, from_fn
 from .json_valid import JsonValid
 from .nlp_metrics import Readability
+from .rego_policy import RegoPolicy
 from .semantic_similarity import SemanticSimilarity
 from .text_matching import RegexMatching, StringMatching
 
@@ -37,6 +38,7 @@ __all__ = [
     "FnCheck",
     "JsonValid",
     "Readability",
+    "RegoPolicy",
     "StringMatching",
     "RegexMatching",
     "Equals",

@@ -70,6 +70,7 @@ dev = [
     { include-group = "test" },
     "giskard-llm[openai,google,anthropic]>=1.0.0a1",
     "giskard-agents[litellm]>=1.0.0a1",
+    "giskard-checks[regorus]>=1.0.0a1",
     "ipykernel==7.2.0",
     "pip-audit==2.10.0",
     "pylint-pydantic==0.4.1",
