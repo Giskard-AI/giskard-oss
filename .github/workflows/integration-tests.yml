@@ -96,8 +96,8 @@ jobs:
         env:
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          TEST_MODEL: "google/gemini-2.0-flash"
-          TEST_LITELLM_MODEL: "gemini/gemini-2.0-flash"
+          TEST_MODEL: "google/gemini-3.5-flash"
+          TEST_LITELLM_MODEL: "gemini/gemini-3.5-flash"
           TEST_EMBEDDING_MODEL: "google/gemini-embedding-001"
           PYTEST_MARK: ${{ matrix.backend.pytest_mark }}
         run: uv run pytest libs/giskard-agents -m "$PYTEST_MARK"
@@ -114,14 +114,18 @@ jobs:
         # `extras` is the giskard-llm optional-dependency group to install;
         # aliases share an install (bare/azure_ai reuse openai/azure, gemini reuses google).
         include:
-          - { python-version: "3.12", provider: openai,    extras: openai    }
-          - { python-version: "3.12", provider: bare,      extras: openai    }
-          - { python-version: "3.12", provider: google,    extras: google    }
-          - { python-version: "3.12", provider: gemini,    extras: google    }
+          - { python-version: "3.12", provider: openai, extras: openai }
+          - { python-version: "3.12", provider: bare, extras: openai }
+          - { python-version: "3.12", provider: google, extras: google }
+          - { python-version: "3.12", provider: gemini, extras: google }
           - { python-version: "3.12", provider: anthropic, extras: anthropic }
-          - { python-version: "3.12", provider: azure,     extras: azure     }
-          - { python-version: "3.12", provider: azure_ai,  extras: azure     }
-          - { python-version: "3.12", provider: azure_foundry_v1, extras: openai }
+          - { python-version: "3.12", provider: azure, extras: azure }
+          - { python-version: "3.12", provider: azure_ai, extras: azure }
+          - {
+              python-version: "3.12",
+              provider: azure_foundry_v1,
+              extras: openai,
+            }
     name: llm / ${{ matrix.provider }} / ${{ matrix.python-version }}
     env:
       PROVIDER: ${{ matrix.provider }}
@@ -179,6 +183,6 @@ jobs:
       - name: Run functional tests
         env:
           GOOGLE_API_KEY: ${{ matrix.provider == 'google' && secrets.GEMINI_API_KEY || '' }}
-          TEST_MODEL: "google/gemini-2.0-flash"
+          TEST_MODEL: "google/gemini-3.5-flash"
           TEST_EMBEDDING_MODEL: "google/gemini-embedding-001"
         run: make test-functional PACKAGE=giskard-checks PROVIDER=$PROVIDER

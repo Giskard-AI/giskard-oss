@@ -52,7 +52,7 @@ class LiteLLMGenerator(BaseGenerator):
     """A generator for creating chat completion pipelines using LiteLLM."""
 
     model: str = Field(
-        description="The model identifier to use (e.g. 'gemini/gemini-2.0-flash')"
+        description="The model identifier to use (e.g. 'gemini/gemini-3.5-flash')"
     )
     retry_policy: RetryPolicy | None = Field(default_factory=RetryPolicy)
 

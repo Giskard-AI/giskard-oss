@@ -43,4 +43,4 @@ def test_litellm_generator_raises_import_error_on_instantiation():
     from giskard.agents.generators.litellm_generator import LiteLLMGenerator
 
     with pytest.raises(ImportError, match="giskard-agents\\[litellm\\]"):
-        LiteLLMGenerator(model="gemini/gemini-2.0-flash")
+        LiteLLMGenerator(model="gemini/gemini-3.5-flash")

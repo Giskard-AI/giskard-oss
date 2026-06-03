@@ -22,8 +22,8 @@ pytestmark = pytest.mark.functional
 _MODELS = {
     "openai": os.getenv("TEST_OPENAI_MODEL", "openai/gpt-4.1-nano"),
     "bare": os.getenv("TEST_BARE_MODEL", "gpt-4.1-nano"),
-    "google": os.getenv("TEST_GOOGLE_MODEL", "google/gemini-2.0-flash"),
-    "gemini": os.getenv("TEST_GEMINI_MODEL", "gemini/gemini-2.0-flash"),
+    "google": os.getenv("TEST_GOOGLE_MODEL", "google/gemini-3.5-flash"),
+    "gemini": os.getenv("TEST_GEMINI_MODEL", "gemini/gemini-3.5-flash"),
     "anthropic": os.getenv(
         "TEST_ANTHROPIC_MODEL", "anthropic/claude-haiku-4-5-20251001"
     ),
