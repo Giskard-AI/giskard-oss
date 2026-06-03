@@ -25,7 +25,7 @@ class SuiteGeneratorRegistry:
             raise TypeError(
                 f"Expected a ScenarioGenerator instance or subclass, got {type(instance).__name__}"
             )
-        if any(instance == existing for existing in self._generators):
+        if instance in self._generators:
             raise ValueError(
                 f"{type(instance).__name__} is already registered with equivalent configuration"
             )
@@ -35,11 +35,10 @@ class SuiteGeneratorRegistry:
         self, generator: "ScenarioGenerator | type[ScenarioGenerator]"
     ) -> None:
         instance = _normalize_generator(generator)
-        for i, existing in enumerate(self._generators):
-            if instance == existing:
-                del self._generators[i]
-                return
-        raise ValueError(f"{type(instance).__name__} is not registered")
+        try:
+            self._generators.remove(instance)
+        except ValueError:
+            raise ValueError(f"{type(instance).__name__} is not registered") from None
 
     def clear(self) -> None:
         self._generators.clear()

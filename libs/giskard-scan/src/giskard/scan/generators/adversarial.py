@@ -138,8 +138,8 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
         n_cats = len(ADVERSARIAL_CATEGORIES)
 
         if max_scenarios is not None:
-            _rng = rng if rng is not None else np.random.default_rng()
-            raw_counts = _rng.multinomial(max_scenarios, np.ones(n_cats) / n_cats)
+            rng = rng or np.random.default_rng()
+            raw_counts = rng.multinomial(max_scenarios, np.ones(n_cats) / n_cats)
             rules_per_cat = [min(int(n), MAX_RULES_PER_CATEGORY) for n in raw_counts]
         else:
             rules_per_cat = [DEFAULT_RULES_PER_CATEGORY] * n_cats
@@ -195,6 +195,7 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
         remaining missing rules each time.  Returns at most *num_rules* items.
         """
         rules: list[str] = []
+        pipeline = self._rule_generation_pipeline()
 
         for _ in range(3):
             num_missing_rules = num_rules - len(rules)
@@ -202,15 +203,11 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
             if num_missing_rules <= 0:
                 break
 
-            rule_response = (
-                await self._rule_generation_pipeline()
-                .with_inputs(
-                    description=description,
-                    category=category,
-                    num_rules=num_missing_rules,
-                )
-                .run()
-            )
+            rule_response = await pipeline.with_inputs(
+                description=description,
+                category=category,
+                num_rules=num_missing_rules,
+            ).run()
             rules.extend(rule_response.output.rules)
 
         return rules[:num_rules]
