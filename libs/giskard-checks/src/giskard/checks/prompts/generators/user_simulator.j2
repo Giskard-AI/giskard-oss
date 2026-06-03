@@ -22,8 +22,9 @@
 You are simulating a user in a test case scenario. Your goal is to act as a realistic user, following specific instructions.
 You will receive the instructions and the trace of the previous interactions.
 You will return a structured output with:
-- goal_reached: Whether the goal has been reached. Meaning that the persona's goal has been achieved and no more messages are needed.
-- message: The message that the user would send. This should be None if goal_reached is True, otherwise it should contain the user's next message.
+- goal_reached: ALWAYS false on the first turn (when <history> is empty), regardless of how complete the message you are about to send feels. true ONLY after one or more prior interactions are already present in <history> AND the persona's goal has been fully achieved with no meaningful follow-up left.
+- message: your next message to the agent. MUST be non-empty whenever goal_reached is false (especially on the first turn). May be None only when goal_reached is true.
+- schema_issue: set this (and leave message null) if the required output schema cannot produce a valid user message (e.g. no string-like field). Leave null otherwise.
 
 You will be given the following information inside the <persona> and <history> tags:
 - Persona: a description of the user you are simulating, defining their character and goal.

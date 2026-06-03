@@ -1,33 +1,8 @@
-import json
-from typing import Any, cast, override
+from typing import cast
 
-from giskard.agents.chat import Message
-from giskard.agents.generators._types import Response
-from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import CheckStatus, Groundedness, Interaction, Trace
-from pydantic import Field
 
-
-class MockGenerator(BaseGenerator):
-    passed: bool
-    reason: str | None
-    calls: list[list[Message]] = Field(default_factory=list)
-
-    @override
-    async def _call_model(
-        self,
-        messages: list[Message],
-        params: GenerationParams,
-        metadata: dict[str, Any] | None = None,
-    ) -> Response:
-        self.calls.append(messages)
-        return Response(
-            message=Message(
-                role="assistant",
-                content=json.dumps({"passed": self.passed, "reason": self.reason}),
-            ),
-            finish_reason="stop",
-        )
+from ..testing_utils import MockJudgeGenerator as MockGenerator
 
 
 async def test_run_returns_success() -> None:

@@ -78,7 +78,7 @@ Generators have built-in support for retries and rate limiting via dedicated fie
 
 ### Retries
 
-By default, `LiteLLMGenerator` retries failed requests with exponential backoff using LiteLLM's retry-eligibility logic. You can customize the retry policy:
+By default, `GiskardLLMGenerator` retries failed requests with exponential backoff. You can customize the retry policy:
 
 ```python
 from giskard.agents.generators.middleware import RetryPolicy
@@ -120,22 +120,22 @@ For advanced cross-cutting concerns (logging, caching, etc.), you can write cust
 import logging
 from typing import Any
 
-from giskard.agents import Message
-from giskard.agents.generators import GenerationParams, Response
+from giskard.agents.generators import GenerationParams
 from giskard.agents.generators.middleware import CompletionMiddleware, NextFn
+from giskard.llm.types import ChatMessage, CompletionResponse
 
 @CompletionMiddleware.register("logging")
 class LoggingMiddleware(CompletionMiddleware):
     async def call(
         self,
-        messages: list[Message],
+        messages: list[ChatMessage],
         params: GenerationParams | None,
         metadata: dict[str, Any] | None,
         next_fn: NextFn,
-    ) -> Response:
+    ) -> CompletionResponse:
         logging.info(f"Sending {len(messages)} messages")
         response = await next_fn(messages, params, metadata)
-        logging.info(f"Got response: {response.finish_reason}")
+        logging.info(f"Got response: {response.choices[0].finish_reason}")
         return response
 
 generator = agents.Generator(

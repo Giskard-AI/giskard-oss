@@ -1,5 +1,5 @@
 # Variables
-LIBS := giskard-core giskard-agents giskard-checks
+LIBS := giskard-core giskard-llm giskard-agents giskard-checks
 PACKAGE ?= # Optional package to test (e.g., giskard-core, giskard-agents, giskard-checks)
 AGENT_NAME ?= # Optional, for setup-for-agents telemetry
 REASON ?= # Optional, for setup-for-agents telemetry
@@ -44,12 +44,32 @@ else
 	$(foreach lib,$(LIBS),uv run pytest libs/$(lib) -m "not functional" &&) true
 endif
 
-test-functional: ## Run functional tests only (requires API keys), optional PACKAGE=<name>
+test-functional: ## Run functional tests only (requires API keys), optional PACKAGE=<name> PROVIDER=<name>
 ifdef PACKAGE
+ifdef PROVIDER
+	uv run pytest libs/$(PACKAGE) -m "functional and $(PROVIDER)"
+else
 	uv run pytest libs/$(PACKAGE) -m "functional"
+endif
 else
 	$(foreach lib,$(LIBS),uv run pytest libs/$(lib) -m "functional" &&) true
 endif
+
+install-no-providers: ## Install giskard-llm without provider SDKs (for no_providers tests)
+	uv sync --package giskard-llm
+
+install-minimal: ## Install with test group only (no provider SDKs, all packages)
+	uv sync --only-group test
+
+test-unit-minimal: ## Run unit tests on minimal deps (no provider SDKs), optional PACKAGE=<name>
+ifdef PACKAGE
+	uv run pytest libs/$(PACKAGE) -m "not functional"
+else
+	$(foreach lib,$(LIBS),uv run pytest libs/$(lib) -m "not functional" &&) true
+endif
+
+test-no-providers: ## Run tests that verify behavior when provider SDKs are missing
+	uv run pytest libs/giskard-llm -m "no_providers"
 
 test-package-conflict: ## Test package conflict with giskard legacy package installed
 	@echo "Testing package conflict..."

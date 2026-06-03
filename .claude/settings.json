@@ -1,0 +1,21 @@
+{
+  "enabledPlugins": {
+    "pyright-lsp@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c '[[ ! -d \"$PWD/.venv\" ]] && make -C \"$PWD\" setup >&2 || true'",
+            "async": true,
+            "statusMessage": "Running make setup..."
+          }
+        ]
+      }
+    ]
+  }
+}

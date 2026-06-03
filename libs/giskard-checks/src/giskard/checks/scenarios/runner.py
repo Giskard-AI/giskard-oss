@@ -23,6 +23,7 @@ from ..core.result import CheckResult, ScenarioResult, TestCaseResult
 from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
 from ..core.types import ProviderType
+from ..utils.inference import _infer_trace_type
 
 
 def _validate_multiple_runs(value: int | None) -> int | None:
@@ -69,6 +70,23 @@ def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
     return steps
 
 
+def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
+    scenario: Scenario[InputType, OutputType, TraceType],
+    run_target: (
+        ProviderType[[InputType], OutputType]
+        | ProviderType[[InputType, TraceType], OutputType]
+        | NotProvided
+    ),
+) -> type[TraceType]:
+    if scenario.trace_type is not None:
+        return scenario.trace_type
+    effective_target = (
+        run_target if not isinstance(run_target, NotProvided) else scenario.target
+    )
+    inferred = _infer_trace_type(effective_target)
+    return cast(type[TraceType], inferred if inferred is not None else Trace)
+
+
 class ScenarioRunner:
     """Execute scenarios by running their steps sequentially.
 
@@ -96,6 +114,7 @@ class ScenarioRunner:
     ```python
     runner = ScenarioRunner()
     result = await runner.run(scenario)
+    result = await runner.run(scenario, target=my_sut, return_exception=True)
     ```
     """
 
@@ -114,14 +133,8 @@ class ScenarioRunner:
         telemetry_tag("giskard_component", "scenario_runner")
         telemetry_tag("giskard_operation", "scenario_run")
 
-        trace = (
-            scenario.trace_type(annotations=scenario.annotations)
-            if scenario.trace_type is not None
-            else cast(
-                TraceType,
-                Trace[InputType, OutputType](annotations=scenario.annotations),
-            )
-        )
+        trace_cls = _resolve_trace_type(scenario, target)
+        trace = cast(TraceType, trace_cls(annotations=scenario.annotations))
 
         steps = _build_steps(scenario, target)
         steps_results: list[TestCaseResult] = []

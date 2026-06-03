@@ -1,28 +1,32 @@
 import asyncio
-import json
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from enum import StrEnum
 from typing import (
     Any,
-    AsyncGenerator,
-    AsyncIterator,
     Generic,
-    List,
-    Optional,
+    Literal,
     Self,
-    Type,
     TypeVar,
     cast,
 )
 
 import logfire_api as logfire
 import tenacity as t
+from giskard.llm import chat
+from giskard.llm.types import (
+    AssistantMessage,
+    ChatMessage,
+    ChatMessageParam,
+    ToolMessage,
+)
+from giskard.llm.utils import deserialize_arguments
 from pydantic import BaseModel, Field, ValidationError
 
-from .chat import Chat, Message, Role
+from .chat import Chat
 from .context import RunContext
 from .errors.serializable import Error
-from .errors.workflow_errors import WorkflowError
+from .errors.workflow_errors import ModelRefusalError, WorkflowError
 from .generators import BaseGenerator, GenerationParams
 from .templates import MessageTemplate, PromptsManager, get_prompts_manager
 from .tools.tool import Tool
@@ -56,8 +60,8 @@ class WorkflowStep(BaseModel):
     step_type: StepType
     workflow: "ChatWorkflow[Any]"
     chat: Chat[Any]
-    message: Message
-    previous: Optional["WorkflowStep"] = Field(default=None)
+    message: ChatMessage
+    previous: "WorkflowStep | None" = Field(default=None)
 
 
 StepGenerator = AsyncGenerator[WorkflowStep, None]
@@ -160,8 +164,12 @@ class _StepRunner:
             if not message.tool_calls:
                 break
 
-    async def _run_tools(self, chat: Chat[Any]) -> AsyncGenerator[Message, None]:
-        if not chat.last or not chat.last.tool_calls:
+    async def _run_tools(self, chat: Chat[Any]) -> AsyncGenerator[ToolMessage, None]:
+        if (
+            not chat.last
+            or not isinstance(chat.last, AssistantMessage)
+            or not chat.last.tool_calls
+        ):
             return
 
         for tool_call in chat.last.tool_calls:
@@ -170,16 +178,15 @@ class _StepRunner:
 
             tool = self._workflow.tools[tool_call.function.name]
             tool_content = await tool.run(
-                json.loads(tool_call.function.arguments),
+                deserialize_arguments(tool_call.function.arguments),
                 ctx=chat.context,
             )
-            yield Message(
-                role="tool",
+            yield ToolMessage(
                 tool_call_id=tool_call.id,
                 content=tool_content,
             )
 
-    async def _run_completion(self, chat: Chat[Any]) -> Message:
+    async def _run_completion(self, chat: Chat[Any]) -> AssistantMessage:
         # Determine if strict output parsing is enabled
         strict_parsing = chat.output_model and self._workflow.output_model_strict
         if strict_parsing:
@@ -198,21 +205,32 @@ class _StepRunner:
         # Simple completion without output validation
         response = await self._workflow.generator.complete(chat.messages, self._params)
 
-        return response.message
+        if not response.choices:
+            raise RuntimeError("Provider returned an empty choices list.")
+
+        return response.choices[0].message
 
     async def _run_completion_with_output_validation(
         self, chat: Chat[OutputType], output_model: type[OutputType]
-    ) -> Message:
+    ) -> AssistantMessage:
         response = await self._workflow.generator.complete(chat.messages, self._params)
 
+        if not response.choices:
+            raise RuntimeError("Provider returned an empty choices list.")
+
         # If the assistant produced tool calls, defer parsing to after tools are run
-        if response.message.tool_calls:
-            return response.message
+        if response.choices[0].message.tool_calls:
+            return response.choices[0].message
+
+        # If the model refused to generate content, raise a ModelRefusalError
+        choice = response.choices[0]
+        if choice.finish_reason == "refusal" or choice.message.is_refusal:
+            raise ModelRefusalError(refusal=choice.message.text)
 
         # Attempt the parsing to raise ValidationError if output is not compatible
-        response.message.parse(output_model)
+        output_model.model_validate_json(choice.message.text or "")
 
-        return response.message
+        return choice.message
 
 
 class ChatWorkflow(BaseModel, Generic[OutputType]):
@@ -242,7 +260,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
 
     generator: "BaseGenerator"
 
-    messages: list[Message | MessageTemplate | TemplateReference] = Field(
+    messages: list[ChatMessage | MessageTemplate | TemplateReference] = Field(
         default_factory=list
     )
     tools: dict[str, Tool] = Field(default_factory=dict)
@@ -256,8 +274,8 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
 
     def chat(
         self,
-        message: str | Message | MessageTemplate,
-        role: Role = "user",
+        message: str | ChatMessage | ChatMessageParam | MessageTemplate,
+        role: Literal["user", "assistant", "system", "developer"] = "user",
         *,
         as_template: bool = False,
     ) -> Self:
@@ -286,7 +304,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
             if as_template:
                 message = MessageTemplate(role=role, content_template=message)
             else:
-                message = Message(role=role, content=message)
+                message = chat.message(message, role)
 
         return self.model_copy(update={"messages": [*self.messages, message]})
 
@@ -325,7 +343,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
 
     def with_output(
         self: "ChatWorkflow[Any]",
-        output_model: Type[NewOutputType],
+        output_model: type[NewOutputType],
         strict: bool = True,
         num_retries: int | None = 2,
     ) -> "ChatWorkflow[NewOutputType]":
@@ -434,7 +452,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         WorkflowError
             If the workflow fails and the error policy is RAISE (default).
         """
-        last_step: Optional[WorkflowStep] = None
+        last_step: WorkflowStep | None = None
 
         try:
             # Run the steps, and store the last step.
@@ -451,7 +469,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
             return await self._handle_error(err, last_step)
 
     async def _handle_error(
-        self, err: Exception, last_step: Optional[WorkflowStep] = None
+        self, err: Exception, last_step: WorkflowStep | None = None
     ) -> Chat[OutputType]:
         # Raise an error if the error mode is RAISE.
         if self.error_policy == ErrorPolicy.RAISE:
@@ -475,7 +493,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
     @logfire.instrument("chat_workflow.run_many")
     async def run_many(
         self, n: int, max_steps: int | None = None
-    ) -> List[Chat[OutputType]]:
+    ) -> list[Chat[OutputType]]:
         """Run multiple completions in parallel.
 
         Parameters
@@ -599,7 +617,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
 
             yield result
 
-    async def _render_messages(self) -> List[Message]:
+    async def _render_messages(self) -> list[ChatMessage]:
         rendered_messages = []
         context_vars = {}
         if self.output_model is not None:
@@ -618,5 +636,5 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         return rendered_messages
 
 
-def _output_instructions(output_model: Type[BaseModel]) -> str:
+def _output_instructions(output_model: type[BaseModel]) -> str:
     return f"Provide your answer in JSON format, respecting this schema:\n{output_model.model_json_schema()}"

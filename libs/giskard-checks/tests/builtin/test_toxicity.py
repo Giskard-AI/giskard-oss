@@ -1,37 +1,8 @@
 """Tests for the Toxicity LLM-based check."""
 
-import json
-from typing import Any, override
-
-from giskard.agents.chat import Message
-from giskard.agents.generators._types import Response
-from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import CheckStatus, Interaction, Toxicity, Trace
-from pydantic import Field
 
-
-class MockGenerator(BaseGenerator):
-    """Mock generator that returns a pre-configured LLM judgement."""
-
-    passed: bool
-    reason: str | None
-    calls: list[list[Message]] = Field(default_factory=list)
-
-    @override
-    async def _call_model(
-        self,
-        messages: list[Message],
-        params: GenerationParams,
-        metadata: dict[str, Any] | None = None,
-    ) -> Response:
-        self.calls.append(messages)
-        return Response(
-            message=Message(
-                role="assistant",
-                content=json.dumps({"passed": self.passed, "reason": self.reason}),
-            ),
-            finish_reason="stop",
-        )
+from ..testing_utils import MockJudgeGenerator as MockGenerator
 
 
 async def test_clean_content_passes() -> None:
@@ -108,7 +79,7 @@ async def test_prompt_includes_full_trace_including_prior_turns() -> None:
     assert result.status == CheckStatus.PASS
     assert len(generator.calls) == 1
     assert len(generator.calls[0]) >= 1
-    prompt = generator.calls[0][0].content
+    prompt = generator.calls[0][0].transcript
     assert isinstance(prompt, str)
     assert "<TRACE>" in prompt
     assert "</TRACE>" in prompt

@@ -1,74 +1,83 @@
-import json
 import time
+from collections.abc import Sequence
 from typing import Any, override
 from unittest.mock import MagicMock, patch
 
 import pytest
-from giskard.agents.chat import Chat, Message
-from giskard.agents.generators.base import BaseGenerator, GenerationParams, Response
-from giskard.agents.generators.litellm_generator import LiteLLMGenerator
-from giskard.agents.tools import Function, Tool, ToolCall, tool
+from giskard.agents.chat import Chat
+from giskard.agents.generators.base import BaseGenerator, GenerationParams
+from giskard.agents.generators.giskard_llm_generator import GiskardLLMGenerator
+from giskard.agents.tools import Tool, tool
 from giskard.agents.workflow import ChatWorkflow
 from giskard.core import MinIntervalRateLimiter
-from litellm import ModelResponse
+from giskard.llm.types import (
+    AssistantMessage,
+    ChatMessage,
+    Choice,
+    CompletionResponse,
+    ToolCall,
+    ToolCallFunction,
+)
 from pydantic import Field
 
 
 @pytest.fixture
 def mock_response():
-    return ModelResponse(
+    return CompletionResponse(
         choices=[
-            dict(
+            Choice(
                 finish_reason="stop",
-                message=dict(role="assistant", content="Mock response"),
+                message=AssistantMessage(content="Mock response"),
             )
         ]
     )
 
 
-async def test_litellm_generator_completion_with_mock(
-    generator: LiteLLMGenerator, mock_response: ModelResponse
+async def test_generator_completion_with_mock(
+    generator: GiskardLLMGenerator, mock_response: CompletionResponse
 ):
     with patch(
-        "giskard.agents.generators.litellm_generator.acompletion",
+        "giskard.agents.generators.giskard_llm_generator.acompletion",
         return_value=mock_response,
     ):
         response = await generator.complete(
-            messages=[Message(role="user", content="Test message")]
+            messages=[{"role": "user", "content": "Test message"}]
         )
 
-        assert response.message.role == "assistant"
-        assert response.message.content == "Mock response"
-        assert response.finish_reason == "stop"
+        assert response.choices[0].message.role == "assistant"
+        assert response.choices[0].message.content == "Mock response"
+        assert response.choices[0].finish_reason == "stop"
 
 
+@pytest.mark.google
 @pytest.mark.functional
-async def test_generator_completion(generator: LiteLLMGenerator):
+async def test_generator_completion(generator: GiskardLLMGenerator):
     response = await generator.complete(
         messages=[
-            Message(
-                role="system",
-                content="You are a helpful assistant, greeting the user with 'Hello I am TestBot'.",
-            ),
-            Message(role="user", content="Hello, world!"),
+            {
+                "role": "system",
+                "content": "You are a helpful assistant, greeting the user with 'Hello I am TestBot'.",
+            },
+            {"role": "user", "content": "Hello, world!"},
         ]
     )
 
-    assert isinstance(response, Response)
-    assert response.message.role == "assistant"
-    assert isinstance(response.message.content, str)
-    assert "I am TestBot" in response.message.content
-    assert response.finish_reason == "stop"
+    assert isinstance(response, CompletionResponse)
+    assert response.choices[0].message.role == "assistant"
+    assert response.choices[0].message.text is not None
+    assert "I am TestBot" in response.choices[0].message.text
+    assert response.choices[0].finish_reason == "stop"
 
 
+@pytest.mark.google
 @pytest.mark.functional
-async def test_generator_chat(generator: LiteLLMGenerator):
+async def test_generator_chat(generator: GiskardLLMGenerator):
     test_message = "Hello, world!"
     pipeline = generator.chat(test_message)
 
     assert isinstance(pipeline, ChatWorkflow)
     assert len(pipeline.messages) == 1
-    assert isinstance(pipeline.messages[0], Message)
+    assert isinstance(pipeline.messages[0], ChatMessage)
     assert pipeline.messages[0].role == "user"
     assert pipeline.messages[0].content == test_message
 
@@ -84,20 +93,20 @@ async def test_generator_chat(generator: LiteLLMGenerator):
     assert isinstance(chats[2], Chat)
 
 
-async def test_litellm_generator_gets_rate_limiter(mock_response: ModelResponse):
+async def test_generator_gets_rate_limiter(mock_response: CompletionResponse):
     rate_limiter = MinIntervalRateLimiter.from_rpm(60, max_concurrent=1)
-    generator = LiteLLMGenerator(
+    generator = GiskardLLMGenerator(
         model="test-model",
         rate_limiter=rate_limiter,
     )
     with patch(
-        "giskard.agents.generators.litellm_generator.acompletion",
+        "giskard.agents.generators.giskard_llm_generator.acompletion",
         return_value=mock_response,
     ):
         start_time = time.monotonic()
         for _ in range(3):
             _ = await generator.complete(
-                messages=[Message(role="user", content="Test message")]
+                messages=[{"role": "user", "content": "Test message"}]
             )
         end_time = time.monotonic()
 
@@ -110,16 +119,16 @@ async def test_litellm_generator_gets_rate_limiter(mock_response: ModelResponse)
     assert elapsed_time < 3
 
 
-async def test_generator_without_rate_limiter(mock_response: ModelResponse):
-    generator = LiteLLMGenerator(model="test-model")
+async def test_generator_without_rate_limiter(mock_response: CompletionResponse):
+    generator = GiskardLLMGenerator(model="test-model")
     with patch(
-        "giskard.agents.generators.litellm_generator.acompletion",
+        "giskard.agents.generators.giskard_llm_generator.acompletion",
         return_value=mock_response,
     ):
         start_time = time.monotonic()
         for _ in range(3):
             _ = await generator.complete(
-                messages=[Message(role="user", content="Test message")]
+                messages=[{"role": "user", "content": "Test message"}]
             )
         end_time = time.monotonic()
 
@@ -128,7 +137,7 @@ async def test_generator_without_rate_limiter(mock_response: ModelResponse):
 
 
 def test_generator_with_params():
-    generator = LiteLLMGenerator(model="test-model")
+    generator = GiskardLLMGenerator(model="test-model")
     generator = generator.with_params(temperature=0.5)
     assert generator.params.temperature == 0.5
 
@@ -145,7 +154,7 @@ def test_generator_with_params():
 def test_generator_with_params_and_rate_limiter():
     """with_params uses a shallow copy: rate limiter is shared, not deep-copied."""
     rate_limiter = MinIntervalRateLimiter.from_rpm(100, max_concurrent=5)
-    generator = LiteLLMGenerator(
+    generator = GiskardLLMGenerator(
         model="test-model",
         rate_limiter=rate_limiter,
     )
@@ -158,7 +167,7 @@ def test_generator_with_params_and_rate_limiter():
         generator_with_params = generator.with_params(temperature=0.5, max_tokens=100)
         mock_deepcopy.assert_not_called()
 
-    assert isinstance(generator_with_params, LiteLLMGenerator)
+    assert isinstance(generator_with_params, GiskardLLMGenerator)
     assert generator_with_params.params.temperature == 0.5
     assert generator_with_params.params.max_tokens == 100
 
@@ -168,21 +177,21 @@ def test_generator_with_params_and_rate_limiter():
     assert generator.params.max_tokens is None
 
 
-async def test_generator_with_params_overwrite(mock_response: ModelResponse):
+async def test_generator_with_params_overwrite(mock_response: CompletionResponse):
     # ARRANGE: Create a generator with base parameters.
-    generator = LiteLLMGenerator(model="test-model").with_params(
+    generator = GiskardLLMGenerator(model="test-model").with_params(
         temperature=0.5,  # This should be preserved.
         max_tokens=100,  # This should be overwritten.
         timeout=30,  # This should be overwritten.
     )
 
     with patch(
-        "giskard.agents.generators.litellm_generator.acompletion",
+        "giskard.agents.generators.giskard_llm_generator.acompletion",
         return_value=mock_response,
     ) as mock_acompletion:
         # ACT: Call complete() with overriding parameters.
         _ = await generator.complete(
-            messages=[Message(role="user", content="Test message")],
+            messages=[{"role": "user", "content": "Test message"}],
             params=GenerationParams(max_tokens=200, timeout=60),
         )
 
@@ -217,34 +226,44 @@ class SpyGenerator(BaseGenerator):
     @override
     async def _call_model(
         self,
-        messages: list[Message],
+        messages: Sequence[ChatMessage],
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
+    ) -> CompletionResponse:
         self.call_count += 1
         self.calls.append({"messages": messages, "params": params})
 
         if self.call_count == 1 and params.tools:
-            return Response(
-                message=Message(
-                    role="assistant",
-                    content=None,
-                    tool_calls=[
-                        ToolCall(
-                            id="call_spy_1",
-                            function=Function(
-                                name=params.tools[0].name,
-                                arguments=json.dumps({"city": "Paris"}),
-                            ),
-                        )
-                    ],
-                ),
-                finish_reason="tool_calls",
+            return CompletionResponse(
+                choices=[
+                    Choice(
+                        message=AssistantMessage(
+                            content=None,
+                            tool_calls=[
+                                ToolCall(
+                                    id="call_spy_1",
+                                    function=ToolCallFunction(
+                                        name=params.tools[0].name,
+                                        arguments={"city": "Paris"},
+                                    ),
+                                )
+                            ],
+                        ),
+                        finish_reason="tool_calls",
+                        index=0,
+                    )
+                ],
+                model="test-model",
             )
-
-        return Response(
-            message=Message(role="assistant", content=self.canned_response),
-            finish_reason="stop",
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content=self.canned_response),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ],
+            model="test-model",
         )
 
 
@@ -271,7 +290,7 @@ async def test_call_model_receives_internal_types():
     )
 
     assert len(gen.calls) >= 1
-    assert all(isinstance(m, Message) for m in gen.calls[0]["messages"])
+    assert all(isinstance(m, ChatMessage) for m in gen.calls[0]["messages"])
     assert isinstance(gen.calls[0]["params"], GenerationParams)
     assert all(isinstance(t, Tool) for t in gen.calls[0]["params"].tools)
 
@@ -289,14 +308,20 @@ async def test_subclass_controls_message_serialization():
         @override
         async def _call_model(
             self,
-            messages: list[Message],
+            messages: Sequence[ChatMessage],
             params: GenerationParams,
             metadata: dict[str, Any] | None = None,
-        ) -> Response:
+        ) -> CompletionResponse:
             last_content = messages[-1].content or ""
             tagged = f"[tagged] {last_content}"
-            return Response(
-                message=Message(role="assistant", content=tagged), finish_reason="stop"
+            return CompletionResponse(
+                choices=[
+                    Choice(
+                        message=AssistantMessage(content=tagged),
+                        finish_reason="stop",
+                        index=0,
+                    )
+                ]
             )
 
     gen = TaggingGenerator()
@@ -323,13 +348,19 @@ async def test_subclass_controls_tool_serialization():
         @override
         async def _call_model(
             self,
-            messages: list[Message],
+            messages: Sequence[ChatMessage],
             params: GenerationParams,
             metadata: dict[str, Any] | None = None,
-        ) -> Response:
+        ) -> CompletionResponse:
             content = f"custom_{params.tools[0].name}" if params.tools else "none"
-            return Response(
-                message=Message(role="assistant", content=content), finish_reason="stop"
+            return CompletionResponse(
+                choices=[
+                    Choice(
+                        message=AssistantMessage(content=content),
+                        finish_reason="stop",
+                        index=0,
+                    )
+                ]
             )
 
     gen = RenamedToolGenerator()
