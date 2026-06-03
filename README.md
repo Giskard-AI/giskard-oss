@@ -107,7 +107,7 @@ result.print_report()
 pip install giskard-scan
 ```
 
-**[Giskard Scan](https://docs.giskard.ai/oss/scan)** is the red-teaming and vulnerability scanning layer for agentic systems. It generates adversarial test suites automatically from a plain-language description of your agent, covering prompt injection, harmful content, stereotypes, misinformation, and more.
+**Giskard Scan** is the red-teaming and vulnerability scanning layer for agentic systems. It generates adversarial test suites automatically from a plain-language description of your agent, covering prompt injection, harmful content, stereotypes, misinformation, and more.
 
 Use Giskard Scan to:
 
@@ -127,7 +127,7 @@ async def main():
         languages=["en"],
     )
     results = await suite.run(my_agent)
-    print(results)
+    results.print_report()
 
 asyncio.run(main())
 ```
