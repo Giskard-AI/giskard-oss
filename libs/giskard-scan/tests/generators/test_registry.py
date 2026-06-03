@@ -156,6 +156,6 @@ def test_suite_generator_registry_contains_builtin_generators():
 
 
 def test_suite_generator_registry_exported_from_top_level():
-    from giskard.scan.registry import SuiteGeneratorRegistry, suite_generator_registry
+    from giskard.scan import SuiteGeneratorRegistry, suite_generator_registry
 
     assert isinstance(suite_generator_registry, SuiteGeneratorRegistry)

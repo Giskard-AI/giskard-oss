@@ -3,6 +3,8 @@ from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
+from giskard.checks.core.interaction import Trace
+from giskard.checks.core.scenario import Scenario
 from giskard.checks.scenarios.suite import Suite
 
 from .generators.base import ScenarioGenerator
@@ -15,7 +17,7 @@ async def _generate_scenarios(
     generators: list[ScenarioGenerator],
     max_scenarios: int | None = None,
     seed: int = 42,
-) -> list[Any]:
+) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
     rng = np.random.default_rng(seed)
 
     tasks = []
@@ -51,7 +53,26 @@ async def generate_suite(
     max_scenarios: int | None = None,
     seed: int = 42,
 ) -> Suite[Any, Any]:
-    """Generate a test suite by running all registered (or supplied) generators."""
+    """Generate a test suite by running all registered (or supplied) generators.
+
+    This is the primary public entry point for suite generation.  It resolves
+    generators, distributes the optional scenario budget, runs generation
+    concurrently, and wraps the results in a named Suite.
+
+    Args:
+        description: Natural-language description of the agent under test.
+        languages: BCP-47 language codes the agent is expected to handle.
+        generators: Sequence of generator instances or classes to use.
+            When None, all generators registered in
+            suite_generator_registry are used.
+        max_scenarios: Total upper bound on scenarios across all generators.
+            None lets each generator apply its own default.
+        seed: Integer seed for the top-level RNG, ensuring reproducibility
+            across runs with the same arguments.
+
+    Returns:
+        A Suite containing all generated scenarios, ready for execution.
+    """
     if max_scenarios is not None and max_scenarios < 0:
         raise ValueError(f"max_scenarios must be non-negative, got {max_scenarios}")
 
