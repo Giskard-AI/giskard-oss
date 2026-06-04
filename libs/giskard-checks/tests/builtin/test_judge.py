@@ -1,10 +1,18 @@
+import asyncio
 import json
 from collections.abc import Sequence
 from typing import Any, cast, override
 
 import pytest
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
-from giskard.checks import Check, CheckStatus, Interaction, LLMJudge, Trace
+from giskard.checks import (
+    Check,
+    CheckResult,
+    CheckStatus,
+    Interaction,
+    LLMJudge,
+    Trace,
+)
 from giskard.llm.types import (
     AssistantMessage,
     ChatMessage,
@@ -175,3 +183,32 @@ async def test_validate_both_prompt_or_path() -> None:
             prompt="Evaluate the answer.",
             prompt_path="prompts/judge_prompt.j2",
         )
+
+
+async def test_multi_run_executes_in_parallel() -> None:
+    generator = MockGenerator(passed=True, reason="Looks good")
+    judge = LLMJudge(generator=generator, prompt="Evaluate the answer.", num_runs=3)
+
+    active_runs = 0
+    max_active_runs = 0
+
+    async def fake_run_once(
+        trace: Trace,
+        *,
+        inputs: dict[str, Any],
+    ) -> CheckResult:
+        nonlocal active_runs, max_active_runs
+        _ = trace
+        _ = inputs
+        active_runs += 1
+        max_active_runs = max(max_active_runs, active_runs)
+        await asyncio.sleep(0.01)
+        active_runs -= 1
+        return CheckResult.success(message="Check passed", details={})
+
+    judge._run_once = fake_run_once  # type: ignore[method-assign]
+
+    result = await judge.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    assert max_active_runs > 1

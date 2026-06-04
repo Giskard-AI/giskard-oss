@@ -1,3 +1,4 @@
+import asyncio
 from collections import Counter
 from typing import Any, Literal, override
 
@@ -108,9 +109,9 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             The result of the check evaluation.
         """
         inputs = await self.get_inputs(trace)
-        results = [
-            await self._run_once(trace, inputs=inputs) for _ in range(self.num_runs)
-        ]
+        results = await asyncio.gather(
+            *(self._run_once(trace, inputs=inputs) for _ in range(self.num_runs))
+        )
 
         if self.num_runs == 1:
             return results[0]
