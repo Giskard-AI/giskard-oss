@@ -162,13 +162,13 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### certifi-2025.8.3
+### certifi-2026.5.20
 
 - HomePage: https://github.com/certifi/python-certifi
 - Author: Kenneth Reitz
 - License: MOZILLA PUBLIC LICENSE 2.0 _MPL 2.0_
 - Compatible: True
-- Size: 294877
+- Size: 243390
 
 ### cffi-2.0.0
 
@@ -178,13 +178,13 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### charset-normalizer-3.4.3
+### charset-normalizer-3.4.7
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
 - License: MIT
 - Compatible: True
-- Size: 826776
+- Size: 1083177
 
 ### click-8.4.1
 
@@ -338,13 +338,13 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### idna-3.10
+### idna-3.18
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
-- License: BSD LICENSE
+- License: BSD-3-CLAUSE
 - Compatible: True
-- Size: 349141
+- Size: 325350
 
 ### importlib-metadata-8.9.0
 
@@ -410,13 +410,13 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### markdown-it-py-4.0.0
+### markdown-it-py-4.2.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
 - License: MIT LICENSE
 - Compatible: True
-- Size: 223857
+- Size: 238475
 
 ### markupsafe-3.0.3
 
@@ -458,13 +458,13 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### packaging-25.0
+### packaging-26.2
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
-- License: APACHE SOFTWARE LICENSE;; BSD LICENSE
+- License: APACHE-2.0;; BSD-2-CLAUSE
 - Compatible: True
-- Size: 236486
+- Size: 379794
 
 ### posthog-7.17.0
 
@@ -522,13 +522,13 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### pygments-2.19.2
+### pygments-2.20.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
-- License: BSD LICENSE
+- License: BSD-2-CLAUSE
 - Compatible: True
-- Size: 4467170
+- Size: 4491298
 
 ### python-dotenv-1.2.2
 
@@ -562,21 +562,21 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### requests-2.32.5
+### requests-2.34.2
 
-- HomePage: https://requests.readthedocs.io
-- Author: Kenneth Reitz
+- HomePage: UNKNOWN
+- Author: UNKNOWN
 - License: APACHE SOFTWARE LICENSE
 - Compatible: True
-- Size: 202504
+- Size: 232372
 
-### rich-14.1.0
+### rich-15.0.0
 
-- HomePage: https://github.com/Textualize/rich
+- HomePage: UNKNOWN
 - Author: Will McGugan
 - License: MIT LICENSE
 - Compatible: True
-- Size: 954426
+- Size: 1237756
 
 ### rpds-py-2026.5.1
 
@@ -658,13 +658,13 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### urllib3-2.5.0
+### urllib3-2.7.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
 - License: MIT
 - Compatible: True
-- Size: 421374
+- Size: 428936
 
 ### websockets-16.0
 
