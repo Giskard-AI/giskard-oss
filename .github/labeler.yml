@@ -17,3 +17,8 @@
   - changed-files:
       - any-glob-to-any-file:
           - "libs/giskard-checks/**"
+
+"Scope: Scan":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "libs/giskard-scan/**"

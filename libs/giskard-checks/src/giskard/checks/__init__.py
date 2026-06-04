@@ -19,6 +19,7 @@ from .builtin import (
     Not,
     NotEquals,
     RegexMatching,
+    RegoPolicy,
     SemanticSimilarity,
     StringMatching,
     from_fn,
@@ -52,7 +53,6 @@ from .judges import (
     LLMJudge,
     Toxicity,
 )
-from .scenarios.catalog import ScenarioCategory, generate_suite
 from .scenarios.runner import ScenarioRunner
 from .scenarios.suite import Suite
 from .settings import get_default_generator, set_default_generator
@@ -109,6 +109,7 @@ __all__ = [
     "GreaterEquals",
     "FnCheck",
     "JsonValid",
+    "RegoPolicy",
     "from_fn",
     "Groundedness",
     "LLMJudge",
@@ -123,9 +124,6 @@ __all__ = [
     "LLMGenerator",
     # Generators
     "UserSimulator",
-    # Suite generation
-    "ScenarioCategory",
-    "generate_suite",
     # Testing
     "WithSpy",
     "TestCaseRunner",

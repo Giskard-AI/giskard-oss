@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 local-embeddings = ["sentence-transformers>=2.0,<4"]
+regorus = ["celine-regorus>=0.9.1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]

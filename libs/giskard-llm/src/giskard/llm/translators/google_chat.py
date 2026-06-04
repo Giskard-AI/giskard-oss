@@ -52,6 +52,10 @@ KNOWN_COMPLETION_PARAMS = frozenset(
     {"temperature", "max_tokens", "tools", "response_format", "safety_settings"}
 )
 
+# Sentinel that skips Gemini 3 thought-signature validation when we have no real
+# signature for a tool call. https://ai.google.dev/gemini-api/docs/thought-signatures
+_SKIP_THOUGHT_SIGNATURE = b"skip_thought_signature_validator"
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,7 +80,10 @@ def _text_content(text: str) -> "PartDict":
 def serialize_text_content(
     content: TextContent, _info: SerializationInfo
 ) -> "PartDict":
-    return _text_content(content.text)
+    part = _text_content(content.text)
+    if content.thought_signature is not None:
+        part["thought_signature"] = content.thought_signature
+    return part
 
 
 @RefusalContent.register_serializer(_PROVIDER)
@@ -103,7 +110,8 @@ def serialize_tool_call(tool_call: ToolCall, info: SerializationInfo) -> "PartDi
         "function_call": {
             "name": tool_call.function.name,
             "args": tool_call.function.arguments,
-        }
+        },
+        "thought_signature": tool_call.thought_signature or _SKIP_THOUGHT_SIGNATURE,
     }
 
 
@@ -321,7 +329,7 @@ class GoogleChatTranslator:
         part: "Part", num_messages: int, part_index: int
     ) -> CompletionContent | ToolCall:
         if part.text is not None:
-            return TextContent(text=part.text)
+            return TextContent(text=part.text, thought_signature=part.thought_signature)
         if part.function_call is not None:
             fc = part.function_call
             return ToolCall(
@@ -331,6 +339,7 @@ class GoogleChatTranslator:
                     name=fc.name or "",
                     arguments=fc.args or {},
                 ),
+                thought_signature=part.thought_signature,
             )
         raise ValueError(f"Unsupported part content type: {part}")
 

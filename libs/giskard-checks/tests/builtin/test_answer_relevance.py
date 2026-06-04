@@ -13,15 +13,12 @@ Tests cover:
 - Empty trace handled gracefully (NoMatch when resolving last turn)
 """
 
-import json
-from collections.abc import Sequence
-from typing import Any, override
+from typing import Any
 
-from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import AnswerRelevance, CheckResult, CheckStatus, Interaction, Trace
 from giskard.checks.core.extraction import NoMatch
-from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
-from pydantic import Field
+
+from ..testing_utils import MockJudgeGenerator as MockGenerator
 
 _EXPECTED_INPUT_KEYS = frozenset({"question", "answer", "history", "context"})
 
@@ -33,34 +30,6 @@ def _assert_answer_relevance_inputs(result: CheckResult) -> dict[str, Any]:
     assert isinstance(inputs, dict)
     assert set(inputs.keys()) == _EXPECTED_INPUT_KEYS
     return inputs
-
-
-class MockGenerator(BaseGenerator):
-    passed: bool
-    reason: str | None = None
-    calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
-
-    @override
-    async def _call_model(
-        self,
-        messages: Sequence[ChatMessage],
-        params: GenerationParams,
-        metadata: dict[str, Any] | None = None,
-    ) -> CompletionResponse:
-        self.calls.append(messages)
-        return CompletionResponse(
-            choices=[
-                Choice(
-                    message=AssistantMessage(
-                        content=json.dumps(
-                            {"passed": self.passed, "reason": self.reason}
-                        )
-                    ),
-                    finish_reason="stop",
-                    index=0,
-                )
-            ]
-        )
 
 
 class TestAnswerRelevanceBasic:
