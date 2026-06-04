@@ -23,6 +23,7 @@ Find a list of packages below
 |✔|anyio|
 |✔|attrs|
 |✔|backoff|
+|✔|celine-regorus|
 |✔|certifi|
 |✔|cffi|
 |✔|charset-normalizer|
@@ -159,6 +160,14 @@ Find a list of packages below
 - HomePage: https://github.com/litl/backoff
 - Author: Bob Green
 - License: MIT LICENSE
+- Compatible: True
+- Size: -1
+
+### celine-regorus-0.9.1.post20260227075446
+
+- HomePage: UNKNOWN
+- Author: UNKNOWN
+- License: APACHE SOFTWARE LICENSE;; BSD LICENSE;; MIT LICENSE
 - Compatible: True
 - Size: -1
 

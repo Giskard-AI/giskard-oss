@@ -68,11 +68,14 @@ test = [
     "pytest-cov==7.1.0",
     "pytest-timeout==2.4.0",
 ]
-dev = [
-    { include-group = "test" },
+all-extras = [
     "giskard-llm[openai,google,anthropic]>=1.0.0a1",
     "giskard-agents[litellm]>=1.0.0a1",
     "giskard-checks[regorus]>=1.0.0a1",
+]
+dev = [
+    { include-group = "test" },
+    { include-group = "all-extras" },
     "ipykernel==7.3.0",
     "pip-audit==2.10.1",
     "pylint-pydantic==0.4.1",

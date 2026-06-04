@@ -110,25 +110,22 @@ security: ## Check for security vulnerabilities
 	uv run pip-audit --skip-editable
 
 generate-licenses: ## Generate licenses
-	uv tool run licensecheck --license MIT \
+	uvx licensecheck --license MIT \
 		--format markdown --file THIRD_PARTY_NOTICES.md \
-		--requirements-paths $(foreach lib,$(LIBS),libs/$(lib)/pyproject.toml) \
-		--extras openai google anthropic litellm \
+		--groups all-extras \
 		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm giskard-scan
 
 check-licenses: ## Check for licenses
-	uv tool run licensecheck --license MIT \
+	uvx licensecheck --license MIT \
 		--show-only-failing --zero \
-		--requirements-paths $(foreach lib,$(LIBS),libs/$(lib)/pyproject.toml) \
-		--extras openai google anthropic litellm \
+		--groups all-extras \
 		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm giskard-scan
 
 check-licenses-file: ## Check that THIRD_PARTY_NOTICES.md is up to date (run make generate-licenses if this fails)
 	@TMPFILE=$$(mktemp) && TMPFILE2=$$(mktemp) && TMPFILE3=$$(mktemp) && \
-	uv tool run licensecheck --license MIT \
+	uvx licensecheck --license MIT \
 		--format markdown --file $$TMPFILE \
-		--requirements-paths $(foreach lib,$(LIBS),libs/$(lib)/pyproject.toml) \
-		--extras openai google anthropic litellm \
+		--groups all-extras \
 		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm giskard-scan && \
 	sed -e 's/[[:space:]]*$$//' $$TMPFILE | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}' > $$TMPFILE2 && \
 	sed -e 's/[[:space:]]*$$//' THIRD_PARTY_NOTICES.md | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}' > $$TMPFILE3 && \
