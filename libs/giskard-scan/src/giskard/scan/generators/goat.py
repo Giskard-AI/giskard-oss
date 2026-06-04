@@ -120,7 +120,7 @@ class GOATAttackScenarioGenerator(ScenarioGenerator):
     """Generate GOAT attack scenarios for harmful-content robustness testing.
 
     The generator creates one multi-turn scenario per selected GOAT objective.
-    Each scenario assigns a primary GOAT strategy and also exposes the complete
+    Each scenario exposes the complete
     strategy list to both the attacker and evaluator prompts.
 
     Parameters
