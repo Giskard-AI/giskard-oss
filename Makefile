@@ -123,7 +123,23 @@ check-licenses: ## Check for licenses
 		--extras openai google anthropic all litellm \
 		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm
 
-check: lint check-format check-compat typecheck security check-licenses ## Run all checks
+check-licenses-file: ## Check that THIRD_PARTY_NOTICES.md is up to date (run make generate-licenses if this fails)
+	@TMPFILE=$$(mktemp) && TMPFILE2=$$(mktemp) && TMPFILE3=$$(mktemp) && \
+	uv tool run licensecheck --license MIT \
+		--format markdown --file $$TMPFILE \
+		--requirements-paths $(foreach lib,$(LIBS),libs/$(lib)/pyproject.toml) \
+		--extras openai google anthropic all litellm \
+		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm && \
+	sed -e 's/[[:space:]]*$$//' $$TMPFILE | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}' > $$TMPFILE2 && \
+	sed -e 's/[[:space:]]*$$//' THIRD_PARTY_NOTICES.md | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}' > $$TMPFILE3 && \
+	if ! diff -q $$TMPFILE2 $$TMPFILE3 > /dev/null 2>&1; then \
+		rm -f $$TMPFILE $$TMPFILE2 $$TMPFILE3; \
+		echo "THIRD_PARTY_NOTICES.md is out of date. Run: make generate-licenses"; \
+		exit 1; \
+	fi; \
+	rm -f $$TMPFILE $$TMPFILE2 $$TMPFILE3
+
+check: lint check-format check-compat typecheck security check-licenses check-licenses-file ## Run all checks
 
 clean: ## Clean up build artifacts and caches
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
