@@ -1,11 +1,25 @@
 import asyncio
 import time
-from contextlib import nullcontext
+from collections.abc import Iterator
+from contextlib import contextmanager, nullcontext
 from typing import Any, Generic, Self, TypeVar
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
 from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
+from rich.console import RenderableType
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    ProgressColumn,
+    SpinnerColumn,
+    Task,
+    TaskID,
+    TextColumn,
+    TimeElapsedColumn,
+)
+from rich.text import Text
 
 from .._telemetry_props import suite_shape_properties
 from ..core.interaction import Trace
@@ -15,6 +29,19 @@ from ..core.types import ProviderType
 
 InputType = TypeVar("InputType", infer_variance=True)
 OutputType = TypeVar("OutputType", infer_variance=True)
+
+
+class _OverallOnly(ProgressColumn):
+    """Render the wrapped column only for the overall task, not per-scenario rows."""
+
+    def __init__(self, column: ProgressColumn) -> None:
+        super().__init__()
+        self._column: ProgressColumn = column
+
+    def render(self, task: "Task") -> RenderableType:
+        if not task.fields.get("overall"):
+            return Text("")
+        return self._column.render(task)
 
 
 class Suite(BaseModel, Generic[InputType, OutputType]):
@@ -94,6 +121,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
+        progress: bool = True,
     ) -> SuiteResult:
         """Run all scenarios in the suite.
 
@@ -107,8 +135,12 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         parallel : bool
             If True, run all scenarios concurrently while preserving result order.
         max_concurrency : int | None
-            Optional upper bound on concurrent scenario runs when ``parallel=True``.
-            Must be a positive integer when provided.
+            Max concurrent scenarios when ``parallel=True`` (positive int).
+            ``None`` (default) is unbounded: all scenarios start at once, so the
+            provider's rate limits become the effective cap.
+        progress : bool
+            If True (default), display a progress bar showing which scenario is
+            currently running. Set to False for non-interactive environments.
 
         Returns
         -------
@@ -147,12 +179,13 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             )
 
             start_time = time.perf_counter()
-            if parallel:
-                results = await self._run_parallel(
-                    target, return_exception, max_concurrency
-                )
-            else:
-                results = await self._run_serial(target, return_exception)
+            with self._progress_bar(enabled=progress) as tracker:
+                if parallel:
+                    results = await self._run_parallel(
+                        target, return_exception, max_concurrency, tracker
+                    )
+                else:
+                    results = await self._run_serial(target, return_exception, tracker)
             end_time = time.perf_counter()
 
             suite_result = SuiteResult(
@@ -174,33 +207,66 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
         return suite_result
 
+    @contextmanager
+    def _progress_bar(self, enabled: bool) -> Iterator[tuple[Progress, TaskID]]:
+        """Yield ``(progress, task_id)``; disabled when ``enabled`` is False so calls are no-ops."""
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            _OverallOnly(BarColumn()),
+            _OverallOnly(MofNCompleteColumn()),
+            TimeElapsedColumn(),
+            disable=not enabled,
+        ) as progress:
+            task_id = progress.add_task(
+                "Running scenarios", total=len(self.scenarios), overall=True
+            )
+            yield progress, task_id
+            progress.update(task_id, completed=len(self.scenarios))
+            progress.refresh()
+
     async def _run_serial(
         self,
         target: Any,
         return_exception: bool,
+        tracker: tuple[Progress, TaskID],
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
-        return [
-            await scenario.run(target=target, return_exception=return_exception)
-            for scenario in self.scenarios
-        ]
+        progress, overall_id = tracker
+        results: list[ScenarioResult[Trace[Any, Any]]] = []
+        for scenario in self.scenarios:
+            progress.update(overall_id, description=f"Running: {scenario.name}")
+            results.append(
+                await scenario.run(target=target, return_exception=return_exception)
+            )
+            progress.advance(overall_id)
+        return results
 
     async def _run_parallel(
         self,
         target: Any,
         return_exception: bool,
         max_concurrency: int | None,
+        tracker: tuple[Progress, TaskID],
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
         semaphore = (
             asyncio.Semaphore(max_concurrency) if max_concurrency else nullcontext()
         )
+        progress, overall_id = tracker
 
         async def run_scenario(
             scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
         ) -> ScenarioResult[Trace[Any, Any]]:
             async with semaphore:
-                return await scenario.run(
-                    target=target, return_exception=return_exception
-                )
+                # Show a row per scenario while it runs, so all in-flight ones appear.
+                sub_id = progress.add_task(f"  ↳ {scenario.name}", total=None)
+                try:
+                    result = await scenario.run(
+                        target=target, return_exception=return_exception
+                    )
+                finally:
+                    progress.remove_task(sub_id)
+                progress.advance(overall_id)
+            return result
 
         try:
             async with asyncio.TaskGroup() as task_group:
