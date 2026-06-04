@@ -4,6 +4,8 @@ from contextlib import nullcontext
 
 import pytest
 from giskard.checks import Equals, Scenario, Suite
+from giskard.checks.scenarios.suite import _OverallOnly
+from rich.progress import MofNCompleteColumn, Progress
 
 
 @pytest.fixture
@@ -292,3 +294,51 @@ async def test_suite_parallel_rejects_invalid_max_concurrency():
 
     with pytest.raises(ValueError, match="max_concurrency must be greater than 0"):
         await suite.run(parallel=True, max_concurrency=0)
+
+
+def test_progress_counter_appears_only_on_the_overall_row():
+    """The counter shows on the overall summary row and is blank on scenario rows."""
+    column = _OverallOnly(MofNCompleteColumn())
+    with Progress(column, disable=True) as progress:
+        overall_id = progress.add_task("overall", total=3, completed=1, overall=True)
+        scenario_id = progress.add_task("scenario", total=None)
+        by_id = {task.id: task for task in progress.tasks}
+
+    assert column.render(by_id[overall_id]).plain == "1/3"
+    assert column.render(by_id[scenario_id]).plain == ""
+
+
+@pytest.mark.asyncio
+async def test_suite_progress_can_be_disabled(monkeypatch):
+    """`progress=False` builds a disabled bar so its calls are no-ops."""
+    bars = []
+    monkeypatch.setattr(Progress, "__enter__", lambda self: bars.append(self) or self)
+
+    suite = Suite(name="progress_off_suite", target=lambda inputs: inputs)
+    suite.append(Scenario("a").interact("a"))
+
+    await suite.run(progress=False)
+
+    assert bars[0].disable is True
+
+
+@pytest.mark.asyncio
+async def test_suite_parallel_progress_shows_a_row_per_scenario(monkeypatch):
+    """Parallel mode adds one progress row per running scenario."""
+    rows = []
+    original_add_task = Progress.add_task
+
+    def record_row(self, description, **kwargs):
+        rows.append(description)
+        return original_add_task(self, description, **kwargs)
+
+    monkeypatch.setattr(Progress, "add_task", record_row)
+
+    suite = Suite(name="progress_rows_suite", target=lambda inputs: inputs)
+    for name in ("alpha", "beta"):
+        suite.append(Scenario(name).interact("hi"))
+
+    await suite.run(parallel=True)
+
+    assert "  ↳ alpha" in rows
+    assert "  ↳ beta" in rows
