@@ -129,7 +129,7 @@ check-licenses-file: ## Check that THIRD_PARTY_NOTICES.md is up to date (run mak
 		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm giskard-scan && \
 	sed -e 's/[[:space:]]*$$//' $$TMPFILE | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}' > $$TMPFILE2 && \
 	sed -e 's/[[:space:]]*$$//' THIRD_PARTY_NOTICES.md | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}' > $$TMPFILE3 && \
-	if ! diff -q $$TMPFILE2 $$TMPFILE3 > /dev/null 2>&1; then \
+	if ! diff $$TMPFILE2 $$TMPFILE3; then \
 		rm -f $$TMPFILE $$TMPFILE2 $$TMPFILE3; \
 		echo "THIRD_PARTY_NOTICES.md is out of date. Run: make generate-licenses"; \
 		exit 1; \
