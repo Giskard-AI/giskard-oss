@@ -98,7 +98,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### aiohttp-3.13.5
+### aiohttp-3.14.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -234,7 +234,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### filelock-3.29.0
+### filelock-3.29.1
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -266,7 +266,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### google-genai-2.7.0
+### google-genai-2.8.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -394,7 +394,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### litellm-1.86.2
+### litellm-1.87.0
 
 - HomePage: UNKNOWN
 - Author: BerriAI
@@ -402,7 +402,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### logfire-api-4.34.0
+### logfire-api-4.35.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -450,7 +450,7 @@ Find a list of packages below
 - Compatible: True
 - Size: -1
 
-### openai-2.38.0
+### openai-2.41.0
 
 - HomePage: UNKNOWN
 - Author: UNKNOWN
@@ -466,7 +466,7 @@ Find a list of packages below
 - Compatible: True
 - Size: 236486
 
-### posthog-7.16.2
+### posthog-7.17.0
 
 - HomePage: https://github.com/posthog/posthog-python
 - Author: Posthog
