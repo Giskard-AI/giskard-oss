@@ -8,8 +8,7 @@ class PromptInjectionScenarioGenerator(DatasetScenarioGenerator):
 
     Loads scenarios from the bundled ``prompt_injection.jsonl`` dataset and
     tags them as OWASP LLM Top-10 2025 – LLM01 (prompt injection) threats.
-    Sampling behaviour is inherited from
-    :class:`~giskard.checks.scenarios_generator.base.DatasetScenarioGenerator`.
+    Sampling behaviour is inherited from DatasetScenarioGenerator.
     """
 
     tags: ClassVar[list[str]] = [

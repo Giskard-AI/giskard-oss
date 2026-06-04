@@ -29,7 +29,7 @@ from google.genai._interactions.types import (
 
 pytestmark = pytest.mark.google
 
-_MODEL = "gemini-2.0-flash"
+_MODEL = "gemini-3.5-flash"
 _FIXED_DT = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
 

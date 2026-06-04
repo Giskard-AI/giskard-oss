@@ -23,6 +23,7 @@ dependencies = [
     "giskard-core>=1.0.0a1",
     "giskard-agents>=1.0.0a1",
     "giskard-checks>=1.0.0a1",
+    "giskard-scan>=1.0.0b1",
 ]
 requires-python = ">=3.12"
 
@@ -46,6 +47,7 @@ giskard-core = { workspace = true }
 giskard-llm = { workspace = true }
 giskard-agents = { workspace = true }
 giskard-checks = { workspace = true }
+giskard-scan = { workspace = true }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -70,6 +72,7 @@ dev = [
     { include-group = "test" },
     "giskard-llm[openai,google,anthropic]>=1.0.0a1",
     "giskard-agents[litellm]>=1.0.0a1",
+    "giskard-checks[regorus]>=1.0.0a1",
     "ipykernel==7.2.0",
     "pip-audit==2.10.0",
     "pylint-pydantic==0.4.1",

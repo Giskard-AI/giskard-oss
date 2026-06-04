@@ -762,7 +762,7 @@ async def test_google_respond_text(mock_errors):
         return_value=_make_google_interaction_response()
     )
 
-    resp = await provider.respond("gemini-2.0-flash", "Hello")
+    resp = await provider.respond("gemini-3.5-flash", "Hello")
     assert resp.id == "int_001"
     assert len(resp.outputs) == 1
     assert isinstance(resp.outputs[0], ResponseOutputMessage)
@@ -787,7 +787,7 @@ async def test_google_respond_function_call(mock_errors):
         return_value=_make_google_interaction_response(steps=[fc_item])
     )
 
-    resp = await provider.respond("gemini-2.0-flash", "Weather?")
+    resp = await provider.respond("gemini-3.5-flash", "Weather?")
     assert len(resp.outputs) == 1
     assert isinstance(resp.outputs[0], ResponseFunctionToolCall)
     assert resp.outputs[0].call_id == "call_xyz"

@@ -25,6 +25,7 @@ from .comparison import (
 from .composition import AllOf, AnyOf, Not
 from .fn import FnCheck, from_fn
 from .json_valid import JsonValid
+from .rego_policy import RegoPolicy
 from .retrieval import (
     MRR,
     AveragePrecision,
@@ -49,6 +50,7 @@ __all__ = [
     "NDCGAtK",
     "AveragePrecision",
     "JsonValid",
+    "RegoPolicy",
     "StringMatching",
     "RegexMatching",
     "Equals",

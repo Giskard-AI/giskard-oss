@@ -39,7 +39,7 @@ async def test_litellm_generator_completion(mock_litellm_response: Any) -> None:
     """``LiteLLMGenerator._call_model`` routes through ``litellm.acompletion``."""
     from giskard.agents.generators.litellm_generator import LiteLLMGenerator
 
-    generator = LiteLLMGenerator(model="gemini/gemini-2.0-flash")
+    generator = LiteLLMGenerator(model="gemini/gemini-3.5-flash")
     with patch(
         "litellm.acompletion",
         return_value=mock_litellm_response,
@@ -52,7 +52,7 @@ async def test_litellm_generator_completion(mock_litellm_response: Any) -> None:
     assert response.choices[0].message.content == "Mock response"
     assert response.choices[0].finish_reason == "stop"
     mock_acompletion.assert_called_once()
-    assert mock_acompletion.call_args.kwargs["model"] == "gemini/gemini-2.0-flash"
+    assert mock_acompletion.call_args.kwargs["model"] == "gemini/gemini-3.5-flash"
 
 
 async def test_litellm_generator_forwards_params(mock_litellm_response: Any) -> None:
@@ -103,10 +103,10 @@ def test_litellm_generator_registered_as_kind() -> None:
     from giskard.agents.generators.base import BaseGenerator
     from giskard.agents.generators.litellm_generator import LiteLLMGenerator
 
-    instance = LiteLLMGenerator(model="gemini/gemini-2.0-flash")
+    instance = LiteLLMGenerator(model="gemini/gemini-3.5-flash")
     dumped = instance.model_dump()
     assert dumped["kind"] == "litellm"
 
     reconstructed = BaseGenerator.model_validate(dumped)
     assert isinstance(reconstructed, LiteLLMGenerator)
-    assert reconstructed.model == "gemini/gemini-2.0-flash"
+    assert reconstructed.model == "gemini/gemini-3.5-flash"
