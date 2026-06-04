@@ -181,7 +181,7 @@ class GOATAttackScenarioGenerator(ScenarioGenerator):
     ) -> list[tuple[str, str, str]]:
         assignments = list(DEFAULT_GOAT_OBJECTIVES.items())
         selected_assignments: list[tuple[str, str]]
-        rng = rng if rng is not None else np.random.default_rng()
+        rng = rng or np.random.default_rng()
 
         if max_scenarios is None or max_scenarios >= len(assignments):
             selected_assignments = assignments
