@@ -18,6 +18,7 @@ from pydantic import ValidationError
         ("null", None),
         ("true", True),
         ("42", 42),
+        ("hello", "hello"),
     ],
 )
 async def test_valid_json_output_passes(outputs: Any, expected_parsed: Any) -> None:
@@ -83,6 +84,7 @@ async def test_nested_jsonpath_extraction() -> None:
         ),
         ({"type": "integer"}, 42, 42),
         ({"type": "string", "minLength": 3, "maxLength": 7}, '"hello"', "hello"),
+        ({"type": "string", "minLength": 3, "maxLength": 7}, "hello", "hello"),
     ],
 )
 async def test_schema_validation_passes(
