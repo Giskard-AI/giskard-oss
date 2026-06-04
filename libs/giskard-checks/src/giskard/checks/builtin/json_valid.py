@@ -114,7 +114,7 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
     @staticmethod
     def _parse_json(value: Any) -> Any:
         if isinstance(value, str):
-            if value == "":
+            if value.strip() == "":
                 return json.loads(value)
             if JsonValid._looks_like_serialized_json(value):
                 return json.loads(value)
@@ -129,10 +129,24 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
 
     @staticmethod
     def _looks_like_serialized_json(value: str) -> bool:
-        stripped = value.lstrip()
-        return stripped.startswith(("{", "[", '"')) or stripped.startswith(
-            ("true", "false", "null")
-        ) or stripped[:1].isdigit() or stripped.startswith("-")
+        stripped = value.strip()
+        if not stripped:
+            return False
+
+        if stripped.startswith(("{", "[", '"')):
+            return True
+
+        if stripped in ("true", "false", "null"):
+            return True
+
+        if (stripped[:1].isdigit() or stripped.startswith("-")) and "_" not in stripped:
+            try:
+                parsed = json.loads(stripped)
+            except json.JSONDecodeError:
+                return False
+            return isinstance(parsed, int | float)
+
+        return False
 
     @staticmethod
     def _validate_schema_definition(schema: dict[str, Any]) -> None:

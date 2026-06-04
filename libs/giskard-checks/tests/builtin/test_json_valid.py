@@ -19,6 +19,11 @@ from pydantic import ValidationError
         ("true", True),
         ("42", 42),
         ("hello", "hello"),
+        ("truth", "truth"),
+        ("falsehood", "falsehood"),
+        ("nullify", "nullify"),
+        ("123-apple", "123-apple"),
+        ("-infinity", "-infinity"),
     ],
 )
 async def test_valid_json_output_passes(outputs: Any, expected_parsed: Any) -> None:
@@ -38,6 +43,7 @@ async def test_valid_json_output_passes(outputs: Any, expected_parsed: Any) -> N
     [
         '{"name": "Alice"',
         "",
+        "   ",
     ],
 )
 async def test_invalid_json_string_fails(outputs: str) -> None:
