@@ -14,6 +14,7 @@ from .result import (
 )
 from .scenario import Scenario, Step
 from .testcase import TestCase
+from .trend import SuiteRunPoint, SuiteRunTrendAnalyzer, SuiteRunTrendReport, SuiteTrend
 from .types import Target
 
 __all__ = [
@@ -36,4 +37,8 @@ __all__ = [
     "TestCase",
     "InputGenerationException",
     "resolve",
+    "SuiteRunPoint",
+    "SuiteRunTrendAnalyzer",
+    "SuiteRunTrendReport",
+    "SuiteTrend",
 ]
