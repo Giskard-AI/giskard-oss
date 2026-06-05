@@ -27,6 +27,7 @@ from .fn import FnCheck, from_fn
 from .json_valid import JsonValid
 from .rego_policy import RegoPolicy
 from .semantic_similarity import SemanticSimilarity
+from .output_safety import XSSOutputCheck
 from .text_matching import RegexMatching, StringMatching
 
 __all__ = [
@@ -53,4 +54,5 @@ __all__ = [
     "Toxicity",
     "BaseLLMCheck",
     "LLMCheckResult",
+    "XSSOutputCheck",
 ]
