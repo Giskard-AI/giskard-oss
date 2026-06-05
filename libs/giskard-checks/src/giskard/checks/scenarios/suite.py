@@ -1,6 +1,6 @@
 import asyncio
 import time
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager, nullcontext
 from typing import Any, Generic, Self, TypeVar
 
@@ -23,7 +23,12 @@ from rich.text import Text
 
 from .._telemetry_props import suite_shape_properties
 from ..core.interaction import Trace
-from ..core.result import ScenarioResult, SuiteResult
+from ..core.result import (
+    STATUS_MAPPING,
+    ScenarioResult,
+    ScenarioStatus,
+    SuiteResult,
+)
 from ..core.scenario import Scenario
 from ..core.types import ProviderType
 
@@ -42,6 +47,77 @@ class _OverallOnly(ProgressColumn):
         if not task.fields.get("overall"):
             return Text("")
         return self._column.render(task)
+
+
+_STATUS_COUNT_LABELS: tuple[tuple[str, str], ...] = (
+    ("error", "errored"),
+    ("fail", "failed"),
+    ("skip", "skipped"),
+    ("pass", "passed"),
+)
+
+
+class _SuiteProgress(Progress):
+    """Progress display that appends a live status-count summary below the rows.
+
+    As scenarios finish, ``record`` tallies their outcomes and the overridden
+    ``get_renderables`` draws a colored ``errored, failed, skipped, passed`` line
+    under the task rows, mirroring the final suite summary.
+    """
+
+    def __init__(self, *columns: ProgressColumn, **kwargs: Any) -> None:
+        # Set before super().__init__(): it renders get_renderables(), which reads _counts.
+        self._counts: dict[str, int] = {"pass": 0, "fail": 0, "error": 0, "skip": 0}
+        self._overall_id: TaskID | None = None
+        super().__init__(*columns, **kwargs)
+
+    @property
+    def _overall(self) -> TaskID:
+        assert self._overall_id is not None, "overall task not started"
+        return self._overall_id
+
+    def start_overall(self, total: int) -> None:
+        self._overall_id = self.add_task("Running scenarios", total=total, overall=True)
+
+    def complete_overall(self, total: int) -> None:
+        self.update(self._overall, completed=total)
+        self.refresh()
+
+    def describe(self, text: str) -> None:
+        self.update(self._overall, description=text)
+
+    def record(self, status: ScenarioStatus) -> None:
+        """Tally one finished scenario and advance the overall bar."""
+        self._counts[status.value] += 1
+        if self._overall_id is not None:
+            self.advance(self._overall_id)
+
+    @contextmanager
+    def scenario_row(self, name: str) -> Iterator[None]:
+        """Show a row for one scenario while it runs, then remove it."""
+        task_id = self.add_task(f"  ↳ {name}", total=None)
+        try:
+            yield
+        finally:
+            self.remove_task(task_id)
+
+    def _summary_renderable(self) -> Text | None:
+        """Colored counts line, or ``None`` until at least one scenario has finished."""
+        parts = [
+            f"[{STATUS_MAPPING[key]['color']} bold]{self._counts[key]} {label}"
+            f"[/{STATUS_MAPPING[key]['color']} bold]"
+            for key, label in _STATUS_COUNT_LABELS
+            if self._counts[key]
+        ]
+        if not parts:
+            return None
+        return Text.from_markup("  " + ", ".join(parts))
+
+    def get_renderables(self) -> Iterable[RenderableType]:
+        yield self.make_tasks_table(self.tasks)
+        summary = self._summary_renderable()
+        if summary is not None:
+            yield summary
 
 
 class Suite(BaseModel, Generic[InputType, OutputType]):
@@ -208,9 +284,9 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         return suite_result
 
     @contextmanager
-    def _progress_bar(self, enabled: bool) -> Iterator[tuple[Progress, TaskID]]:
-        """Yield ``(progress, task_id)``; disabled when ``enabled`` is False so calls are no-ops."""
-        with Progress(
+    def _progress_bar(self, enabled: bool) -> Iterator[_SuiteProgress]:
+        """Yield a progress tracker; a disabled no-op display when ``enabled`` is False."""
+        with _SuiteProgress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             _OverallOnly(BarColumn()),
@@ -218,27 +294,24 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             TimeElapsedColumn(),
             disable=not enabled,
         ) as progress:
-            task_id = progress.add_task(
-                "Running scenarios", total=len(self.scenarios), overall=True
-            )
-            yield progress, task_id
-            progress.update(task_id, completed=len(self.scenarios))
-            progress.refresh()
+            progress.start_overall(len(self.scenarios))
+            yield progress
+            progress.complete_overall(len(self.scenarios))
 
     async def _run_serial(
         self,
         target: Any,
         return_exception: bool,
-        tracker: tuple[Progress, TaskID],
+        progress: _SuiteProgress,
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
-        progress, overall_id = tracker
         results: list[ScenarioResult[Trace[Any, Any]]] = []
         for scenario in self.scenarios:
-            progress.update(overall_id, description=f"Running: {scenario.name}")
-            results.append(
-                await scenario.run(target=target, return_exception=return_exception)
+            progress.describe(f"Running: {scenario.name}")
+            result = await scenario.run(
+                target=target, return_exception=return_exception
             )
-            progress.advance(overall_id)
+            results.append(result)
+            progress.record(result.status)
         return results
 
     async def _run_parallel(
@@ -246,26 +319,21 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         target: Any,
         return_exception: bool,
         max_concurrency: int | None,
-        tracker: tuple[Progress, TaskID],
+        progress: _SuiteProgress,
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
         semaphore = (
             asyncio.Semaphore(max_concurrency) if max_concurrency else nullcontext()
         )
-        progress, overall_id = tracker
 
         async def run_scenario(
             scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
         ) -> ScenarioResult[Trace[Any, Any]]:
             async with semaphore:
-                # Show a row per scenario while it runs, so all in-flight ones appear.
-                sub_id = progress.add_task(f"  ↳ {scenario.name}", total=None)
-                try:
+                with progress.scenario_row(scenario.name):
                     result = await scenario.run(
                         target=target, return_exception=return_exception
                     )
-                finally:
-                    progress.remove_task(sub_id)
-                progress.advance(overall_id)
+                progress.record(result.status)
             return result
 
         try:

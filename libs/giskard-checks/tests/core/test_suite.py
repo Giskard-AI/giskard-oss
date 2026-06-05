@@ -4,7 +4,8 @@ from contextlib import nullcontext
 
 import pytest
 from giskard.checks import Equals, Scenario, Suite
-from giskard.checks.scenarios.suite import _OverallOnly
+from giskard.checks.core.result import ScenarioStatus
+from giskard.checks.scenarios.suite import _OverallOnly, _SuiteProgress
 from rich.progress import MofNCompleteColumn, Progress
 
 
@@ -342,3 +343,59 @@ async def test_suite_parallel_progress_shows_a_row_per_scenario(monkeypatch):
 
     assert "  ↳ alpha" in rows
     assert "  ↳ beta" in rows
+
+
+def test_progress_summary_shows_all_nonzero_counts_in_order():
+    """The live summary line lists errored, failed, skipped, passed in that order."""
+    progress = _SuiteProgress(disable=True)
+    for _ in range(19):
+        progress.record(ScenarioStatus.PASS)
+    for _ in range(5):
+        progress.record(ScenarioStatus.FAIL)
+    for _ in range(2):
+        progress.record(ScenarioStatus.SKIP)
+    progress.record(ScenarioStatus.ERROR)
+
+    summary = progress._summary_renderable()
+    assert summary is not None
+    assert summary.plain.strip() == "1 errored, 5 failed, 2 skipped, 19 passed"
+
+
+def test_progress_summary_omits_zero_counts():
+    """Statuses with no occurrences are not shown."""
+    progress = _SuiteProgress(disable=True)
+    for _ in range(3):
+        progress.record(ScenarioStatus.PASS)
+    progress.record(ScenarioStatus.FAIL)
+
+    summary = progress._summary_renderable()
+    assert summary is not None
+    assert summary.plain.strip() == "1 failed, 3 passed"
+
+
+def test_progress_summary_absent_before_any_scenario_completes():
+    """No summary line until at least one scenario has finished."""
+    progress = _SuiteProgress(disable=True)
+    assert progress._summary_renderable() is None
+
+
+@pytest.mark.asyncio
+async def test_suite_progress_records_each_scenario_outcome(monkeypatch):
+    """Each finished scenario feeds its status into the live counts, in order."""
+    recorded = []
+    monkeypatch.setattr(
+        _SuiteProgress, "record", lambda self, status: recorded.append(status)
+    )
+
+    passing = Scenario("s1").interact("a", "a")
+    failing = (
+        Scenario("s2")
+        .interact("b", "c")
+        .check(Equals(expected_value="b", key="trace.last.outputs"))
+    )
+    suite = Suite(name="record_suite")
+    suite.append(passing).append(failing)
+
+    await suite.run()
+
+    assert recorded == [ScenarioStatus.PASS, ScenarioStatus.FAIL]
