@@ -1,10 +1,13 @@
 import importlib
 import sys
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
+
+_import_lock = threading.Lock()
 
 _REFERENCE_PATH: ContextVar[Path | None] = ContextVar(
     "giskard_checks_reference_path", default=None
@@ -72,13 +75,6 @@ def _module_belongs_to_search_path(module: Any, search_path: str) -> bool:
     return Path(module_file).resolve().is_relative_to(Path(search_path))
 
 
-def _module_belongs_to_search_paths(module: Any, search_paths: list[str]) -> bool:
-    return any(
-        _module_belongs_to_search_path(module, search_path)
-        for search_path in search_paths
-    )
-
-
 def _module_exists_in_search_path(module_name: str, search_path: str) -> bool:
     module_parts = module_name.split(".")
     module_root = Path(search_path).resolve().joinpath(*module_parts)
@@ -123,29 +119,30 @@ def resolve_python_reference(value: str, *, path: Path | None = None) -> Any:
         )
 
     search_paths = _module_search_paths(path)
-    original_sys_path = sys.path[:]
-    try:
-        for search_path in reversed(search_paths):
-            if search_path not in sys.path:
-                sys.path.insert(0, search_path)
+    with _import_lock:
+        original_sys_path = sys.path[:]
+        try:
+            for search_path in reversed(search_paths):
+                if search_path not in sys.path:
+                    sys.path.insert(0, search_path)
 
-        cached_module = sys.modules.get(module_name)
-        if cached_module is not None and search_paths:
-            preferred_search_path = search_paths[0]
-            if _module_exists_in_search_path(module_name, preferred_search_path):
-                if not _module_belongs_to_search_path(
-                    cached_module, preferred_search_path
-                ):
-                    sys.modules.pop(module_name, None)
+            cached_module = sys.modules.get(module_name)
+            if cached_module is not None and search_paths:
+                preferred_search_path = search_paths[0]
+                if _module_exists_in_search_path(module_name, preferred_search_path):
+                    if not _module_belongs_to_search_path(
+                        cached_module, preferred_search_path
+                    ):
+                        sys.modules.pop(module_name, None)
 
-        importlib.invalidate_caches()
-        module = importlib.import_module(module_name)
-    except ModuleNotFoundError as exc:
-        raise ValueError(
-            f"Could not import module '{module_name}' for Python reference '{value}': {exc}"
-        ) from exc
-    finally:
-        sys.path[:] = original_sys_path
+            importlib.invalidate_caches()
+            module = importlib.import_module(module_name)
+        except ModuleNotFoundError as exc:
+            raise ValueError(
+                f"Could not import module '{module_name}' for Python reference '{value}': {exc}"
+            ) from exc
+        finally:
+            sys.path[:] = original_sys_path
 
     try:
         return getattr(module, attribute_path)

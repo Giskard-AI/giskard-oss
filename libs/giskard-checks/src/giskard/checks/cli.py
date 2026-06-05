@@ -10,8 +10,6 @@ from pydantic import TypeAdapter, ValidationError
 from rich.console import Console
 from rich.table import Table
 
-from giskard.core.discriminated import _REGISTRY
-
 from . import builtin, judges, testing  # noqa: F401
 from .core.check import Check
 from .core.importing import python_reference_path
@@ -157,8 +155,11 @@ def _write_text_output(output: str, path: Path | None) -> None:
         print(output)
         return
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(output, encoding="utf-8")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(output, encoding="utf-8")
+    except OSError as exc:
+        raise CliError(f"Failed to write output to {path}: {exc}") from exc
 
 
 def _result_exit_code(result: ScenarioResult[Any] | SuiteResult) -> int:
@@ -260,9 +261,7 @@ def _validate_command(args: argparse.Namespace) -> int:
 
 
 def _iter_registered_checks() -> list[tuple[str, type[Any]]]:
-    metadata = getattr(Check, "__pydantic_generic_metadata__", {})
-    origin = metadata.get("origin") or Check
-    registered = dict(_REGISTRY._reverse_kinds.get(origin, {}))
+    registered = Check.list_registered_types()
     checks = [
         (kind, cls)
         for kind, cls in registered.items()
