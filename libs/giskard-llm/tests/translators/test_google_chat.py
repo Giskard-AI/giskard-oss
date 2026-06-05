@@ -6,7 +6,10 @@ Content shape: https://ai.google.dev/api/generate-content#Content
 from typing import Literal
 
 import pytest
-from giskard.llm.translators.google_chat import GoogleChatTranslator
+from giskard.llm.translators.google_chat import (
+    _SKIP_THOUGHT_SIGNATURE,
+    GoogleChatTranslator,
+)
 from giskard.llm.types import (
     AssistantMessage,
     ChatMessage,
@@ -15,6 +18,8 @@ from giskard.llm.types import (
     RefusalContent,
     SystemMessage,
     TextContent,
+    ToolCall,
+    ToolCallFunction,
     UserMessage,
 )
 
@@ -33,7 +38,7 @@ from .tool_turn_fixtures import (
     user_two_parallel_tool_calls_two_results,
 )
 
-_MODEL = "gemini-2.0-flash"
+_MODEL = "gemini-3.5-flash"
 
 
 def test_single_user_message():
@@ -225,7 +230,8 @@ def test_user_tool_call_and_result_with_tools():
                     "function_call": {
                         "name": "get_weather",
                         "args": {"city": "Paris"},
-                    }
+                    },
+                    "thought_signature": _SKIP_THOUGHT_SIGNATURE,
                 }
             ],
         },
@@ -280,13 +286,15 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
                     "function_call": {
                         "name": "get_weather",
                         "args": {"city": "Paris"},
-                    }
+                    },
+                    "thought_signature": _SKIP_THOUGHT_SIGNATURE,
                 },
                 {
                     "function_call": {
                         "name": "get_local_time",
                         "args": {"timezone": "Asia/Tokyo"},
-                    }
+                    },
+                    "thought_signature": _SKIP_THOUGHT_SIGNATURE,
                 },
             ],
         },
@@ -353,13 +361,15 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
                     "function_call": {
                         "name": "get_weather",
                         "args": {"city": "Paris"},
-                    }
+                    },
+                    "thought_signature": _SKIP_THOUGHT_SIGNATURE,
                 },
                 {
                     "function_call": {
                         "name": "get_local_time",
                         "args": {"timezone": "Asia/Tokyo"},
-                    }
+                    },
+                    "thought_signature": _SKIP_THOUGHT_SIGNATURE,
                 },
             ],
         },
@@ -382,6 +392,71 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
                         "name": "get_local_time",
                         "response": {"result": TOOL_RESULT_TIME_PARALLEL},
                     }
+                }
+            ],
+        },
+    ]
+    validate_google_contents(payload["contents"])
+
+
+def test_assistant_text_thought_signature_is_replayed():
+    """A captured text-part ``thought_signature`` is replayed verbatim."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="Hi."),
+        AssistantMessage(
+            content=[
+                TextContent(
+                    text="Thinking about it.",
+                    thought_signature=b"text-signature-bytes",
+                )
+            ],
+        ),
+    ]
+    payload = GoogleChatTranslator.to_google(_MODEL, messages)
+    assert payload["contents"] == [
+        {"role": "user", "parts": [{"text": "Hi."}]},
+        {
+            "role": "model",
+            "parts": [
+                {
+                    "text": "Thinking about it.",
+                    "thought_signature": b"text-signature-bytes",
+                }
+            ],
+        },
+    ]
+    validate_google_contents(payload["contents"])
+
+
+def test_tool_call_thought_signature_is_replayed():
+    """A captured ``thought_signature`` is replayed verbatim, not the skip sentinel."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="What's the weather in Paris?"),
+        AssistantMessage(
+            tool_calls=[
+                ToolCall(
+                    id="call_weather_1",
+                    function=ToolCallFunction(
+                        name="get_weather",
+                        arguments={"city": "Paris"},
+                    ),
+                    thought_signature=b"real-signature-bytes",
+                )
+            ],
+        ),
+    ]
+    payload = GoogleChatTranslator.to_google(_MODEL, messages, tools=[WEATHER_TOOL])
+    assert payload["contents"] == [
+        {"role": "user", "parts": [{"text": "What's the weather in Paris?"}]},
+        {
+            "role": "model",
+            "parts": [
+                {
+                    "function_call": {
+                        "name": "get_weather",
+                        "args": {"city": "Paris"},
+                    },
+                    "thought_signature": b"real-signature-bytes",
                 }
             ],
         },

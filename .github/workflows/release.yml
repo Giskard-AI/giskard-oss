@@ -12,6 +12,7 @@ on:
           - giskard-llm
           - giskard-agents
           - giskard-checks
+          - giskard-scan
       bump_type:
         description: 'Version bump type'
         required: true

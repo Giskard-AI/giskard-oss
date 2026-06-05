@@ -3,6 +3,7 @@ from typing import Any, override
 
 import pytest
 from giskard import agents
+from giskard.agents.errors.workflow_errors import ModelRefusalError
 from giskard.agents.generators import BaseGenerator, GenerationParams
 from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
 from pydantic import BaseModel, Field, ValidationError
@@ -240,3 +241,73 @@ async def test_output_model_zero_retries():
 
     # Should have made exactly 1 attempt
     assert generator.call_count == 1
+
+
+class RefusalGenerator(BaseGenerator):
+    """Returns a refusal response; finish_reason controls which detection path triggers."""
+
+    refusal_text: str = "I can't help with that."
+    finish_reason: str = "refusal"
+
+    @override
+    async def _call_model(
+        self,
+        messages: Sequence[ChatMessage],
+        params: GenerationParams,
+        metadata: dict[str, Any] | None = None,
+    ) -> CompletionResponse:
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(refusal=self.refusal_text),
+                    finish_reason=self.finish_reason,
+                    index=0,
+                )
+            ]
+        )
+
+
+async def test_refusal_finish_reason_wraps_model_refusal_error():
+    """finish_reason='refusal' surfaces as WorkflowError whose cause is ModelRefusalError."""
+    workflow = agents.ChatWorkflow(generator=RefusalGenerator())
+
+    with pytest.raises(agents.errors.WorkflowError) as exc_info:
+        await (
+            workflow.chat("Generate something.", role="user")
+            .with_output(DummyOutputModel, strict=True, num_retries=0)
+            .run()
+        )
+
+    assert isinstance(exc_info.value.exception, ModelRefusalError)
+
+
+async def test_refusal_message_field_wraps_model_refusal_error():
+    """message.refusal set (without finish_reason='refusal') also raises ModelRefusalError."""
+    workflow = agents.ChatWorkflow(generator=RefusalGenerator(finish_reason="stop"))
+
+    with pytest.raises(agents.errors.WorkflowError) as exc_info:
+        await (
+            workflow.chat("Generate something.", role="user")
+            .with_output(DummyOutputModel, strict=True, num_retries=0)
+            .run()
+        )
+
+    assert isinstance(exc_info.value.exception, ModelRefusalError)
+
+
+async def test_model_refusal_error_carries_refusal_text():
+    """The model's refusal message is preserved on the ModelRefusalError."""
+    refusal_msg = "I cannot assist with this request."
+    workflow = agents.ChatWorkflow(generator=RefusalGenerator(refusal_text=refusal_msg))
+
+    with pytest.raises(agents.errors.WorkflowError) as exc_info:
+        await (
+            workflow.chat("Generate something.", role="user")
+            .with_output(DummyOutputModel, strict=True, num_retries=0)
+            .run()
+        )
+
+    err = exc_info.value.exception
+    assert isinstance(err, ModelRefusalError)
+    assert err.refusal == refusal_msg
+    assert refusal_msg in str(err)

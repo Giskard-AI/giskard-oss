@@ -35,18 +35,25 @@ Provider-specific kwargs:
     - ``base_url``: Azure AI Foundry **resource endpoint** URL (typically
       ``https://<resource>.services.ai.azure.com``). If callers still pass a URL
       that only appends legacy ``/models``, that suffix is stripped for Foundry hosts.
+    - ``timeout``: request timeout in seconds
+    - ``http_client``: caller-owned async HTTP client passed to the SDK; not closed by giskard-llm
+    - ``default_headers``: extra headers merged into every SDK request
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false, reportMissingSuperCall=false
 
 import logging
 import os
-from typing import Any
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse, urlunparse
 
 from ..errors import ProviderNotAvailableError
 from ..utils import compact
 from .openai import OpenAIProvider
+
+if TYPE_CHECKING:
+    from httpx import AsyncClient
 
 logger = logging.getLogger(__name__)
 
@@ -85,16 +92,19 @@ class AzureAIProvider(OpenAIProvider):
         api_key: str | None = None,
         base_url: str | None = None,
         timeout: float | None = None,
+        http_client: "AsyncClient | None" = None,
+        default_headers: Mapping[str, str] | None = None,
         **_kwargs: Any,
     ) -> None:
-        if _kwargs:
-            logger.warning(
-                "%s provider: ignoring unknown kwargs: %s", PROVIDER, sorted(_kwargs)
-            )
         try:
             import openai
         except ImportError as exc:
             raise ProviderNotAvailableError(PROVIDER, "openai", extra="azure") from exc
+
+        if _kwargs:
+            logger.warning(
+                "%s provider: ignoring unknown kwargs: %s", PROVIDER, sorted(_kwargs)
+            )
 
         resolved_key = api_key or os.environ.get("AZURE_AI_API_KEY")
         resolved_endpoint = _normalize_azure_ai_endpoint(
@@ -108,5 +118,7 @@ class AzureAIProvider(OpenAIProvider):
                 azure_endpoint=resolved_endpoint,
                 api_version=resolved_version,
                 timeout=timeout,
+                http_client=http_client,
+                default_headers=default_headers,
             )
         )

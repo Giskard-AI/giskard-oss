@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field, ValidationError
 from .chat import Chat
 from .context import RunContext
 from .errors.serializable import Error
-from .errors.workflow_errors import WorkflowError
+from .errors.workflow_errors import ModelRefusalError, WorkflowError
 from .generators import BaseGenerator, GenerationParams
 from .templates import MessageTemplate, PromptsManager, get_prompts_manager
 from .tools.tool import Tool
@@ -222,10 +222,15 @@ class _StepRunner:
         if response.choices[0].message.tool_calls:
             return response.choices[0].message
 
-        # Attempt the parsing to raise ValidationError if output is not compatible
-        output_model.model_validate_json(response.choices[0].message.text or "")
+        # If the model refused to generate content, raise a ModelRefusalError
+        choice = response.choices[0]
+        if choice.finish_reason == "refusal" or choice.message.is_refusal:
+            raise ModelRefusalError(refusal=choice.message.text)
 
-        return response.choices[0].message
+        # Attempt the parsing to raise ValidationError if output is not compatible
+        output_model.model_validate_json(choice.message.text or "")
+
+        return choice.message
 
 
 class ChatWorkflow(BaseModel, Generic[OutputType]):
