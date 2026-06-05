@@ -1,0 +1,5 @@
+{
+  "name": "custom_trace_test",
+  "trace_type": "python:trace_types.CustomTrace",
+  "steps": []
+}

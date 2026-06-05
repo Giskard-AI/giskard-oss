@@ -17,12 +17,18 @@ dependencies = [
     "rich>=14.2.0,<16",
 ]
 
+[project.scripts]
+giskard = "giskard.checks.cli:main"
+
 [project.optional-dependencies]
 readability = [
     "textstat>=0.7.0",
 ]
 regorus = ["celine-regorus>=0.9.1"]
-all = ["giskard-checks[regorus]"] # Install all optional dependencies
+yaml = [
+    "pyyaml>=6.0.2,<7",
+]
+all = ["giskard-checks[regorus,yaml]"] # Install all optional dependencies
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]

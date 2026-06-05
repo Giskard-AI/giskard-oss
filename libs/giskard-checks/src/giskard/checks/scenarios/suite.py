@@ -5,7 +5,7 @@ from contextlib import contextmanager, nullcontext
 from typing import Any, Generic, Self, TypeVar
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 from pydantic.experimental.missing_sentinel import MISSING
 from rich.console import RenderableType
 from rich.progress import (
@@ -21,6 +21,7 @@ from rich.progress import (
 )
 from rich.text import Text
 
+from ..core.importing import resolve_python_reference, validation_reference_path
 from .._telemetry_props import suite_shape_properties
 from ..core.interaction import Trace
 from ..core.result import (
@@ -138,6 +139,34 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         default=MISSING,
         description="Suite-level target SUT that will override any scenario-level target.",
     )
+
+    @field_validator("target", mode="before")
+    @classmethod
+    def _load_target_reference(cls, value: Any, info: ValidationInfo) -> Any:
+        """Resolve a ``python:module.symbol`` string into a callable target.
+
+        Parameters
+        ----------
+        value : Any
+            The raw field value from deserialisation. Passed through unchanged
+            unless it is a ``str`` beginning with ``python:``.
+        info : ValidationInfo
+            Pydantic validation context. When a ``"path"`` key is present the
+            corresponding ``Path`` is used as the definition-file location for
+            module resolution.
+
+        Returns
+        -------
+        Any
+            The resolved callable, or *value* unchanged when it is not a string.
+        """
+        if not isinstance(value, str):
+            return value
+
+        path = validation_reference_path(
+            info.context.get("path") if isinstance(info.context, dict) else None
+        )
+        return resolve_python_reference(value, path=path)
 
     def append(
         self,

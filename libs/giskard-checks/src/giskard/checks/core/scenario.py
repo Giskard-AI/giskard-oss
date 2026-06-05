@@ -1,9 +1,10 @@
 from typing import Any, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 from pydantic.experimental.missing_sentinel import MISSING
 
 from .check import Check
+from .importing import resolve_python_reference, validation_reference_path
 from .input_generator import InputGenerator
 from .interaction import Interact, InteractionSpec, Trace
 from .result import ScenarioResult
@@ -122,6 +123,62 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         default_factory=list,
         description="Flat 'Key:Value' labels for grouping and Hub upload alignment.",
     )
+
+    @field_validator("target", mode="before")
+    @classmethod
+    def _load_target_reference(cls, value: Any, info: ValidationInfo) -> Any:
+        """Resolve a ``python:module.symbol`` string into a callable target.
+
+        Parameters
+        ----------
+        value : Any
+            The raw field value from deserialisation. Passed through unchanged
+            unless it is a ``str`` beginning with ``python:``.
+        info : ValidationInfo
+            Pydantic validation context. When a ``"path"`` key is present the
+            corresponding ``Path`` is used as the definition-file location for
+            module resolution.
+
+        Returns
+        -------
+        Any
+            The resolved callable, or *value* unchanged when it is not a string.
+        """
+        if not isinstance(value, str):
+            return value
+
+        path = validation_reference_path(
+            info.context.get("path") if isinstance(info.context, dict) else None
+        )
+        return resolve_python_reference(value, path=path)
+
+    @field_validator("trace_type", mode="before")
+    @classmethod
+    def _load_trace_type_reference(cls, value: Any, info: ValidationInfo) -> Any:
+        """Resolve a ``python:module.symbol`` string into a trace type class.
+
+        Parameters
+        ----------
+        value : Any
+            The raw field value from deserialisation. Passed through unchanged
+            unless it is a ``str`` beginning with ``python:``.
+        info : ValidationInfo
+            Pydantic validation context. When a ``"path"`` key is present the
+            corresponding ``Path`` is used as the definition-file location for
+            module resolution.
+
+        Returns
+        -------
+        Any
+            The resolved class, or *value* unchanged when it is not a string.
+        """
+        if not isinstance(value, str):
+            return value
+
+        path = validation_reference_path(
+            info.context.get("path") if isinstance(info.context, dict) else None
+        )
+        return resolve_python_reference(value, path=path)
 
     def __init__(
         self,

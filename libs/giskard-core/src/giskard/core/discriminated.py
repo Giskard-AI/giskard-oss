@@ -89,6 +89,32 @@ class Discriminated(BaseModel):
         return decorator
 
     @classmethod
+    def list_registered_kinds(cls) -> tuple[str, ...]:
+        """Return registered discriminator kinds for this discriminated base.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Sorted tuple of kind strings registered under this base class.
+        """
+        metadata = getattr(cls, "__pydantic_generic_metadata__", {})
+        origin = metadata.get("origin") or cls
+        return tuple(sorted(_REGISTRY._reverse_kinds.get(origin, {})))
+
+    @classmethod
+    def list_registered_types(cls) -> dict[str, type[Any]]:
+        """Return registered discriminator kinds and their concrete types.
+
+        Returns
+        -------
+        dict[str, type[Any]]
+            Mapping of kind string to concrete subclass for this base class.
+        """
+        metadata = getattr(cls, "__pydantic_generic_metadata__", {})
+        origin = metadata.get("origin") or cls
+        return dict(_REGISTRY._reverse_kinds.get(origin, {}))
+
+    @classmethod
     def __get_pydantic_core_schema__(
         cls, source: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:

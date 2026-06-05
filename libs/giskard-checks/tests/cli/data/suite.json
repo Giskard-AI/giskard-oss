@@ -1,0 +1,26 @@
+{
+  "name": "cli_suite",
+  "target": "python:targets.echo",
+  "scenarios": [
+    {
+      "name": "suite_case",
+      "steps": [
+        {
+          "interacts": [
+            {
+              "kind": "interact",
+              "inputs": "hello"
+            }
+          ],
+          "checks": [
+            {
+              "kind": "equals",
+              "key": "trace.last.outputs",
+              "expected_value": "hello"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
