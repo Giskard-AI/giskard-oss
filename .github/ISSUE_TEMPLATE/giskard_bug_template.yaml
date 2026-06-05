@@ -33,7 +33,7 @@ body:
     id: giskard-lib-version
     attributes:
       label: Giskard Library Version
-      description: You can  obtain the Giskard library version with `python -c "import giskard ; print(giskard.__version__)"`
+      description: You can obtain the Giskard library version with `python -c "import giskard.checks; print(giskard.checks.__version__)"`
       placeholder: e.g., 3.0.0a1
     validations:
       required: true

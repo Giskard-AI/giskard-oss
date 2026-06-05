@@ -1,7 +1,13 @@
 """Public package exports for giskard.checks."""
 
 import os
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+try:
+    __version__ = version("giskard-checks")
+except PackageNotFoundError:
+    __version__ = "unknown"
 
 from giskard.agents import add_prompts_path
 
