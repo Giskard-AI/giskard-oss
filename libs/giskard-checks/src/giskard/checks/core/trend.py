@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
@@ -144,6 +144,10 @@ class SuiteRunTrendAnalyzer:
     ) -> None:
         if window < 2:
             raise ValueError("window must be >= 2 (OLS requires at least two points)")
+        if regression_threshold >= improvement_threshold:
+            raise ValueError(
+                "regression_threshold must be strictly less than improvement_threshold"
+            )
         self.window = window
         self.regression_threshold = regression_threshold
         self.improvement_threshold = improvement_threshold
@@ -164,7 +168,7 @@ class SuiteRunTrendAnalyzer:
             Optional wall-clock time for this run.  When omitted,
             ``datetime.now(UTC)`` is used.
         """
-        self._runs.append((result, timestamp or datetime.now(UTC)))
+        self._runs.append((result, timestamp or datetime.now(timezone.utc)))
 
     def analyze(self) -> SuiteRunTrendReport:
         """Compute OLS trend over the most recent *window* runs.
