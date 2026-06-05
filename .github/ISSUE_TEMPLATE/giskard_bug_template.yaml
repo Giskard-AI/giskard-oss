@@ -33,7 +33,7 @@ body:
     id: giskard-lib-version
     attributes:
       label: Giskard Library Version
-      description: For pip/uv installs, run `python -c "import importlib.metadata as m; print(m.version('giskard'))"`; for source check the version in `pyproject.toml`.
+      description: For pip installs, run `pip show giskard`; for uv installs, run `uv pip show giskard`; for source check the version in `pyproject.toml`.
       placeholder: e.g., 3.0.0a1
     validations:
       required: true
