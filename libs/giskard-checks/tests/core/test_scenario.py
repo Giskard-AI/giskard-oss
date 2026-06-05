@@ -779,7 +779,7 @@ class TestScenarioErrorHandling:
         assert result.errored
 
     async def test_generator_raises_exception_after_yield(self):
-        """Test that generator exceptions from InteractionSpec propagate."""
+        """Test that generator exceptions from InteractionSpec propagate by default."""
         check1 = MockCheck(result=CheckResult.success(message="Check 1"))
         generator_error_component = GeneratorErrorComponent()
         check2 = MockCheck(result=CheckResult.success(message="Check 2"))
@@ -794,6 +794,31 @@ class TestScenarioErrorHandling:
                 .check(check2)
                 .run()
             )
+
+    async def test_generator_exception_returns_error_result(self):
+        """Test that generator exceptions become error results when requested."""
+        check1 = MockCheck(result=CheckResult.success(message="Check 1"))
+        generator_error_component = GeneratorErrorComponent()
+        check2 = MockCheck(result=CheckResult.success(message="Check 2"))
+
+        result = await (
+            Scenario("generator_exception")
+            .check(check1)
+            .add_interaction(generator_error_component)
+            .check(check2)
+            .run(return_exception=True)
+        )
+
+        assert len(result.steps) == 2
+        assert result.steps[0].passed
+        assert result.steps[1].errored
+        error = result.steps[1].results[0]
+        assert error.message == "Input generation failed with error: Generator error"
+        assert error.details["check_name"] == "Input generation"
+        assert error.details["exception_type"] == "RuntimeError"
+        assert error.details["phase"] == "input_generation"
+        assert "Generator error" in error.details["traceback"]
+        assert result.errored
 
     async def test_all_executed_results_collected(self):
         """Test that all checks in a step are executed and results collected."""

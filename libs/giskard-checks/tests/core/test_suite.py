@@ -229,6 +229,37 @@ async def test_suite_parallel_fail_fast_when_return_exception_is_false():
 
 
 @pytest.mark.asyncio
+async def test_suite_records_input_generation_errors_when_return_exception_is_true():
+    async def flaky_target(inputs):
+        if inputs == "boom":
+            raise RuntimeError("boom")
+        return inputs
+
+    suite = Suite(name="input_generation_error_suite", target=flaky_target)
+    suite.append(Scenario("boom").interact("boom"))
+    suite.append(
+        Scenario("ok")
+        .interact("ok")
+        .check(Equals(expected_value="ok", key="trace.last.outputs"))
+    )
+
+    result = await suite.run(return_exception=True)
+
+    assert len(result.results) == 2
+    assert result.results[0].errored
+    assert result.results[0].steps[0].results[0].message == (
+        "Input generation failed with error: boom"
+    )
+    assert result.results[0].steps[0].results[0].details["check_name"] == (
+        "Input generation"
+    )
+    assert result.results[0].steps[0].results[0].details["exception_type"] == (
+        "RuntimeError"
+    )
+    assert result.results[1].passed
+
+
+@pytest.mark.asyncio
 async def test_suite_parallel_telemetry_includes_flag(monkeypatch):
     events = []
 
