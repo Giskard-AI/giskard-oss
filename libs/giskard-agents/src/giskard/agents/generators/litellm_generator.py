@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast, override
 
 from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
+from giskard.llm.utils import sanitize_schema_name
 from pydantic import Field
 
 from ..tools import Tool
@@ -35,6 +36,13 @@ def _import_litellm() -> Any:
             "LiteLLMGenerator requires the optional 'litellm' dependency. "
             "Install it with: pip install giskard-agents[litellm]"
         ) from exc
+
+
+def _sanitize_response_format_name(converted: dict[str, Any]) -> None:
+    """Sanitize ``converted['json_schema']['name']`` in place when present."""
+    json_schema = converted.get("json_schema")
+    if isinstance(json_schema, dict) and json_schema.get("name"):
+        json_schema["name"] = sanitize_schema_name(json_schema["name"])
 
 
 @CompletionMiddleware.register("litellm_retry")
@@ -98,6 +106,21 @@ class LiteLLMGenerator(BaseGenerator):
         data = raw if isinstance(raw, dict) else raw.model_dump()
         return AssistantMessage.model_validate(data)
 
+    def _normalize_response_format(
+        self, litellm: Any, wire_params: dict[str, Any]
+    ) -> None:
+        """Pre-convert ``response_format`` to litellm's wire dict with a safe name."""
+        response_format = wire_params.get("response_format")
+        if response_format is None:
+            return
+
+        converted = litellm.utils.type_to_response_format_param(response_format)
+        if not isinstance(converted, dict):
+            return
+
+        _sanitize_response_format_name(converted)
+        wire_params["response_format"] = converted
+
     @override
     async def _call_model(
         self,
@@ -113,6 +136,7 @@ class LiteLLMGenerator(BaseGenerator):
             wire_params["tools"] = wire_tools
         if metadata:
             wire_params["metadata"] = metadata
+        self._normalize_response_format(litellm, wire_params)
 
         raw = cast(
             "ModelResponse",
