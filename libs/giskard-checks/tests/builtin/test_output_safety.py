@@ -17,6 +17,8 @@ from pydantic import ValidationError
         "The capital of France is Paris.",
         "Here is a Python function: def add(a, b): return a + b",
         "Use <strong>bold</strong> and <em>italic</em> for emphasis.",
+        "online = True",
+        "onboarding_status = 'complete'",
         "",
         42,
         None,
@@ -54,7 +56,7 @@ async def test_clean_output_passes(outputs: object) -> None:
         ("x=eval;x('alert(1)')", "eval() call"),
         ("steal(document.cookie)", "document.cookie access"),
         ("var c = document  .  cookie;", "document.cookie access"),
-        ('src="data:text/html,<script>alert(1)</script>"', "data: URI with script"),
+        ('<img src="data:text/javascript,alert(1)">', "data: URI with script"),
     ],
 )
 async def test_xss_output_fails(outputs: str, expected_label: str) -> None:

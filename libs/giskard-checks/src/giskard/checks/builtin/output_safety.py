@@ -19,14 +19,26 @@ from ..core.result import CheckResult
 # XSS payload patterns — case-insensitive, covers the six main categories:
 # 1. Script tags
 # 2. javascript: URI scheme
-# 3. Event handler attributes (onerror=, onload=, onclick=, …)
+# 3. Event handler attributes restricted to a known HTML allowlist (avoids
+#    false positives on identifiers like `online`, `onboarding`, etc.)
 # 4. eval() calls
 # 5. document.cookie access
 # 6. data: URI with script content
+_HTML_EVENT_HANDLERS = (
+    "abort|blur|cancel|canplay|canplaythrough|change|click|close|contextmenu"
+    "|cuechange|dblclick|drag|dragend|dragenter|dragexit|dragleave|dragover"
+    "|dragstart|drop|durationchange|emptied|ended|error|focus|input|invalid"
+    "|keydown|keypress|keyup|load|loadeddata|loadedmetadata|loadend|loadstart"
+    "|message|mousedown|mouseenter|mouseleave|mousemove|mouseout|mouseover"
+    "|mouseup|wheel|pause|play|playing|progress|ratechange|reset|resize"
+    "|scroll|seeked|seeking|select|stalled|submit|suspend|timeupdate|toggle"
+    "|volumechange|waiting"
+)
+
 _XSS_PATTERNS: list[tuple[str, str]] = [
     (r"<script", "script tag"),
     (r"javascript\s*:", "javascript: URI"),
-    (r"on\w+\s*=", "event handler attribute"),
+    (rf"\bon(?:{_HTML_EVENT_HANDLERS})\s*=", "event handler attribute"),
     (r"\beval\s*\(", "eval() call"),
     (r"\bdocument\s*\.\s*cookie\b", "document.cookie access"),
     (r"data\s*:\s*[^,]*script", "data: URI with script"),
