@@ -21,7 +21,7 @@ def _load_scenarios(
 ) -> list[Scenario[str, Any, Trace[str, Any]]]:
     path = _DATA_DIR / f"{category.value}.jsonl"
     scenarios = []
-    with path.open(encoding="utf-8") as f:
+    with path.open() as f:
         for line in f:
             line = line.strip()
             if not line:
