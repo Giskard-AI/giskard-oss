@@ -197,7 +197,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
-        progress: bool = True,
+        verbose: bool = True,
     ) -> SuiteResult:
         """Run all scenarios in the suite.
 
@@ -214,7 +214,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             Max concurrent scenarios when ``parallel=True`` (positive int).
             ``None`` (default) is unbounded: all scenarios start at once, so the
             provider's rate limits become the effective cap.
-        progress : bool
+        verbose : bool
             If True (default), display a progress bar showing which scenario is
             currently running. Set to False for non-interactive environments.
 
@@ -255,7 +255,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             )
 
             start_time = time.perf_counter()
-            with self._progress_bar(enabled=progress) as tracker:
+            with self._progress_bar(enabled=verbose) as tracker:
                 if parallel:
                     results = await self._run_parallel(
                         target, return_exception, max_concurrency, tracker

@@ -316,14 +316,14 @@ def test_progress_counter_appears_only_on_the_overall_row():
 
 @pytest.mark.asyncio
 async def test_suite_progress_can_be_disabled(monkeypatch):
-    """`progress=False` builds a disabled bar so its calls are no-ops."""
+    """`verbose=False` builds a disabled bar so its calls are no-ops."""
     bars = []
     monkeypatch.setattr(Progress, "__enter__", lambda self: bars.append(self) or self)
 
     suite = Suite(name="progress_off_suite", target=lambda inputs: inputs)
     suite.append(Scenario("a").interact("a"))
 
-    await suite.run(progress=False)
+    await suite.run(verbose=False)
 
     assert bars[0].disable is True
 
