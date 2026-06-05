@@ -7,6 +7,7 @@ from giskard.checks import Equals, Scenario, Suite
 from giskard.checks.core.result import ScenarioStatus
 from giskard.checks.scenarios.suite import _OverallOnly, _SuiteProgress
 from rich.progress import MofNCompleteColumn, Progress
+from rich.text import Text
 
 
 @pytest.fixture
@@ -305,8 +306,12 @@ def test_progress_counter_appears_only_on_the_overall_row():
         scenario_id = progress.add_task("scenario", total=None)
         by_id = {task.id: task for task in progress.tasks}
 
-    assert column.render(by_id[overall_id]).plain == "1/3"
-    assert column.render(by_id[scenario_id]).plain == ""
+    overall = column.render(by_id[overall_id])
+    scenario = column.render(by_id[scenario_id])
+    assert isinstance(overall, Text)
+    assert isinstance(scenario, Text)
+    assert overall.plain == "1/3"
+    assert scenario.plain == ""
 
 
 @pytest.mark.asyncio
