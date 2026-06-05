@@ -1,7 +1,7 @@
 """Public package exports for giskard.checks."""
 
-import os
 from importlib.metadata import PackageNotFoundError, version
+import os
 from pathlib import Path
 
 try:
@@ -80,6 +80,7 @@ add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.checks")
 
 
 __all__ = [
+    "__version__",
     # Modules
     "builtin",
     "judges",

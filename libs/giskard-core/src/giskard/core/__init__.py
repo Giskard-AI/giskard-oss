@@ -6,6 +6,12 @@ definitions, configuration patterns, and serialization utilities.
 """
 
 import importlib.util
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("giskard-core")
+except PackageNotFoundError:
+    __version__ = "unknown"
 
 from .discriminated import Discriminated, discriminated_base
 from .errors import Error
@@ -39,6 +45,7 @@ if spec and spec.has_location:
     )
 
 __all__ = [
+    "__version__",
     # Discriminated unions
     "Discriminated",
     "discriminated_base",
