@@ -16,13 +16,14 @@ from giskard.agents.generators.litellm_generator import (
     LiteLLMRetryMiddleware,
     RetryPolicy,
 )
+from giskard.llm.types import UserMessageParam
 from pydantic import BaseModel
 
 litellm = pytest.importorskip("litellm")
 
 pytestmark = pytest.mark.litellm
 
-_USER_MESSAGE = [{"role": "user", "content": "Hi"}]
+_USER_MESSAGE: list[UserMessageParam] = [{"role": "user", "content": "Hi"}]
 
 
 def _make_litellm_response(content: str = "Mock response") -> Any:
