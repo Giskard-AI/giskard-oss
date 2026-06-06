@@ -1,7 +1,7 @@
 """Public package exports for giskard.checks."""
 
-from importlib.metadata import PackageNotFoundError, version
 import os
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 try:
