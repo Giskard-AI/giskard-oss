@@ -23,6 +23,7 @@ openai = ["giskard-llm[openai]>=1.0.0a1,<2"]
 google = ["giskard-llm[google]>=1.0.0a1,<2"]
 anthropic = ["giskard-llm[anthropic]>=1.0.0a1,<2"]
 litellm = ["litellm>=1.83.0,<2"]
+local-embeddings = ["sentence-transformers>=2.0,<4"]
 all = ["giskard-llm[all]>=1.0.0a1,<2"]
 
 [build-system]
@@ -46,6 +47,7 @@ markers = [
     "google: marks tests requiring the google-genai provider SDK",
     "anthropic: marks tests requiring the anthropic provider SDK",
     "litellm: marks tests requiring the optional litellm SDK",
+    "sentence_transformers: marks tests requiring the optional sentence-transformers SDK",
     "giskard_llm: marks tests requiring the giskard-llm routing layer",
 ]
 
