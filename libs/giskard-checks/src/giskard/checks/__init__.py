@@ -9,6 +9,8 @@ from . import builtin, judges
 from .builtin import (
     AllOf,
     AnyOf,
+    ContainsAll,
+    ContainsAny,
     Equals,
     FnCheck,
     GreaterEquals,
@@ -116,6 +118,8 @@ __all__ = [
     "SemanticSimilarity",
     "Toxicity",
     "StringMatching",
+    "ContainsAny",
+    "ContainsAll",
     "RegexMatching",
     # Exceptions
     "InputGenerationException",

@@ -27,7 +27,7 @@ from .fn import FnCheck, from_fn
 from .json_valid import JsonValid
 from .rego_policy import RegoPolicy
 from .semantic_similarity import SemanticSimilarity
-from .text_matching import RegexMatching, StringMatching
+from .text_matching import ContainsAll, ContainsAny, RegexMatching, StringMatching
 
 __all__ = [
     "AllOf",
@@ -38,6 +38,8 @@ __all__ = [
     "JsonValid",
     "RegoPolicy",
     "StringMatching",
+    "ContainsAny",
+    "ContainsAll",
     "RegexMatching",
     "Equals",
     "NotEquals",

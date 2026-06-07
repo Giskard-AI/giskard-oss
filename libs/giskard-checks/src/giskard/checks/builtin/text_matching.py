@@ -2,6 +2,8 @@
 
 This module provides checks for text matching:
 - StringMatching: Literal substring matching with normalization
+- ContainsAny: List-based substring matching requiring at least one value
+- ContainsAll: List-based substring matching requiring every value
 - RegexMatching: Regular expression pattern matching
 """
 
@@ -316,6 +318,136 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
 
         return CheckResult.failure(
             message=f"The answer does not contain the keyword '{keyword}'",
+            details=details,
+        )
+
+
+class ListTextMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    TextBasedCheck[InputType, OutputType, TraceType], ABC
+):
+    """Base class for checks that compare text against a list of strings."""
+
+    values: list[str] = Field(
+        description="The string values to search for within the text.",
+    )
+    normalization_form: NormalizationForm | None = Field(
+        default="NFKC",
+        description="Unicode normalization form to apply (NFC, NFD, NFKC, NFKD). Defaults to NFKC.",
+    )
+    case_sensitive: bool = Field(
+        default=False,
+        description="If True, matching is case-sensitive. If False, all strings are lowercased before comparison.",
+    )
+
+    @model_validator(mode="after")
+    def validate_values(self) -> Self:
+        """Validate that values contains at least one string."""
+        if not self.values:
+            raise ValueError("'values' must contain at least one string.")
+
+        return self
+
+    def _format_str(self, value: str) -> str:
+        value = normalize_string(value, self.normalization_form)
+
+        if not self.case_sensitive:
+            value = value.lower()
+
+        return value
+
+    def _extract_text(
+        self, trace: TraceType
+    ) -> tuple[str, dict[str, Any]] | CheckResult:
+        text = provided_or_resolve(
+            trace, key=self.text_key, value=provide_not_none(self.text)
+        )
+        details: dict[str, Any] = {
+            "text": text,
+            "values": self.values,
+            "normalization_form": self.normalization_form,
+            "case_sensitive": self.case_sensitive,
+        }
+
+        if isinstance(text, NoMatch):
+            return CheckResult.failure(
+                message=f"No value found for text key '{self.text_key}'.",
+                details=details,
+            )
+
+        if not isinstance(text, str):
+            return CheckResult.failure(
+                message=f"Value for text is not a string, expected string but got {type(text).__name__}.",
+                details=details,
+            )
+
+        return text, details
+
+    def _match_values(self, text: str) -> tuple[list[str], list[str]]:
+        formatted_text = self._format_str(text)
+        matched = [
+            value for value in self.values if self._format_str(value) in formatted_text
+        ]
+        missing = [value for value in self.values if value not in matched]
+
+        return matched, missing
+
+
+@Check.register("contains_any")
+class ContainsAny[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    ListTextMatching[InputType, OutputType, TraceType]
+):
+    """Check that validates if text contains at least one string from a list."""
+
+    @override
+    async def run(self, trace: TraceType) -> CheckResult:
+        result = self._extract_text(trace)
+
+        if isinstance(result, CheckResult):
+            return result
+
+        text, details = result
+        matched, missing = self._match_values(text)
+        details["matched_values"] = matched
+        details["missing_values"] = missing
+
+        if matched:
+            return CheckResult.success(
+                message=f"The answer contains at least one expected value: '{matched[0]}'.",
+                details=details,
+            )
+
+        return CheckResult.failure(
+            message="The answer does not contain any expected values.",
+            details=details,
+        )
+
+
+@Check.register("contains_all")
+class ContainsAll[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    ListTextMatching[InputType, OutputType, TraceType]
+):
+    """Check that validates if text contains every string from a list."""
+
+    @override
+    async def run(self, trace: TraceType) -> CheckResult:
+        result = self._extract_text(trace)
+
+        if isinstance(result, CheckResult):
+            return result
+
+        text, details = result
+        matched, missing = self._match_values(text)
+        details["matched_values"] = matched
+        details["missing_values"] = missing
+
+        if not missing:
+            return CheckResult.success(
+                message="The answer contains all expected values.",
+                details=details,
+            )
+
+        return CheckResult.failure(
+            message=f"The answer is missing expected values: {', '.join(repr(value) for value in missing)}.",
             details=details,
         )
 

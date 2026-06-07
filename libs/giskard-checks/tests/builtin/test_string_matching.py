@@ -1,7 +1,14 @@
 """Tests for the StringMatching check."""
 
 import pytest
-from giskard.checks import CheckStatus, Interaction, StringMatching, Trace
+from giskard.checks import (
+    CheckStatus,
+    ContainsAll,
+    ContainsAny,
+    Interaction,
+    StringMatching,
+    Trace,
+)
 from giskard.checks.core.extraction import NoMatch
 
 
@@ -413,3 +420,100 @@ async def test_unicode_e_acute_no_normalization_fails() -> None:
     result = await check.run(Trace())
     # Without normalization, they should not match
     assert result.status == CheckStatus.FAIL
+
+
+async def test_contains_any_passes_when_one_value_matches() -> None:
+    check = ContainsAny(
+        text="Machine learning is a subset of artificial intelligence.",
+        values=["deep learning", "artificial intelligence"],
+    )
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["matched_values"] == ["artificial intelligence"]
+    assert result.details["missing_values"] == ["deep learning"]
+
+
+async def test_contains_any_fails_when_no_values_match() -> None:
+    check = ContainsAny(text="The answer discusses Python.", values=["Java", "Rust"])
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.FAIL
+    assert result.details["matched_values"] == []
+    assert result.details["missing_values"] == ["Java", "Rust"]
+
+
+async def test_contains_all_passes_when_every_value_matches() -> None:
+    check = ContainsAll(
+        text="The response includes definition, example, and caveat sections.",
+        values=["definition", "example", "caveat"],
+    )
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["matched_values"] == ["definition", "example", "caveat"]
+    assert result.details["missing_values"] == []
+
+
+async def test_contains_all_fails_when_one_value_is_missing() -> None:
+    check = ContainsAll(
+        text="The response includes a definition.", values=["definition", "example"]
+    )
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.FAIL
+    assert result.details["matched_values"] == ["definition"]
+    assert result.details["missing_values"] == ["example"]
+
+
+async def test_contains_checks_are_case_insensitive_by_default() -> None:
+    check = ContainsAny(text="Hello World", values=["world"])
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+
+
+async def test_contains_checks_support_case_sensitive_matching() -> None:
+    check = ContainsAny(text="Hello World", values=["world"], case_sensitive=True)
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.FAIL
+
+
+async def test_contains_checks_support_unicode_normalization() -> None:
+    check = ContainsAll(
+        text="Full-width Ａ and superscript ² are normalized.",
+        values=["A", "2"],
+        normalization_form="NFKC",
+    )
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+
+
+async def test_contains_checks_extract_text_with_jsonpath() -> None:
+    check = ContainsAll(
+        text_key="trace.last.outputs.answer",
+        values=["Paris", "France"],
+    )
+    interaction = Interaction(
+        inputs={"query": "Where is the Eiffel Tower?"},
+        outputs={"answer": "The Eiffel Tower is in Paris, France."},
+    )
+
+    result = await check.run(Trace(interactions=[interaction]))
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["text"] == "The Eiffel Tower is in Paris, France."
+
+
+async def test_contains_checks_reject_empty_values() -> None:
+    with pytest.raises(ValueError, match="'values' must contain at least one string"):
+        ContainsAny(text="Hello", values=[])
