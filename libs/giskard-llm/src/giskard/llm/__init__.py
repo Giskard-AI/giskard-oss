@@ -1,6 +1,6 @@
 """giskard-llm -- lightweight LLM routing over native provider SDKs."""
 
-from importlib.metadata import PackageNotFoundError, version
+from giskard.core.utils import get_lib_version
 
 from . import chat
 from .errors import (
@@ -35,10 +35,7 @@ from .types import (
     Usage,
 )
 
-try:
-    __version__ = version("giskard-llm")
-except PackageNotFoundError:
-    __version__ = "unknown"
+__version__ = get_lib_version("giskard-llm")
 
 __all__ = [
     "__version__",

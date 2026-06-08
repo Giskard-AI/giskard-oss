@@ -1,10 +1,10 @@
 """Public package exports for giskard.checks."""
 
 import os
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from giskard.agents import add_prompts_path
+from giskard.core.utils import get_lib_version
 
 from . import builtin, judges
 from .builtin import (
@@ -60,10 +60,7 @@ from .settings import get_default_generator, set_default_generator
 from .testing import WithSpy
 from .testing.runner import TestCaseRunner
 
-try:
-    __version__ = version("giskard-agents")
-except PackageNotFoundError:
-    __version__ = "unknown"
+__version__ = get_lib_version("giskard-agents")
 
 # Install rich.pretty for better REPL output (including Pydantic models)
 # Can be disabled by setting GISKARD_CHECKS_DISABLE_RICH_PRETTY=1

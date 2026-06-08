@@ -1,4 +1,4 @@
-from importlib.metadata import PackageNotFoundError, version
+from giskard.core.utils import get_lib_version
 
 from .chat import Chat
 from .context import RunContext
@@ -16,10 +16,7 @@ from .templates import (
 from .tools import Tool, tool
 from .workflow import ChatWorkflow, ErrorPolicy, StepType
 
-try:
-    __version__ = version("giskard-agents")
-except PackageNotFoundError:
-    __version__ = "unknown"
+__version__ = get_lib_version("giskard-agents")
 
 __all__ = [
     "__version__",

@@ -6,7 +6,6 @@ definitions, configuration patterns, and serialization utilities.
 """
 
 import importlib.util
-from importlib.metadata import PackageNotFoundError, version
 
 from .discriminated import Discriminated, discriminated_base
 from .errors import Error
@@ -22,7 +21,7 @@ from .telemetry import (
     telemetry_run_context,
     telemetry_tag,
 )
-from .utils import NOT_PROVIDED, NotProvided, provide_not_none
+from .utils import NOT_PROVIDED, NotProvided, get_lib_version, provide_not_none
 
 LEGACY_GISKARD_PACKAGE_NAME = "giskard"
 
@@ -39,10 +38,7 @@ if spec and spec.has_location:
         )
     )
 
-try:
-    __version__ = version("giskard-core")
-except PackageNotFoundError:
-    __version__ = "unknown"
+__version__ = get_lib_version("giskard-core")
 
 __all__ = [
     "__version__",

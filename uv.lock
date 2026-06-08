@@ -978,6 +978,7 @@ name = "giskard-llm"
 version = "1.0.0b3"
 source = { editable = "libs/giskard-llm" }
 dependencies = [
+    { name = "giskard-core" },
     { name = "pydantic" },
 ]
 
@@ -1003,6 +1004,7 @@ openai = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.40,<1" },
+    { name = "giskard-core", editable = "libs/giskard-core" },
     { name = "giskard-llm", extras = ["openai"], marker = "extra == 'azure'", editable = "libs/giskard-llm" },
     { name = "giskard-llm", extras = ["openai", "google", "anthropic"], marker = "extra == 'all'", editable = "libs/giskard-llm" },
     { name = "google-genai", marker = "extra == 'google'", specifier = ">=2.0,<3" },

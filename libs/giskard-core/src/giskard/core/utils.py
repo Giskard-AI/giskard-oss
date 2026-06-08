@@ -1,5 +1,6 @@
 """Utility constants and helpers for the Giskard library ecosystem."""
 
+from importlib.metadata import PackageNotFoundError, version
 from typing import Literal
 
 from pydantic import BaseModel
@@ -16,3 +17,10 @@ NOT_PROVIDED = NotProvided()
 
 def provide_not_none[T](value: T | None) -> T | NotProvided:
     return value if value is not None else NOT_PROVIDED
+
+
+def get_lib_version(lib: str, default: str = "unknown") -> str:
+    try:
+        return version(lib)
+    except PackageNotFoundError:
+        return default
