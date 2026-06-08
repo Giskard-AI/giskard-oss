@@ -39,7 +39,7 @@ async def test_google_multi_system_works():
         provider="google",
         api_key="os.environ/GOOGLE_API_KEY",  # pragma: allowlist secret
     )
-    model = os.getenv("TEST_GOOGLE_MODEL", "google/gemini-2.0-flash")
+    model = os.getenv("TEST_GOOGLE_MODEL", "google/gemini-3.5-flash")
     resp = await client.acompletion(model, _MULTI_SYSTEM_MESSAGES)
     assert resp.choices[0].message.content
 

@@ -17,6 +17,9 @@ dependencies = [
     "rich>=14.2.0,<16",
 ]
 
+[project.optional-dependencies]
+regorus = ["celine-regorus>=0.9.1"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]
 addopts = "--doctest-modules"
