@@ -12,6 +12,25 @@ from ..core.check import Check
 from ..core.result import CheckResult, TestCaseResult
 from ..core.testcase import TestCase
 
+_CHECK_PARAM_EXCLUDES = {
+    "kind",
+    "name",
+    "description",
+    "generator",
+    "embedding_model",
+    "checks",
+    "check",
+}
+
+
+def _check_params(check: Check) -> dict[str, object]:
+    params = check.model_dump(
+        mode="json",
+        exclude=_CHECK_PARAM_EXCLUDES,
+        exclude_none=True,
+    )
+    return {key: value for key, value in params.items() if value not in ({}, [])}
+
 
 async def _run_check[
     InputType,
@@ -47,6 +66,7 @@ async def _run_check[
                 "check_kind": check.kind,
                 "check_name": check.name,
                 "check_description": check.description,
+                "check_params": _check_params(check),
             }
         }
     )

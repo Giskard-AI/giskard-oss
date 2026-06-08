@@ -1,3 +1,4 @@
+import json
 from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar
@@ -44,6 +45,16 @@ def _pluralize(count: int, word: str, plural: str | None = None) -> str:
     if plural is None:
         plural = word + "s"
     return f"{count} {plural}"
+
+
+def _format_check_params(params: Any) -> str:
+    if not isinstance(params, dict) or not params:
+        return ""
+
+    return "\n".join(
+        f"{key}: {json.dumps(value, ensure_ascii=False, default=str)}"
+        for key, value in params.items()
+    )
 
 
 class CheckStatus(str, Enum):
@@ -193,18 +204,30 @@ class CheckResult(BaseResult, frozen=True):
         """Return True if `status` is `SKIP`."""
         return self.status == CheckStatus.SKIP
 
+    @property
+    def check_label(self) -> str:
+        return str(
+            self.details.get("check_name")
+            or self.details.get("check_kind")
+            or self.details.get("name")
+            or "Unnamed check"
+        )
+
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         status = STATUS_MAPPING[self.status]
 
-        name = self.details.get("check_name", "[dim italic]Unnamed check[/dim italic]")
+        name = self.check_label
 
         if self.status == CheckStatus.FAIL or self.status == CheckStatus.ERROR:
             details = (
                 self.message
                 or "[dim italic]No specific error message provided[/dim italic]"
             )
+            params = _format_check_params(self.details.get("check_params"))
+            if params:
+                details = f"{details}\n{params}"
         else:
             details = ""
 
@@ -416,11 +439,12 @@ class TestCaseResult(BaseResult, frozen=True):
         failure_messages: list[str] = []
         for result in self.results:
             if result.failed or result.errored:
-                check_name: str = result.details.get(
-                    "check_name"
-                ) or result.details.get("check_kind", "Unknown check")
+                check_name = result.check_label
                 status = "ERRORED" if result.errored else "FAILED"
                 message = result.message or "No specific error message provided"
+                params = _format_check_params(result.details.get("check_params"))
+                if params:
+                    message = f"{message}\n{params}"
                 failure_messages.append(f"{check_name} {status}: {message}")
         return failure_messages
 
