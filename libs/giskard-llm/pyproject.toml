@@ -7,6 +7,7 @@ license = { text = "MIT" }
 authors = [{ name = "Giskard R&D", email = "rnd@giskard.ai" }]
 requires-python = ">=3.12"
 dependencies = [
+    "giskard-core>=1.0.1b3,<2",
     "pydantic>=2.11.0,<3",
 ]
 

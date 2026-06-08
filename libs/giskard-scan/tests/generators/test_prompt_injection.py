@@ -1,4 +1,4 @@
-from giskard.checks.scenarios_generator.prompt_injection import (
+from giskard.scan.generators.prompt_injection import (
     PromptInjectionScenarioGenerator,
 )
 
