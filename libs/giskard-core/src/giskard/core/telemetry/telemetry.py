@@ -11,7 +11,7 @@ from typing import cast
 
 from posthog import Posthog, identify_context, set_context_session, tag
 
-from ..utils import get_lib_version
+from ..utils import GISKARD_LIBS_VERSIONS
 
 _DISABLING_ENV_VARS = [
     "DO_NOT_TRACK",
@@ -67,18 +67,12 @@ ENV_INFORMATION: dict[str, str] = {}
 
 def _get_env_information() -> dict[str, str]:
     if not ENV_INFORMATION:
-        _NOT_INSTALLED = "not_installed"
         ENV_INFORMATION.update(
             {
-                "giskard_core_version": get_lib_version("giskard-core", _NOT_INSTALLED),
-                "giskard_checks_version": get_lib_version(
-                    "giskard-checks", _NOT_INSTALLED
-                ),
-                "giskard_scan_version": get_lib_version("giskard-scan", _NOT_INSTALLED),
-                "giskard_agents_version": get_lib_version(
-                    "giskard-agents", _NOT_INSTALLED
-                ),
-                "giskard_llm_version": get_lib_version("giskard-llm", _NOT_INSTALLED),
+                **{
+                    f"{lib}_version": lib_version
+                    for lib, lib_version in GISKARD_LIBS_VERSIONS.items()
+                },
                 "environment": _get_environment_info(),
             }
         )
