@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from giskard.agents import add_prompts_path
+from giskard.core.utils import get_lib_version
 
 from .catalog import generate_suite
 from .generators.adversarial import AdversarialScenarioGenerator
@@ -12,6 +13,8 @@ from .generators.prompt_injection import PromptInjectionScenarioGenerator
 from .registry import SuiteGeneratorRegistry, suite_generator_registry
 
 add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.scan")
+
+__version__ = get_lib_version("giskard-scan")
 
 __all__ = [
     "generate_suite",
