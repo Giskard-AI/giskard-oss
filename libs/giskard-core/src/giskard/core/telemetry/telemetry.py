@@ -70,7 +70,7 @@ def _get_env_information() -> dict[str, str]:
         ENV_INFORMATION.update(
             {
                 **{
-                    f"{lib}_version": lib_version
+                    f"{lib.replace('-', '_')}_version": lib_version
                     for lib, lib_version in GISKARD_LIBS_VERSIONS.items()
                 },
                 "environment": _get_environment_info(),
