@@ -1,5 +1,6 @@
 """Public package exports for giskard.scan."""
 
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from giskard.agents import add_prompts_path
@@ -12,6 +13,11 @@ from .generators.prompt_injection import PromptInjectionScenarioGenerator
 from .registry import SuiteGeneratorRegistry, suite_generator_registry
 
 add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.scan")
+
+try:
+    __version__ = version("giskard-core")
+except PackageNotFoundError:
+    __version__ = "unknown"
 
 __all__ = [
     "generate_suite",

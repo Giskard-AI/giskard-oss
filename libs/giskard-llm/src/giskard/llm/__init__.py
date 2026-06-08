@@ -2,11 +2,6 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
-try:
-    __version__ = version("giskard-llm")
-except PackageNotFoundError:
-    __version__ = "unknown"
-
 from . import chat
 from .errors import (
     AuthenticationError,
@@ -39,6 +34,11 @@ from .types import (
     ToolDefParam,
     Usage,
 )
+
+try:
+    __version__ = version("giskard-llm")
+except PackageNotFoundError:
+    __version__ = "unknown"
 
 __all__ = [
     "__version__",

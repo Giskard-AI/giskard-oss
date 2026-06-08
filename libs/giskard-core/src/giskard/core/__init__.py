@@ -8,11 +8,6 @@ definitions, configuration patterns, and serialization utilities.
 import importlib.util
 from importlib.metadata import PackageNotFoundError, version
 
-try:
-    __version__ = version("giskard-core")
-except PackageNotFoundError:
-    __version__ = "unknown"
-
 from .discriminated import Discriminated, discriminated_base
 from .errors import Error
 from .rate_limiter import (
@@ -43,6 +38,11 @@ if spec and spec.has_location:
             f"by running: pip uninstall {LEGACY_GISKARD_PACKAGE_NAME}"
         )
     )
+
+try:
+    __version__ = version("giskard-core")
+except PackageNotFoundError:
+    __version__ = "unknown"
 
 __all__ = [
     "__version__",
