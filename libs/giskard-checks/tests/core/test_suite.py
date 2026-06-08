@@ -350,38 +350,41 @@ async def test_suite_parallel_progress_shows_a_row_per_scenario(monkeypatch):
     assert "  ↳ beta" in rows
 
 
-def test_progress_summary_shows_all_nonzero_counts_in_order():
-    """The live summary line lists errored, failed, skipped, passed in that order."""
+@pytest.mark.parametrize(
+    ("records", "expected"),
+    [
+        ([], None),
+        (
+            [
+                ScenarioStatus.FAIL,
+                ScenarioStatus.PASS,
+                ScenarioStatus.PASS,
+                ScenarioStatus.PASS,
+            ],
+            "1 failed, 3 passed",
+        ),
+        (
+            [ScenarioStatus.ERROR]
+            + [ScenarioStatus.SKIP] * 2
+            + [ScenarioStatus.FAIL] * 5
+            + [ScenarioStatus.PASS] * 19,
+            "1 errored, 5 failed, 2 skipped, 19 passed",
+        ),
+    ],
+    ids=["empty", "omits_zero_counts", "all_nonzero_in_order"],
+)
+def test_progress_summary_renderable(records, expected):
+    """Live summary lists errored, failed, skipped, passed; omits zeros; absent when empty."""
     progress = _SuiteProgress(disable=True)
-    for _ in range(19):
-        progress.record(ScenarioStatus.PASS)
-    for _ in range(5):
-        progress.record(ScenarioStatus.FAIL)
-    for _ in range(2):
-        progress.record(ScenarioStatus.SKIP)
-    progress.record(ScenarioStatus.ERROR)
+    for status in records:
+        progress.record(status)
 
     summary = progress._summary_renderable()
-    assert summary is not None
-    assert summary.plain.strip() == "1 errored, 5 failed, 2 skipped, 19 passed"
-
-
-def test_progress_summary_omits_zero_counts():
-    """Statuses with no occurrences are not shown."""
-    progress = _SuiteProgress(disable=True)
-    for _ in range(3):
-        progress.record(ScenarioStatus.PASS)
-    progress.record(ScenarioStatus.FAIL)
-
-    summary = progress._summary_renderable()
-    assert summary is not None
-    assert summary.plain.strip() == "1 failed, 3 passed"
-
-
-def test_progress_summary_absent_before_any_scenario_completes():
-    """No summary line until at least one scenario has finished."""
-    progress = _SuiteProgress(disable=True)
-    assert progress._summary_renderable() is None
+    if expected is None:
+        assert summary is None
+    else:
+        assert summary is not None
+        assert summary.plain.strip() == expected
 
 
 @pytest.mark.asyncio

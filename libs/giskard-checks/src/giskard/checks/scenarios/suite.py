@@ -24,10 +24,11 @@ from rich.text import Text
 from .._telemetry_props import suite_shape_properties
 from ..core.interaction import Trace
 from ..core.result import (
-    STATUS_MAPPING,
+    STATUS_SUMMARY_ORDER,
     ScenarioResult,
     ScenarioStatus,
     SuiteResult,
+    format_status_count_text,
 )
 from ..core.scenario import Scenario
 from ..core.types import ProviderType
@@ -49,14 +50,6 @@ class _OverallOnly(ProgressColumn):
         return self._column.render(task)
 
 
-_STATUS_COUNT_LABELS: tuple[tuple[str, str], ...] = (
-    ("error", "errored"),
-    ("fail", "failed"),
-    ("skip", "skipped"),
-    ("pass", "passed"),
-)
-
-
 class _SuiteProgress(Progress):
     """Progress display that appends a live status-count summary below the rows.
 
@@ -65,26 +58,18 @@ class _SuiteProgress(Progress):
     under the task rows, mirroring the final suite summary.
     """
 
-    def __init__(self, *columns: ProgressColumn, **kwargs: Any) -> None:
+    def __init__(self, *columns: ProgressColumn, disable: bool = False) -> None:
         # Set before super().__init__(): it renders get_renderables(), which reads _counts.
-        self._counts: dict[str, int] = {"pass": 0, "fail": 0, "error": 0, "skip": 0}
+        self._counts: dict[str, int] = {key: 0 for key, _ in STATUS_SUMMARY_ORDER}
         self._overall_id: TaskID | None = None
-        super().__init__(*columns, **kwargs)
-
-    @property
-    def _overall(self) -> TaskID:
-        assert self._overall_id is not None, "overall task not started"
-        return self._overall_id
+        super().__init__(*columns, disable=disable)
 
     def start_overall(self, total: int) -> None:
         self._overall_id = self.add_task("Running scenarios", total=total, overall=True)
 
-    def complete_overall(self, total: int) -> None:
-        self.update(self._overall, completed=total)
-        self.refresh()
-
     def describe(self, text: str) -> None:
-        self.update(self._overall, description=text)
+        if self._overall_id is not None:
+            self.update(self._overall_id, description=text)
 
     def record(self, status: ScenarioStatus) -> None:
         """Tally one finished scenario and advance the overall bar."""
@@ -103,15 +88,7 @@ class _SuiteProgress(Progress):
 
     def _summary_renderable(self) -> Text | None:
         """Colored counts line, or ``None`` until at least one scenario has finished."""
-        parts = [
-            f"[{STATUS_MAPPING[key]['color']} bold]{self._counts[key]} {label}"
-            f"[/{STATUS_MAPPING[key]['color']} bold]"
-            for key, label in _STATUS_COUNT_LABELS
-            if self._counts[key]
-        ]
-        if not parts:
-            return None
-        return Text.from_markup("  " + ", ".join(parts))
+        return format_status_count_text(self._counts, prefix="  ")
 
     def get_renderables(self) -> Iterable[RenderableType]:
         yield self.make_tasks_table(self.tasks)
@@ -287,16 +264,15 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     def _progress_bar(self, enabled: bool) -> Iterator[_SuiteProgress]:
         """Yield a progress tracker; a disabled no-op display when ``enabled`` is False."""
         with _SuiteProgress(
-            SpinnerColumn(),
+            _OverallOnly(SpinnerColumn()),
             TextColumn("[progress.description]{task.description}"),
             _OverallOnly(BarColumn()),
             _OverallOnly(MofNCompleteColumn()),
-            TimeElapsedColumn(),
+            _OverallOnly(TimeElapsedColumn()),
             disable=not enabled,
         ) as progress:
             progress.start_overall(len(self.scenarios))
             yield progress
-            progress.complete_overall(len(self.scenarios))
 
     async def _run_serial(
         self,
