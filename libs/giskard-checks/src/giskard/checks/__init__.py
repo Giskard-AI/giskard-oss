@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from giskard.agents import add_prompts_path
+from giskard.core.utils import get_lib_version
 
 from . import builtin, judges
 from .builtin import (
@@ -59,6 +60,8 @@ from .settings import get_default_generator, set_default_generator
 from .testing import WithSpy
 from .testing.runner import TestCaseRunner
 
+__version__ = get_lib_version("giskard-checks")
+
 # Install rich.pretty for better REPL output (including Pydantic models)
 # Can be disabled by setting GISKARD_CHECKS_DISABLE_RICH_PRETTY=1
 if os.getenv("GISKARD_CHECKS_DISABLE_RICH_PRETTY", "").lower() not in (
@@ -74,6 +77,7 @@ add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.checks")
 
 
 __all__ = [
+    "__version__",
     # Modules
     "builtin",
     "judges",

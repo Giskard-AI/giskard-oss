@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar
@@ -6,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.panel import Panel
 from rich.rule import Rule
+from rich.text import Text
 
 from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
@@ -36,6 +38,33 @@ STATUS_MAPPING = {
         "symbol": "s",
     },
 }
+
+STATUS_SUMMARY_ORDER: tuple[tuple[str, str], ...] = (
+    ("error", "errored"),
+    ("fail", "failed"),
+    ("skip", "skipped"),
+    ("pass", "passed"),
+)
+
+
+def format_status_count_parts(counts: Mapping[str, int]) -> list[str]:
+    """Build Rich markup fragments for non-zero status counts in summary order."""
+    return [
+        f"[{STATUS_MAPPING[key]['color']} bold]{counts[key]} {label}"
+        f"[/{STATUS_MAPPING[key]['color']} bold]"
+        for key, label in STATUS_SUMMARY_ORDER
+        if counts.get(key)
+    ]
+
+
+def format_status_count_text(
+    counts: Mapping[str, int], *, prefix: str = ""
+) -> Text | None:
+    """Colored counts line, or ``None`` when every count is zero."""
+    parts = format_status_count_parts(counts)
+    if not parts:
+        return None
+    return Text.from_markup(prefix + ", ".join(parts))
 
 
 def _pluralize(count: int, word: str, plural: str | None = None) -> str:
@@ -455,31 +484,15 @@ class TestCaseResult(BaseResult, frozen=True):
         for result in self.results:
             yield from result.__rich_console__(console, options)
 
-        # Build subtitle with counts
-        counts = {
-            "errored": sum(1 for r in self.results if r.errored),
-            "failed": sum(1 for r in self.results if r.failed),
-            "skipped": sum(1 for r in self.results if r.skipped),
-            "passed": sum(1 for r in self.results if r.passed),
+        status_counts = {
+            "error": sum(1 for r in self.results if r.errored),
+            "fail": sum(1 for r in self.results if r.failed),
+            "skip": sum(1 for r in self.results if r.skipped),
+            "pass": sum(1 for r in self.results if r.passed),
         }
-        count_parts: list[str] = []
-        if counts["errored"]:
-            count_parts.append(
-                f"[{STATUS_MAPPING['error']['color']} bold]{counts['errored']} errored[/{STATUS_MAPPING['error']['color']} bold]"
-            )
-        if counts["failed"]:
-            count_parts.append(
-                f"[{STATUS_MAPPING['fail']['color']} bold]{counts['failed']} failed[/{STATUS_MAPPING['fail']['color']} bold]"
-            )
-        if counts["skipped"]:
-            count_parts.append(
-                f"[{STATUS_MAPPING['skip']['color']} bold]{counts['skipped']} skipped[/{STATUS_MAPPING['skip']['color']} bold]"
-            )
-        if counts["passed"]:
-            count_parts.append(
-                f"[{STATUS_MAPPING['pass']['color']} bold]{counts['passed']} passed[/{STATUS_MAPPING['pass']['color']} bold]"
-            )
-        subtitle = ", ".join(count_parts) + f" in {self.duration_ms}ms"
+        subtitle = ", ".join(format_status_count_parts(status_counts)) + (
+            f" in {self.duration_ms}ms"
+        )
 
         yield Rule(subtitle, style=f"{status['color']} bold")
 
@@ -597,26 +610,18 @@ class SuiteResult(BaseResult, frozen=True):
         yield Rule(style="bold blue")
 
         # Summary metrics
-        count_parts = []
-        count_parts.append(
+        count_parts = [
             f"[{STATUS_MAPPING['total']['color']} bold]{len(self.results)} total[/{STATUS_MAPPING['total']['color']} bold]"
+        ]
+        count_parts.extend(
+            format_status_count_parts(
+                {
+                    "error": self.errored_count,
+                    "fail": self.failed_count,
+                    "skip": self.skipped_count,
+                    "pass": self.passed_count,
+                }
+            )
         )
-        if self.errored_count:
-            count_parts.append(
-                f"[{STATUS_MAPPING['error']['color']} bold]{self.errored_count} errored[/{STATUS_MAPPING['error']['color']} bold]"
-            )
-        if self.failed_count:
-            count_parts.append(
-                f"[{STATUS_MAPPING['fail']['color']} bold]{self.failed_count} failed[/{STATUS_MAPPING['fail']['color']} bold]"
-            )
-        if self.skipped_count:
-            count_parts.append(
-                f"[{STATUS_MAPPING['skip']['color']} bold]{self.skipped_count} skipped[/{STATUS_MAPPING['skip']['color']} bold]"
-            )
-        if self.passed_count:
-            count_parts.append(
-                f"[{STATUS_MAPPING['pass']['color']} bold]{self.passed_count} passed[/{STATUS_MAPPING['pass']['color']} bold]"
-            )
-
         summary = ", ".join(count_parts)
         yield f"Summary: {summary} | Pass Rate: [default bold]{self.pass_rate:.1%}[/default bold] | Total Duration: {self.duration_ms}ms"
