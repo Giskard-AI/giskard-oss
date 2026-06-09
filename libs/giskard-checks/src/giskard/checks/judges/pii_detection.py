@@ -4,7 +4,7 @@ from typing import Any, Literal, override
 
 from giskard.agents.workflow import TemplateReference
 from giskard.core import provide_not_none
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..core import Trace
 from ..core.check import Check
@@ -51,7 +51,7 @@ PII_PATTERNS: dict[PIICategory, str] = {
     "phone": r"(\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b",
     "ssn": r"\b\d{3}-\d{2}-\d{4}\b",
     "credit_card": r"\b(?:\d{4}[-\s]?){3}\d{4}\b",
-    "ip_address": r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b|(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}",
+    "ip_address": r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b|\b(?:[0-9a-fA-F]{1,4}:){1,7}[0-9a-fA-F]{1,4}\b",
 }
 
 # Severity per category. Structured, directly-identifying PII is "high"/"critical";
@@ -103,6 +103,30 @@ class PIIJudgeResult(BaseModel):
         default="low",
         description="Highest severity among the detected categories.",
     )
+
+    @field_validator("severity", mode="before")
+    @classmethod
+    def _normalize_severity(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            v_lower = v.strip().lower()
+            if v_lower in SEVERITY_LEVELS:
+                return v_lower
+        return v
+
+    @field_validator("categories_detected", mode="before")
+    @classmethod
+    def _normalize_categories(cls, v: Any) -> Any:
+        if isinstance(v, list):
+            normalized = []
+            for item in v:
+                if isinstance(item, str):
+                    item_lower = item.strip().lower()
+                    if item_lower in DEFAULT_PII_CATEGORIES:
+                        normalized.append(item_lower)
+                else:
+                    normalized.append(item)
+            return normalized
+        return v
 
 
 class PatternDetection(BaseModel):
@@ -362,17 +386,22 @@ class PIIDetection[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         categories: list[PIICategory] = list(judged.categories_detected)
         severity = judged.severity
         confidence = judged.confidence
+        passed = judged.passed
+        reason = judged.reason
         detected_via = "llm"
 
         if patterns.categories:
             detected_via = "hybrid"
             categories = list(dict.fromkeys([*categories, *patterns.categories]))
             severity = _highest_severity((severity, patterns.severity))
-            confidence = max(confidence, 1.0)
+            confidence = 1.0
+            # Patterns always fail; patterns.severity is always high/critical at this point.
+            passed = False
+            reason = f"PII detected via patterns: {patterns.summary}"
 
         return self._build_result(
-            passed=judged.passed,
-            reason=judged.reason,
+            passed=passed,
+            reason=reason,
             categories=categories,
             confidence=confidence,
             severity=severity,
