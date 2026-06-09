@@ -11,10 +11,13 @@ from pydantic import Field
 
 
 class MockGenerator(BaseGenerator):
-    """Mock generator that returns a pre-configured LLM judgement."""
+    """Mock generator that returns a pre-configured structured LLM judgement."""
 
     passed: bool
     reason: str | None
+    categories_detected: list[str] = Field(default_factory=list)
+    confidence: float = 0.5
+    severity: str = "low"
     calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
 
     @override
@@ -30,7 +33,13 @@ class MockGenerator(BaseGenerator):
                 Choice(
                     message=AssistantMessage(
                         content=json.dumps(
-                            {"passed": self.passed, "reason": self.reason}
+                            {
+                                "passed": self.passed,
+                                "reason": self.reason,
+                                "categories_detected": self.categories_detected,
+                                "confidence": self.confidence,
+                                "severity": self.severity,
+                            }
                         )
                     ),
                     finish_reason="stop",
@@ -136,7 +145,10 @@ async def test_custom_output_key() -> None:
     result = await check.run(Trace(interactions=[interaction]))
 
     assert result.status == CheckStatus.PASS
-    assert result.details["inputs"]["output"] == "Hello! I am here to help, no personal data shared."
+    assert (
+        result.details["inputs"]["output"]
+        == "Hello! I am here to help, no personal data shared."
+    )
 
 
 async def test_category_filtering_passed_to_template() -> None:
@@ -207,7 +219,9 @@ async def test_direct_output_overrides_trace() -> None:
     )
     interaction = Interaction(
         inputs={"query": "test"},
-        outputs={"response": "Trace output that should be ignored with user@example.com."},
+        outputs={
+            "response": "Trace output that should be ignored with user@example.com."
+        },
     )
     result = await check.run(Trace(interactions=[interaction]))
 
@@ -462,7 +476,7 @@ async def test_hybrid_mode_early_exit_on_high_severity_pii() -> None:
 
 async def test_hybrid_mode_calls_llm_for_low_severity_pii() -> None:
     """Test that hybrid mode calls LLM when patterns don't have matches.
-    
+
     In hybrid mode, if patterns are checked but find no matches in any category,
     we proceed to LLM evaluation. The detected_via should be "llm" since no
     patterns matched (detected_via is "llm" when hybrid mode doesn't find patterns).
@@ -472,7 +486,10 @@ async def test_hybrid_mode_calls_llm_for_low_severity_pii() -> None:
         generator=generator,
         output="General discussion about locations",
         mode="hybrid",
-        categories=["name", "address"],  # Only contextual categories (no regex patterns)
+        categories=[
+            "name",
+            "address",
+        ],  # Only contextual categories (no regex patterns)
     )
     result = await check.run(Trace())
 
@@ -486,7 +503,7 @@ async def test_hybrid_mode_calls_llm_for_low_severity_pii() -> None:
 
 async def test_hybrid_mode_early_exit_on_pattern_catch() -> None:
     """Test that hybrid mode exits early when high-severity PII is caught by patterns.
-    
+
     In hybrid mode, when patterns detect high-severity PII (like emails, SSNs, etc.),
     the check fails immediately without calling the LLM (early exit optimization).
     The detected_via is "pattern" since we exited via pattern detection.
@@ -578,7 +595,7 @@ async def test_pattern_caching_compiled_once() -> None:
         output="test1@example.com",
         mode="pattern",
     )
-    result1 = await check1.run(Trace())
+    await check1.run(Trace())
 
     # Verify patterns were compiled
     assert pii_module._compiled_patterns_cache is not None
@@ -590,7 +607,7 @@ async def test_pattern_caching_compiled_once() -> None:
         output="test2@example.com",
         mode="pattern",
     )
-    result2 = await check2.run(Trace())
+    await check2.run(Trace())
 
     # Verify patterns are the same instance (cache hit)
     assert pii_module._compiled_patterns_cache is cached_patterns_1
@@ -653,6 +670,31 @@ async def test_backward_compatibility_existing_tests_pass() -> None:
 
     assert result.status == CheckStatus.FAIL
     assert result.details["detected_via"] == "llm"
+    assert len(generator.calls) == 1
+
+
+async def test_llm_structured_fields_propagate() -> None:
+    """LLM-reported categories, severity, and confidence flow into the result."""
+    generator = MockGenerator(
+        passed=False,
+        reason="The response reveals a home address.",
+        categories_detected=["address"],
+        confidence=0.9,
+        severity="medium",
+    )
+    check = PIIDetection(
+        generator=generator,
+        output="They moved to a quiet neighborhood last spring.",
+        mode="llm",
+        categories=["address"],
+    )
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.FAIL
+    assert result.details["detected_via"] == "llm"
+    assert result.details["categories_detected"] == ["address"]
+    assert result.details["confidence"] == 0.9
+    assert result.details["severity"] == "medium"
     assert len(generator.calls) == 1
 
 
