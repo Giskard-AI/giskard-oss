@@ -1,152 +1,101 @@
-# Add PIIDetection Built-in LLM Judge Check (Closes #2374)
+# Add PIIDetection Built-in Check (Closes #2374)
 
 ## Summary
 
-This PR implements a complete `PIIDetection` check for detecting personally identifiable information (PII) in AI agent responses. The check follows the existing `Toxicity` check architecture and integrates seamlessly with the Giskard checks framework.
+Adds a built-in `PIIDetection` check that flags personally identifiable information (PII)
+in agent responses using a **hybrid regex-pattern + LLM-judgment** approach. Structured PII
+(emails, phone numbers, SSNs, credit cards, IP addresses) is caught deterministically by
+regex; contextual PII (names, addresses, medical, financial) is caught by an LLM judge. The
+check follows the existing judge architecture (same shape as `Toxicity`) and integrates with
+the Scenario/Suite framework.
 
-## What's Included
+## What's included
 
-### 🎯 Core Implementation
+### Core implementation
+`libs/giskard-checks/src/giskard/checks/judges/pii_detection.py`
 
-**PIIDetection Check Class** (`libs/giskard-checks/src/giskard/checks/judges/pii_detection.py`)
-- LLM-based judge check extending `BaseLLMCheck`
-- Registration name: `"pii_detection"`
-- Full type safety with Literal types for categories
-- Complete docstring with usage examples
+- LLM-based judge extending `BaseLLMCheck`, registered as `"pii_detection"`.
+- **9 categories**: email, phone, ssn, credit_card, ip_address, name, address, medical, financial.
+- **Three detection modes** (`mode`, default `"hybrid"`):
+  - `"pattern"` — fast, deterministic regex only.
+  - `"llm"` — LLM judgment for structured and contextual PII.
+  - `"hybrid"` — patterns first; if high/critical-severity structured PII is found the check
+    fails immediately **without an LLM call**, otherwise the LLM evaluates contextual PII and
+    its findings are merged with any pattern matches.
+- **Structured LLM output** (`PIIJudgeResult`): the judge returns `passed`, `reason`,
+  `categories_detected`, `confidence`, and `severity` directly — no parsing of free text.
+- Result `details` expose `severity` (low/medium/high/critical), `confidence` (0–1),
+  `detected_via` (pattern/llm/hybrid), and `categories_detected`.
+- Configurable `categories`, custom `output_key` extraction, and full Pydantic
+  serialization round-trip via the discriminated `Check` union.
+- Compiled regex patterns are cached at module level across instances.
 
-**Features:**
-- **9 PII Categories**: email, phone, SSN, credit card, IP address, name, address, medical info, financial info
-- **Configurable Categories**: Filter to specific PII types via `categories` parameter
-- **Custom Extraction**: Support for custom output paths via `output_key` parameter
-- **Serialization**: Full Pydantic support for `Check.model_validate()` round-trip
+### Prompt template
+`libs/giskard-checks/src/giskard/checks/prompts/judges/pii_detection.j2`
 
-### 🎨 Prompt Template
+- Per-category guidance with false-positive caveats (test/example data, placeholders).
+- Instructs the judge to emit the structured `PIIJudgeResult` fields (categories, severity,
+  confidence) alongside the verdict.
 
-**Jinja2 Template** (`libs/giskard-checks/src/giskard/checks/prompts/judges/pii_detection.j2`)
-- Comprehensive explanations of all PII categories with examples
-- Clear guidance for structured and contextual PII detection
-- Standard JSON output format (`passed` + `reason`)
-- Follows existing judge prompt conventions
+### Tests
+`libs/giskard-checks/tests/builtin/test_pii_detection.py` — 35 async tests
 
-### ✅ Comprehensive Test Suite
+- Core: clean content passes, PII fails, trace extraction (incl. custom `output_key`),
+  full-trace context for multi-turn conversations.
+- Per-category coverage for all 9 categories and category filtering.
+- Hybrid/pattern modes: pattern-only detection without LLM calls, hybrid early-exit on
+  high-severity PII (asserts the LLM is not called), severity/confidence values, pattern cache.
+- Structured output: `test_llm_structured_fields_propagate` verifies LLM-reported
+  categories/severity/confidence flow into the result.
+- Edge cases: direct output overrides trace, `None` reason handling, serialization round-trip.
 
-**19 Test Cases** (`libs/giskard-checks/tests/builtin/test_pii_detection.py`)
-
-Core functionality:
-- Clean content passes the check
-- PII-containing content fails appropriately
-- Output extraction from trace (with and without custom `output_key`)
-- Full trace context in prompts (for multi-turn conversations)
-
-Category coverage:
-- Individual tests for all 9 PII categories (email, phone, SSN, credit card, IP address, name, address, medical, financial)
-- Category filtering validation
-
-Edge cases:
-- Direct output overrides trace output
-- None reason handling
-- Default categories applied when not specified
-- Serialization round-trip (model_dump + model_validate)
-
-### 📦 Updated Exports
-
-- `libs/giskard-checks/src/giskard/checks/judges/__init__.py` - Added PIIDetection export
-- `libs/giskard-checks/src/giskard/checks/__init__.py` - Added PIIDetection to top-level exports
+### Exports
+`judges/__init__.py` and `checks/__init__.py` export `PIIDetection`.
 
 ## Validation
 
-✅ **All 19 new tests pass**
-```
-libs/giskard-checks/tests/builtin/test_pii_detection.py::test_clean_content_passes PASSED
-libs/giskard-checks/tests/builtin/test_pii_detection.py::test_pii_content_fails PASSED
-libs/giskard-checks/tests/builtin/test_pii_detection.py::test_output_extracted_from_trace PASSED
-[... 19 more tests ...]
-```
+- `ruff format` + `ruff check` (repo config): clean.
+- `basedpyright --level error` (judges + tests): 0 errors.
+- `vermin --target=3.12-`: compatible.
+- PII tests: **35 passed**.
+- Full `giskard-checks` unit suite: **619 passed, 4 skipped** (no regressions).
 
-✅ **No regressions** - All 11 existing toxicity tests still pass
-
-✅ **Serialization verified** - Round-trip serialization works correctly
-
-✅ **Top-level import works** - `from giskard.checks import PIIDetection`
-
-✅ **Template registered** - Prompt template correctly referenced and loaded
-
-## Architecture Alignment
-
-This implementation strictly follows the established patterns:
-- Inherits from `BaseLLMCheck` (same as Toxicity)
-- Uses `@Check.register()` decorator for registration
-- Implements `get_prompt()` returning `TemplateReference`
-- Implements `get_inputs()` building template context
-- Uses Pydantic `Field()` with proper descriptions
-- Follows naming conventions and code style
-- Minimal, idiomatic Python
-
-## Usage Example
+## Usage
 
 ```python
 from giskard.checks import PIIDetection, Scenario
 from giskard.agents.generators import Generator
 
-# Check with default settings (all categories, LLM mode)
-check = PIIDetection(
-    generator=Generator(model="openai/gpt-4o"),
-)
-
-# Or with custom categories
-check = PIIDetection(
-    output="Response to evaluate for PII",
-    categories=["email", "phone", "ssn"],
-    generator=Generator(model="openai/gpt-4o"),
-)
-
-# Use in a scenario
+# Default: hybrid mode, all categories
 scenario = (
     Scenario(name="pii_safety")
-    .interact(
-        inputs="What's your contact info?",
-        outputs="My email is john@example.com"
-    )
+    .interact(inputs="What's your contact info?", outputs="My email is john@example.com")
     .check(PIIDetection())
+)
+
+# Fast, deterministic-only
+check = PIIDetection(
+    output="Call me at 555-123-4567 or info@example.com",
+    categories=["email", "phone"],
+    mode="pattern",
+)
+
+# Contextual PII via LLM
+check = PIIDetection(
+    categories=["name", "address", "medical"],
+    mode="llm",
+    generator=Generator(model="openai/gpt-4o"),
 )
 ```
 
-## Files Changed
+## Acceptance criteria
 
-```
-libs/giskard-checks/src/giskard/checks/judges/pii_detection.py (NEW)
-├── PIICategory type alias (9 categories)
-├── DEFAULT_PII_CATEGORIES tuple
-└── PIIDetection class (126 lines)
+- [x] Detects structured PII via regex (emails, phone numbers, SSNs)
+- [x] Detects contextual PII via LLM (names, addresses)
+- [x] Configurable category filtering
+- [x] Hybrid mode combines both approaches
+- [x] Tests cover: clean output passes, PII present fails, category filtering
 
-libs/giskard-checks/src/giskard/checks/prompts/judges/pii_detection.j2 (NEW)
-└── Comprehensive Jinja2 template (110 lines)
-
-libs/giskard-checks/tests/builtin/test_pii_detection.py (NEW)
-└── 19 async test functions (400+ lines)
-
-libs/giskard-checks/src/giskard/checks/judges/__init__.py (MODIFIED)
-└── Added PIIDetection import and export
-
-libs/giskard-checks/src/giskard/checks/__init__.py (MODIFIED)
-└── Added PIIDetection to judges import and __all__ list
-```
-
-## Checklist
-
-- [x] Follows existing Toxicity check architecture exactly
-- [x] Type-safe implementation with Literal types
-- [x] Complete docstring with examples
-- [x] Comprehensive test coverage (19 tests)
-- [x] All new tests pass
-- [x] No regressions in existing tests
-- [x] Serialization round-trip verified
-- [x] Proper exports in __init__ files
-- [x] Prompt template correctly registered
-- [x] Code style matches repository conventions
-- [x] Minimal, idiomatic implementation
-- [x] Ready for merge
-
-## Related Issue
+## Related issue
 
 Closes #2374
