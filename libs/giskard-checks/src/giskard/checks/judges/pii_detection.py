@@ -245,8 +245,17 @@ class PIIDetection[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
         """Build template variables for the PII detection judge prompt.
 
-        Returns ``output``, ``categories``, and ``trace`` keys. The ``trace`` key
-        lets custom templates access interaction history or metadata.
+        Parameters
+        ----------
+        trace : Trace
+            Trace for resolving inputs.
+
+        Returns
+        -------
+        dict[str, Any]
+            Template variables with ``output``, ``categories``, and ``trace``
+            keys. The ``trace`` key lets custom templates access interaction
+            history or metadata.
         """
         return {
             "trace": trace,
@@ -271,6 +280,18 @@ class PIIDetection[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         In hybrid mode patterns are checked first; if high-severity PII is found
         the check fails immediately without an LLM call, otherwise the LLM is
         invoked for contextual analysis and merged with any pattern matches.
+
+        Parameters
+        ----------
+        trace : TraceType
+            The interaction trace to evaluate.
+
+        Returns
+        -------
+        CheckResult
+            Pass if no PII is detected, fail otherwise. ``details`` includes
+            ``severity``, ``confidence``, ``detected_via``, and
+            ``categories_detected``.
         """
         text = self._resolve_output(trace)
 
@@ -305,6 +326,7 @@ class PIIDetection[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     def _pattern_only_result(
         self, text: str, patterns: PatternDetection
     ) -> CheckResult:
+        """Build a CheckResult from regex-only detection (no LLM call)."""
         if patterns.categories:
             return self._build_result(
                 passed=False,
