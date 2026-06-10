@@ -238,6 +238,8 @@ class CheckResult(BaseResult, frozen=True):
         status = STATUS_MAPPING[self.status]
 
         name = self.check_label
+        if name == "Unnamed check":
+            name = "[dim italic]Unnamed check[/dim italic]"
 
         if self.status == CheckStatus.FAIL or self.status == CheckStatus.ERROR:
             details = (
