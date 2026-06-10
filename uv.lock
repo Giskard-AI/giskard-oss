@@ -872,7 +872,7 @@ test = [
 
 [[package]]
 name = "giskard-agents"
-version = "1.0.2b3"
+version = "1.0.2b4"
 source = { editable = "libs/giskard-agents" }
 dependencies = [
     { name = "giskard-core" },
@@ -924,7 +924,7 @@ provides-extras = ["openai", "google", "anthropic", "litellm", "all"]
 
 [[package]]
 name = "giskard-checks"
-version = "1.0.2b3"
+version = "1.0.2b4"
 source = { editable = "libs/giskard-checks" }
 dependencies = [
     { name = "giskard-agents" },
@@ -960,7 +960,7 @@ provides-extras = ["regorus"]
 
 [[package]]
 name = "giskard-core"
-version = "1.0.1b3"
+version = "1.0.1b4"
 source = { editable = "libs/giskard-core" }
 dependencies = [
     { name = "posthog" },
@@ -975,7 +975,7 @@ requires-dist = [
 
 [[package]]
 name = "giskard-llm"
-version = "1.0.0b3"
+version = "1.0.0b4"
 source = { editable = "libs/giskard-llm" }
 dependencies = [
     { name = "giskard-core" },
@@ -1015,7 +1015,7 @@ provides-extras = ["openai", "google", "anthropic", "azure", "all"]
 
 [[package]]
 name = "giskard-scan"
-version = "1.0.0b1"
+version = "1.0.0b2"
 source = { editable = "libs/giskard-scan" }
 dependencies = [
     { name = "giskard-agents" },
