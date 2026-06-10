@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from giskard.checks.scenarios_generator.base import DatasetScenarioGenerator
+from giskard.scan.generators.base import DatasetScenarioGenerator
 
 
 class _StubDatasetGenerator(DatasetScenarioGenerator):
@@ -13,7 +13,7 @@ async def test_dataset_generator_no_budget_returns_all(tmp_path, monkeypatch):
     """With max_scenarios=None the generator returns every scenario."""
     import json
 
-    import giskard.checks.scenarios_generator.base as base_mod
+    import giskard.scan.generators.base as base_mod
 
     stub_file = tmp_path / "stub.jsonl"
     stub_file.write_text(
@@ -39,7 +39,7 @@ async def test_dataset_generator_budget_subsamples(tmp_path, monkeypatch):
     """With max_scenarios=2, only 2 scenarios are returned."""
     import json
 
-    import giskard.checks.scenarios_generator.base as base_mod
+    import giskard.scan.generators.base as base_mod
 
     stub_file = tmp_path / "stub.jsonl"
     stub_file.write_text(
@@ -62,7 +62,7 @@ async def test_dataset_generator_budget_larger_than_dataset_returns_all(
     """With max_scenarios > dataset size, all scenarios are returned."""
     import json
 
-    import giskard.checks.scenarios_generator.base as base_mod
+    import giskard.scan.generators.base as base_mod
 
     stub_file = tmp_path / "stub.jsonl"
     stub_file.write_text(
@@ -83,7 +83,7 @@ async def test_dataset_generator_budget_reproducible(tmp_path, monkeypatch):
     """Same seed always picks the same subset."""
     import json
 
-    import giskard.checks.scenarios_generator.base as base_mod
+    import giskard.scan.generators.base as base_mod
 
     stub_file = tmp_path / "stub.jsonl"
     stub_file.write_text(
@@ -104,7 +104,7 @@ async def test_dataset_generator_budget_reproducible(tmp_path, monkeypatch):
 
 async def test_dataset_generator_missing_file_raises_runtime_error(monkeypatch):
     """Pointing _DATA_DIR at a non-existent path raises RuntimeError with 'not found'."""
-    import giskard.checks.scenarios_generator.base as base_mod
+    import giskard.scan.generators.base as base_mod
 
     monkeypatch.setattr(
         base_mod, "_DATA_DIR", Path("/nonexistent/path/that/does/not/exist")
@@ -118,7 +118,7 @@ async def test_dataset_generator_malformed_jsonl_raises_value_error(
     tmp_path, monkeypatch
 ):
     """A malformed JSONL line raises ValueError that includes the filename or line number."""
-    import giskard.checks.scenarios_generator.base as base_mod
+    import giskard.scan.generators.base as base_mod
 
     stub_file = tmp_path / "stub.jsonl"
     stub_file.write_text(

@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
-from giskard.checks.scenarios_generator.base import ScenarioGenerator
-from giskard.checks.scenarios_generator.catalog import generate_suite
-from giskard.checks.scenarios_generator.registry import suite_generator_registry
+from giskard.scan.catalog import generate_suite
+from giskard.scan.generators.base import ScenarioGenerator
+from giskard.scan.registry import suite_generator_registry
 
 
 class _StubGenerator(ScenarioGenerator):
