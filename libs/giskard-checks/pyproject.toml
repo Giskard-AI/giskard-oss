@@ -1,6 +1,6 @@
 [project]
 name = "giskard-checks"
-version = "1.0.2b3"
+version = "1.0.2b4"
 description = "Add your description here"
 readme = "README.md"
 license = { text = "MIT" }
@@ -16,6 +16,9 @@ dependencies = [
     "regex>=2026.1.15",
     "rich>=14.2.0,<16",
 ]
+
+[project.optional-dependencies]
+regorus = ["celine-regorus>=0.9.1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]
