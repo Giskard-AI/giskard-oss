@@ -26,12 +26,12 @@ def _sample_suite_result() -> SuiteResult:
                                 status=CheckStatus.PASS,
                                 message="grounded",
                                 metrics=[Metric(name="score", value=0.95)],
-                                details={"check_name": "Groundedness"},
+                                check_name="Groundedness",
                             ),
                             CheckResult(
                                 status=CheckStatus.PASS,
                                 message="relevant",
-                                details={"check_name": "AnswerRelevance"},
+                                check_name="AnswerRelevance",
                             ),
                         ],
                         duration_ms=100,
@@ -48,13 +48,13 @@ def _sample_suite_result() -> SuiteResult:
                             CheckResult(
                                 status=CheckStatus.PASS,
                                 message="pre-check ok",
-                                details={"check_name": "SanityCheck"},
+                                check_name="SanityCheck",
                             ),
                             CheckResult(
                                 status=CheckStatus.FAIL,
                                 message="answer is not grounded",
                                 metrics=[Metric(name="confidence", value=0.2)],
-                                details={"check_name": "Groundedness"},
+                                check_name="Groundedness",
                             ),
                         ],
                         duration_ms=120,
@@ -71,7 +71,7 @@ def _sample_suite_result() -> SuiteResult:
                             CheckResult(
                                 status=CheckStatus.ERROR,
                                 message="judge crashed",
-                                details={"check_name": "LLMJudge"},
+                                check_name="LLMJudge",
                             )
                         ],
                         duration_ms=150,
@@ -88,7 +88,7 @@ def _sample_suite_result() -> SuiteResult:
                             CheckResult(
                                 status=CheckStatus.SKIP,
                                 message="no retrieved context",
-                                details={"check_name": "ContextRelevance"},
+                                check_name="ContextRelevance",
                             )
                         ],
                         duration_ms=50,
@@ -251,12 +251,12 @@ def test_failed_scenario_with_mixed_check_statuses_is_still_a_failure() -> None:
                             CheckResult(
                                 status=CheckStatus.FAIL,
                                 message="hard failure",
-                                details={"check_name": "CheckA"},
+                                check_name="CheckA",
                             ),
                             CheckResult(
                                 status=CheckStatus.SKIP,
                                 message="skipped follow-up",
-                                details={"check_name": "CheckB"},
+                                check_name="CheckB",
                             ),
                         ],
                         duration_ms=50,

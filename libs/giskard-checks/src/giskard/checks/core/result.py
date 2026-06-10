@@ -4,7 +4,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.panel import Panel
 from rich.rule import Rule
@@ -130,6 +130,8 @@ class CheckResult(BaseResult, frozen=True):
         Outcome status of the check.
     message : str or None
         Optional short message to surface to users (e.g., success/failure reason).
+    check_name : str or None
+        Direct display name for the check.
     metrics : list[Metric]
         Auxiliary metrics captured by the check.
     details : dict[str, Any]
@@ -149,8 +151,29 @@ class CheckResult(BaseResult, frozen=True):
 
     status: CheckStatus = Field(..., description="Check status")
     message: str | None = Field(default=None, description="Check message")
+    check_name: str | None = Field(default=None, description="Check name")
     metrics: list[Metric] = Field(default_factory=list, description="Check metric")
     details: dict[str, Any] = Field(default_factory=dict, description="Check details")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _promote_legacy_check_name(cls, data: Any) -> Any:
+        """Promote legacy details-based names into the first-class field."""
+        if not isinstance(data, dict):
+            return data
+        if data.get("check_name"):
+            return data
+
+        details = data.get("details")
+        if not isinstance(details, dict):
+            return data
+
+        for key in ("check_name", "check_kind", "name"):
+            value = details.get(key)
+            if value:
+                return {**data, "check_name": value}
+
+        return data
 
     # Convenience constructors
     @classmethod
@@ -158,6 +181,7 @@ class CheckResult(BaseResult, frozen=True):
         cls,
         *,
         message: str | None = None,
+        check_name: str | None = None,
         details: dict[str, Any] | None = None,
     ) -> "CheckResult":
         """Construct a successful result.
@@ -168,6 +192,7 @@ class CheckResult(BaseResult, frozen=True):
         return cls(
             status=CheckStatus.PASS,
             message=message,
+            check_name=check_name,
             details={} if details is None else details,
         )
 
@@ -176,12 +201,14 @@ class CheckResult(BaseResult, frozen=True):
         cls,
         *,
         message: str | None = None,
+        check_name: str | None = None,
         details: dict[str, Any] | None = None,
     ) -> "CheckResult":
         """Construct a failure result."""
         return cls(
             status=CheckStatus.FAIL,
             message=message,
+            check_name=check_name,
             details={} if details is None else details,
         )
 
@@ -190,12 +217,14 @@ class CheckResult(BaseResult, frozen=True):
         cls,
         *,
         message: str | None = None,
+        check_name: str | None = None,
         details: dict[str, Any] | None = None,
     ) -> "CheckResult":
         """Construct a skipped result (e.g., precondition not met)."""
         return cls(
             status=CheckStatus.SKIP,
             message=message,
+            check_name=check_name,
             details={} if details is None else details,
         )
 
@@ -204,12 +233,14 @@ class CheckResult(BaseResult, frozen=True):
         cls,
         *,
         message: str | None = None,
+        check_name: str | None = None,
         details: dict[str, Any] | None = None,
     ) -> "CheckResult":
         """Construct an error result from an exception or unexpected condition."""
         return cls(
             status=CheckStatus.ERROR,
             message=message,
+            check_name=check_name,
             details={} if details is None else details,
         )
 
@@ -235,13 +266,7 @@ class CheckResult(BaseResult, frozen=True):
 
     @property
     def check_label(self) -> str:
-        details = self.details if isinstance(self.details, Mapping) else {}
-        return str(
-            details.get("check_name")
-            or details.get("check_kind")
-            or details.get("name")
-            or "Unnamed check"
-        )
+        return self.check_name or "Unnamed check"
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
