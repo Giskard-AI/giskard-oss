@@ -222,12 +222,22 @@ class CheckResult(BaseResult, frozen=True):
         """Return True if `status` is `SKIP`."""
         return self.status == CheckStatus.SKIP
 
+    @property
+    def check_label(self) -> str:
+        details = self.details if isinstance(self.details, Mapping) else {}
+        return str(
+            details.get("check_name")
+            or details.get("check_kind")
+            or details.get("name")
+            or "Unnamed check"
+        )
+
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         status = STATUS_MAPPING[self.status]
 
-        name = self.details.get("check_name", "[dim italic]Unnamed check[/dim italic]")
+        name = self.check_label
 
         if self.status == CheckStatus.FAIL or self.status == CheckStatus.ERROR:
             details = (

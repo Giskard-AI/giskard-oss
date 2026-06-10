@@ -7,6 +7,7 @@ from giskard.checks import (
     Metric,
     ScenarioResult,
     SuiteResult,
+    TestCaseResult,
     Trace,
 )
 from giskard.checks.export.junit import to_junit_xml
@@ -168,6 +169,39 @@ def test_to_junit_xml_maps_failure_error_and_skip() -> None:
     skipped = testcases["scenario_skip"].find("skipped")
     assert skipped is not None
     assert "no retrieved context" in (skipped.text or "")
+
+
+def test_to_junit_xml_falls_back_to_check_kind_for_labels() -> None:
+    suite_result = SuiteResult(
+        results=[
+            ScenarioResult(
+                scenario_name="scenario_kind_only",
+                steps=[
+                    TestCaseResult(
+                        results=[
+                            CheckResult(
+                                status=CheckStatus.FAIL,
+                                message="kind-only failure",
+                                details={"check_kind": "MyCheck"},
+                            )
+                        ],
+                        duration_ms=10,
+                    )
+                ],
+                duration_ms=10,
+                final_trace=Trace(),
+            )
+        ],
+        duration_ms=10,
+    )
+
+    root = ET.fromstring(to_junit_xml(suite_result))
+    testcase = root.find("testcase")
+    assert testcase is not None
+    failure = testcase.find("failure")
+    assert failure is not None
+    assert failure.attrib["type"] == "MyCheck"
+    assert "MyCheck" in (failure.text or "")
 
 
 def test_to_junit_xml_writes_file(tmp_path: Path) -> None:

@@ -23,14 +23,8 @@ def _to_json(value: Any) -> str:
 
 
 def _check_label(result: CheckResult, fallback: str) -> str:
-    if isinstance(result.details, dict):
-        return str(
-            result.details.get("check_name")
-            or result.details.get("check_kind")
-            or result.details.get("name")
-            or fallback
-        )
-    return fallback
+    label = result.check_label
+    return label if label != "Unnamed check" else fallback
 
 
 def _iter_checks(scenario: ScenarioResult[Any]):

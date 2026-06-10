@@ -3,9 +3,10 @@ import time
 from contextlib import nullcontext
 
 import pytest
-from giskard.checks import Equals, Scenario, Suite
+from giskard.checks import CheckResult, Equals, Scenario, Suite
 from giskard.checks.core.result import ScenarioStatus
 from giskard.checks.scenarios.suite import _OverallOnly, _SuiteProgress
+from rich.console import Console
 from rich.progress import MofNCompleteColumn, Progress
 from rich.text import Text
 
@@ -28,6 +29,20 @@ def sut3():
 @pytest.fixture
 def identity_sut():
     return lambda inputs: inputs
+
+
+def test_check_result_console_falls_back_to_check_kind():
+    result = CheckResult.failure(
+        message="boom",
+        details={"check_kind": "MyCheck"},
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "MyCheck" in output
+    assert "Unnamed check" not in output
 
 
 @pytest.mark.asyncio
