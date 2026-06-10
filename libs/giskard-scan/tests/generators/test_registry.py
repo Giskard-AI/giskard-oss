@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
-from giskard.checks.scenarios_generator.base import ScenarioGenerator
-from giskard.checks.scenarios_generator.registry import SuiteGeneratorRegistry
+from giskard.scan.generators.base import ScenarioGenerator
+from giskard.scan.registry import SuiteGeneratorRegistry
 
 
 class _GenA(ScenarioGenerator):
@@ -144,20 +144,20 @@ def test_generators_returns_copy():
 
 
 def test_suite_generator_registry_contains_builtin_generators():
-    from giskard.checks.scenarios_generator.adversarial_generator import (
-        AdversarialScenarioGenerator,
-    )
-    from giskard.checks.scenarios_generator.prompt_injection import (
+    from giskard.scan.generators.adversarial import AdversarialScenarioGenerator
+    from giskard.scan.generators.goat import GOATAttackScenarioGenerator
+    from giskard.scan.generators.prompt_injection import (
         PromptInjectionScenarioGenerator,
     )
-    from giskard.checks.scenarios_generator.registry import suite_generator_registry
+    from giskard.scan.registry import suite_generator_registry
 
     types = {type(g) for g in suite_generator_registry.generators()}
     assert AdversarialScenarioGenerator in types
+    assert GOATAttackScenarioGenerator in types
     assert PromptInjectionScenarioGenerator in types
 
 
 def test_suite_generator_registry_exported_from_top_level():
-    from giskard.checks import SuiteGeneratorRegistry, suite_generator_registry
+    from giskard.scan import SuiteGeneratorRegistry, suite_generator_registry
 
     assert isinstance(suite_generator_registry, SuiteGeneratorRegistry)

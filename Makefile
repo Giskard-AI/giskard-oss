@@ -1,5 +1,5 @@
 # Variables
-LIBS := giskard-core giskard-llm giskard-agents giskard-checks
+LIBS := giskard-core giskard-llm giskard-agents giskard-checks giskard-scan
 PACKAGE ?= # Optional package to test (e.g., giskard-core, giskard-agents, giskard-checks)
 AGENT_NAME ?= # Optional, for setup-for-agents telemetry
 REASON ?= # Optional, for setup-for-agents telemetry
@@ -112,12 +112,12 @@ security: ## Check for security vulnerabilities
 generate-licenses: ## Generate licenses
 	uv tool run licensecheck --license MIT \
 		--format markdown --file THIRD_PARTY_NOTICES.md \
-		--skip-dependencies giskard-agents giskard-checks giskard-core
+		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-scan
 
 check-licenses: ## Check for licenses
 	uv tool run licensecheck --license MIT \
 		--show-only-failing --zero \
-		--skip-dependencies giskard-agents giskard-checks giskard-core
+		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-scan
 
 check: lint check-format check-compat typecheck security check-licenses ## Run all checks
 
