@@ -10,10 +10,12 @@ import pytest
 from giskard.checks import (
     Check,
     CheckResult,
+    CheckStatus,
     Equals,
     Interact,
     Interaction,
     TestCase,
+    TestCaseResult,
     Trace,
 )
 from rich.console import Console
@@ -283,6 +285,26 @@ class TestTestCaseResult:
         assert "None" not in report
         assert "equals" in report
         assert 'expected_value: "wrong"' in report
+
+    def test_failure_formatting_handles_non_dict_details(self):
+        result = CheckResult.model_construct(
+            status=CheckStatus.FAIL,
+            message="failed",
+            metrics=[],
+            details=None,
+        )
+
+        assert result.check_label == "Unnamed check"
+
+        test_case_result = TestCaseResult(results=[result], duration_ms=1)
+        assert test_case_result.format_failures() == [
+            "Unnamed check FAILED: failed"
+        ]
+
+        console = Console(record=True, force_terminal=False, no_color=True, width=120)
+        result.print_report(console)
+
+        assert "Unnamed check" in console.export_text()
 
     async def test_testcase_result_format_failures_with_errors(self):
         """Test format_failures() with error results."""

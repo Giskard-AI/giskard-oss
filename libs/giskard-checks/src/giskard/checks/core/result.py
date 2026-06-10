@@ -206,10 +206,11 @@ class CheckResult(BaseResult, frozen=True):
 
     @property
     def check_label(self) -> str:
+        details = self.details if isinstance(self.details, dict) else {}
         return str(
-            self.details.get("check_name")
-            or self.details.get("check_kind")
-            or self.details.get("name")
+            details.get("check_name")
+            or details.get("check_kind")
+            or details.get("name")
             or "Unnamed check"
         )
 
@@ -225,7 +226,11 @@ class CheckResult(BaseResult, frozen=True):
                 self.message
                 or "[dim italic]No specific error message provided[/dim italic]"
             )
-            params = _format_check_params(self.details.get("check_params"))
+            params = _format_check_params(
+                self.details.get("check_params")
+                if isinstance(self.details, dict)
+                else None
+            )
             if params:
                 details = f"{details}\n{params}"
         else:
@@ -442,7 +447,11 @@ class TestCaseResult(BaseResult, frozen=True):
                 check_name = result.check_label
                 status = "ERRORED" if result.errored else "FAILED"
                 message = result.message or "No specific error message provided"
-                params = _format_check_params(result.details.get("check_params"))
+                params = _format_check_params(
+                    result.details.get("check_params")
+                    if isinstance(result.details, dict)
+                    else None
+                )
                 if params:
                     message = f"{message}\n{params}"
                 failure_messages.append(f"{check_name} {status}: {message}")
