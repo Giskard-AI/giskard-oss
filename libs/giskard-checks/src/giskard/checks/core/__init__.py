@@ -5,6 +5,8 @@ from .interaction import Interact, Interaction, InteractionSpec, Trace
 from .result import (
     CheckResult,
     CheckStatus,
+    GroupedSuiteResult,
+    GroupStats,
     Metric,
     ScenarioResult,
     SuiteResult,
@@ -23,6 +25,8 @@ __all__ = [
     "Check",
     "CheckResult",
     "CheckStatus",
+    "GroupedSuiteResult",
+    "GroupStats",
     "Metric",
     "ScenarioResult",
     "SuiteResult",

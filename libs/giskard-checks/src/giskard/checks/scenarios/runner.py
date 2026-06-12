@@ -184,6 +184,7 @@ class ScenarioRunner:
             steps=steps_results,
             duration_ms=duration_ms,
             final_trace=trace,
+            tags=list(scenario.tags),
         )
 
         telemetry_capture(

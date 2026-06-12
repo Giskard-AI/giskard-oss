@@ -145,6 +145,7 @@ def test_generators_returns_copy():
 
 def test_suite_generator_registry_contains_builtin_generators():
     from giskard.scan.generators.adversarial import AdversarialScenarioGenerator
+    from giskard.scan.generators.crescendo import CrescendoAttackScenarioGenerator
     from giskard.scan.generators.goat import GOATAttackScenarioGenerator
     from giskard.scan.generators.prompt_injection import (
         PromptInjectionScenarioGenerator,
@@ -153,6 +154,7 @@ def test_suite_generator_registry_contains_builtin_generators():
 
     types = {type(g) for g in suite_generator_registry.generators()}
     assert AdversarialScenarioGenerator in types
+    assert CrescendoAttackScenarioGenerator in types
     assert GOATAttackScenarioGenerator in types
     assert PromptInjectionScenarioGenerator in types
 
