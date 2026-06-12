@@ -95,9 +95,9 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
     :class:`~giskard.checks.judges.Conformity` to evaluate the agent's
     response against the rule.
 
-    Tags signal downstream tooling that this generator covers two threat
-    categories: harmful content generation and misguidance / unauthorized
-    advice.
+    Each category in :data:`ADVERSARIAL_CATEGORIES` carries its own
+    ``tags`` (for example ``threat-type:harmful-content-generation``),
+    applied per scenario via :meth:`~giskard.checks.core.scenario.Scenario.with_tags`.
     """
 
     async def generate_scenario(
