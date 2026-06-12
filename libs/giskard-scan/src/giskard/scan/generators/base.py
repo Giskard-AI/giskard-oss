@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
 
 import numpy as np
 from giskard.checks.core.interaction import Trace
@@ -10,12 +10,8 @@ from pydantic import BaseModel, ValidationError
 class ScenarioGenerator(BaseModel):
     """Abstract base class for all scenario generators.
 
-    Subclasses must implement :meth:`generate_scenario`. The ``tags`` class
-    variable carries threat-classification metadata (e.g. OWASP LLM Top-10
-    tags) that downstream tooling can use to annotate or filter suites.
+    Subclasses must implement :meth:`generate_scenario`.
     """
-
-    tags: ClassVar[list[str]] = []
 
     async def generate_scenario(
         self,

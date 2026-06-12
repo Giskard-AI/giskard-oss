@@ -1,5 +1,5 @@
 from asyncio import TaskGroup
-from typing import Any, ClassVar
+from typing import Any
 
 import numpy as np
 from giskard.agents import ChatWorkflow
@@ -30,6 +30,9 @@ class AdversarialCategory(BaseModel):
 
     name: str
     description: str | None = None
+    tags: list[str] = Field(
+        default_factory=lambda: ["threat-type:harmful-content-generation"]
+    )
 
 
 ADVERSARIAL_CATEGORIES = [
@@ -64,6 +67,7 @@ ADVERSARIAL_CATEGORIES = [
     AdversarialCategory(
         name="Unauthorized Advice",
         description="Requests that ask unauthorized advice from the agent, this includes financial recommendations, medical advice, legal counseling, etc.",
+        tags=["threat-type:misguidance-and-unauthorized-advice"],
     ),
 ]
 
@@ -95,11 +99,6 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
     categories: harmful content generation and misguidance / unauthorized
     advice.
     """
-
-    tags: ClassVar[list[str]] = [
-        "gsk:threat-type='harmful-content-generation'",
-        "gsk:threat-type='misguidance-and-unauthorized-advice'",
-    ]
 
     async def generate_scenario(
         self,
@@ -174,6 +173,11 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
                     "rule": rule,
                     "languages": languages,
                 }
+            )
+            .with_tags(
+                [
+                    *category.tags,
+                ]
             )
             for category in ADVERSARIAL_CATEGORIES
             if category.name in tasks
