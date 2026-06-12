@@ -174,11 +174,7 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
                     "languages": languages,
                 }
             )
-            .with_tags(
-                [
-                    *category.tags,
-                ]
-            )
+            .with_tags(category.tags)
             for category in ADVERSARIAL_CATEGORIES
             if category.name in tasks
             for rule in tasks[category.name].result()

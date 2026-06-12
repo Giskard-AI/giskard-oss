@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 
 class ScenarioGenerator(BaseModel):
@@ -56,9 +56,11 @@ class DatasetScenarioGenerator(ScenarioGenerator):
     Attributes:
         dataset_name: Stem of the ``.jsonl`` file inside the package
             ``data/`` directory (e.g. ``"prompt_injection"``).
+        tags: Tags applied to every loaded scenario via :meth:`~giskard.checks.core.scenario.Scenario.with_tags`.
     """
 
     dataset_name: str
+    tags: list[str] = Field(default_factory=list)
 
     async def generate_scenario(
         self,
@@ -106,6 +108,8 @@ class DatasetScenarioGenerator(ScenarioGenerator):
                         "languages": languages,
                     }
                 )
+                if self.tags:
+                    scenario = scenario.with_tags(self.tags)
                 scenarios.append(scenario)
 
         if max_scenarios is not None and max_scenarios < len(scenarios):

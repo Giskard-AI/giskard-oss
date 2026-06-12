@@ -10,7 +10,7 @@ def _normalize_generator(
 
 
 class SuiteGeneratorRegistry:
-    """Global registry of ScenarioGenerator instances."""
+    """Mutable registry of scenario generator instances."""
 
     def __init__(self) -> None:
         self._generators: list[ScenarioGenerator] = []

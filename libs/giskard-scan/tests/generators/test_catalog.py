@@ -26,17 +26,6 @@ class _StubGenerator(ScenarioGenerator):
         return [Scenario(name=f"stub-{self.name}-{i}") for i in range(n)]
 
 
-@pytest.fixture(autouse=True)
-def isolated_registry():
-    """Snapshot and restore registry around each test."""
-    original = vulnerability_suite_generator_registry.generators()
-    vulnerability_suite_generator_registry.clear()
-    yield
-    vulnerability_suite_generator_registry.clear()
-    for g in original:
-        vulnerability_suite_generator_registry.register(g)
-
-
 async def test_generate_suite_requires_explicit_generators():
     with pytest.raises(
         TypeError, match="missing 1 required positional argument: 'generators'"
@@ -46,7 +35,9 @@ async def test_generate_suite_requires_explicit_generators():
         )
 
 
-async def test_generate_suite_does_not_read_vulnerability_registry():
+async def test_generate_suite_does_not_read_vulnerability_registry(
+    isolated_vulnerability_registry,
+):
     vulnerability_suite_generator_registry.register(_StubGenerator(name="registry"))
     suite = await generate_suite(
         "My chatbot",
@@ -66,7 +57,9 @@ async def test_generate_suite_generators_bare_type_is_normalized():
     assert suite.scenarios[0].name == "stub-stub-0"
 
 
-async def test_generate_suite_empty_generators_returns_empty_suite():
+async def test_generate_suite_empty_generators_returns_empty_suite(
+    isolated_vulnerability_registry,
+):
     vulnerability_suite_generator_registry.register(_StubGenerator(name="a"))
     suite = await generate_suite("My chatbot", languages=["en"], generators=[])
     assert suite.scenarios == []
