@@ -25,6 +25,7 @@ def test_public_api_is_accessible():
         "RegoPolicy",
         "Interaction",
         "Trace",
+        "Target",
     ]:
         assert hasattr(m, name), f"giskard.checks missing attribute: {name}"
 

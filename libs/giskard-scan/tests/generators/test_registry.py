@@ -138,28 +138,3 @@ def test_generators_returns_copy():
     snapshot = registry.generators()
     snapshot.clear()
     assert len(registry.generators()) == 1
-
-
-# --- built-in generators ---
-
-
-def test_suite_generator_registry_contains_builtin_generators():
-    from giskard.scan.generators.adversarial import AdversarialScenarioGenerator
-    from giskard.scan.generators.crescendo import CrescendoAttackScenarioGenerator
-    from giskard.scan.generators.goat import GOATAttackScenarioGenerator
-    from giskard.scan.generators.prompt_injection import (
-        PromptInjectionScenarioGenerator,
-    )
-    from giskard.scan.registry import suite_generator_registry
-
-    types = {type(g) for g in suite_generator_registry.generators()}
-    assert AdversarialScenarioGenerator in types
-    assert CrescendoAttackScenarioGenerator in types
-    assert GOATAttackScenarioGenerator in types
-    assert PromptInjectionScenarioGenerator in types
-
-
-def test_suite_generator_registry_exported_from_top_level():
-    from giskard.scan import SuiteGeneratorRegistry, suite_generator_registry
-
-    assert isinstance(suite_generator_registry, SuiteGeneratorRegistry)

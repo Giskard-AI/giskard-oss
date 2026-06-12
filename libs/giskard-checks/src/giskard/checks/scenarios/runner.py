@@ -22,7 +22,7 @@ from ..core.interaction import Interact
 from ..core.result import CheckResult, ScenarioResult, TestCaseResult
 from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
-from ..core.types import ProviderType
+from ..core.types import Target
 from ..utils.inference import _infer_trace_type
 
 
@@ -38,11 +38,7 @@ def _validate_multiple_runs(value: int | None) -> int | None:
 
 def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
-    target: (
-        ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, TraceType], OutputType]
-        | NotProvided
-    ),
+    target: Target[InputType, OutputType, TraceType] | NotProvided,
 ) -> list[Step[InputType, OutputType, TraceType]]:
     """Build steps with target bound to Interact outputs where needed.
 
@@ -72,11 +68,7 @@ def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
 
 def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
-    run_target: (
-        ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, TraceType], OutputType]
-        | NotProvided
-    ),
+    run_target: Target[InputType, OutputType, TraceType] | NotProvided,
 ) -> type[TraceType]:
     if scenario.trace_type is not None:
         return scenario.trace_type
@@ -122,11 +114,7 @@ class ScenarioRunner:
     async def _run_once[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ) = NOT_PROVIDED,
+        target: Target[InputType, OutputType, TraceType] | NotProvided = NOT_PROVIDED,
         return_exception: bool = False,
     ) -> ScenarioResult[TraceType]:
         start_time = time.perf_counter()
@@ -201,11 +189,7 @@ class ScenarioRunner:
     async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ) = NOT_PROVIDED,
+        target: Target[InputType, OutputType, TraceType] | NotProvided = NOT_PROVIDED,
         return_exception: bool = False,
         multiple_runs: int | None = None,
     ) -> ScenarioResult[TraceType]:
@@ -220,7 +204,7 @@ class ScenarioRunner:
         ----------
         scenario : Scenario
             The scenario to execute.
-        target : ProviderType | NotProvided
+        target : Target | NotProvided
             Optional target override used to replace `NOT_PROVIDED` interaction outputs.
         return_exception : bool
             If True, return results even when exceptions occur instead of raising.
