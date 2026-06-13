@@ -1,0 +1,48 @@
+[project]
+name = "giskard-scan"
+version = "1.0.0b2"
+description = "Agent vulnerability scanner — red teaming, prompt injection, adversarial scenario generation"
+readme = "README.md"
+license = { text = "Apache Software License 2.0" }
+authors = [{ name = "Giskard R&D", email = "rnd@giskard.ai" }]
+requires-python = ">=3.12"
+dependencies = [
+    "giskard-checks>=1.0.2b3,<2",
+    "giskard-agents>=1.0.2b3,<2",
+    "numpy>=2.4.1,<3",
+]
+
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/giskard"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/giskard/scan",
+  "README.md",
+  "pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "src"]
+addopts = "--doctest-modules"
+asyncio_mode = "auto"
+pythonpath = ["src"]
+markers = [
+    "integration: integration tests that are skipped unless --run-integration is provided",
+]
+
+[tool.ruff.lint]
+select = ["E", "W", "I", "F"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort.sections]
+"my_packages" = ["giskard"]
+
+[tool.pyright]
+failOnWarnings = false
+typeCheckingMode = "recommended"
+reportImportCycles = "warning"

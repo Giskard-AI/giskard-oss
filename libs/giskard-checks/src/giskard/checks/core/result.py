@@ -1,3 +1,5 @@
+from collections import defaultdict
+from collections.abc import Mapping
 from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar
@@ -6,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.panel import Panel
 from rich.rule import Rule
+from rich.table import Table
+from rich.text import Text
 
 from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
@@ -36,6 +40,33 @@ STATUS_MAPPING = {
         "symbol": "s",
     },
 }
+
+STATUS_SUMMARY_ORDER: tuple[tuple[str, str], ...] = (
+    ("error", "errored"),
+    ("fail", "failed"),
+    ("skip", "skipped"),
+    ("pass", "passed"),
+)
+
+
+def format_status_count_parts(counts: Mapping[str, int]) -> list[str]:
+    """Build Rich markup fragments for non-zero status counts in summary order."""
+    return [
+        f"[{STATUS_MAPPING[key]['color']} bold]{counts[key]} {label}"
+        f"[/{STATUS_MAPPING[key]['color']} bold]"
+        for key, label in STATUS_SUMMARY_ORDER
+        if counts.get(key)
+    ]
+
+
+def format_status_count_text(
+    counts: Mapping[str, int], *, prefix: str = ""
+) -> Text | None:
+    """Colored counts line, or ``None`` when every count is zero."""
+    parts = format_status_count_parts(counts)
+    if not parts:
+        return None
+    return Text.from_markup(prefix + ", ".join(parts))
 
 
 def _pluralize(count: int, word: str, plural: str | None = None) -> str:
@@ -261,6 +292,10 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
         default=1,
         description="Full scenario executions that ran before stopping (at most multiple_runs).",
     )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Snapshot of scenario tags at run time.",
+    )
 
     @computed_field
     @property
@@ -455,31 +490,15 @@ class TestCaseResult(BaseResult, frozen=True):
         for result in self.results:
             yield from result.__rich_console__(console, options)
 
-        # Build subtitle with counts
-        counts = {
-            "errored": sum(1 for r in self.results if r.errored),
-            "failed": sum(1 for r in self.results if r.failed),
-            "skipped": sum(1 for r in self.results if r.skipped),
-            "passed": sum(1 for r in self.results if r.passed),
+        status_counts = {
+            "error": sum(1 for r in self.results if r.errored),
+            "fail": sum(1 for r in self.results if r.failed),
+            "skip": sum(1 for r in self.results if r.skipped),
+            "pass": sum(1 for r in self.results if r.passed),
         }
-        count_parts: list[str] = []
-        if counts["errored"]:
-            count_parts.append(
-                f"[{STATUS_MAPPING['error']['color']} bold]{counts['errored']} errored[/{STATUS_MAPPING['error']['color']} bold]"
-            )
-        if counts["failed"]:
-            count_parts.append(
-                f"[{STATUS_MAPPING['fail']['color']} bold]{counts['failed']} failed[/{STATUS_MAPPING['fail']['color']} bold]"
-            )
-        if counts["skipped"]:
-            count_parts.append(
-                f"[{STATUS_MAPPING['skip']['color']} bold]{counts['skipped']} skipped[/{STATUS_MAPPING['skip']['color']} bold]"
-            )
-        if counts["passed"]:
-            count_parts.append(
-                f"[{STATUS_MAPPING['pass']['color']} bold]{counts['passed']} passed[/{STATUS_MAPPING['pass']['color']} bold]"
-            )
-        subtitle = ", ".join(count_parts) + f" in {self.duration_ms}ms"
+        subtitle = ", ".join(format_status_count_parts(status_counts)) + (
+            f" in {self.duration_ms}ms"
+        )
 
         yield Rule(subtitle, style=f"{status['color']} bold")
 
@@ -553,6 +572,62 @@ class SuiteResult(BaseResult, frozen=True):
 
         return to_junit_xml(self, path=path)
 
+    def group_by(self, key: str) -> "GroupedSuiteResult":
+        """Group results by a tag key and return a GroupedSuiteResult.
+
+        A scenario may appear in multiple buckets if it carries several tags with
+        the same key (e.g. ``["Category:Hallucination", "Category:Adversarial"]``).
+        This is intentional: a scenario that tests two vulnerabilities affects both
+        pass rates. Totals across buckets may therefore exceed the number of scenarios.
+        Scenarios with no tag matching ``key`` go into the ``None`` bucket.
+
+        Parameters
+        ----------
+        key : str
+            The tag key to group by (e.g. ``"Category"``).
+
+        Returns
+        -------
+        GroupedSuiteResult
+            Wrapper holding this result, the key, and per-group stats.
+        """
+
+        buckets: defaultdict[str | None, dict[str, int]] = defaultdict(
+            lambda: {"passed": 0, "failed": 0, "errored": 0, "skipped": 0}
+        )
+
+        for result in self.results:
+            matched_values: set[str] = set()
+            for tag in result.tags:
+                tag_key, tag_value = _parse_tag(tag)
+                if tag_key == key:
+                    matched_values.add(tag_value)
+            for val in matched_values or {None}:
+                _record_into(buckets[val], result)
+
+        groups = {
+            bucket_key: GroupStats(name=bucket_key, **counts)
+            for bucket_key, counts in buckets.items()
+        }
+
+        return GroupedSuiteResult(suite_result=self, key=key, groups=groups)
+
+    def print_report(
+        self, console: Console | None = None, group_by: str | None = None
+    ) -> None:
+        """Print the suite report, optionally with a grouped pass-rate table.
+
+        Parameters
+        ----------
+        console : Console | None
+            Rich console to use. Defaults to a new Console().
+        group_by : str | None
+            Tag key to group by (e.g. ``"Category"``). When set, appends a
+            per-group pass-rate table after the standard report.
+        """
+        console = console or Console()
+        console.print(self.group_by(group_by) if group_by is not None else self)
+
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
@@ -597,26 +672,97 @@ class SuiteResult(BaseResult, frozen=True):
         yield Rule(style="bold blue")
 
         # Summary metrics
-        count_parts = []
-        count_parts.append(
+        count_parts = [
             f"[{STATUS_MAPPING['total']['color']} bold]{len(self.results)} total[/{STATUS_MAPPING['total']['color']} bold]"
+        ]
+        count_parts.extend(
+            format_status_count_parts(
+                {
+                    "error": self.errored_count,
+                    "fail": self.failed_count,
+                    "skip": self.skipped_count,
+                    "pass": self.passed_count,
+                }
+            )
         )
-        if self.errored_count:
-            count_parts.append(
-                f"[{STATUS_MAPPING['error']['color']} bold]{self.errored_count} errored[/{STATUS_MAPPING['error']['color']} bold]"
-            )
-        if self.failed_count:
-            count_parts.append(
-                f"[{STATUS_MAPPING['fail']['color']} bold]{self.failed_count} failed[/{STATUS_MAPPING['fail']['color']} bold]"
-            )
-        if self.skipped_count:
-            count_parts.append(
-                f"[{STATUS_MAPPING['skip']['color']} bold]{self.skipped_count} skipped[/{STATUS_MAPPING['skip']['color']} bold]"
-            )
-        if self.passed_count:
-            count_parts.append(
-                f"[{STATUS_MAPPING['pass']['color']} bold]{self.passed_count} passed[/{STATUS_MAPPING['pass']['color']} bold]"
-            )
-
         summary = ", ".join(count_parts)
         yield f"Summary: {summary} | Pass Rate: [default bold]{self.pass_rate:.1%}[/default bold] | Total Duration: {self.duration_ms}ms"
+
+
+def _parse_tag(tag: str) -> tuple[str, str]:
+    key, _, value = tag.partition(":")
+    return key, value
+
+
+def _record_into(bucket: dict[str, int], result: "ScenarioResult[Any]") -> None:
+    if result.passed:
+        bucket["passed"] += 1
+    elif result.errored:
+        bucket["errored"] += 1
+    elif result.skipped:
+        bucket["skipped"] += 1
+    else:
+        bucket["failed"] += 1
+
+
+class GroupStats(BaseModel, frozen=True):
+    """Pass/fail counts for one tag-value bucket. Mirrors Hub's Metric shape."""
+
+    name: str | None
+    passed: int
+    failed: int
+    errored: int
+    skipped: int = 0
+
+    @computed_field
+    @property
+    def total(self) -> int:
+        """Total scenarios in this bucket (passed + failed + errored + skipped)."""
+        return self.passed + self.failed + self.errored + self.skipped
+
+    @computed_field
+    @property
+    def non_skipped(self) -> int:
+        """Scenarios counted toward pass rate (total minus skipped)."""
+        return self.total - self.skipped
+
+    @computed_field
+    @property
+    def pass_rate(self) -> float | None:
+        """Fraction passed out of non-skipped scenarios; None when non_skipped == 0."""
+        if self.non_skipped == 0:
+            return None
+        return self.passed / self.non_skipped
+
+
+class GroupedSuiteResult(BaseResult, frozen=True):
+    """SuiteResult grouped by a tag key, with per-group stats and Rich table."""
+
+    suite_result: SuiteResult
+    key: str
+    groups: dict[str | None, GroupStats]
+
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        yield from self.suite_result.__rich_console__(console, options)
+
+        table = Table(title=f"Results by {self.key}")
+        table.add_column(self.key, style="bold")
+        table.add_column("Pass Rate", justify="right")
+
+        for group_value, stats in self.groups.items():
+            if group_value is None:
+                display_name = "(untagged)"
+            elif group_value == "":
+                display_name = "true"
+            else:
+                display_name = group_value
+            rate = (
+                f"{stats.passed} / {stats.non_skipped}"
+                if stats.pass_rate is not None
+                else "—"
+            )
+            table.add_row(display_name, rate)
+
+        yield table

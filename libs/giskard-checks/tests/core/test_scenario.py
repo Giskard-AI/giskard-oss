@@ -1195,6 +1195,41 @@ class TestScenarioExtendAndSerialization:
         assert result.final_trace.interactions[0].outputs == "Hi"
 
 
+def test_scenario_tags_default_empty():
+    scenario = Scenario("s")
+    assert scenario.tags == []
+
+
+def test_scenario_tags_constructor():
+    scenario = Scenario("s", tags=["Category:Hallucination", "Severity:High"])
+    assert scenario.tags == ["Category:Hallucination", "Severity:High"]
+
+
+def test_scenario_with_tags_fluent():
+    scenario = Scenario("s").with_tags(["Category:Adversarial"])
+    assert scenario.tags == ["Category:Adversarial"]
+
+
+def test_scenario_with_tags_returns_self():
+    scenario = Scenario("s")
+    result = scenario.with_tags(["foo"])
+    assert result is scenario
+
+
+def test_scenario_with_tags_overrides_previous():
+    scenario = Scenario("s", tags=["Category:Foo"]).with_tags(["Category:Bar"])
+    assert scenario.tags == ["Category:Bar"]
+
+
+def test_scenario_with_tags_chained_with_constructor():
+    scenario = (
+        Scenario("s", tags=["Category:Foo"])
+        .with_tags(["Category:Bar"])
+        .with_tags(["Category:Baz"])
+    )
+    assert scenario.tags == ["Category:Baz"]
+
+
 @pytest.fixture
 def echo_sut():
     return lambda inputs: f"Echo: {inputs}"
@@ -1251,3 +1286,39 @@ class TestScenarioDynamicBinding:
             match="Interaction outputs are not provided and no target was bound",
         ):
             await scenario.run()
+
+
+@pytest.mark.asyncio
+async def test_scenario_result_snapshots_tags():
+    def sut(inputs):
+        return f"reply: {inputs}"
+
+    scenario = (
+        Scenario("s", tags=["Category:Hallucination"])
+        .interact("hello", sut)
+        .check(Equals(expected_value="reply: hello", key="trace.last.outputs"))
+    )
+    result = await scenario.run()
+    assert result.tags == ["Category:Hallucination"]
+
+
+@pytest.mark.asyncio
+async def test_scenario_result_tags_snapshot_is_independent():
+    def sut(inputs):
+        return inputs
+
+    scenario = Scenario("s", tags=["Category:Foo"]).interact("hi", sut)
+    result = await scenario.run()
+    scenario.tags = ["Category:Bar"]  # mutate after run
+    assert result.tags == ["Category:Foo"]  # snapshot unchanged
+
+
+@pytest.mark.asyncio
+async def test_scenario_result_tags_snapshot_independent_from_original():
+    def sut(inputs):
+        return inputs
+
+    scenario = Scenario("s", tags=["Category:Foo"]).interact("hi", sut)
+    result = await scenario.run()
+    scenario.tags.append("Category:Bar")  # mutate the original list
+    assert result.tags == ["Category:Foo"]  # snapshot unchanged

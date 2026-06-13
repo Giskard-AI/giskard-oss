@@ -99,6 +99,38 @@ result.print_report()
 
 > The `run()` method is async. In a script, wrap it with `asyncio.run()`. See the [full docs](https://docs.giskard.ai/oss/checks) for `Suites`, `LLMJudge`, multi-turn scenarios, and more.
 
+---
+
+## Giskard Scan — vulnerability scanner for AI agents
+
+```sh
+pip install giskard-scan
+```
+
+**Giskard Scan** is the red-teaming and vulnerability scanning layer for agentic systems. It generates adversarial test suites automatically from a plain-language description of your agent, covering prompt injection, harmful content, stereotypes, misinformation, and more.
+
+Use Giskard Scan to:
+
+- **Red-team your agent** — automatically generate adversarial inputs across OWASP LLM Top-10 threat categories
+- **Run prompt-injection probes** — built-in dataset of injection payloads ready to use
+- **Extend with custom generators** — pass your own `ScenarioGenerator` instances to `generate_suite`, or register them on `vulnerability_suite_generator_registry`
+
+### Quickstart
+
+```python
+import asyncio
+from giskard.scan import vulnerability_scan
+
+async def main():
+    await vulnerability_scan(
+        target=my_agent,
+        description="A customer support chatbot for an e-commerce platform.",
+        languages=["en"],
+    )
+
+asyncio.run(main())
+```
+
 ## Looking for Giskard v2?
 
 Giskard v2 included **Scan** (automatic vulnerability detection) and **RAGET** (RAG evaluation test set generation) for both ML models and LLM applications. These features are not available in v3.

@@ -4,6 +4,10 @@ from contextlib import nullcontext
 
 import pytest
 from giskard.checks import Equals, Scenario, Suite
+from giskard.checks.core.result import GroupedSuiteResult, GroupStats, ScenarioStatus
+from giskard.checks.scenarios.suite import _OverallOnly, _SuiteProgress
+from rich.progress import MofNCompleteColumn, Progress
+from rich.text import Text
 
 
 @pytest.fixture
@@ -292,3 +296,297 @@ async def test_suite_parallel_rejects_invalid_max_concurrency():
 
     with pytest.raises(ValueError, match="max_concurrency must be greater than 0"):
         await suite.run(parallel=True, max_concurrency=0)
+
+
+def test_progress_counter_appears_only_on_the_overall_row():
+    """The counter shows on the overall summary row and is blank on scenario rows."""
+    column = _OverallOnly(MofNCompleteColumn())
+    with Progress(column, disable=True) as progress:
+        overall_id = progress.add_task("overall", total=3, completed=1, overall=True)
+        scenario_id = progress.add_task("scenario", total=None)
+        by_id = {task.id: task for task in progress.tasks}
+
+    overall = column.render(by_id[overall_id])
+    scenario = column.render(by_id[scenario_id])
+    assert isinstance(overall, Text)
+    assert isinstance(scenario, Text)
+    assert overall.plain == "1/3"
+    assert scenario.plain == ""
+
+
+@pytest.mark.asyncio
+async def test_suite_progress_can_be_disabled(monkeypatch):
+    """`verbose=False` builds a disabled bar so its calls are no-ops."""
+    bars = []
+    monkeypatch.setattr(Progress, "__enter__", lambda self: bars.append(self) or self)
+
+    suite = Suite(name="progress_off_suite", target=lambda inputs: inputs)
+    suite.append(Scenario("a").interact("a"))
+
+    await suite.run(verbose=False)
+
+    assert bars[0].disable is True
+
+
+@pytest.mark.asyncio
+async def test_suite_parallel_progress_shows_a_row_per_scenario(monkeypatch):
+    """Parallel mode adds one progress row per running scenario."""
+    rows = []
+    original_add_task = Progress.add_task
+
+    def record_row(self, description, **kwargs):
+        rows.append(description)
+        return original_add_task(self, description, **kwargs)
+
+    monkeypatch.setattr(Progress, "add_task", record_row)
+
+    suite = Suite(name="progress_rows_suite", target=lambda inputs: inputs)
+    for name in ("alpha", "beta"):
+        suite.append(Scenario(name).interact("hi"))
+
+    await suite.run(parallel=True)
+
+    assert "  ↳ alpha" in rows
+    assert "  ↳ beta" in rows
+
+
+@pytest.mark.parametrize(
+    ("records", "expected"),
+    [
+        ([], None),
+        (
+            [
+                ScenarioStatus.FAIL,
+                ScenarioStatus.PASS,
+                ScenarioStatus.PASS,
+                ScenarioStatus.PASS,
+            ],
+            "1 failed, 3 passed",
+        ),
+        (
+            [ScenarioStatus.ERROR]
+            + [ScenarioStatus.SKIP] * 2
+            + [ScenarioStatus.FAIL] * 5
+            + [ScenarioStatus.PASS] * 19,
+            "1 errored, 5 failed, 2 skipped, 19 passed",
+        ),
+    ],
+    ids=["empty", "omits_zero_counts", "all_nonzero_in_order"],
+)
+def test_progress_summary_renderable(records, expected):
+    """Live summary lists errored, failed, skipped, passed; omits zeros; absent when empty."""
+    progress = _SuiteProgress(disable=True)
+    for status in records:
+        progress.record(status)
+
+    summary = progress._summary_renderable()
+    if expected is None:
+        assert summary is None
+    else:
+        assert summary is not None
+        assert summary.plain.strip() == expected
+
+
+@pytest.mark.asyncio
+async def test_suite_progress_records_each_scenario_outcome(monkeypatch):
+    """Each finished scenario feeds its status into the live counts, in order."""
+    recorded = []
+    monkeypatch.setattr(
+        _SuiteProgress, "record", lambda self, status: recorded.append(status)
+    )
+
+    passing = Scenario("s1").interact("a", "a")
+    failing = (
+        Scenario("s2")
+        .interact("b", "c")
+        .check(Equals(expected_value="b", key="trace.last.outputs"))
+    )
+    suite = Suite(name="record_suite")
+    suite.append(passing).append(failing)
+
+    await suite.run()
+
+    assert recorded == [ScenarioStatus.PASS, ScenarioStatus.FAIL]
+
+
+def test_group_stats_pass_rate_all_passed():
+    stats = GroupStats(name="Hallucination", passed=3, failed=0, errored=0)
+    assert stats.total == 3
+    assert stats.pass_rate == 1.0
+
+
+def test_group_stats_pass_rate_mixed():
+    stats = GroupStats(name="Adversarial", passed=2, failed=3, errored=0)
+    assert stats.total == 5
+    assert stats.pass_rate == pytest.approx(2 / 5)
+
+
+def test_group_stats_pass_rate_none_when_zero_total():
+    stats = GroupStats(name="Empty", passed=0, failed=0, errored=0)
+    assert stats.total == 0
+    assert stats.pass_rate is None
+
+
+def test_group_stats_total_includes_errored():
+    stats = GroupStats(name="X", passed=1, failed=1, errored=2)
+    assert stats.total == 4
+
+
+def test_group_stats_pass_rate_zero_when_all_errored():
+    stats = GroupStats(name="X", passed=0, failed=0, errored=3)
+    assert stats.total == 3
+    assert stats.pass_rate == pytest.approx(0.0)
+
+
+def test_group_stats_total_includes_skipped():
+    stats = GroupStats(name="X", passed=1, failed=1, errored=1, skipped=2)
+    assert stats.total == 5
+
+
+def test_group_stats_pass_rate_excludes_skipped_from_denominator():
+    stats = GroupStats(name="X", passed=2, failed=1, errored=0, skipped=5)
+    assert stats.pass_rate == pytest.approx(2 / 3)
+
+
+def test_suite_group_by_skipped_scenario_counted_separately():
+    from giskard.checks.core.interaction.trace import Trace
+    from giskard.checks.core.result import (
+        CheckResult,
+        ScenarioResult,
+        SuiteResult,
+        TestCaseResult,
+    )
+
+    empty_trace = Trace(interactions=[])
+
+    skipped_step = TestCaseResult(
+        results=[CheckResult.skip(message="precondition not met")],
+        duration_ms=0,
+    )
+    skipped_scenario = ScenarioResult(
+        scenario_name="t_skip",
+        steps=[skipped_step],
+        duration_ms=0,
+        final_trace=empty_trace,
+        tags=["Category:Hallucination"],
+    )
+    passing_step = TestCaseResult(
+        results=[CheckResult.success()],
+        duration_ms=0,
+    )
+    passing_scenario = ScenarioResult(
+        scenario_name="t_pass",
+        steps=[passing_step],
+        duration_ms=0,
+        final_trace=empty_trace,
+        tags=["Category:Hallucination"],
+    )
+    suite_result = SuiteResult(
+        results=[skipped_scenario, passing_scenario], duration_ms=0
+    )
+    grouped = suite_result.group_by("Category")
+
+    stats = grouped.groups["Hallucination"]
+    assert stats.skipped == 1
+    assert stats.passed == 1
+    assert stats.failed == 0
+    assert stats.total == 2
+    assert stats.pass_rate == 1.0  # skipped excluded from denominator
+
+
+@pytest.mark.asyncio
+async def test_suite_group_by_returns_grouped_suite_result(identity_sut):
+    from giskard.checks import Equals, Scenario, Suite
+
+    suite = Suite(name="s", target=identity_sut)
+    suite.append(
+        Scenario("t1", tags=["Category:Hallucination"])
+        .interact("hi")
+        .check(Equals(expected_value="hi", key="trace.last.outputs"))
+    )
+    suite.append(
+        Scenario("t2", tags=["Category:Adversarial"])
+        .interact("hi")
+        .check(Equals(expected_value="WRONG", key="trace.last.outputs"))
+    )
+    suite.append(Scenario("t3").interact("hi"))  # untagged, no checks
+
+    result = await suite.run(verbose=False)
+    grouped = result.group_by("Category")
+
+    assert isinstance(grouped, GroupedSuiteResult)
+    assert grouped.key == "Category"
+    assert set(grouped.groups.keys()) == {"Hallucination", "Adversarial", None}
+    assert grouped.groups["Hallucination"].passed == 1
+    assert grouped.groups["Hallucination"].total == 1
+    assert grouped.groups["Adversarial"].failed == 1
+    assert grouped.groups["Adversarial"].total == 1
+    assert grouped.groups[None].total == 1
+
+
+@pytest.mark.asyncio
+async def test_suite_group_by_bare_tag(identity_sut):
+    from giskard.checks import Scenario, Suite
+
+    suite = Suite(name="s", target=identity_sut)
+    suite.append(Scenario("t1", tags=["flaky"]).interact("hi"))
+    result = await suite.run(verbose=False)
+    grouped = result.group_by("flaky")
+
+    assert grouped.groups[""].total == 1  # bare tag: value is ""
+
+
+@pytest.mark.asyncio
+async def test_suite_group_by_multi_value_tags_count_in_both_buckets(identity_sut):
+    from giskard.checks import Scenario, Suite
+
+    suite = Suite(name="s", target=identity_sut)
+    suite.append(
+        Scenario(
+            "t1", tags=["Category:Hallucination", "Category:Adversarial"]
+        ).interact("hi")
+    )
+    result = await suite.run(verbose=False)
+    grouped = result.group_by("Category")
+
+    # Scenario appears in both buckets — totals sum to 2, not 1
+    assert grouped.groups["Hallucination"].total == 1
+    assert grouped.groups["Adversarial"].total == 1
+    assert None not in grouped.groups  # fully matched, not untagged
+
+
+def test_parse_tag_colon_only():
+    from giskard.checks.core.result import _parse_tag
+
+    key, value = _parse_tag(":")
+    assert key == ""
+    assert value == ""
+
+
+def test_parse_tag_empty_string():
+    from giskard.checks.core.result import _parse_tag
+
+    key, value = _parse_tag("")
+    assert key == ""
+    assert value == ""
+
+
+def test_parse_tag_multiple_colons():
+    from giskard.checks.core.result import _parse_tag
+
+    # Only splits on the first colon; rest of string becomes value
+    key, value = _parse_tag("a:b:c")
+    assert key == "a"
+    assert value == "b:c"
+
+
+def test_parse_tag_no_colon():
+    from giskard.checks.core.result import _parse_tag
+
+    key, value = _parse_tag("flaky")
+    assert key == "flaky"
+    assert value == ""
+
+
+def test_group_stats_importable_from_top_level():
+    from giskard.checks import GroupedSuiteResult, GroupStats  # noqa: F401

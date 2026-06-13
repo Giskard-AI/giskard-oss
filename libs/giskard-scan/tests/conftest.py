@@ -1,0 +1,13 @@
+import pytest
+from giskard.scan.vulnerability import vulnerability_suite_generator_registry
+
+
+@pytest.fixture
+def isolated_vulnerability_registry():
+    """Snapshot and restore the vulnerability generator registry."""
+    original = vulnerability_suite_generator_registry.generators()
+    vulnerability_suite_generator_registry.clear()
+    yield
+    vulnerability_suite_generator_registry.clear()
+    for generator in original:
+        vulnerability_suite_generator_registry.register(generator)
