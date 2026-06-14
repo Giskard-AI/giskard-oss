@@ -20,7 +20,7 @@ pip install giskard-checks
 
 Requires Python >= 3.12.
 
-**Telemetry:** This package depends on `giskard-core`, which may send **optional, aggregated usage analytics** when you run scenarios, suites, or test cases (no prompts, outputs, or scenario text). See **[Telemetry](../giskard-core/README.md#telemetry)** in the `giskard-core` README for what is collected and how to opt out (`DO_NOT_TRACK`, `GISKARD_TELEMETRY_DISABLED`, or `disable_telemetry()`).
+**Telemetry:** This package depends on `giskard-core`, which may send **optional, aggregated usage analytics** when you run scenarios, suites, or test cases (no prompts, outputs, or scenario text). See **[Telemetry](../giskard-core/README.md#telemetry)** in the `giskard-core` README for what is collected and how to opt out (`DO_NOT_TRACK`, `GISKARD_TELEMETRY_DISABLED`, `GISKARD_TELEMETRY_DISABLE_GEOIP`, or `disable_telemetry()`).
 
 **Dependencies:**
 - `pydantic>=2.12` - Core data validation and serialization
@@ -427,13 +427,13 @@ User simulation
 Use `UserSimulator` for LLM-powered user personas in multi-turn scenarios. Supports predefined personas (e.g., ``frustrated_customer``, ``helpful_user``) or custom descriptions.
 
 ```python
-from giskard.checks import scenario, UserSimulator, set_default_generator
+from giskard.checks import Scenario, UserSimulator, set_default_generator
 from giskard.agents.generators import Generator
 
 set_default_generator(Generator(model="openai/gpt-4o-mini"))
 
 result = await (
-    scenario("user-simulation")
+    Scenario("user-simulation")
     .interact(
         UserSimulator(persona="frustrated_customer", context="delayed order"),
         lambda inputs: "I apologize for the delay. Let me look into that.",

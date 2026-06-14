@@ -2,8 +2,10 @@
     "include": ["libs"],
     "executionEnvironments": [
       { "root": "libs/giskard-core/src" },
+      { "root": "libs/giskard-llm/src" },
       { "root": "libs/giskard-agents/src" },
-      { "root": "libs/giskard-checks/src" }
+      { "root": "libs/giskard-checks/src" },
+      { "root": "libs/giskard-scan/src" }
     ],
     "failOnWarnings": false,
     "typeCheckingMode": "recommended",

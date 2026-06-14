@@ -1,8 +1,9 @@
-from typing import Any
+from typing import Any, Literal
 
+from giskard.llm import chat
+from giskard.llm.types import ChatMessage
 from pydantic import BaseModel
 
-from ..chat import Message, Role
 from .environment import _inline_env
 
 
@@ -20,10 +21,10 @@ class MessageTemplate(BaseModel):
         environment.
     """
 
-    role: Role
+    role: Literal["user", "assistant", "system", "developer"]
     content_template: str
 
-    def render(self, **kwargs: Any) -> Message:
+    def render(self, **kwargs: Any) -> ChatMessage:
         """
         Render the message template with the given context.
 
@@ -33,4 +34,4 @@ class MessageTemplate(BaseModel):
         template = _inline_env.from_string(self.content_template)
         rendered_content = template.render(**kwargs)
 
-        return Message(role=self.role, content=rendered_content)
+        return chat.message(rendered_content, self.role)

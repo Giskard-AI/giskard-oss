@@ -1,14 +1,48 @@
-from typing import Any, cast, override
+"""Optional LiteLLM-backed generator.
 
-from litellm import Choices, ModelResponse, acompletion
-from litellm import _should_retry as litellm_should_retry
+Install the optional dependency with::
+
+    pip install giskard-agents[litellm]
+
+Importing this module is safe without litellm; instantiation raises ImportError.
+"""
+
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, cast, override
+
+from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
+from giskard.llm.utils import sanitize_schema_name
 from pydantic import Field
 
-from ..chat import Message
 from ..tools import Tool
-from ._types import GenerationParams, Response
+from ._types import GenerationParams
 from .base import BaseGenerator
 from .middleware import CompletionMiddleware, RetryMiddleware, RetryPolicy
+
+if TYPE_CHECKING:
+    from litellm import ModelResponse
+    from openai.types.chat.chat_completion_message_param import (
+        ChatCompletionMessageParam,
+    )
+
+
+def _import_litellm() -> Any:
+    try:
+        import litellm
+
+        return litellm
+    except ImportError as exc:
+        raise ImportError(
+            "LiteLLMGenerator requires the optional 'litellm' dependency. "
+            "Install it with: pip install giskard-agents[litellm]"
+        ) from exc
+
+
+def _sanitize_response_format_name(converted: dict[str, Any]) -> None:
+    """Sanitize ``converted['json_schema']['name']`` in place when present."""
+    json_schema = converted.get("json_schema")
+    if isinstance(json_schema, dict) and json_schema.get("name"):
+        json_schema["name"] = sanitize_schema_name(json_schema["name"])
 
 
 @CompletionMiddleware.register("litellm_retry")
@@ -17,7 +51,8 @@ class LiteLLMRetryMiddleware(RetryMiddleware):
 
     @override
     def _should_retry(self, err: Exception) -> bool:
-        return litellm_should_retry(getattr(err, "status_code", 0))
+        litellm = _import_litellm()
+        return litellm._should_retry(getattr(err, "status_code", 0))
 
 
 @BaseGenerator.register("litellm")
@@ -25,9 +60,14 @@ class LiteLLMGenerator(BaseGenerator):
     """A generator for creating chat completion pipelines using LiteLLM."""
 
     model: str = Field(
-        description="The model identifier to use (e.g. 'gemini/gemini-2.0-flash')"
+        description="The model identifier to use (e.g. 'gemini/gemini-3.5-flash')"
     )
     retry_policy: RetryPolicy | None = Field(default_factory=RetryPolicy)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Fail fast if litellm is not installed."""
+        super().model_post_init(__context)
+        _import_litellm()
 
     @override
     def _create_retry_middleware(self) -> LiteLLMRetryMiddleware | None:
@@ -49,43 +89,68 @@ class LiteLLMGenerator(BaseGenerator):
             for t in tools
         ]
 
-    def _serialize_messages(self, messages: list[Message]) -> list[dict[str, Any]]:
-        """Convert ``Message`` objects to LiteLLM's dict format."""
+    def _serialize_messages(
+        self, messages: Sequence[ChatMessage]
+    ) -> "list[ChatCompletionMessageParam]":
+        """Convert ``Message`` objects to OpenaAI's dict format (litellm expects)."""
         return [
-            m.model_dump(include={"role", "content", "tool_calls", "tool_call_id"})
+            cast(
+                "ChatCompletionMessageParam",
+                cast(object, m.model_dump(context={"provider": "openai/chat"})),
+            )
             for m in messages
         ]
 
-    def _deserialize_response(self, raw: Any) -> Message:
+    def _deserialize_response(self, raw: Any) -> AssistantMessage:
         """Convert a LiteLLM response object into an internal ``Message``."""
         data = raw if isinstance(raw, dict) else raw.model_dump()
-        return Message.model_validate(data)
+        return AssistantMessage.model_validate(data)
+
+    def _normalize_response_format(
+        self, litellm: Any, wire_params: dict[str, Any]
+    ) -> None:
+        """Pre-convert ``response_format`` to litellm's wire dict with a safe name."""
+        response_format = wire_params.get("response_format")
+        if response_format is None:
+            return
+
+        converted = litellm.utils.type_to_response_format_param(response_format)
+        if not isinstance(converted, dict):
+            return
+
+        _sanitize_response_format_name(converted)
+        wire_params["response_format"] = converted
 
     @override
     async def _call_model(
         self,
-        messages: list[Message],
+        messages: Sequence[ChatMessage],
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
+    ) -> CompletionResponse:
+        litellm = _import_litellm()
         wire_messages = self._serialize_messages(messages)
-        wire_params = params.model_dump(exclude={"tools"})
+        wire_params = params.model_dump(exclude={"tools"}, exclude_unset=True)
         wire_tools = self._serialize_tools(params.tools) if params.tools else []
         if wire_tools:
             wire_params["tools"] = wire_tools
         if metadata:
             wire_params["metadata"] = metadata
+        self._normalize_response_format(litellm, wire_params)
 
         raw = cast(
-            ModelResponse,
-            await acompletion(messages=wire_messages, model=self.model, **wire_params),
+            "ModelResponse",
+            await litellm.acompletion(
+                messages=wire_messages, model=self.model, **wire_params
+            ),
         )
 
-        choice = cast(Choices, raw.choices[0])
-        message = self._deserialize_response(choice.message)
-        response_metadata = raw.model_dump(exclude={"choices"})
-        return Response(
-            message=message,
-            finish_reason=choice.finish_reason,  # pyright: ignore[reportArgumentType]
-            metadata=response_metadata,
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=self._deserialize_response(choice.message),
+                    finish_reason=choice.finish_reason,
+                )
+                for choice in raw.choices
+            ]
         )

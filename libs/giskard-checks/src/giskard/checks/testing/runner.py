@@ -1,7 +1,7 @@
 import time
 import traceback
 
-from giskard.core import scoped_telemetry, telemetry, telemetry_tag
+from giskard.core import scoped_telemetry, telemetry_capture, telemetry_tag
 
 from .._telemetry_props import (
     check_kind_counts_from_sequence,
@@ -77,7 +77,7 @@ class TestCaseRunner:
             has_test_case_name=test_case.name is not None,
             check_kinds=check_kinds,
         )
-        _ = telemetry.capture(
+        telemetry_capture(
             "checks_test_case_run_started",
             properties=shape_props,
         )
@@ -95,7 +95,7 @@ class TestCaseRunner:
             duration_ms=total_duration_ms,
         )
 
-        _ = telemetry.capture(
+        telemetry_capture(
             "checks_test_case_run_finished",
             properties={
                 **shape_props,

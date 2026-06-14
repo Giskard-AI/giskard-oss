@@ -1,72 +1,21 @@
-from typing import Generic, Literal, Type, TypeVar
-
-from pydantic import BaseModel, Field
+from giskard.llm.types import AssistantMessage, ChatMessage, ChatMessageParam
+from pydantic import BaseModel, Field, TypeAdapter
 
 from .context import RunContext
 from .errors.serializable import Error
-from .tools import ToolCall
 
-Role = Literal["assistant", "user", "system", "tool"]
-
-
-class TextContent(BaseModel):
-    type: Literal["text"] = "text"
-    text: str
+_CHAT_MESSAGE_TYPE_ADAPTER = TypeAdapter(ChatMessage)
 
 
-class File(BaseModel):
-    data: bytes
-
-
-class FileContent(BaseModel):
-    type: Literal["file"] = "file"
-    file: File
-
-
-class ThinkingContent(BaseModel):
-    type: Literal["thinking"] = "thinking"
-    thinking: str
-
-
-Content = TextContent | ThinkingContent | None
-
-
-T = TypeVar("T", bound=BaseModel)
-OutputType = TypeVar("OutputType", bound=BaseModel)
-
-
-class Message(BaseModel):
-    role: Role
-    content: str | Content | list[Content] | None = None
-    tool_calls: list[ToolCall] | None = None
-    tool_call_id: str | None = None
-
-    def parse(self, model_type: type[T]) -> T:
-        return model_type.model_validate_json(self.content)  # pyright: ignore[reportArgumentType]
-
-    @property
-    def transcript(self) -> str:
-        role = self.role
-        if role == "tool" and self.tool_call_id is not None:
-            role += f":{self.tool_call_id}"
-
-        content = str(self.content)
-        if self.tool_calls:
-            for tool_call in self.tool_calls:
-                content += f"\n>[tool_call:{tool_call.function.name}:{tool_call.id}]: {tool_call.function.arguments}"
-
-        return f"[{role}]: {content}"
-
-
-class Chat(BaseModel, Generic[OutputType]):
-    messages: list[Message]
-    output_model: Type[OutputType] | None = Field(default=None)
+class Chat[OutputType: BaseModel](BaseModel):
+    messages: list[ChatMessage]
+    output_model: type[OutputType] | None = Field(default=None)
     context: RunContext = Field(default_factory=RunContext)
 
     error: Error | None = None
 
     @property
-    def last(self) -> Message:
+    def last(self) -> ChatMessage:
         return self.messages[-1]
 
     @property
@@ -77,7 +26,16 @@ class Chat(BaseModel, Generic[OutputType]):
     def output(self) -> OutputType:
         if self.output_model is None:
             raise ValueError("Output model not set")
-        return self.last.parse(self.output_model)
+
+        last = self.last
+        if not isinstance(last, AssistantMessage):
+            raise ValueError("Last message is not an assistant message")
+
+        output_text = last.text
+        if output_text is None:
+            raise ValueError("Last message has no output text")
+
+        return self.output_model.model_validate_json(output_text)
 
     @property
     def failed(self) -> bool:
@@ -91,6 +49,6 @@ class Chat(BaseModel, Generic[OutputType]):
             cloned.context = self.context
         return cloned
 
-    def add(self, message: Message) -> "Chat[OutputType]":
-        self.messages.append(message)
+    def add(self, message: ChatMessage | ChatMessageParam) -> "Chat[OutputType]":
+        self.messages.append(_CHAT_MESSAGE_TYPE_ADAPTER.validate_python(message))
         return self

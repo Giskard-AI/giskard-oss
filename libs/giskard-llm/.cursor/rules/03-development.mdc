@@ -1,0 +1,26 @@
+---
+description: Development workflow for giskard-llm. Read before creating a PR.
+alwaysApply: false
+---
+
+# giskard-llm Development Workflow
+
+## Dependencies
+
+- **Core**: `pydantic>=2.0` only. No other runtime dependencies.
+- **Provider SDKs**: Optional extras in `pyproject.toml` (`openai`, `google`, `anthropic`, `azure`). Never add a provider SDK to core.
+- **Package manager**: `uv`.
+
+## Format and Lint
+
+`ruff format` and `ruff check` via pre-commit hooks. If `basedpyright` fails on provider files due to uninstalled SDKs, add `# pyright: reportMissingImports=false` at the top of the provider file.
+
+## CI
+
+- **Unit tests**: run on every PR, no SDK required — all provider interactions are mocked.
+- **Functional tests**: run per-provider in a matrix. Each matrix entry installs only its SDK and injects only its env vars at the step level.
+- **`workflow_dispatch`**: allows manual triggering with org-membership check.
+
+## Commit Messages
+
+Semantic format scoped to the lib: `feat(giskard-llm): add azure provider`, `fix(giskard-llm): google system message extraction`.

@@ -1,0 +1,71 @@
+---
+description: Provider documentation standards. Read when creating or modifying a provider.
+globs: "**/providers/*.py"
+---
+
+# Provider Documentation
+
+Each provider class must have a comprehensive docstring that serves as the single source of truth for that provider's behavior. This replaces external documentation that would go stale.
+
+## Required Docstring Sections
+
+Every provider class docstring must cover:
+
+1. **Overview** — SDK used, what model prefix routes here (e.g., `"google/"`, `"azure/"`).
+2. **Authentication** — Required env vars (e.g., `GOOGLE_API_KEY`) and alternative kwargs.
+3. **Role mapping** — How canonical roles (`system`, `user`, `assistant`, `tool`) map to the SDK format.
+4. **Message constraints** — Provider-specific validation rules (alternation, system message handling, etc.).
+5. **Tool call format** — How tool definitions and tool results are converted.
+6. **Error mapping** — Which SDK exceptions map to which `LLMError` subclasses.
+7. **Supported features** — Completion, embeddings, structured output, and any limitations.
+8. **Provider-specific kwargs** — Any pass-through params unique to this provider (e.g., `merge_system` for Anthropic).
+
+## Example
+
+```python
+class GoogleProvider:
+    """Google Gemini provider using the ``google-genai`` SDK.
+
+    Routing prefix: ``google/``
+
+    Authentication:
+        - Env: ``GOOGLE_API_KEY`` (or ``GEMINI_API_KEY``)
+        - Kwargs: ``api_key``
+
+    Role mapping:
+        - ``system`` -> extracted to ``system_instruction`` config (accepts a list)
+        - ``assistant`` -> ``model``
+        - ``tool`` -> ``function_response`` part
+        - ``user`` -> ``user``
+
+    Message constraints:
+        - Multiple system messages: supported natively (passed as list)
+        - System-only messages: raises ``BadRequestError``
+        - No strict alternation required
+
+    Tool call format:
+        - Tool definitions: converted to ``FunctionDeclaration``
+        - Tool results: converted to ``function_response`` parts
+        - Tool call IDs: synthetic (``call_<index>``) since Gemini doesn't provide them
+
+    Error mapping:
+        - ``google.genai.errors.ClientError`` (400) -> ``BadRequestError``
+        - ``google.genai.errors.ClientError`` (401/403) -> ``AuthenticationError``
+        - ``google.genai.errors.ClientError`` (429) -> ``RateLimitError``
+        - ``google.genai.errors.ServerError`` -> ``ServerError``
+
+    Supported features:
+        - Completion: yes
+        - Embeddings: yes
+        - Structured output (response_format): yes, via ``response_schema``
+
+    Provider-specific kwargs:
+        - ``safety_settings``: override default safety settings
+    """
+```
+
+## Rules
+
+- **The docstring is the spec.** When behavior changes, update the docstring in the same commit.
+- **No external provider docs.** Don't maintain separate markdown files per provider. The class docstring is authoritative.
+- **README references providers briefly.** The top-level README has a summary table; details link to the source.

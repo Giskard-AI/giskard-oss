@@ -1,4 +1,6 @@
-from .chat import Chat, Message
+from giskard.core.utils import get_lib_version
+
+from .chat import Chat
 from .context import RunContext
 from .embeddings import EmbeddingModel
 from .errors import Error, WorkflowError
@@ -14,11 +16,13 @@ from .templates import (
 from .tools import Tool, tool
 from .workflow import ChatWorkflow, ErrorPolicy, StepType
 
+__version__ = get_lib_version("giskard-agents")
+
 __all__ = [
+    "__version__",
     "Generator",
     "ChatWorkflow",
     "Chat",
-    "Message",
     "Tool",
     "tool",
     "MessageTemplate",

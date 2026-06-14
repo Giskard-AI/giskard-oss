@@ -4,22 +4,9 @@ Kept in a separate module to break the circular dependency between
 ``base`` (BaseGenerator) and ``middleware`` (CompletionMiddleware).
 """
 
-from typing import Any, Literal
-
 from pydantic import BaseModel, Field
 
-from ..chat import Message
 from ..tools import Tool
-
-type FinishReason = (
-    Literal["stop", "length", "tool_calls", "content_filter", "null"] | None
-)
-
-
-class Response(BaseModel):
-    message: Message
-    finish_reason: FinishReason
-    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class GenerationParams(BaseModel):

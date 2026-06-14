@@ -5,6 +5,7 @@ docker-stack.yml
 local_report.md
 .run
 .DS_Store
+.claude/worktrees/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -176,3 +177,8 @@ mlruns
 # VSCode
 .vscode/
 .github/CREDENTIALS.md
+
+# Local development
+local/
+*.local
+.claude/settings.local.json

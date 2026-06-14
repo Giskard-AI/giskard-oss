@@ -12,7 +12,7 @@ from giskard.core import (
     NOT_PROVIDED,
     NotProvided,
     scoped_telemetry,
-    telemetry,
+    telemetry_capture,
     telemetry_tag,
 )
 
@@ -22,16 +22,23 @@ from ..core.interaction import Interact
 from ..core.result import CheckResult, ScenarioResult, TestCaseResult
 from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
-from ..core.types import ProviderType
+from ..core.types import Target
+from ..utils.inference import _infer_trace_type
+
+
+def _validate_multiple_runs(value: int | None) -> int | None:
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError("multiple_runs must be an integer greater than or equal to 1")
+    if value < 1:
+        raise ValueError("multiple_runs must be greater than or equal to 1")
+    return value
 
 
 def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
-    target: (
-        ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, TraceType], OutputType]
-        | NotProvided
-    ),
+    target: Target[InputType, OutputType, TraceType] | NotProvided,
 ) -> list[Step[InputType, OutputType, TraceType]]:
     """Build steps with target bound to Interact outputs where needed.
 
@@ -59,6 +66,19 @@ def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
     return steps
 
 
+def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
+    scenario: Scenario[InputType, OutputType, TraceType],
+    run_target: Target[InputType, OutputType, TraceType] | NotProvided,
+) -> type[TraceType]:
+    if scenario.trace_type is not None:
+        return scenario.trace_type
+    effective_target = (
+        run_target if not isinstance(run_target, NotProvided) else scenario.target
+    )
+    inferred = _infer_trace_type(effective_target)
+    return cast(type[TraceType], inferred if inferred is not None else Trace)
+
+
 class ScenarioRunner:
     """Execute scenarios by running their steps sequentially.
 
@@ -77,58 +97,32 @@ class ScenarioRunner:
     The runner handles exceptions from checks by converting them into
     `CheckResult.error` objects and stopping execution.
 
+    For a `multiple_runs` setting greater than 1, the full scenario is executed
+    at most that many times (fresh trace per attempt); each attempt must pass
+    for the next to run, otherwise execution stops with that attempt's result.
+
     Examples
     --------
     ```python
     runner = ScenarioRunner()
     result = await runner.run(scenario)
+    result = await runner.run(scenario, target=my_sut, return_exception=True)
     ```
     """
 
     @scoped_telemetry
-    async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
+    async def _run_once[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ) = NOT_PROVIDED,
+        target: Target[InputType, OutputType, TraceType] | NotProvided = NOT_PROVIDED,
         return_exception: bool = False,
     ) -> ScenarioResult[TraceType]:
-        """Execute a scenario's steps sequentially with shared Trace.
-
-        Each step is executed in order:
-        - Interaction specs update the shared trace
-        - Checks validate the current trace and stop execution on failure
-
-        Execution stops on the first failing check; remaining steps are not executed.
-
-        Parameters
-        ----------
-        scenario : Scenario
-            The scenario to execute.
-        return_exception : bool
-            If True, return results even when exceptions occur instead of raising.
-
-        Returns
-        -------
-        ScenarioResult
-            Results from executing the scenario.
-        """
-
         start_time = time.perf_counter()
         telemetry_tag("giskard_component", "scenario_runner")
         telemetry_tag("giskard_operation", "scenario_run")
 
-        trace = (
-            scenario.trace_type(annotations=scenario.annotations)
-            if scenario.trace_type is not None
-            else cast(
-                TraceType,
-                Trace[InputType, OutputType](annotations=scenario.annotations),
-            )
-        )
+        trace_cls = _resolve_trace_type(scenario, target)
+        trace = cast(TraceType, trace_cls(annotations=scenario.annotations))
 
         steps = _build_steps(scenario, target)
         steps_results: list[TestCaseResult] = []
@@ -138,7 +132,7 @@ class ScenarioRunner:
             has_target=has_target,
         )
 
-        _ = telemetry.capture(
+        telemetry_capture(
             "checks_scenario_run_started",
             properties=shape_props,
         )
@@ -178,9 +172,10 @@ class ScenarioRunner:
             steps=steps_results,
             duration_ms=duration_ms,
             final_trace=trace,
+            tags=list(scenario.tags),
         )
 
-        _ = telemetry.capture(
+        telemetry_capture(
             "checks_scenario_run_finished",
             properties={
                 **shape_props,
@@ -190,6 +185,74 @@ class ScenarioRunner:
         )
 
         return result
+
+    async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
+        self,
+        scenario: Scenario[InputType, OutputType, TraceType],
+        target: Target[InputType, OutputType, TraceType] | NotProvided = NOT_PROVIDED,
+        return_exception: bool = False,
+        multiple_runs: int | None = None,
+    ) -> ScenarioResult[TraceType]:
+        """Execute a scenario up to N times, stopping on the first non-passing run.
+
+        Each run is executed independently with a fresh trace. The scenario is
+        run at most ``multiple_runs`` times when every run passes; otherwise
+        execution stops on the first run whose outcome is not PASS (FAIL, ERROR,
+        or SKIP). This is not a "retry until success" strategy.
+
+        Parameters
+        ----------
+        scenario : Scenario
+            The scenario to execute.
+        target : Target | NotProvided
+            Optional target override used to replace `NOT_PROVIDED` interaction outputs.
+        return_exception : bool
+            If True, return results even when exceptions occur instead of raising.
+        multiple_runs : int | None
+            Optional cap on full scenario executions. When provided, it overrides
+            the scenario-level `multiple_runs` value.
+
+        Returns
+        -------
+        ScenarioResult
+            Results from the last run executed, updated with multi-run metadata.
+        """
+
+        configured_runs = (
+            _validate_multiple_runs(multiple_runs) or scenario.multiple_runs
+        )
+        start_time = time.perf_counter()
+        last_result: ScenarioResult[TraceType] | None = None
+
+        for attempt in range(1, configured_runs + 1):
+            result = await self._run_once(
+                scenario,
+                target=target,
+                return_exception=return_exception,
+            )
+            last_result = result
+
+            if not result.passed:
+                end_time = time.perf_counter()
+                return result.model_copy(
+                    update={
+                        "duration_ms": int((end_time - start_time) * 1000),
+                        "multiple_runs": configured_runs,
+                        "runs_executed": attempt,
+                    }
+                )
+
+        if last_result is None:  # Defensive: configured_runs validation prevents this.
+            raise RuntimeError("Scenario did not execute any runs")
+
+        end_time = time.perf_counter()
+        return last_result.model_copy(
+            update={
+                "duration_ms": int((end_time - start_time) * 1000),
+                "multiple_runs": configured_runs,
+                "runs_executed": configured_runs,
+            }
+        )
 
 
 _default_runner = ScenarioRunner()
