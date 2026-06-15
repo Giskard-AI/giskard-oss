@@ -35,7 +35,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     key: JSONPathStr = Field(
         ..., description="The key to extract the actual value from the trace"
     )
-    expected_value: ExpectedType | None | NotProvided = Field(
+    expected_value: ExpectedType | NotProvided = Field(
         default=NOT_PROVIDED,
         description="The expected value to compare against. If omitted, the expected value is extracted from the trace using expected_value_key. Explicit None is valid and compares against None.",
     )
