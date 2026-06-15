@@ -207,8 +207,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         has_target = not isinstance(target, NotProvided)
 
         if max_concurrency is not None:
-            if isinstance(max_concurrency, bool) or not isinstance(
-                max_concurrency, int
+            if not isinstance(max_concurrency, int) or isinstance(
+                max_concurrency, bool
             ):
                 raise TypeError("max_concurrency must be None or a positive integer")
             if max_concurrency < 1:
