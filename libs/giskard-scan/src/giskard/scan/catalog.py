@@ -8,7 +8,7 @@ from giskard.checks.core.scenario import Scenario
 from giskard.checks.scenarios.suite import Suite
 
 from .generators.base import ScenarioGenerator
-from .registry import _normalize_generator, suite_generator_registry
+from .registry import _normalize_generator
 
 
 async def _generate_scenarios(
@@ -49,22 +49,20 @@ async def _generate_scenarios(
 async def generate_suite(
     description: str,
     languages: list[str],
-    generators: Sequence[ScenarioGenerator | type[ScenarioGenerator]] | None = None,
+    generators: Sequence[ScenarioGenerator | type[ScenarioGenerator]],
     max_scenarios: int | None = None,
     seed: int = 42,
 ) -> Suite[Any, Any]:
-    """Generate a test suite by running all registered (or supplied) generators.
+    """Generate a test suite by running the supplied generators.
 
-    This is the primary public entry point for suite generation.  It resolves
-    generators, distributes the optional scenario budget, runs generation
-    concurrently, and wraps the results in a named Suite.
+    This generic suite builder resolves generator classes or instances,
+    distributes the optional scenario budget, runs generation concurrently,
+    and wraps the results in a named Suite.
 
     Args:
         description: Natural-language description of the agent under test.
         languages: BCP-47 language codes the agent is expected to handle.
         generators: Sequence of generator instances or classes to use.
-            When None, all generators registered in
-            suite_generator_registry are used.
         max_scenarios: Total upper bound on scenarios across all generators.
             None lets each generator apply its own default.
         seed: Integer seed for the top-level RNG, ensuring reproducibility
@@ -76,11 +74,7 @@ async def generate_suite(
     if max_scenarios is not None and max_scenarios < 0:
         raise ValueError(f"max_scenarios must be non-negative, got {max_scenarios}")
 
-    resolved = (
-        [_normalize_generator(g) for g in generators]
-        if generators is not None
-        else suite_generator_registry.generators()
-    )
+    resolved = [_normalize_generator(g) for g in generators]
     scenarios = await _generate_scenarios(
         description, languages, resolved, max_scenarios, seed
     )

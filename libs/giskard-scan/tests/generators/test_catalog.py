@@ -6,7 +6,7 @@ from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
 from giskard.scan.catalog import generate_suite
 from giskard.scan.generators.base import ScenarioGenerator
-from giskard.scan.registry import suite_generator_registry
+from giskard.scan.vulnerability import vulnerability_suite_generator_registry
 
 
 class _StubGenerator(ScenarioGenerator):
@@ -26,33 +26,25 @@ class _StubGenerator(ScenarioGenerator):
         return [Scenario(name=f"stub-{self.name}-{i}") for i in range(n)]
 
 
-@pytest.fixture(autouse=True)
-def isolated_registry():
-    """Snapshot and restore registry around each test."""
-    original = suite_generator_registry.generators()
-    suite_generator_registry.clear()
-    yield
-    suite_generator_registry.clear()
-    for g in original:
-        suite_generator_registry.register(g)
+async def test_generate_suite_requires_explicit_generators():
+    with pytest.raises(
+        TypeError, match="missing 1 required positional argument: 'generators'"
+    ):
+        await generate_suite(  # pyright: ignore[reportCallIssue]
+            "My chatbot", languages=["en"]
+        )
 
 
-async def test_generate_suite_uses_registry_by_default():
-    suite_generator_registry.register(_StubGenerator(name="a"))
-    suite = await generate_suite("My chatbot", languages=["en"])
-    assert len(suite.scenarios) == 1
-    assert suite.scenarios[0].name == "stub-a-0"
-
-
-async def test_generate_suite_generators_override_bypasses_registry():
-    suite_generator_registry.register(_StubGenerator(name="registry"))
+async def test_generate_suite_does_not_read_vulnerability_registry(
+    isolated_vulnerability_registry,
+):
+    vulnerability_suite_generator_registry.register(_StubGenerator(name="registry"))
     suite = await generate_suite(
         "My chatbot",
         languages=["en"],
-        generators=[_StubGenerator(name="override")],
+        generators=[_StubGenerator(name="explicit")],
     )
-    assert len(suite.scenarios) == 1
-    assert suite.scenarios[0].name == "stub-override-0"
+    assert [scenario.name for scenario in suite.scenarios] == ["stub-explicit-0"]
 
 
 async def test_generate_suite_generators_bare_type_is_normalized():
@@ -65,21 +57,24 @@ async def test_generate_suite_generators_bare_type_is_normalized():
     assert suite.scenarios[0].name == "stub-stub-0"
 
 
-async def test_generate_suite_empty_registry_returns_empty_suite():
-    suite = await generate_suite("My chatbot", languages=["en"])
-    assert suite.scenarios == []
-
-
-async def test_generate_suite_empty_generators_override_returns_empty_suite():
-    suite_generator_registry.register(_StubGenerator(name="a"))
+async def test_generate_suite_empty_generators_returns_empty_suite(
+    isolated_vulnerability_registry,
+):
+    vulnerability_suite_generator_registry.register(_StubGenerator(name="a"))
     suite = await generate_suite("My chatbot", languages=["en"], generators=[])
     assert suite.scenarios == []
 
 
 async def test_generate_suite_max_scenarios_limits_output():
-    suite_generator_registry.register(_StubGenerator(name="a", scenario_count=5))
-    suite_generator_registry.register(_StubGenerator(name="b", scenario_count=5))
-    suite = await generate_suite("My chatbot", languages=["en"], max_scenarios=2)
+    suite = await generate_suite(
+        "My chatbot",
+        languages=["en"],
+        generators=[
+            _StubGenerator(name="a", scenario_count=5),
+            _StubGenerator(name="b", scenario_count=5),
+        ],
+        max_scenarios=2,
+    )
     assert len(suite.scenarios) == 2
 
 
@@ -139,12 +134,13 @@ async def test_generate_suite_no_max_passes_none_to_generators():
 
 
 async def test_generate_suite_registry_generators_not_mutated():
-    """The catalog must not mutate registered generator instances."""
+    """The catalog must not mutate provided generator instances."""
     gen = _StubGenerator(name="orig", scenario_count=3)
-    suite_generator_registry.register(gen)
     original_count = gen.scenario_count
 
-    await generate_suite("My chatbot", languages=["en"], max_scenarios=1)
+    await generate_suite(
+        "My chatbot", languages=["en"], generators=[gen], max_scenarios=1
+    )
 
     assert gen.scenario_count == original_count
 
@@ -152,13 +148,19 @@ async def test_generate_suite_registry_generators_not_mutated():
 async def test_generate_suite_negative_max_scenarios_raises_valueerror():
     """max_scenarios < 0 raises ValueError."""
     with pytest.raises(ValueError, match="max_scenarios must be non-negative, got -1"):
-        await generate_suite("My chatbot", languages=["en"], max_scenarios=-1)
+        await generate_suite(
+            "My chatbot", languages=["en"], generators=[], max_scenarios=-1
+        )
 
 
 async def test_generate_suite_max_scenarios_zero_returns_empty():
     """max_scenarios=0 is a valid no-op budget: returns an empty suite."""
-    suite_generator_registry.register(_StubGenerator(name="a", scenario_count=5))
-    suite = await generate_suite("My chatbot", languages=["en"], max_scenarios=0)
+    suite = await generate_suite(
+        "My chatbot",
+        languages=["en"],
+        generators=[_StubGenerator(name="a", scenario_count=5)],
+        max_scenarios=0,
+    )
     assert suite.scenarios == []
 
 

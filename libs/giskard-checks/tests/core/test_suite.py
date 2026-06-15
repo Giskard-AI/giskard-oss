@@ -4,7 +4,7 @@ from contextlib import nullcontext
 
 import pytest
 from giskard.checks import CheckResult, Equals, Scenario, Suite
-from giskard.checks.core.result import ScenarioStatus
+from giskard.checks.core.result import GroupedSuiteResult, GroupStats, ScenarioStatus
 from giskard.checks.scenarios.suite import _OverallOnly, _SuiteProgress
 from rich.console import Console
 from rich.progress import MofNCompleteColumn, Progress
@@ -423,3 +423,186 @@ async def test_suite_progress_records_each_scenario_outcome(monkeypatch):
     await suite.run()
 
     assert recorded == [ScenarioStatus.PASS, ScenarioStatus.FAIL]
+
+
+def test_group_stats_pass_rate_all_passed():
+    stats = GroupStats(name="Hallucination", passed=3, failed=0, errored=0)
+    assert stats.total == 3
+    assert stats.pass_rate == 1.0
+
+
+def test_group_stats_pass_rate_mixed():
+    stats = GroupStats(name="Adversarial", passed=2, failed=3, errored=0)
+    assert stats.total == 5
+    assert stats.pass_rate == pytest.approx(2 / 5)
+
+
+def test_group_stats_pass_rate_none_when_zero_total():
+    stats = GroupStats(name="Empty", passed=0, failed=0, errored=0)
+    assert stats.total == 0
+    assert stats.pass_rate is None
+
+
+def test_group_stats_total_includes_errored():
+    stats = GroupStats(name="X", passed=1, failed=1, errored=2)
+    assert stats.total == 4
+
+
+def test_group_stats_pass_rate_zero_when_all_errored():
+    stats = GroupStats(name="X", passed=0, failed=0, errored=3)
+    assert stats.total == 3
+    assert stats.pass_rate == pytest.approx(0.0)
+
+
+def test_group_stats_total_includes_skipped():
+    stats = GroupStats(name="X", passed=1, failed=1, errored=1, skipped=2)
+    assert stats.total == 5
+
+
+def test_group_stats_pass_rate_excludes_skipped_from_denominator():
+    stats = GroupStats(name="X", passed=2, failed=1, errored=0, skipped=5)
+    assert stats.pass_rate == pytest.approx(2 / 3)
+
+
+def test_suite_group_by_skipped_scenario_counted_separately():
+    from giskard.checks.core.interaction.trace import Trace
+    from giskard.checks.core.result import (
+        CheckResult,
+        ScenarioResult,
+        SuiteResult,
+        TestCaseResult,
+    )
+
+    empty_trace = Trace(interactions=[])
+
+    skipped_step = TestCaseResult(
+        results=[CheckResult.skip(message="precondition not met")],
+        duration_ms=0,
+    )
+    skipped_scenario = ScenarioResult(
+        scenario_name="t_skip",
+        steps=[skipped_step],
+        duration_ms=0,
+        final_trace=empty_trace,
+        tags=["Category:Hallucination"],
+    )
+    passing_step = TestCaseResult(
+        results=[CheckResult.success()],
+        duration_ms=0,
+    )
+    passing_scenario = ScenarioResult(
+        scenario_name="t_pass",
+        steps=[passing_step],
+        duration_ms=0,
+        final_trace=empty_trace,
+        tags=["Category:Hallucination"],
+    )
+    suite_result = SuiteResult(
+        results=[skipped_scenario, passing_scenario], duration_ms=0
+    )
+    grouped = suite_result.group_by("Category")
+
+    stats = grouped.groups["Hallucination"]
+    assert stats.skipped == 1
+    assert stats.passed == 1
+    assert stats.failed == 0
+    assert stats.total == 2
+    assert stats.pass_rate == 1.0  # skipped excluded from denominator
+
+
+@pytest.mark.asyncio
+async def test_suite_group_by_returns_grouped_suite_result(identity_sut):
+    from giskard.checks import Equals, Scenario, Suite
+
+    suite = Suite(name="s", target=identity_sut)
+    suite.append(
+        Scenario("t1", tags=["Category:Hallucination"])
+        .interact("hi")
+        .check(Equals(expected_value="hi", key="trace.last.outputs"))
+    )
+    suite.append(
+        Scenario("t2", tags=["Category:Adversarial"])
+        .interact("hi")
+        .check(Equals(expected_value="WRONG", key="trace.last.outputs"))
+    )
+    suite.append(Scenario("t3").interact("hi"))  # untagged, no checks
+
+    result = await suite.run(verbose=False)
+    grouped = result.group_by("Category")
+
+    assert isinstance(grouped, GroupedSuiteResult)
+    assert grouped.key == "Category"
+    assert set(grouped.groups.keys()) == {"Hallucination", "Adversarial", None}
+    assert grouped.groups["Hallucination"].passed == 1
+    assert grouped.groups["Hallucination"].total == 1
+    assert grouped.groups["Adversarial"].failed == 1
+    assert grouped.groups["Adversarial"].total == 1
+    assert grouped.groups[None].total == 1
+
+
+@pytest.mark.asyncio
+async def test_suite_group_by_bare_tag(identity_sut):
+    from giskard.checks import Scenario, Suite
+
+    suite = Suite(name="s", target=identity_sut)
+    suite.append(Scenario("t1", tags=["flaky"]).interact("hi"))
+    result = await suite.run(verbose=False)
+    grouped = result.group_by("flaky")
+
+    assert grouped.groups[""].total == 1  # bare tag: value is ""
+
+
+@pytest.mark.asyncio
+async def test_suite_group_by_multi_value_tags_count_in_both_buckets(identity_sut):
+    from giskard.checks import Scenario, Suite
+
+    suite = Suite(name="s", target=identity_sut)
+    suite.append(
+        Scenario(
+            "t1", tags=["Category:Hallucination", "Category:Adversarial"]
+        ).interact("hi")
+    )
+    result = await suite.run(verbose=False)
+    grouped = result.group_by("Category")
+
+    # Scenario appears in both buckets — totals sum to 2, not 1
+    assert grouped.groups["Hallucination"].total == 1
+    assert grouped.groups["Adversarial"].total == 1
+    assert None not in grouped.groups  # fully matched, not untagged
+
+
+def test_parse_tag_colon_only():
+    from giskard.checks.core.result import _parse_tag
+
+    key, value = _parse_tag(":")
+    assert key == ""
+    assert value == ""
+
+
+def test_parse_tag_empty_string():
+    from giskard.checks.core.result import _parse_tag
+
+    key, value = _parse_tag("")
+    assert key == ""
+    assert value == ""
+
+
+def test_parse_tag_multiple_colons():
+    from giskard.checks.core.result import _parse_tag
+
+    # Only splits on the first colon; rest of string becomes value
+    key, value = _parse_tag("a:b:c")
+    assert key == "a"
+    assert value == "b:c"
+
+
+def test_parse_tag_no_colon():
+    from giskard.checks.core.result import _parse_tag
+
+    key, value = _parse_tag("flaky")
+    assert key == "flaky"
+    assert value == ""
+
+
+def test_group_stats_importable_from_top_level():
+    from giskard.checks import GroupedSuiteResult, GroupStats  # noqa: F401

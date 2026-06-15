@@ -251,7 +251,7 @@ class TestTestCaseResult:
         result = await test_case.run()
         check_result = result.results[0]
 
-        assert check_result.details["check_name"] is None
+        assert check_result.check_name == "equals"
         assert check_result.details["check_kind"] == "equals"
         assert check_result.details["check_params"] == {
             "key": "trace.interactions[-1].outputs",
