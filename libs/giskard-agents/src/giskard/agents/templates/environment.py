@@ -34,6 +34,37 @@ def _finalize_value(value: Any) -> Any:
     return value
 
 
+def fence(value: Any) -> str:
+    """Neutralize delimiter breakouts in untrusted prompt content.
+
+    Prompts embed untrusted data (agent outputs, traces) inside pseudo-XML
+    markers such as ``<AGENT ANSWER>...</AGENT ANSWER>``. Because the
+    environment renders prompts with ``autoescape=False``, unescaped data could
+    contain a literal closing marker and inject instructions into the judge.
+    Rendering the value the same way the engine would (via ``_finalize_value``)
+    and escaping ``&``, ``<`` and ``>`` makes the markers unforgeable while
+    keeping the text human- and model-readable.
+
+    Parameters
+    ----------
+    value : Any
+        The (untrusted) value to embed in a prompt. Finalized like a normal
+        template expression before escaping; ``None`` renders as an empty
+        string.
+
+    Returns
+    -------
+    str
+        The finalized text with ``&``, ``<`` and ``>`` replaced by their HTML
+        entities.
+    """
+    finalized = _finalize_value(value)
+    if finalized is None:
+        return ""
+    text = finalized if isinstance(finalized, str) else str(finalized)
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 _inline_env = SandboxedEnvironment(
     trim_blocks=True,
     lstrip_blocks=True,
@@ -42,6 +73,7 @@ _inline_env = SandboxedEnvironment(
     autoescape=False,
     finalize=_finalize_value,
 )
+_inline_env.filters["fence"] = fence
 
 
 class MessageExtension(Extension):
@@ -92,7 +124,7 @@ class PromptsLoader(PrefixLoader):
 
 def create_message_environment(loader_mapping: dict[str, Path]) -> SandboxedEnvironment:
     """Create a Jinja2 environment with MessageExtension."""
-    return SandboxedEnvironment(
+    env = SandboxedEnvironment(
         loader=PromptsLoader(
             {
                 namespace: FileSystemLoader(path)
@@ -109,3 +141,5 @@ def create_message_environment(loader_mapping: dict[str, Path]) -> SandboxedEnvi
         enable_async=True,
         finalize=_finalize_value,
     )
+    env.filters["fence"] = fence
+    return env

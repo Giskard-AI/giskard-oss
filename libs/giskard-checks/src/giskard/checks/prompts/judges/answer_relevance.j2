@@ -39,20 +39,20 @@ Determine whether the **current answer** is relevant to the **current question**
 ## Markers
 
 <CONVERSATION HISTORY>
-{{ history }}
+{{ history | fence }}
 </CONVERSATION HISTORY>
 
 <CURRENT QUESTION>
-{{ question }}
+{{ question | fence }}
 </CURRENT QUESTION>
 
 <CURRENT ANSWER>
-{{ answer }}
+{{ answer | fence }}
 </CURRENT ANSWER>
 
 {% if context %}
 <DOMAIN CONTEXT>
-{{ context }}
+{{ context | fence }}
 </DOMAIN CONTEXT>
 {% endif %}
 
