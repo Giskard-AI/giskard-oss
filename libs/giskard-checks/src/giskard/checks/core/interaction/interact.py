@@ -7,7 +7,7 @@ from pydantic import Field, PrivateAttr, model_validator
 
 from ...utils.inference import _infer_input_type
 from ..input_generator import InputGenerator
-from ..types import GeneratorType, ProviderType
+from ..types import GeneratorType, Target
 from .base import InteractionSpec
 from .interaction import Interaction
 from .trace import Trace
@@ -132,11 +132,9 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         | GeneratorType[[], InputType, None]
         | GeneratorType[[TraceType], InputType, TraceType]
     ) = Field(..., description="The inputs of the interaction.")
-    outputs: (
-        ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, TraceType], OutputType]
-        | NotProvided
-    ) = Field(default=NOT_PROVIDED, description="The outputs of the interaction.")
+    outputs: Target[InputType, OutputType, TraceType] | NotProvided = Field(
+        default=NOT_PROVIDED, description="The outputs of the interaction."
+    )
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="The metadata of the interaction."
     )
@@ -177,11 +175,7 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
 
     def set_outputs(
         self,
-        outputs: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ),
+        outputs: Target[InputType, OutputType, TraceType] | NotProvided,
     ) -> "Interact[InputType, OutputType, TraceType]":
         """Update the outputs of the interact and recompute the injection mappings. Returns self for chaining."""
         self.outputs = outputs

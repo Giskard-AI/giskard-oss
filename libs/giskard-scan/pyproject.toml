@@ -1,6 +1,6 @@
 [project]
 name = "giskard-scan"
-version = "1.0.0b1"
+version = "1.0.0b2"
 description = "Agent vulnerability scanner — red teaming, prompt injection, adversarial scenario generation"
 readme = "README.md"
 license = { text = "Apache Software License 2.0" }
