@@ -289,13 +289,31 @@ async def test_suite_parallel_respects_max_concurrency():
     assert peak_runs == 2
 
 
-@pytest.mark.asyncio
-async def test_suite_parallel_rejects_invalid_max_concurrency():
-    suite = Suite(name="invalid_parallel_limit_suite", target=lambda inputs: inputs)
+@pytest.fixture
+def simple_suite():
+    suite = Suite(name="invalid_limit_suite", target=lambda inputs: inputs)
     suite.append(Scenario("a").interact("a"))
+    return suite
 
-    with pytest.raises(ValueError, match="max_concurrency must be greater than 0"):
-        await suite.run(parallel=True, max_concurrency=0)
+
+@pytest.mark.parametrize("parallel", [True, False])
+@pytest.mark.parametrize(
+    ("max_concurrency", "error_type", "message"),
+    [
+        (0, ValueError, "max_concurrency must be greater than 0"),
+        (-1, ValueError, "max_concurrency must be greater than 0"),
+        (True, TypeError, "max_concurrency must be None or a positive integer"),
+        (False, TypeError, "max_concurrency must be None or a positive integer"),
+        (1.5, TypeError, "max_concurrency must be None or a positive integer"),
+        ("2", TypeError, "max_concurrency must be None or a positive integer"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_suite_rejects_invalid_max_concurrency(
+    simple_suite, parallel, max_concurrency, error_type, message
+):
+    with pytest.raises(error_type, match=message):
+        await simple_suite.run(parallel=parallel, max_concurrency=max_concurrency)
 
 
 def test_progress_counter_appears_only_on_the_overall_row():
