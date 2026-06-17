@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+
 from giskard.core import Discriminated, discriminated_base
 from pydantic import Field
 
