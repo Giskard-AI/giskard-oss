@@ -474,6 +474,7 @@ def test_suite_group_by_skipped_scenario_counted_separately():
         SuiteResult,
         TestCaseResult,
     )
+    from giskard.checks.scenarios.suite import Suite
 
     empty_trace = Trace(interactions=[])
 
@@ -500,7 +501,9 @@ def test_suite_group_by_skipped_scenario_counted_separately():
         tags=["Category:Hallucination"],
     )
     suite_result = SuiteResult(
-        results=[skipped_scenario, passing_scenario], duration_ms=0
+        results=[skipped_scenario, passing_scenario],
+        duration_ms=0,
+        suite=Suite(name="test"),
     )
     grouped = suite_result.group_by("Category")
 
