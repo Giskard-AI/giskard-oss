@@ -1,4 +1,4 @@
-from typing import ClassVar
+from pydantic import Field
 
 from .base import DatasetScenarioGenerator
 
@@ -11,8 +11,10 @@ class PromptInjectionScenarioGenerator(DatasetScenarioGenerator):
     Sampling behaviour is inherited from DatasetScenarioGenerator.
     """
 
-    tags: ClassVar[list[str]] = [
-        "gsk:threat-type='prompt-injection'",
-        "owasp:llm-top-10-2025='LLM01'",
-    ]
     dataset_name: str = "prompt_injection"
+    tags: list[str] = Field(
+        default_factory=lambda: [
+            "threat-type:prompt-injection",
+            "owasp:llm-top-10-2025:LLM01",
+        ]
+    )

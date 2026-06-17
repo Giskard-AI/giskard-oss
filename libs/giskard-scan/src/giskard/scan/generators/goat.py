@@ -1,6 +1,6 @@
 """Scenario generator for GOAT-style multi-turn attacks."""
 
-from typing import Any, ClassVar, override
+from typing import Any, override
 
 import numpy as np
 from giskard.checks.core.interaction import Trace
@@ -129,10 +129,6 @@ class GOATAttackScenarioGenerator(ScenarioGenerator):
         Maximum number of attacker turns per scenario.
     """
 
-    tags: ClassVar[list[str]] = [
-        "gsk:threat-type='harmful-content-generation'",
-    ]
-
     max_turns: int = Field(default=DEFAULT_GOAT_MAX_TURNS, ge=1)
 
     @override
@@ -222,5 +218,11 @@ class GOATAttackScenarioGenerator(ScenarioGenerator):
                     ],
                     "language": language,
                 }
+            )
+            .with_tags(
+                [
+                    "threat-type:harmful-content-generation",
+                    "probe-type:multi-turn",
+                ]
             )
         )

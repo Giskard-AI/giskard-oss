@@ -31,7 +31,7 @@ from ..core.result import (
     format_status_count_text,
 )
 from ..core.scenario import Scenario
-from ..core.types import ProviderType
+from ..core.types import Target
 
 InputType = TypeVar("InputType", infer_variance=True)
 OutputType = TypeVar("OutputType", infer_variance=True)
@@ -134,11 +134,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     scenarios: list[Scenario[InputType, OutputType, Trace[Any, Any]]] = Field(
         default_factory=list, description="Scenarios in the suite"
     )
-    target: (
-        ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, Trace[Any, Any]], OutputType]
-        | NotProvided
-    ) = Field(
+    target: Target[InputType, OutputType, Trace[Any, Any]] | NotProvided = Field(
         default=NOT_PROVIDED,
         description="Suite-level target SUT that will override any scenario-level target.",
     )
@@ -164,13 +160,9 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
     async def run(
         self,
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[
-                [InputType, Trace[Any, Any]], OutputType
-            ]  # Trace[Any, Any] because scenarios in suite have different TraceType
-            | NotProvided
-        ) = NOT_PROVIDED,
+        target: Target[InputType, OutputType, Trace[Any, Any]] | NotProvided = (
+            NOT_PROVIDED
+        ),
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
@@ -214,8 +206,13 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         target = target if not isinstance(target, NotProvided) else self.target
         has_target = not isinstance(target, NotProvided)
 
-        if parallel and max_concurrency is not None and max_concurrency < 1:
-            raise ValueError("max_concurrency must be greater than 0")
+        if max_concurrency is not None:
+            if not isinstance(max_concurrency, int) or isinstance(
+                max_concurrency, bool
+            ):
+                raise TypeError("max_concurrency must be None or a positive integer")
+            if max_concurrency < 1:
+                raise ValueError("max_concurrency must be greater than 0")
 
         with telemetry_run_context():
             telemetry_tag("giskard_component", "suite")

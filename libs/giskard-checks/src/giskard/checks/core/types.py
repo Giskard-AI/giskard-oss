@@ -7,3 +7,7 @@ type GeneratorProvider[**P, R, S] = Callable[P, SyncOrAsyncGenerator[R, S]]
 
 type ProviderType[**P, T] = T | SyncOrAsyncCallable[P, T]
 type GeneratorType[**P, R, S] = ProviderType[P, R] | GeneratorProvider[P, R, S]
+type Target[InputType, OutputType, TraceType] = (
+    ProviderType[[InputType], OutputType]
+    | ProviderType[[InputType, TraceType], OutputType]
+)

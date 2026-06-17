@@ -7,7 +7,7 @@ from .check import Check
 from .input_generator import InputGenerator
 from .interaction import Interact, InteractionSpec, Trace
 from .result import ScenarioResult
-from .types import GeneratorType, ProviderType
+from .types import GeneratorType, Target
 
 
 class Step[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
@@ -75,7 +75,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
     annotations : dict[str, Any]
         Key-value pairs merged into the trace at run start.
         Can be accessed as `trace.annotations` during scenario execution.
-    target : ProviderType[[InputType], OutputType] | ProviderType[[InputType, TraceType], OutputType] | NotProvided
+    target : Target[InputType, OutputType, TraceType] | NotProvided
         Default SUT for interactions whose outputs are ``NOT_PROVIDED`` when no
         per-call ``target`` is passed to ``run`` (see ``with_target``).
     multiple_runs : int
@@ -83,6 +83,9 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         execution uses a fresh trace). Each run must pass for the next to run;
         execution stops on the first non-passing run (FAIL, ERROR, or SKIP). This
         is not a "retry until one success" mode.
+    tags : list[str]
+        Flat ``'Key:Value'`` labels for grouping and Hub upload alignment.
+        Tags without ``:`` are bare boolean labels.
     """
 
     name: str = Field(
@@ -101,11 +104,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         default_factory=dict,
         description="Scenario-level annotations that will be injected in the trace.",
     )
-    target: (
-        ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, TraceType], OutputType]
-        | NotProvided
-    ) = Field(
+    target: Target[InputType, OutputType, TraceType] | NotProvided = Field(
         default=NOT_PROVIDED,
         description="Scenario-level target SUT that will be used to replace NOT_PROVIDED outputs.",
     )
@@ -118,6 +117,10 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         ),
         ge=1,
         strict=True,
+    )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Flat 'Key:Value' labels for grouping and Hub upload alignment.",
     )
 
     def __init__(
@@ -158,11 +161,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             | GeneratorType[[], InputType, None]
             | GeneratorType[[TraceType], InputType, TraceType]
         ),
-        outputs: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ) = NOT_PROVIDED,
+        outputs: Target[InputType, OutputType, TraceType] | NotProvided = NOT_PROVIDED,
         metadata: dict[str, object] | None = None,
     ) -> Self:
         """Add an interaction to the scenario.
@@ -270,16 +269,13 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
 
     def with_target(
         self,
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-        ),
+        target: Target[InputType, OutputType, TraceType],
     ) -> Self:
         """Set the default SUT for interactions with ``NOT_PROVIDED`` outputs.
 
         Parameters
         ----------
-        target : ProviderType[[InputType], OutputType] | ProviderType[[InputType, TraceType], OutputType]
+        target : Target[InputType, OutputType, TraceType]
             Callable that produces outputs given inputs (and optionally the trace).
 
         Returns
@@ -290,13 +286,25 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         self.target = target
         return self
 
+    def with_tags(self, tags: list[str]) -> Self:
+        """Set scenario tags for grouping and Hub upload.
+
+        Parameters
+        ----------
+        tags : list[str]
+            Flat strings in 'Key:Value' format. Tags without ':' are bare labels.
+
+        Returns
+        -------
+        Self
+            This scenario for method chaining.
+        """
+        self.tags = tags
+        return self
+
     async def run(
         self,
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ) = NOT_PROVIDED,
+        target: Target[InputType, OutputType, TraceType] | NotProvided = NOT_PROVIDED,
         return_exception: bool = False,
         multiple_runs: int | None = None,
     ) -> ScenarioResult[TraceType]:
@@ -312,7 +320,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
 
         Parameters
         ----------
-        target : ProviderType | NotProvided
+        target : Target | NotProvided
             Optional target override used to replace `NOT_PROVIDED` interaction outputs.
         return_exception : bool
             If True, return results even when exceptions occur instead of raising.
@@ -322,7 +330,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
 
         Parameters
         ----------
-        target : ProviderType[[InputType], OutputType] | ProviderType[[InputType, TraceType], OutputType] | NotProvided, optional
+        target : Target[InputType, OutputType, TraceType] | NotProvided, optional
             SUT used to replace ``NOT_PROVIDED`` outputs on ``Interact`` specs.
             Defaults to ``NOT_PROVIDED``; overrides the scenario's ``target`` when set.
         return_exception : bool, default False
