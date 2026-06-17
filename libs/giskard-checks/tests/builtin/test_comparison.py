@@ -6,8 +6,10 @@ Tests cover different types (numbers, strings) and various comparison scenarios:
 - TypeError handling (missing methods and incompatible types)
 """
 
+import pytest
 from giskard.checks import (
     CheckStatus,
+    Equals,
     GreaterEquals,
     GreaterThan,
     Interaction,
@@ -17,6 +19,37 @@ from giskard.checks import (
     Trace,
 )
 from giskard.checks.core.extraction import NoMatch
+
+
+class TestComparisonValidation:
+    """Test shared comparison-check configuration validation."""
+
+    @pytest.mark.parametrize(
+        "check_cls",
+        [Equals, GreaterThan, LesserThan, GreaterEquals, LesserThanEquals, NotEquals],
+    )
+    def test_expected_value_or_key_is_required(self, check_cls):
+        with pytest.raises(
+            ValueError,
+            match="Either 'expected_value' or 'expected_value_key' must be provided",
+        ):
+            check_cls(key="trace.interactions[-1].outputs")
+
+    def test_explicit_none_expected_value_is_valid(self):
+        check = Equals(
+            expected_value=None,
+            key="trace.interactions[-1].outputs",
+        )
+
+        assert check.expected_value is None
+
+    def test_expected_value_key_is_valid_without_expected_value(self):
+        check = Equals(
+            expected_value_key="trace.interactions[0].inputs",
+            key="trace.interactions[-1].outputs",
+        )
+
+        assert check.expected_value_key == "trace.interactions[0].inputs"
 
 
 class TestLesserThan:
