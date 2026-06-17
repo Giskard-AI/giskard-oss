@@ -119,6 +119,31 @@ async def test_suite_result_aggregation():
 
 
 @pytest.mark.asyncio
+async def test_suite_result_exposes_originating_suite():
+    """The suite that produced a result is recoverable from the result."""
+    suite = Suite(name="recover_suite", target=lambda inputs: inputs)
+    suite.append(Scenario("s1").interact("a", "a"))
+
+    result = await suite.run()
+
+    # In-memory: the originating suite is recoverable from the result. Pydantic
+    # revalidates the submodel, so this is an equal copy rather than the same
+    # object, but the suite-level target callable is carried through by identity.
+    assert result.suite is not None
+    assert result.suite.name == suite.name
+    assert result.suite.target is suite.target
+
+    # Serialization: `suite` is excluded (it holds non-serializable callables),
+    # so dumping never raises and the field is absent from the output.
+    dumped = result.model_dump()
+    assert "suite" not in dumped
+    assert "suite" not in result.model_dump_json()
+
+    # Round-trip: deserializing has no suite to restore, so it comes back None.
+    assert result.__class__.model_validate_json(result.model_dump_json()).suite is None
+
+
+@pytest.mark.asyncio
 async def test_suite_callable_target():
     """Verify that suite target can be a callable."""
     scenario = Scenario("s1").interact("hello")

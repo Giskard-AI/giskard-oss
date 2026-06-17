@@ -4,6 +4,9 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
+if TYPE_CHECKING:
+    from giskard.checks.scenarios.suite import Suite
+
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.panel import Panel
@@ -13,9 +16,6 @@ from rich.text import Text
 
 from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
-
-if TYPE_CHECKING:
-    from giskard.checks.scenarios.suite import Suite
 
 STATUS_MAPPING = {
     "total": {
@@ -515,8 +515,9 @@ class SuiteResult(BaseResult, frozen=True):
         Scenario results produced during the suite execution.
     duration_ms : int
         Total execution time in milliseconds.
-    suite : Suite
-        The Suite that produced this result.
+    suite : Suite | None
+        The Suite that produced this result. Excluded from serialization
+        (``None`` after a serialize/deserialize round-trip).
     passed_count : int
         Number of scenarios that passed.
     failed_count : int
@@ -533,8 +534,8 @@ class SuiteResult(BaseResult, frozen=True):
         ..., description="List of scenario results"
     )
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
-    suite: "Suite[Any, Any]" = Field(
-        ..., description="The Suite that produced this result"
+    suite: "Suite[Any, Any] | None" = Field(
+        default=None, exclude=True, description="The Suite that produced this result"
     )
 
     @computed_field
