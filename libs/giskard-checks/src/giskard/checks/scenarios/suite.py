@@ -241,6 +241,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             suite_result = SuiteResult(
                 results=results,
                 duration_ms=int((end_time - start_time) * 1000),
+                suite=self,
             )
 
             telemetry_capture(
@@ -320,3 +321,9 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
                 raise exc_group.exceptions[0]
             raise
         return [task.result() for task in tasks]
+
+
+# `SuiteResult.suite` is a forward reference to `Suite`, which is only imported
+# under `TYPE_CHECKING` in result.py to avoid a circular import. Rebuild the model
+# here, where `Suite` exists at runtime, so Pydantic can resolve the annotation.
+SuiteResult.model_rebuild()

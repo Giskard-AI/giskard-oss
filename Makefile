@@ -115,7 +115,7 @@ generate-licenses: ## Generate licenses
 		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-scan
 
 check-licenses: ## Check for licenses
-	uv tool run licensecheck --license MIT \
+	uv tool run --from "licensecheck==2025.1.0" licensecheck --license MIT \
 		--show-only-failing --zero \
 		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-scan
 

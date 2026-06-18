@@ -92,7 +92,7 @@ class DatasetScenarioGenerator(ScenarioGenerator):
             )
 
         scenarios = []
-        with path.open() as f:
+        with path.open(encoding="utf-8") as f:
             for line_num, line in enumerate(f, start=1):
                 line = line.strip()
                 if not line:
