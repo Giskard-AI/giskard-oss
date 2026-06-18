@@ -128,3 +128,25 @@ async def test_dataset_generator_malformed_jsonl_raises_value_error(
     gen = _StubDatasetGenerator()
     with pytest.raises(ValueError, match=r"stub\.jsonl|line 2"):
         await gen.generate_scenario("desc", ["en"])
+
+
+async def test_dataset_generator_reads_utf8_content(tmp_path, monkeypatch):
+    """Non-ASCII scenario content is decoded correctly as UTF-8 regardless of locale."""
+    import json
+
+    import giskard.scan.generators.base as base_mod
+
+    stub_file = tmp_path / "stub.jsonl"
+    stub_file.write_text(
+        json.dumps(
+            {"name": "Café Ñoño 日本語 Привет", "steps": [], "annotations": {}},
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
+    gen = _StubDatasetGenerator()
+    result = await gen.generate_scenario("desc", ["en"])
+    assert len(result) == 1
+    assert result[0].name == "Café Ñoño 日本語 Привет"
