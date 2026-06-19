@@ -3,9 +3,10 @@ from typing import Any, override
 
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
-from giskard.scan.generators.base import BaseDatasetScenarioGenerator
 from huggingface_hub import hf_hub_download, list_repo_files
 from pydantic import Field
+
+from .base import BaseDatasetScenarioGenerator
 
 logger = logging.getLogger(__name__)
 
