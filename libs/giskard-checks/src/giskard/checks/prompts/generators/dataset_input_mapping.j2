@@ -7,11 +7,17 @@ user's message contain the literal token {{ "{{prompt}}" }}.
 You will return a structured output with:
 - message: a valid instance of the input schema with the literal token
   {{ "{{prompt}}" }} placed in the single string field that most naturally
-  carries a user's message (e.g. body, content, message, text, question). You
-  may embed it in surrounding text, e.g. "Please answer to {{ "{{prompt}}" }}",
-  or use it alone. Fill every other required field with a short, neutral
-  placeholder value. Do NOT invent or guess any user message content — use only
-  the token. Leave message null only when schema_issue is set.
+  carries a user's message (e.g. body, content, message, text, question). Put
+  the token ALONE in that field. Avoid embedding it in surrounding text; only
+  add surrounding text if the schema clearly forces it. Fill every other
+  required field with a short, neutral placeholder value (a generic constant,
+  not invented user content). Do NOT invent or guess any user message content —
+  use only the token. Leave message null only when schema_issue is set.
+
+  Example — for the schema of an email with `subject` and `body` fields, a
+  good message is:
+  {"subject": "Read this!", "body": "{{ "{{prompt}}" }}"}
+
 - schema_issue: set this (and leave message null) if the schema has no string
   field that can carry a user message. Leave null otherwise.
 
