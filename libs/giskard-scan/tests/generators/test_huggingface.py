@@ -31,6 +31,9 @@ def hf_repo(tmp_path, monkeypatch):
         "hf_hub_download",
         lambda repo_id, repo_file, repo_type=None: files[repo_file],
     )
+    # _list_available_languages is process-cached by (repo_id, filename); tests
+    # reuse the same repo_id/filename with different file sets, so clear it.
+    hf_mod._list_available_languages.cache_clear()
     return add_file
 
 
@@ -108,6 +111,7 @@ async def test_malformed_jsonl_raises_with_source(hf_repo, tmp_path, monkeypatch
     monkeypatch.setattr(
         hf_mod, "hf_hub_download", lambda repo_id, repo_file, repo_type=None: str(bad)
     )
+    hf_mod._list_available_languages.cache_clear()
     gen = _make_gen()
     with pytest.raises(ValueError, match=r"org/dataset/donotanswer\.en\.jsonl|line 2"):
         await gen.generate_scenario("desc", ["en"])

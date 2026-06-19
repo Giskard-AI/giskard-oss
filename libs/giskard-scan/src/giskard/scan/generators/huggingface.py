@@ -1,4 +1,5 @@
 import logging
+from functools import lru_cache
 from typing import Any, override
 
 from giskard.checks.core.interaction import Trace
@@ -11,6 +12,23 @@ from .base import BaseDatasetScenarioGenerator
 logger = logging.getLogger(__name__)
 
 _LANGUAGE_PLACEHOLDER = "{language}"
+
+
+@lru_cache(maxsize=32)
+def _list_available_languages(repo_id: str, filename: str) -> dict[str, str]:
+    """Map available language code -> repo filename via the template.
+
+    Cached per ``(repo_id, filename)``: the repo file list is static within a
+    run, so this avoids hitting the Hub on every scan.
+    """
+    prefix, _, suffix = filename.partition(_LANGUAGE_PLACEHOLDER)
+    available: dict[str, str] = {}
+    for repo_file in list_repo_files(repo_id, repo_type="dataset"):
+        if repo_file.startswith(prefix) and repo_file.endswith(suffix):
+            language = repo_file.removeprefix(prefix).removesuffix(suffix)
+            if language:
+                available[language] = repo_file
+    return available
 
 
 class HuggingFaceDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
@@ -46,14 +64,7 @@ class HuggingFaceDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
 
     def _available_languages(self) -> dict[str, str]:
         """Map available language code -> repo filename via the template."""
-        prefix, _, suffix = self.filename.partition(_LANGUAGE_PLACEHOLDER)
-        available: dict[str, str] = {}
-        for repo_file in list_repo_files(self.repo_id, repo_type="dataset"):
-            if repo_file.startswith(prefix) and repo_file.endswith(suffix):
-                language = repo_file.removeprefix(prefix).removesuffix(suffix)
-                if language:
-                    available[language] = repo_file
-        return available
+        return _list_available_languages(self.repo_id, self.filename)
 
     @override
     def load_scenarios(

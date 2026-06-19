@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import hashlib
 import json
@@ -113,6 +114,7 @@ def substitute_prompt(message: Any, prompt: str) -> Any:
 
 
 _TEMPLATE_CACHE: dict[str, "MappingTemplate[Any]"] = {}
+_TEMPLATE_LOCKS: dict[str, asyncio.Lock] = {}
 
 
 def schema_cache_key(input_type: type) -> str:
@@ -161,15 +163,24 @@ class DatasetInputGenerator[TraceType: Trace](  # pyright: ignore[reportMissingT
         if cached is not None:
             return cached
 
-        schema = json.dumps(schema_dict, indent=2, default=str)
-        workflow = self._generator.template(_MAPPING_TEMPLATE).with_output(
-            MappingTemplate[input_type]
-        )
-        result = await workflow.with_inputs(schema=schema).run()
-        template = result.output
-        if template.schema_issue is not None:
-            raise ValueError(
-                f"Cannot template prompt into {input_type.__qualname__}: {template.schema_issue}"
+        # Scenarios run concurrently (suite uses asyncio.TaskGroup). Serialize
+        # per-schema so concurrent cache misses for the same target don't each
+        # fire a duplicate LLM call.
+        lock = _TEMPLATE_LOCKS.setdefault(key, asyncio.Lock())
+        async with lock:
+            cached = _TEMPLATE_CACHE.get(key)
+            if cached is not None:
+                return cached
+
+            schema = json.dumps(schema_dict, indent=2, default=str)
+            workflow = self._generator.template(_MAPPING_TEMPLATE).with_output(
+                MappingTemplate[input_type]
             )
-        _TEMPLATE_CACHE[key] = template
-        return template
+            result = await workflow.with_inputs(schema=schema).run()
+            template = result.output
+            if template.schema_issue is not None:
+                raise ValueError(
+                    f"Cannot template prompt into {input_type.__qualname__}: {template.schema_issue}"
+                )
+            _TEMPLATE_CACHE[key] = template
+            return template

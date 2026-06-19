@@ -5,6 +5,7 @@ import pytest
 from giskard.checks import Interact, Scenario
 from giskard.checks.generators.dataset import (
     _TEMPLATE_CACHE,
+    _TEMPLATE_LOCKS,
     PROMPT_PLACEHOLDER,
     DatasetInputGenerator,
     MappingTemplate,
@@ -155,8 +156,10 @@ def _mapping_response(
 @pytest.fixture(autouse=True)
 def _clear_cache():
     _TEMPLATE_CACHE.clear()
+    _TEMPLATE_LOCKS.clear()
     yield
     _TEMPLATE_CACHE.clear()
+    _TEMPLATE_LOCKS.clear()
 
 
 async def test_structured_schema_injects_prompt():
