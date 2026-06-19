@@ -49,7 +49,7 @@ class HuggingFaceDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
         available: dict[str, str] = {}
         for repo_file in list_repo_files(self.repo_id, repo_type="dataset"):
             if repo_file.startswith(prefix) and repo_file.endswith(suffix):
-                language = repo_file[len(prefix) : len(repo_file) - len(suffix)]
+                language = repo_file.removeprefix(prefix).removesuffix(suffix)
                 if language:
                     available[language] = repo_file
         return available

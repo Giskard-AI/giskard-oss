@@ -48,27 +48,39 @@ class MappingTemplate[T](BaseModel):  # pyright: ignore[reportMissingTypeArgumen
         return self
 
 
-def _replace(value: Any, prompt: str, replaced: list[bool]) -> Any:
+def _replace(value: Any, prompt: str) -> tuple[Any, bool]:
+    """Return ``(new_value, replaced)`` where ``replaced`` is True iff a placeholder was hit."""
     if isinstance(value, str):
         if PROMPT_PLACEHOLDER in value:
-            replaced[0] = True
-            return value.replace(PROMPT_PLACEHOLDER, prompt)
-        return value
+            return value.replace(PROMPT_PLACEHOLDER, prompt), True
+        return value, False
     if isinstance(value, BaseModel):
-        data = {
-            name: _replace(getattr(value, name), prompt, replaced)
-            for name in type(value).model_fields
-        }
-        return type(value).model_validate(data)
+        replaced = False
+        data: dict[str, Any] = {}
+        for name in type(value).model_fields:
+            data[name], hit = _replace(getattr(value, name), prompt)
+            replaced |= hit
+        return type(value).model_validate(data), replaced
     if isinstance(value, list):
-        return [_replace(item, prompt, replaced) for item in value]
+        replaced = False
+        items: list[Any] = []
+        for item in value:
+            new_item, hit = _replace(item, prompt)
+            items.append(new_item)
+            replaced |= hit
+        return items, replaced
     if isinstance(value, dict):
         # Recurse into values only; dict keys and tuple elements are
         # intentionally out of scope (JSON-shaped agent inputs never carry the
         # message in a key or a tuple). A placeholder hiding only there is not
         # substituted, and substitute_prompt then raises — fails loud, not silent.
-        return {k: _replace(v, prompt, replaced) for k, v in value.items()}
-    return value
+        replaced = False
+        out: dict[Any, Any] = {}
+        for k, v in value.items():
+            out[k], hit = _replace(v, prompt)
+            replaced |= hit
+        return out, replaced
+    return value, False
 
 
 def substitute_prompt(message: Any, prompt: str) -> Any:
@@ -76,9 +88,8 @@ def substitute_prompt(message: Any, prompt: str) -> Any:
 
     Raises ``ValueError`` if the placeholder is not present anywhere.
     """
-    replaced = [False]
-    result = _replace(copy.deepcopy(message), prompt, replaced)
-    if not replaced[0]:
+    result, replaced = _replace(copy.deepcopy(message), prompt)
+    if not replaced:
         raise ValueError(
             f"Template message contains no '{PROMPT_PLACEHOLDER}' placeholder to inject the prompt into"
         )
@@ -90,12 +101,13 @@ _TEMPLATE_CACHE: dict[str, "MappingTemplate[Any]"] = {}
 
 def schema_cache_key(input_type: type) -> str:
     """Stable cache key: qualified class name + hash of its JSON schema."""
-    schema = json.dumps(
-        input_type.model_json_schema(),  # type: ignore[attr-defined]
-        sort_keys=True,
-        default=str,
-    )
-    digest = hashlib.sha256(schema.encode("utf-8")).hexdigest()[:16]
+    schema = input_type.model_json_schema()  # type: ignore[attr-defined]
+    return _schema_cache_key(input_type, schema)
+
+
+def _schema_cache_key(input_type: type, schema: dict[str, Any]) -> str:
+    canonical = json.dumps(schema, sort_keys=True, default=str)
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
     return f"{input_type.__qualname__}:{digest}"
 
 
@@ -132,12 +144,13 @@ class DatasetInputGenerator[TraceType: Trace](  # pyright: ignore[reportMissingT
         yield substitute_prompt(template.message, self.prompt)
 
     async def _resolve_template(self, input_type: type) -> "MappingTemplate[Any]":
-        key = schema_cache_key(input_type)
+        schema_dict = input_type.model_json_schema()  # type: ignore[attr-defined]
+        key = _schema_cache_key(input_type, schema_dict)
         cached = _TEMPLATE_CACHE.get(key)
         if cached is not None:
             return cached
 
-        schema = json.dumps(input_type.model_json_schema(), indent=2, default=str)  # type: ignore[attr-defined]
+        schema = json.dumps(schema_dict, indent=2, default=str)
         workflow = self._generator.template(_MAPPING_TEMPLATE).with_output(
             MappingTemplate[input_type]
         )
