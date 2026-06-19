@@ -117,7 +117,7 @@ _TEMPLATE_CACHE: dict[str, "MappingTemplate[Any]"] = {}
 
 def schema_cache_key(input_type: type) -> str:
     """Stable cache key: qualified class name + hash of its JSON schema."""
-    schema = input_type.model_json_schema()  # type: ignore[attr-defined]
+    schema = input_type.model_json_schema()
     return _schema_cache_key(input_type, schema)
 
 
@@ -125,11 +125,6 @@ def _schema_cache_key(input_type: type, schema: dict[str, Any]) -> str:
     canonical = json.dumps(schema, sort_keys=True, default=str)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
     return f"{input_type.__qualname__}:{digest}"
-
-
-def _cache_clear() -> None:
-    """Test hook: clear the process-level template cache."""
-    _TEMPLATE_CACHE.clear()
 
 
 @InputGenerator.register("dataset_input")
@@ -160,7 +155,7 @@ class DatasetInputGenerator[TraceType: Trace](  # pyright: ignore[reportMissingT
         yield substitute_prompt(template.message, self.prompt)
 
     async def _resolve_template(self, input_type: type) -> "MappingTemplate[Any]":
-        schema_dict = input_type.model_json_schema()  # type: ignore[attr-defined]
+        schema_dict = input_type.model_json_schema()
         key = _schema_cache_key(input_type, schema_dict)
         cached = _TEMPLATE_CACHE.get(key)
         if cached is not None:

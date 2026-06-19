@@ -4,10 +4,10 @@ from typing import Any
 import pytest
 from giskard.checks import Interact, Scenario
 from giskard.checks.generators.dataset import (
+    _TEMPLATE_CACHE,
     PROMPT_PLACEHOLDER,
     DatasetInputGenerator,
     MappingTemplate,
-    _cache_clear,
     schema_cache_key,
     substitute_prompt,
 )
@@ -154,9 +154,9 @@ def _mapping_response(
 
 @pytest.fixture(autouse=True)
 def _clear_cache():
-    _cache_clear()
+    _TEMPLATE_CACHE.clear()
     yield
-    _cache_clear()
+    _TEMPLATE_CACHE.clear()
 
 
 async def test_structured_schema_injects_prompt():
