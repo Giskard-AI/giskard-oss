@@ -48,38 +48,54 @@ class MappingTemplate[T](BaseModel):  # pyright: ignore[reportMissingTypeArgumen
         return self
 
 
+def _replace_str(value: str, prompt: str) -> tuple[str, bool]:
+    if PROMPT_PLACEHOLDER in value:
+        return value.replace(PROMPT_PLACEHOLDER, prompt), True
+    return value, False
+
+
+def _replace_base_model[T: BaseModel](value: T, prompt: str) -> tuple[T, bool]:
+    replaced = False
+    data: dict[str, Any] = {}
+    for name in type(value).model_fields:
+        data[name], hit = _replace(getattr(value, name), prompt)
+        replaced |= hit
+    return type(value).model_validate(data), replaced
+
+
+def _replace_list[T](value: list[T], prompt: str) -> tuple[list[T], bool]:
+    replaced = False
+    items: list[T] = []
+    for item in value:
+        new_item, hit = _replace(item, prompt)
+        items.append(new_item)
+        replaced |= hit
+    return items, replaced
+
+
+def _replace_dict[T](value: dict[str, T], prompt: str) -> tuple[dict[str, T], bool]:
+    replaced = False
+    out: dict[str, T] = {}
+    for k, v in value.items():
+        out[k], hit = _replace(v, prompt)
+        replaced |= hit
+    return out, replaced
+
+
 def _replace(value: Any, prompt: str) -> tuple[Any, bool]:
-    """Return ``(new_value, replaced)`` where ``replaced`` is True iff a placeholder was hit."""
+    """Return ``(new_value, replaced)`` where ``replaced`` is True iff a placeholder was hit.
+
+    Each branch preserves the runtime type of ``value`` (``isinstance`` narrows the value
+    but not the type variable ``T``, so the result is cast back to ``tuple[T, bool]``).
+    """
     if isinstance(value, str):
-        if PROMPT_PLACEHOLDER in value:
-            return value.replace(PROMPT_PLACEHOLDER, prompt), True
-        return value, False
+        return _replace_str(value, prompt)
     if isinstance(value, BaseModel):
-        replaced = False
-        data: dict[str, Any] = {}
-        for name in type(value).model_fields:
-            data[name], hit = _replace(getattr(value, name), prompt)
-            replaced |= hit
-        return type(value).model_validate(data), replaced
+        return _replace_base_model(value, prompt)
     if isinstance(value, list):
-        replaced = False
-        items: list[Any] = []
-        for item in value:
-            new_item, hit = _replace(item, prompt)
-            items.append(new_item)
-            replaced |= hit
-        return items, replaced
-    if isinstance(value, dict):
-        # Recurse into values only; dict keys and tuple elements are
-        # intentionally out of scope (JSON-shaped agent inputs never carry the
-        # message in a key or a tuple). A placeholder hiding only there is not
-        # substituted, and substitute_prompt then raises — fails loud, not silent.
-        replaced = False
-        out: dict[Any, Any] = {}
-        for k, v in value.items():
-            out[k], hit = _replace(v, prompt)
-            replaced |= hit
-        return out, replaced
+        return _replace_list(value, prompt)
+    elif isinstance(value, dict):
+        return _replace_dict(value, prompt)
     return value, False
 
 
