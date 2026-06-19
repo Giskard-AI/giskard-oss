@@ -1,9 +1,14 @@
 import copy
 import hashlib
 import json
-from typing import Any
+from collections.abc import AsyncGenerator
+from typing import Any, override
 
 from pydantic import BaseModel, Field, model_validator
+
+from ..core import Trace
+from ..core.input_generator import InputGenerator
+from ..core.mixin import WithGeneratorMixin
 
 PROMPT_PLACEHOLDER = "{{prompt}}"
 
@@ -92,3 +97,30 @@ def schema_cache_key(input_type: type) -> str:
 def _cache_clear() -> None:
     """Test hook: clear the process-level template cache."""
     _TEMPLATE_CACHE.clear()
+
+
+@InputGenerator.register("dataset_input")
+class DatasetInputGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    InputGenerator[TraceType], WithGeneratorMixin
+):
+    """Single-shot generator that places a fixed dataset prompt into the target input.
+
+    For a ``str`` target the prompt is yielded verbatim (no LLM). For a structured
+    target the prompt is injected into an LLM-resolved, schema-only template; the
+    LLM never sees the prompt itself.
+    """
+
+    prompt: str = Field(
+        ..., min_length=1, description="Fixed dataset prompt, used verbatim."
+    )
+
+    @override
+    async def __call__(
+        self, trace: TraceType, input_type: type[Any] | None = None
+    ) -> AsyncGenerator[Any, TraceType]:
+        T = input_type or str
+        if T is str:
+            yield self.prompt
+            return
+        # Structured path added in Task 5.
+        raise NotImplementedError("structured input_type handled in Task 5")

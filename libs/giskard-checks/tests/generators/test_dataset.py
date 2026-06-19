@@ -1,11 +1,14 @@
 import pytest
 from giskard.checks.generators.dataset import (
     PROMPT_PLACEHOLDER,
+    DatasetInputGenerator,
     MappingTemplate,
     schema_cache_key,
     substitute_prompt,
 )
 from pydantic import BaseModel
+
+from .conftest import LLMTrace, MockGenerator
 
 
 class Email(BaseModel):
@@ -112,3 +115,24 @@ def test_schema_cache_key_stable_and_distinct():
     assert k1 == k2
     # Same field shape but different class name -> different key
     assert schema_cache_key(Other) != k1
+
+
+# --- DatasetInputGenerator: str fast-path ---
+
+
+async def test_str_fast_path_yields_prompt_without_llm():
+    gen = MockGenerator(responses=[])  # would IndexError if the LLM were called
+    g = DatasetInputGenerator(generator=gen, prompt="How do I pick a lock?")
+    agen = g(LLMTrace(), input_type=str)
+    value = await anext(agen)
+    assert value == "How do I pick a lock?"
+    assert gen.calls == []  # no LLM call
+    with pytest.raises(StopAsyncIteration):
+        await anext(agen)
+
+
+async def test_str_fast_path_when_input_type_none():
+    gen = MockGenerator(responses=[])
+    g = DatasetInputGenerator(generator=gen, prompt="X")
+    value = await anext(g(LLMTrace(), input_type=None))
+    assert value == "X"

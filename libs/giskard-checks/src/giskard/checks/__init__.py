@@ -47,6 +47,7 @@ from .core import (
     resolve,
 )
 from .generators.base import BaseLLMGenerator, LLMGenerator
+from .generators.dataset import DatasetInputGenerator
 from .generators.user import UserSimulator
 from .judges import (
     AnswerRelevance,
@@ -133,6 +134,7 @@ __all__ = [
     "BaseLLMGenerator",
     "LLMGenerator",
     # Generators
+    "DatasetInputGenerator",
     "UserSimulator",
     # Testing
     "WithSpy",
