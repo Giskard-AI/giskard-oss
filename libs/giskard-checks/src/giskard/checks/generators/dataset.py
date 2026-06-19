@@ -11,6 +11,7 @@ from ..core.input_generator import InputGenerator
 from ..core.mixin import WithGeneratorMixin
 
 PROMPT_PLACEHOLDER = "{{prompt}}"
+_MAPPING_TEMPLATE = "giskard.checks::generators/dataset_input_mapping.j2"
 
 
 class MappingTemplate[T](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
@@ -122,5 +123,25 @@ class DatasetInputGenerator[TraceType: Trace](  # pyright: ignore[reportMissingT
         if T is str:
             yield self.prompt
             return
-        # Structured path added in Task 5.
-        raise NotImplementedError("structured input_type handled in Task 5")
+        template = await self._resolve_template(T)
+        assert template.message is not None  # _resolve_template raises otherwise
+        yield substitute_prompt(template.message, self.prompt)
+
+    async def _resolve_template(self, input_type: type) -> "MappingTemplate[Any]":
+        key = schema_cache_key(input_type)
+        cached = _TEMPLATE_CACHE.get(key)
+        if cached is not None:
+            return cached
+
+        schema = json.dumps(input_type.model_json_schema(), indent=2, default=str)  # type: ignore[attr-defined]
+        workflow = self._generator.template(_MAPPING_TEMPLATE).with_output(
+            MappingTemplate[input_type]
+        )
+        result = await workflow.with_inputs(schema=schema).run()
+        template = result.output
+        if template.schema_issue is not None:
+            raise ValueError(
+                f"Cannot template prompt into {input_type.__qualname__}: {template.schema_issue}"
+            )
+        _TEMPLATE_CACHE[key] = template
+        return template

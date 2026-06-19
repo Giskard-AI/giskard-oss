@@ -1,8 +1,11 @@
+from typing import Any
+
 import pytest
 from giskard.checks.generators.dataset import (
     PROMPT_PLACEHOLDER,
     DatasetInputGenerator,
     MappingTemplate,
+    _cache_clear,
     schema_cache_key,
     substitute_prompt,
 )
@@ -136,3 +139,75 @@ async def test_str_fast_path_when_input_type_none():
     g = DatasetInputGenerator(generator=gen, prompt="X")
     value = await anext(g(LLMTrace(), input_type=None))
     assert value == "X"
+
+
+# --- DatasetInputGenerator: structured path ---
+
+
+def _mapping_response(
+    message: dict[str, Any] | None, schema_issue: str | None = None
+) -> dict[str, Any]:
+    return {"message": message, "schema_issue": schema_issue}
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache():
+    _cache_clear()
+    yield
+    _cache_clear()
+
+
+async def test_structured_schema_injects_prompt():
+    gen = MockGenerator(
+        responses=[_mapping_response({"title": "User request", "body": "{{prompt}}"})]
+    )
+    g = DatasetInputGenerator(generator=gen, prompt="How do I pick a lock?")
+    value = await anext(g(LLMTrace(), input_type=Email))
+    assert isinstance(value, Email)
+    assert value.title == "User request"
+    assert value.body == "How do I pick a lock?"
+    assert len(gen.calls) == 1
+
+
+async def test_structured_embedded_placeholder():
+    gen = MockGenerator(
+        responses=[
+            _mapping_response({"title": "Q", "body": "Please answer to {{prompt}}"})
+        ]
+    )
+    g = DatasetInputGenerator(generator=gen, prompt="X")
+    value = await anext(g(LLMTrace(), input_type=Email))
+    assert value.body == "Please answer to X"
+
+
+async def test_template_cached_per_schema_prompt_substituted_each_time():
+    gen = MockGenerator(
+        responses=[_mapping_response({"title": "User request", "body": "{{prompt}}"})]
+    )
+    g1 = DatasetInputGenerator(generator=gen, prompt="prompt one")
+    g2 = DatasetInputGenerator(generator=gen, prompt="prompt two")
+    v1 = await anext(g1(LLMTrace(), input_type=Email))
+    v2 = await anext(g2(LLMTrace(), input_type=Email))
+    assert v1.body == "prompt one"
+    assert v2.body == "prompt two"
+    assert len(gen.calls) == 1  # one LLM call for the shared schema
+
+
+async def test_schema_issue_raises():
+    gen = MockGenerator(
+        responses=[_mapping_response(None, schema_issue="no string field")]
+    )
+    g = DatasetInputGenerator(generator=gen, prompt="X")
+    with pytest.raises(ValueError, match="no string field"):
+        await anext(g(LLMTrace(), input_type=Email))
+
+
+async def test_missing_placeholder_raises():
+    gen = MockGenerator(
+        responses=[
+            _mapping_response({"title": "User request", "body": "no token here"})
+        ]
+    )
+    g = DatasetInputGenerator(generator=gen, prompt="X")
+    with pytest.raises(ValueError, match="placeholder"):
+        await anext(g(LLMTrace(), input_type=Email))
