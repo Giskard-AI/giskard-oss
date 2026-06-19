@@ -1,4 +1,6 @@
 import copy
+import hashlib
+import json
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
@@ -71,3 +73,22 @@ def substitute_prompt(message: Any, prompt: str) -> Any:
             f"Template message contains no '{PROMPT_PLACEHOLDER}' placeholder to inject the prompt into"
         )
     return result
+
+
+_TEMPLATE_CACHE: dict[str, "MappingTemplate[Any]"] = {}
+
+
+def schema_cache_key(input_type: type) -> str:
+    """Stable cache key: qualified class name + hash of its JSON schema."""
+    schema = json.dumps(
+        input_type.model_json_schema(),  # type: ignore[attr-defined]
+        sort_keys=True,
+        default=str,
+    )
+    digest = hashlib.sha256(schema.encode("utf-8")).hexdigest()[:16]
+    return f"{input_type.__qualname__}:{digest}"
+
+
+def _cache_clear() -> None:
+    """Test hook: clear the process-level template cache."""
+    _TEMPLATE_CACHE.clear()

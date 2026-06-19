@@ -2,6 +2,7 @@ import pytest
 from giskard.checks.generators.dataset import (
     PROMPT_PLACEHOLDER,
     MappingTemplate,
+    schema_cache_key,
     substitute_prompt,
 )
 from pydantic import BaseModel
@@ -95,3 +96,19 @@ def test_substitute_prompt_wrong_placeholder_token_raises():
     with pytest.raises(ValueError, match="placeholder"):
         substitute_prompt(msg, "X")
     # The malformed tokens are left untouched (not silently shipped as a value).
+
+
+# --- schema-keyed cache ---
+
+
+class Other(BaseModel):
+    title: str
+    body: str
+
+
+def test_schema_cache_key_stable_and_distinct():
+    k1 = schema_cache_key(Email)
+    k2 = schema_cache_key(Email)
+    assert k1 == k2
+    # Same field shape but different class name -> different key
+    assert schema_cache_key(Other) != k1
