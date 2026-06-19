@@ -10,8 +10,10 @@ from .generators.adversarial import AdversarialScenarioGenerator
 from .generators.base import DatasetScenarioGenerator, ScenarioGenerator
 from .generators.crescendo import CrescendoAttackScenarioGenerator
 from .generators.goat import GOATAttackScenarioGenerator
+from .generators.huggingface import HuggingFaceDatasetScenarioGenerator
 from .generators.prompt_injection import PromptInjectionScenarioGenerator
 from .registry import SuiteGeneratorRegistry
+from .types import ScanOptions
 from .vulnerability import vulnerability_scan, vulnerability_suite_generator_registry
 
 add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.scan")
@@ -25,7 +27,9 @@ __all__ = [
     "AdversarialScenarioGenerator",
     "CrescendoAttackScenarioGenerator",
     "GOATAttackScenarioGenerator",
+    "HuggingFaceDatasetScenarioGenerator",
     "PromptInjectionScenarioGenerator",
+    "ScanOptions",
     "SuiteGeneratorRegistry",
     "vulnerability_suite_generator_registry",
     "vulnerability_scan",
