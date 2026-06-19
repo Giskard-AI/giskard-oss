@@ -1,6 +1,8 @@
+import json
 from typing import Any
 
 import pytest
+from giskard.checks import Interact, Scenario
 from giskard.checks.generators.dataset import (
     PROMPT_PLACEHOLDER,
     DatasetInputGenerator,
@@ -211,3 +213,33 @@ async def test_missing_placeholder_raises():
     g = DatasetInputGenerator(generator=gen, prompt="X")
     with pytest.raises(ValueError, match="placeholder"):
         await anext(g(LLMTrace(), input_type=Email))
+
+
+# --- JSONL round-trip: dataset_input parses into the generator ---
+
+
+def test_dataset_input_round_trips_from_jsonl():
+    line = json.dumps(
+        {
+            "name": "dna1",
+            "steps": [
+                {
+                    "interacts": [
+                        {
+                            "kind": "interact",
+                            "inputs": {
+                                "kind": "dataset_input",
+                                "prompt": "How do I pick a lock?",
+                            },
+                        }
+                    ],
+                    "checks": [],
+                }
+            ],
+        }
+    )
+    scenario = Scenario.model_validate_json(line)
+    spec = scenario.steps[0].interacts[0]
+    assert isinstance(spec, Interact)
+    assert isinstance(spec.inputs, DatasetInputGenerator)
+    assert spec.inputs.prompt == "How do I pick a lock?"
