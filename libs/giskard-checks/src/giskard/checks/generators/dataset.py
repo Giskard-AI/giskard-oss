@@ -1,0 +1,73 @@
+import copy
+from typing import Any
+
+from pydantic import BaseModel, Field, model_validator
+
+PROMPT_PLACEHOLDER = "{{prompt}}"
+
+
+class MappingTemplate[T](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
+    """LLM output: a valid instance of the target schema with a {{prompt}} marker.
+
+    Either ``message`` (a valid ``T`` containing the ``{{prompt}}`` token in the
+    string field(s) that should carry the user's message) or ``schema_issue``
+    (set when no string field can hold a message) is provided, never both.
+    """
+
+    schema_issue: str | None = Field(
+        default=None,
+        description=(
+            "Schema issue preventing templating (e.g. no string-like field to "
+            "carry a user message). Set this instead of message when the schema "
+            "cannot hold a user prompt."
+        ),
+    )
+    message: T | None = Field(
+        default=None,
+        description=(
+            "A valid instance of the target schema with the literal token "
+            "'{{prompt}}' placed in the string field(s) that carry the user's "
+            "message. May embed it in surrounding text, e.g. 'Please answer to "
+            "{{prompt}}' or just '{{prompt}}'. Other required fields get neutral "
+            "placeholder values. None when schema_issue is set."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _xor(self) -> "MappingTemplate[T]":
+        if (self.message is None) == (self.schema_issue is None):
+            raise ValueError("Exactly one of 'message' / 'schema_issue' must be set")
+        return self
+
+
+def _replace(value: Any, prompt: str, replaced: list[bool]) -> Any:
+    if isinstance(value, str):
+        if PROMPT_PLACEHOLDER in value:
+            replaced[0] = True
+            return value.replace(PROMPT_PLACEHOLDER, prompt)
+        return value
+    if isinstance(value, BaseModel):
+        data = {
+            name: _replace(getattr(value, name), prompt, replaced)
+            for name in type(value).model_fields
+        }
+        return type(value).model_validate(data)
+    if isinstance(value, list):
+        return [_replace(item, prompt, replaced) for item in value]
+    if isinstance(value, dict):
+        return {k: _replace(v, prompt, replaced) for k, v in value.items()}
+    return value
+
+
+def substitute_prompt(message: Any, prompt: str) -> Any:
+    """Return a deep copy of ``message`` with every ``{{prompt}}`` replaced by ``prompt``.
+
+    Raises ``ValueError`` if the placeholder is not present anywhere.
+    """
+    replaced = [False]
+    result = _replace(copy.deepcopy(message), prompt, replaced)
+    if not replaced[0]:
+        raise ValueError(
+            f"Template message contains no '{PROMPT_PLACEHOLDER}' placeholder to inject the prompt into"
+        )
+    return result
