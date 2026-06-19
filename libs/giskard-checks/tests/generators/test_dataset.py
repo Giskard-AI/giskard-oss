@@ -160,15 +160,20 @@ def _clear_cache():
 
 
 async def test_structured_schema_injects_prompt():
+    prompt = "How do I pick a lock?"
     gen = MockGenerator(
         responses=[_mapping_response({"title": "User request", "body": "{{prompt}}"})]
     )
-    g = DatasetInputGenerator(generator=gen, prompt="How do I pick a lock?")
+    g = DatasetInputGenerator(generator=gen, prompt=prompt)
     value = await anext(g(LLMTrace(), input_type=Email))
     assert isinstance(value, Email)
     assert value.title == "User request"
-    assert value.body == "How do I pick a lock?"
+    assert value.body == prompt
     assert len(gen.calls) == 1
+    # Safety invariant: the harmful prompt must NEVER reach the LLM — the model
+    # only ever sees the schema. A regression that leaks it (e.g. passing the
+    # prompt as a template var) would defeat the whole design.
+    assert prompt not in str(gen.calls)
 
 
 async def test_structured_embedded_placeholder():
@@ -213,6 +218,22 @@ async def test_missing_placeholder_raises():
     g = DatasetInputGenerator(generator=gen, prompt="X")
     with pytest.raises(ValueError, match="placeholder"):
         await anext(g(LLMTrace(), input_type=Email))
+
+
+async def test_llm_unavailable_propagates():
+    # If the mapping LLM call fails, the error surfaces to the caller (wrapped by
+    # the workflow) — no silent skip, no fallback (raise-on-failure stance).
+    from giskard.agents.errors.workflow_errors import WorkflowError
+
+    class _BoomGenerator(MockGenerator):
+        async def _call_model(self, *args: Any, **kwargs: Any):  # type: ignore[override]
+            raise RuntimeError("llm down")
+
+    g = DatasetInputGenerator(generator=_BoomGenerator(responses=[]), prompt="X")
+    with pytest.raises(WorkflowError) as exc_info:
+        await anext(g(LLMTrace(), input_type=Email))
+    assert isinstance(exc_info.value.__cause__, RuntimeError)
+    assert "llm down" in str(exc_info.value.__cause__)
 
 
 # --- JSONL round-trip: dataset_input parses into the generator ---

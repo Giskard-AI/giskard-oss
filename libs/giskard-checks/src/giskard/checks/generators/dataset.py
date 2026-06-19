@@ -63,6 +63,10 @@ def _replace(value: Any, prompt: str, replaced: list[bool]) -> Any:
     if isinstance(value, list):
         return [_replace(item, prompt, replaced) for item in value]
     if isinstance(value, dict):
+        # Recurse into values only; dict keys and tuple elements are
+        # intentionally out of scope (JSON-shaped agent inputs never carry the
+        # message in a key or a tuple). A placeholder hiding only there is not
+        # substituted, and substitute_prompt then raises — fails loud, not silent.
         return {k: _replace(v, prompt, replaced) for k, v in value.items()}
     return value
 
