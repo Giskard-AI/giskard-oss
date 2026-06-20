@@ -36,6 +36,11 @@ class ResolvedScanOptions(TypedDict):
 
     Produced internally by merging caller overrides over the defaults, so all
     keys are present and can be accessed without ``reportTypedDictNotRequiredAccess``.
+
+    Note: this mirrors :class:`ScanOptions`'s fields rather than subclassing it,
+    because ``total=True`` on a subclass does not re-mark keys inherited from a
+    ``total=False`` parent as required (PEP 655 — ``total`` only sets the default
+    for keys declared in the class body).
     """
 
     max_scenarios: int | None

@@ -62,15 +62,11 @@ class HuggingFaceDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
     def allow_commercial_use(self) -> bool:
         return self.repo_allow_commercial_use
 
-    def _available_languages(self) -> dict[str, str]:
-        """Map available language code -> repo filename via the template."""
-        return _list_available_languages(self.repo_id, self.filename)
-
     @override
     def load_scenarios(
         self, description: str, languages: list[str]
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
-        available = self._available_languages()
+        available = _list_available_languages(self.repo_id, self.filename)
         compatible = [language for language in languages if language in available]
 
         if not compatible:

@@ -1,5 +1,4 @@
 import asyncio
-import copy
 import hashlib
 import json
 from collections.abc import AsyncGenerator
@@ -49,63 +48,48 @@ class MappingTemplate[T](BaseModel):  # pyright: ignore[reportMissingTypeArgumen
         return self
 
 
-def _replace_str(value: str, prompt: str) -> tuple[str, bool]:
-    if PROMPT_PLACEHOLDER in value:
-        return value.replace(PROMPT_PLACEHOLDER, prompt), True
-    return value, False
-
-
-def _replace_base_model[T: BaseModel](value: T, prompt: str) -> tuple[T, bool]:
-    replaced = False
-    data: dict[str, Any] = {}
-    for name in type(value).model_fields:
-        data[name], hit = _replace(getattr(value, name), prompt)
-        replaced |= hit
-    return type(value).model_validate(data), replaced
-
-
-def _replace_list[T](value: list[T], prompt: str) -> tuple[list[T], bool]:
-    replaced = False
-    items: list[T] = []
-    for item in value:
-        new_item, hit = _replace(item, prompt)
-        items.append(new_item)
-        replaced |= hit
-    return items, replaced
-
-
-def _replace_dict[T](value: dict[str, T], prompt: str) -> tuple[dict[str, T], bool]:
-    replaced = False
-    out: dict[str, T] = {}
-    for k, v in value.items():
-        out[k], hit = _replace(v, prompt)
-        replaced |= hit
-    return out, replaced
-
-
 def _replace(value: Any, prompt: str) -> tuple[Any, bool]:
-    """Return ``(new_value, replaced)`` where ``replaced`` is True iff a placeholder was hit.
+    """Recursively rebuild ``value`` with every ``{{prompt}}`` replaced by ``prompt``.
 
-    Each branch preserves the runtime type of ``value`` (``isinstance`` narrows the value
-    but not the type variable ``T``, so the result is cast back to ``tuple[T, bool]``).
+    Returns ``(new_value, replaced)`` where ``replaced`` is True iff a placeholder
+    was hit. Every container branch builds a fresh structure, so the result never
+    aliases the input; scalars are immutable and returned as-is.
     """
     if isinstance(value, str):
-        return _replace_str(value, prompt)
+        if PROMPT_PLACEHOLDER in value:
+            return value.replace(PROMPT_PLACEHOLDER, prompt), True
+        return value, False
     if isinstance(value, BaseModel):
-        return _replace_base_model(value, prompt)
+        replaced = False
+        data: dict[str, Any] = {}
+        for name in type(value).model_fields:
+            data[name], hit = _replace(getattr(value, name), prompt)
+            replaced |= hit
+        return type(value).model_validate(data), replaced
     if isinstance(value, list):
-        return _replace_list(value, prompt)
-    elif isinstance(value, dict):
-        return _replace_dict(value, prompt)
+        replaced = False
+        items: list[Any] = []
+        for item in value:
+            new_item, hit = _replace(item, prompt)
+            items.append(new_item)
+            replaced |= hit
+        return items, replaced
+    if isinstance(value, dict):
+        replaced = False
+        out: dict[Any, Any] = {}
+        for k, v in value.items():
+            out[k], hit = _replace(v, prompt)
+            replaced |= hit
+        return out, replaced
     return value, False
 
 
 def substitute_prompt(message: Any, prompt: str) -> Any:
-    """Return a deep copy of ``message`` with every ``{{prompt}}`` replaced by ``prompt``.
+    """Return a copy of ``message`` with every ``{{prompt}}`` replaced by ``prompt``.
 
     Raises ``ValueError`` if the placeholder is not present anywhere.
     """
-    result, replaced = _replace(copy.deepcopy(message), prompt)
+    result, replaced = _replace(message, prompt)
     if not replaced:
         raise ValueError(
             f"Template message contains no '{PROMPT_PLACEHOLDER}' placeholder to inject the prompt into"
@@ -117,13 +101,14 @@ _TEMPLATE_CACHE: dict[str, "MappingTemplate[Any]"] = {}
 _TEMPLATE_LOCKS: dict[str, asyncio.Lock] = {}
 
 
-def schema_cache_key(input_type: type) -> str:
-    """Stable cache key: qualified class name + hash of its JSON schema."""
-    schema = input_type.model_json_schema()
-    return _schema_cache_key(input_type, schema)
+def schema_cache_key(input_type: type, schema: dict[str, Any] | None = None) -> str:
+    """Stable cache key: qualified class name + hash of its JSON schema.
 
-
-def _schema_cache_key(input_type: type, schema: dict[str, Any]) -> str:
+    Pass ``schema`` to reuse an already-computed ``model_json_schema()`` and
+    avoid recomputing it.
+    """
+    if schema is None:
+        schema = input_type.model_json_schema()
     canonical = json.dumps(schema, sort_keys=True, default=str)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
     return f"{input_type.__qualname__}:{digest}"
@@ -158,7 +143,7 @@ class DatasetInputGenerator[TraceType: Trace](  # pyright: ignore[reportMissingT
 
     async def _resolve_template(self, input_type: type) -> "MappingTemplate[Any]":
         schema_dict = input_type.model_json_schema()
-        key = _schema_cache_key(input_type, schema_dict)
+        key = schema_cache_key(input_type, schema_dict)
         cached = _TEMPLATE_CACHE.get(key)
         if cached is not None:
             return cached

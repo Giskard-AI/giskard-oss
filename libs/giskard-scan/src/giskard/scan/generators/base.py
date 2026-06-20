@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, override
@@ -142,7 +143,10 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
             A list of annotated :class:`~giskard.checks.core.scenario.Scenario`
             objects, ordered by their original dataset position.
         """
-        scenarios = self.load_scenarios(description, languages)
+        # load_scenarios does blocking I/O (file reads, and network for the HF
+        # subclass). Generators run concurrently via asyncio.TaskGroup, so offload
+        # to a thread to avoid stalling the event loop and the other generators.
+        scenarios = await asyncio.to_thread(self.load_scenarios, description, languages)
 
         if max_scenarios is not None and max_scenarios < len(scenarios):
             rng = rng if rng is not None else np.random.default_rng()
