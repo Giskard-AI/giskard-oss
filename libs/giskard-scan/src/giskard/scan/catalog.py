@@ -36,11 +36,15 @@ async def _generate_scenarios(
                     )
                 )
         else:
-            for generator in generators:
+            # Each concurrent generator gets its own child stream: a shared rng
+            # would be drawn from in scheduling-dependent order under TaskGroup,
+            # breaking reproducibility despite the seed.
+            child_rngs = rng.spawn(len(generators))
+            for generator, child_rng in zip(generators, child_rngs):
                 tasks.append(
                     task_group.create_task(
                         generator.generate_scenario(
-                            context, max_scenarios=None, rng=rng
+                            context, max_scenarios=None, rng=child_rng
                         )
                     )
                 )

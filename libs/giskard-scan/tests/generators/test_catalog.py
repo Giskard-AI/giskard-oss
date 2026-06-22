@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 import numpy as np
@@ -270,3 +271,52 @@ async def test_generate_suite_reproducibility():
     )
 
     assert [s.name for s in suite_a.scenarios] == [s.name for s in suite_b.scenarios]
+
+
+async def test_generate_suite_unbudgeted_reproducibility():
+    """Without max_scenarios, each generator gets an independent child rng so
+    concurrent draws stay reproducible across runs with the same seed."""
+
+    class _RngGenerator(ScenarioGenerator):
+        name: str
+        # Yield to the event loop before drawing so that, with a *shared* rng,
+        # draw order would depend on coroutine scheduling. Independent child
+        # rngs make each generator's draw stable regardless of interleaving.
+        yield_seconds: float
+
+        async def generate_scenario(
+            self,
+            context: ScenarioContext,
+            max_scenarios: int | None = None,
+            rng: np.random.Generator | None = None,
+        ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+            assert rng is not None
+            await asyncio.sleep(self.yield_seconds)
+            draw = int(rng.integers(0, 1_000_000))
+            return [Scenario(name=f"{self.name}-{draw}")]
+
+    # Different delays force the two coroutines to draw in a fixed wall-clock
+    # order, which is the order a shared stream would couple them to.
+    generators = [
+        _RngGenerator(name="p", yield_seconds=0.02),
+        _RngGenerator(name="q", yield_seconds=0.0),
+    ]
+
+    suite_a = await generate_suite(
+        "My chatbot", languages=["en"], generators=generators, seed=7
+    )
+
+    # Same generators, draws now reversed by swapping the delays. With a shared
+    # rng this flips which generator gets which number; independent child rngs
+    # keep each generator's number pinned to its identity.
+    generators[0].yield_seconds, generators[1].yield_seconds = (0.0, 0.02)
+    suite_b = await generate_suite(
+        "My chatbot", languages=["en"], generators=generators, seed=7
+    )
+
+    names_a = {s.name for s in suite_a.scenarios}
+    names_b = {s.name for s in suite_b.scenarios}
+    assert names_a == names_b
+    # The two generators must draw from independent streams, not the same value.
+    draws = sorted(name.split("-")[1] for name in names_a)
+    assert draws[0] != draws[1]

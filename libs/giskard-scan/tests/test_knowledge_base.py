@@ -141,6 +141,19 @@ async def test_closest_documents_recomputes_all_embeddings_when_any_is_missing()
     ]
 
 
+async def test_closest_documents_rejects_non_finite_embeddings():
+    """NaN/Inf embeddings must raise, not slip past the zero-vector guard."""
+    knowledge_base = KnowledgeBase(
+        documents=(
+            Document(content="seed", embeddings=[float("nan"), 0.0]),
+            Document(content="near", embeddings=[1.0, 0.0]),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="non-finite"):
+        await knowledge_base.closest_documents(seed_index=0, max_documents=2)
+
+
 def test_knowledge_base_documents_are_immutable():
     knowledge_base = KnowledgeBase.from_texts(["alpha"])
 

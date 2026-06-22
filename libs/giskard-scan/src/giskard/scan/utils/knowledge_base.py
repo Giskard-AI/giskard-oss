@@ -121,6 +121,13 @@ class KnowledgeBase(WithEmbeddingMixin):
         matrix = np.asarray(embeddings, dtype=float)
         if matrix.ndim != 2:
             raise ValueError("KnowledgeBase embeddings must be a 2D matrix")
+        # NaN/Inf must be caught before the norm check: norm(nan_vector) is nan,
+        # and nan == 0 is False, so non-finite vectors slip past the zero-vector
+        # guard and corrupt cosine-similarity ordering with no error.
+        if not np.all(np.isfinite(matrix)):
+            raise ValueError(
+                "KnowledgeBase embeddings must not contain non-finite values"
+            )
         if np.any(np.linalg.norm(matrix, axis=1) == 0):
             raise ValueError("KnowledgeBase embeddings must not contain zero vectors")
         return matrix
