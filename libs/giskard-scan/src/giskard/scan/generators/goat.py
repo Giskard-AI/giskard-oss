@@ -10,7 +10,7 @@ from giskard.checks.generators import LLMGenerator
 from giskard.checks.judges import LLMJudge
 from pydantic import BaseModel, Field
 
-from .base import ScenarioGenerator, TargetMode
+from .base import ScenarioContext, ScenarioGenerator, TargetMode
 
 logger = logging.getLogger(__name__)
 
@@ -137,8 +137,7 @@ class GOATAttackScenarioGenerator(ScenarioGenerator):
     @override
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
         target_mode: TargetMode = "multiturn",
@@ -147,10 +146,8 @@ class GOATAttackScenarioGenerator(ScenarioGenerator):
 
         Parameters
         ----------
-        description : str
-            Natural-language description of the agent under test.
-        languages : list[str]
-            BCP-47 language codes the attacker may use.
+        context : ScenarioContext
+            Run-wide context providing description and languages.
         max_scenarios : int, optional
             Maximum number of GOAT objectives to include. ``None`` includes all
             built-in objectives.
@@ -169,12 +166,12 @@ class GOATAttackScenarioGenerator(ScenarioGenerator):
                 "GOATAttackScenarioGenerator requires multiturn mode; skipping (target_mode='singleturn')."
             )
             return []
-        assignments = self._select_objectives(max_scenarios, languages, rng)
+        assignments = self._select_objectives(max_scenarios, context.languages, rng)
         return [
             self._build_scenario(
                 objective_name=objective_name,
                 goal=goal,
-                description=description,
+                description=context.description,
                 language=language,
             )
             for objective_name, goal, language in assignments

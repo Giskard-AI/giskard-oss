@@ -109,17 +109,38 @@ typecheck: ## Run type checking with basedpyright
 security: ## Check for security vulnerabilities
 	uv run pip-audit --skip-editable
 
-generate-licenses: ## Generate licenses
-	uv tool run licensecheck --license MIT \
-		--format markdown --file THIRD_PARTY_NOTICES.md \
-		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-scan
+# Run licensecheck INSIDE the synced project env (uv run --with, not uvx): it reads
+# each package's version from the installed env via importlib, so output is pinned to
+# uv.lock instead of whatever PyPI resolves to at runtime. Pinned for reproducibility.
+LICENSECHECK_VERSION := 2026.0.8
+LICENSECHECK := uv run --with licensecheck==$(LICENSECHECK_VERSION) licensecheck --license MIT
+# all-extras pulls in the provider extras' transitive deps; skip the workspace libs
+# themselves (LIBS) so the notices list only third-party packages.
+LICENSECHECK_FLAGS := --groups all-extras --skip-dependencies $(LIBS)
+# licensecheck markdown output is not byte-stable (trailing whitespace, blank-line
+# runs), so canonicalize it before writing/diffing: strip trailing whitespace and
+# collapse consecutive blank lines.
+NORMALIZE := sed -e 's/[[:space:]]*$$//' | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}'
+
+generate-notices: ## Generate THIRD_PARTY_NOTICES.md
+	$(LICENSECHECK) $(LICENSECHECK_FLAGS) \
+		--format markdown --hide-output-parameters SIZE --file /dev/stdout \
+		| $(NORMALIZE) > THIRD_PARTY_NOTICES.md
 
 check-licenses: ## Check for licenses
-	uv tool run --from "licensecheck==2025.1.0" licensecheck --license MIT \
-		--show-only-failing --zero \
-		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-scan
+	$(LICENSECHECK) $(LICENSECHECK_FLAGS) --show-only-failing --zero
 
-check: lint check-format check-compat typecheck security check-licenses ## Run all checks
+check-notices: ## Check that THIRD_PARTY_NOTICES.md is up to date (run make generate-notices if this fails)
+	@TMPFILE=$$(mktemp); trap 'rm -f "$$TMPFILE"' EXIT; \
+	$(LICENSECHECK) $(LICENSECHECK_FLAGS) \
+		--format markdown --hide-output-parameters SIZE --file /dev/stdout \
+		| $(NORMALIZE) > $$TMPFILE && \
+	if ! diff $$TMPFILE THIRD_PARTY_NOTICES.md; then \
+		echo "THIRD_PARTY_NOTICES.md is out of date. Run: make generate-notices"; \
+		exit 1; \
+	fi
+
+check: lint check-format check-compat typecheck security check-licenses check-notices ## Run all checks
 
 clean: ## Clean up build artifacts and caches
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

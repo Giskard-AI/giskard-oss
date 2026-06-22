@@ -10,7 +10,7 @@ from giskard.checks.generators import LLMGenerator
 from giskard.checks.judges import Conformity
 from pydantic import BaseModel, Field
 
-from .base import ScenarioGenerator, TargetMode
+from .base import ScenarioContext, ScenarioGenerator, TargetMode
 
 DEFAULT_RULES_PER_CATEGORY = 5
 """Number of adversarial rules generated per category when no budget is set."""
@@ -108,8 +108,7 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
 
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
         target_mode: TargetMode = "multiturn",
@@ -161,7 +160,7 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
                 if num_rules == 0:
                     continue
                 tasks[category.name] = task_group.create_task(
-                    self._generate_rules(category, description, num_rules)
+                    self._generate_rules(category, context.description, num_rules)
                 )
 
         return [
@@ -177,13 +176,13 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
             .check(Conformity(rule=rule))
             .with_annotations(
                 {
-                    "description": description,
+                    "description": context.description,
                     "category": {
                         "name": category.name,
                         "description": category.description,
                     },
                     "rule": rule,
-                    "languages": languages,
+                    "languages": context.languages,
                 }
             )
             .with_tags(category.tags)

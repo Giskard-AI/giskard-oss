@@ -1,7 +1,7 @@
 ## Info
 
 - program: licensecheck
-- version: 2025.1.0
+- version: 2026.0.8
 - license: MIT LICENSE
 
 ## Project License
@@ -17,20 +17,30 @@ Find a list of packages below
 |✔|aiohappyeyeballs|
 |✔|aiohttp|
 |✔|aiosignal|
+|✔|annotated-doc|
 |✔|annotated-types|
+|✔|anthropic|
 |✔|anyio|
 |✔|attrs|
+|✔|backoff|
+|✔|celine-regorus|
 |✔|certifi|
+|✔|cffi|
 |✔|charset-normalizer|
 |✔|click|
 |✔|colorama|
+|✔|cryptography|
 |✔|distro|
+|✔|docstring-parser|
 |✔|fastuuid|
 |✔|filelock|
 |✔|frozenlist|
 |✔|fsspec|
+|✔|google-auth|
+|✔|google-genai|
 |✔|griffe|
-|✔|grpcio|
+|✔|griffecli|
+|✔|griffelib|
 |✔|h11|
 |✔|hf-xet|
 |✔|httpcore|
@@ -45,19 +55,27 @@ Find a list of packages below
 |✔|jsonschema-specifications|
 |✔|litellm|
 |✔|logfire-api|
+|✔|markdown-it-py|
 |✔|markupsafe|
+|✔|mdurl|
 |✔|multidict|
+|✔|numpy|
 |✔|openai|
 |✔|packaging|
-|✔|ply|
+|✔|posthog|
 |✔|propcache|
+|✔|pyasn1|
+|✔|pyasn1-modules|
+|✔|pycparser|
 |✔|pydantic|
 |✔|pydantic-core|
+|✔|pygments|
 |✔|python-dotenv|
 |✔|pyyaml|
 |✔|referencing|
 |✔|regex|
 |✔|requests|
+|✔|rich|
 |✔|rpds-py|
 |✔|shellingham|
 |✔|sniffio|
@@ -65,465 +83,542 @@ Find a list of packages below
 |✔|tiktoken|
 |✔|tokenizers|
 |✔|tqdm|
-|✔|typer-slim|
+|✔|typer|
 |✔|typing-extensions|
 |✔|typing-inspection|
 |✔|urllib3|
+|✔|websockets|
 |✔|yarl|
 |✔|zipp|
 
 ### aiohappyeyeballs-2.6.1
 
-- HomePage: UNKNOWN
+- HomePage:
 - Author: J. Nick Koston
-- License: PYTHON SOFTWARE FOUNDATION LICENSE
+- License: Python Software Foundation License
 - Compatible: True
-- Size: -1
 
-### aiohttp-3.13.3
+### aiohttp-3.14.1
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: APACHE-2.0;; MIT
+- HomePage:
+- Author:
+- License: Apache-2.0;; MIT
 - Compatible: True
-- Size: -1
 
 ### aiosignal-1.4.0
 
 - HomePage: https://github.com/aio-libs/aiosignal
-- Author: UNKNOWN
-- License: APACHE SOFTWARE LICENSE
+- Author:
+- License: Apache Software License
 - Compatible: True
-- Size: -1
+
+### annotated-doc-0.0.4
+
+- HomePage:
+- Author: =?utf-8?q?Sebasti=C3=A1n_Ram=C3=ADrez?=
+- License: MIT
+- Compatible: True
 
 ### annotated-types-0.7.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: MIT LICENSE
+- HomePage:
+- Author: Adrian Garcia Badaracco
+- License: MIT License
 - Compatible: True
-- Size: -1
 
-### anyio-4.12.1
+### anthropic-0.96.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
+- HomePage:
+- Author: Anthropic
+- License: MIT License
+- Compatible: True
+
+### anyio-4.13.0
+
+- HomePage:
+- Author: Alex Grönholm
 - License: MIT
 - Compatible: True
-- Size: -1
 
-### attrs-23.2.0
+### attrs-26.1.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: MIT LICENSE
+- HomePage:
+- Author: Hynek Schlawack
+- License: MIT
 - Compatible: True
-- Size: 202960
 
-### certifi-2025.8.3
+### backoff-2.2.1
+
+- HomePage: https://github.com/litl/backoff
+- Author: Bob Green
+- License: MIT License
+- Compatible: True
+
+### celine-regorus-0.9.1.post20260227075446
+
+- HomePage:
+- Author:
+- License: Apache Software License;; BSD License;; MIT License
+- Compatible: True
+
+### certifi-2026.2.25
 
 - HomePage: https://github.com/certifi/python-certifi
 - Author: Kenneth Reitz
-- License: MOZILLA PUBLIC LICENSE 2.0 _MPL 2.0_
+- License: Mozilla Public License 2.0 _MPL 2.0_
 - Compatible: True
-- Size: 294877
 
-### charset-normalizer-3.4.3
+### cffi-2.0.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
+- HomePage:
+- Author: Armin Rigo, Maciej Fijalkowski
 - License: MIT
 - Compatible: True
-- Size: 826776
 
-### click-8.3.1
+### charset-normalizer-3.4.7
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: BSD-3-CLAUSE
+- HomePage:
+- Author: "Ahmed R. TAHRI"
+- License: MIT
 - Compatible: True
-- Size: -1
+
+### click-8.1.8
+
+- HomePage:
+- Author:
+- License: BSD License
+- Compatible: True
 
 ### colorama-0.4.6
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: BSD LICENSE
+- HomePage:
+- Author: Jonathan Hartley
+- License: BSD License
 - Compatible: True
-- Size: -1
+
+### cryptography-49.0.0
+
+- HomePage:
+- Author: The Python Cryptographic Authority and individual contributors
+- License: Apache-2.0;; BSD-3-Clause
+- Compatible: True
 
 ### distro-1.9.0
 
 - HomePage: https://github.com/python-distro/distro
 - Author: Nir Cohen
-- License: APACHE SOFTWARE LICENSE
+- License: Apache Software License
 - Compatible: True
-- Size: -1
+
+### docstring-parser-0.18.0
+
+- HomePage:
+- Author: Marcin Kurczewski
+- License: MIT License
+- Compatible: True
 
 ### fastuuid-0.14.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: BSD LICENSE
+- HomePage:
+- Author:
+- License: BSD License
 - Compatible: True
-- Size: -1
 
-### filelock-3.20.3
+### filelock-3.28.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: UNLICENSE
+- HomePage:
+- Author:
+- License: MIT
 - Compatible: True
-- Size: -1
 
 ### frozenlist-1.8.0
 
 - HomePage: https://github.com/aio-libs/frozenlist
-- Author: UNKNOWN
-- License: APACHE-2.0
+- Author:
+- License: Apache-2.0
 - Compatible: True
-- Size: -1
 
-### fsspec-2026.1.0
+### fsspec-2026.3.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: BSD-3-CLAUSE
+- HomePage:
+- Author:
+- License: BSD-3-Clause
 - Compatible: True
-- Size: -1
 
-### griffe-1.15.0
+### google-auth-2.49.2
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
+- HomePage: https://github.com/googleapis/google-auth-library-python
+- Author: Google Cloud Platform
+- License: Apache Software License
+- Compatible: True
+
+### google-genai-2.4.0
+
+- HomePage:
+- Author: Google LLC
+- License: Apache-2.0
+- Compatible: True
+
+### griffe-2.0.2
+
+- HomePage:
+- Author: Timothée Mazzucotelli
 - License: ISC
 - Compatible: True
-- Size: -1
 
-### grpcio-1.76.0
+### griffecli-2.0.2
 
-- HomePage: https://grpc.io
-- Author: The gRPC Authors
-- License: APACHE SOFTWARE LICENSE
+- HomePage:
+- Author: Timothée Mazzucotelli
+- License: ISC
 - Compatible: True
-- Size: -1
+
+### griffelib-2.0.2
+
+- HomePage:
+- Author: Timothée Mazzucotelli
+- License: ISC
+- Compatible: True
 
 ### h11-0.16.0
 
 - HomePage: https://github.com/python-hyper/h11
 - Author: Nathaniel J. Smith
-- License: MIT LICENSE
+- License: MIT License
 - Compatible: True
-- Size: -1
 
-### hf-xet-1.2.0
+### hf-xet-1.4.3
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: APACHE SOFTWARE LICENSE
+- HomePage:
+- Author:
+- License: Apache-2.0
 - Compatible: True
-- Size: -1
 
 ### httpcore-1.0.9
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: BSD-3-CLAUSE
+- HomePage:
+- Author: Tom Christie
+- License: BSD-3-Clause
 - Compatible: True
-- Size: -1
 
 ### httpx-0.28.1
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: BSD LICENSE
+- HomePage:
+- Author: Tom Christie
+- License: BSD License
 - Compatible: True
-- Size: -1
 
-### huggingface-hub-1.3.2
+### huggingface-hub-1.11.0
 
 - HomePage: https://github.com/huggingface/huggingface_hub
 - Author: Hugging Face, Inc.
-- License: APACHE SOFTWARE LICENSE
+- License: Apache Software License
 - Compatible: True
-- Size: -1
 
-### idna-3.10
+### idna-3.15
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: BSD LICENSE
+- HomePage:
+- Author: Kim Davies
+- License: BSD-3-Clause
 - Compatible: True
-- Size: 349141
 
-### importlib-metadata-8.7.1
+### importlib-metadata-8.5.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: APACHE-2.0
+- HomePage:
+- Author: "Jason R. Coombs"
+- License: Apache Software License
 - Compatible: True
-- Size: -1
 
 ### jinja2-3.1.6
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: BSD LICENSE
+- HomePage:
+- Author:
+- License: BSD License
 - Compatible: True
-- Size: -1
 
-### jiter-0.12.0
+### jiter-0.14.0
 
 - HomePage: https://github.com/pydantic/jiter/
-- Author: UNKNOWN
-- License: MIT LICENSE
+- Author: Samuel Colvin
+- License: MIT
 - Compatible: True
-- Size: -1
 
-### jsonpath-ng-1.7.0
+### jsonpath-ng-1.8.0
 
 - HomePage: https://github.com/h2non/jsonpath-ng
 - Author: Tomas Aparicio
-- License: APACHE SOFTWARE LICENSE
+- License: Apache Software License
 - Compatible: True
-- Size: -1
 
-### jsonschema-4.26.0
+### jsonschema-4.23.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: MIT
+- HomePage:
+- Author: Julian Berman
+- License: MIT License
 - Compatible: True
-- Size: -1
 
 ### jsonschema-specifications-2025.9.1
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
+- HomePage:
+- Author: Julian Berman
 - License: MIT
 - Compatible: True
-- Size: -1
 
-### litellm-1.81.0
+### litellm-1.87.0
 
-- HomePage: UNKNOWN
+- HomePage:
 - Author: BerriAI
-- License: MIT LICENSE
-- Compatible: True
-- Size: -1
-
-### logfire-api-4.19.0
-
-- HomePage: UNKNOWN
-- Author: UNKNOWN
 - License: MIT
 - Compatible: True
-- Size: -1
+
+### logfire-api-4.32.1
+
+- HomePage:
+- Author: Pydantic Team
+- License: MIT
+- Compatible: True
+
+### markdown-it-py-4.0.0
+
+- HomePage:
+- Author: Chris Sewell
+- License: MIT License
+- Compatible: True
 
 ### markupsafe-3.0.3
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: BSD-3-CLAUSE
+- HomePage:
+- Author:
+- License: BSD-3-Clause
 - Compatible: True
-- Size: -1
 
-### multidict-6.7.0
+### mdurl-0.1.2
+
+- HomePage:
+- Author: Taneli Hukkinen
+- License: MIT License
+- Compatible: True
+
+### multidict-6.7.1
 
 - HomePage: https://github.com/aio-libs/multidict
 - Author: Andrew Svetlov
-- License: APACHE LICENSE 2.0
+- License: Apache License 2.0
 - Compatible: True
-- Size: -1
 
-### openai-2.15.0
+### numpy-2.4.4
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: APACHE SOFTWARE LICENSE
+- HomePage:
+- Author: Travis E. Oliphant et al.
+- License: 0BSD;; BSD-3-Clause;; CC0-1.0;; MIT;; Zlib
 - Compatible: True
-- Size: -1
 
-### packaging-25.0
+### openai-2.24.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: APACHE SOFTWARE LICENSE;; BSD LICENSE
+- HomePage:
+- Author: OpenAI
+- License: Apache Software License
 - Compatible: True
-- Size: 236486
 
-### ply-3.11
+### packaging-26.1
 
-- HomePage: http://www.dabeaz.com/ply/
-- Author: David Beazley
-- License: BSD
+- HomePage:
+- Author: Donald Stufft
+- License: Apache-2.0;; BSD-2-Clause
 - Compatible: True
-- Size: -1
+
+### posthog-7.12.0
+
+- HomePage: https://github.com/posthog/posthog-python
+- Author: Posthog
+- License: MIT License
+- Compatible: True
 
 ### propcache-0.4.1
 
 - HomePage: https://github.com/aio-libs/propcache
 - Author: Andrew Svetlov
-- License: APACHE SOFTWARE LICENSE
+- License: Apache Software License
 - Compatible: True
-- Size: -1
 
-### pydantic-2.12.5
+### pyasn1-0.6.3
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
+- HomePage:
+- Author: Ilya Etingof
+- License: BSD-2-Clause
+- Compatible: True
+
+### pyasn1-modules-0.4.2
+
+- HomePage: https://github.com/pyasn1/pyasn1-modules
+- Author: Ilya Etingof
+- License: BSD License
+- Compatible: True
+
+### pycparser-3.0
+
+- HomePage:
+- Author: Eli Bendersky
+- License: BSD-3-Clause
+- Compatible: True
+
+### pydantic-2.13.4
+
+- HomePage:
+- Author: Samuel Colvin
 - License: MIT
 - Compatible: True
-- Size: -1
 
-### pydantic-core-2.41.5
+### pydantic-core-2.46.4
 
-- HomePage: https://github.com/pydantic/pydantic-core
-- Author: UNKNOWN
+- HomePage: https://github.com/pydantic/pydantic
+- Author: Samuel Colvin
 - License: MIT
 - Compatible: True
-- Size: -1
 
-### python-dotenv-1.2.1
+### pygments-2.20.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: BSD-3-CLAUSE
+- HomePage:
+- Author: Georg Brandl
+- License: BSD-2-Clause
 - Compatible: True
-- Size: -1
+
+### python-dotenv-1.2.2
+
+- HomePage:
+- Author: Saurabh Kumar
+- License: BSD-3-Clause
+- Compatible: True
 
 ### pyyaml-6.0.3
 
 - HomePage: https://pyyaml.org/
 - Author: Kirill Simonov
-- License: MIT LICENSE
+- License: MIT License
 - Compatible: True
-- Size: -1
 
 ### referencing-0.37.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
+- HomePage:
+- Author: Julian Berman
 - License: MIT
 - Compatible: True
-- Size: -1
 
-### regex-2026.1.15
+### regex-2026.4.4
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: APACHE-2.0;; CNRI-PYTHON
+- HomePage:
+- Author: Matthew Barnett
+- License: Apache-2.0;; CNRI-Python
 - Compatible: True
-- Size: -1
 
-### requests-2.32.5
+### requests-2.33.1
 
-- HomePage: https://requests.readthedocs.io
+- HomePage:
 - Author: Kenneth Reitz
-- License: APACHE SOFTWARE LICENSE
+- License: Apache Software License
 - Compatible: True
-- Size: 202504
+
+### rich-15.0.0
+
+- HomePage:
+- Author: Will McGugan
+- License: MIT License
+- Compatible: True
 
 ### rpds-py-0.30.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
+- HomePage:
+- Author: Julian Berman
 - License: MIT
 - Compatible: True
-- Size: -1
 
 ### shellingham-1.5.4
 
 - HomePage: https://github.com/sarugaku/shellingham
 - Author: Tzu-ping Chung
-- License: ISC LICENSE _ISCL_
+- License: ISC License _ISCL_
 - Compatible: True
-- Size: -1
 
 ### sniffio-1.3.1
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: APACHE SOFTWARE LICENSE;; MIT LICENSE
+- HomePage:
+- Author: "Nathaniel J. Smith"
+- License: Apache Software License;; MIT License
 - Compatible: True
-- Size: -1
 
-### tenacity-9.1.2
+### tenacity-9.1.4
 
 - HomePage: https://github.com/jd/tenacity
 - Author: Julien Danjou
-- License: APACHE SOFTWARE LICENSE
+- License: Apache Software License
 - Compatible: True
-- Size: -1
 
 ### tiktoken-0.12.0
 
-- HomePage: UNKNOWN
+- HomePage:
 - Author: Shantanu Jain
-- License: MIT LICENSE
+- License: MIT License
 - Compatible: True
-- Size: -1
 
 ### tokenizers-0.22.2
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: APACHE SOFTWARE LICENSE
+- HomePage:
+- Author: Nicolas Patry
+- License: Apache Software License
 - Compatible: True
-- Size: -1
 
-### tqdm-4.67.1
+### tqdm-4.67.3
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
-- License: MIT LICENSE;; MOZILLA PUBLIC LICENSE 2.0 _MPL 2.0_
+- HomePage:
+- Author:
+- License: MIT;; MPL-2.0
 - Compatible: True
-- Size: -1
 
-### typer-slim-0.21.1
+### typer-0.23.1
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
+- HomePage:
+- Author: Sebastián Ramírez
 - License: MIT
 - Compatible: True
-- Size: -1
 
 ### typing-extensions-4.15.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
+- HomePage:
+- Author: "Guido van Rossum, Jukka Lehtosalo, Łukasz Langa, Michael Lee"
 - License: PSF-2.0
 - Compatible: True
-- Size: -1
 
 ### typing-inspection-0.4.2
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
+- HomePage:
+- Author: Victorien Plot
 - License: MIT
 - Compatible: True
-- Size: -1
 
-### urllib3-2.5.0
+### urllib3-2.7.0
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
+- HomePage:
+- Author: Andrey Petrov
 - License: MIT
 - Compatible: True
-- Size: 421374
 
-### yarl-1.22.0
+### websockets-16.0
+
+- HomePage:
+- Author: Aymeric Augustin
+- License: BSD-3-Clause
+- Compatible: True
+
+### yarl-1.23.0
 
 - HomePage: https://github.com/aio-libs/yarl
 - Author: Andrew Svetlov
-- License: APACHE SOFTWARE LICENSE
+- License: Apache-2.0
 - Compatible: True
-- Size: -1
 
-### zipp-3.23.0
+### zipp-3.23.1
 
-- HomePage: UNKNOWN
-- Author: UNKNOWN
+- HomePage:
+- Author: "Jason R. Coombs"
 - License: MIT
 - Compatible: True
-- Size: -1

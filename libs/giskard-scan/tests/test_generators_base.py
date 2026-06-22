@@ -1,11 +1,14 @@
-from giskard.scan.generators.base import DatasetScenarioGenerator, ScenarioGenerator
+from giskard.scan.generators.base import (
+    DatasetScenarioGenerator,
+    ScenarioContext,
+    ScenarioGenerator,
+)
 
 
 class _Stub(ScenarioGenerator):
     async def generate_scenario(
         self,
-        description,
-        languages,
+        context: ScenarioContext,
         max_scenarios=None,
         rng=None,
         target_mode="multiturn",
@@ -25,8 +28,7 @@ async def test_scenario_generator_generate_scenario_accepts_target_mode():
     class _Stub(ScenarioGenerator):
         async def generate_scenario(
             self,
-            description,
-            languages,
+            context: ScenarioContext,
             max_scenarios=None,
             rng=None,
             target_mode="multiturn",
@@ -34,7 +36,8 @@ async def test_scenario_generator_generate_scenario_accepts_target_mode():
             return []
 
     gen = _Stub()
-    result = await gen.generate_scenario("desc", ["en"], target_mode="singleturn")
+    context = ScenarioContext(description="desc", languages=["en"])
+    result = await gen.generate_scenario(context, target_mode="singleturn")
     assert result == []
 
 
