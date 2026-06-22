@@ -2,6 +2,7 @@ import numpy as np
 from giskard.checks.core import Interact
 from giskard.checks.generators import LLMGenerator
 from giskard.checks.judges import LLMJudge
+from giskard.scan.generators.base import ScenarioContext
 from giskard.scan.generators.crescendo import (
     DEFAULT_CRESCENDO_MAX_TURNS,
     DEFAULT_CRESCENDO_OBJECTIVES,
@@ -11,7 +12,9 @@ from giskard.scan.generators.crescendo import (
 
 async def test_crescendo_generator_returns_default_objectives():
     gen = CrescendoAttackScenarioGenerator()
-    scenarios = await gen.generate_scenario("A safety chatbot", ["en"])
+    scenarios = await gen.generate_scenario(
+        ScenarioContext(description="A safety chatbot", languages=["en"])
+    )
 
     assert len(scenarios) == len(DEFAULT_CRESCENDO_OBJECTIVES)
     assert scenarios[0].annotations["objective_name"] == "botulinum toxin"
@@ -25,14 +28,12 @@ async def test_crescendo_generator_budget_subsamples_reproducibly():
     gen = CrescendoAttackScenarioGenerator()
 
     first = await gen.generate_scenario(
-        "A safety chatbot",
-        ["en", "fr"],
+        ScenarioContext(description="A safety chatbot", languages=["en", "fr"]),
         max_scenarios=3,
         rng=np.random.default_rng(42),
     )
     second = await gen.generate_scenario(
-        "A safety chatbot",
-        ["en", "fr"],
+        ScenarioContext(description="A safety chatbot", languages=["en", "fr"]),
         max_scenarios=3,
         rng=np.random.default_rng(42),
     )
@@ -48,7 +49,9 @@ async def test_crescendo_generator_budget_subsamples_reproducibly():
 
 async def test_crescendo_generator_builds_multiturn_scenario_with_annotations():
     gen = CrescendoAttackScenarioGenerator(max_turns=4)
-    scenarios = await gen.generate_scenario("A safety chatbot", ["en", "fr"])
+    scenarios = await gen.generate_scenario(
+        ScenarioContext(description="A safety chatbot", languages=["en", "fr"])
+    )
     scenario = scenarios[0]
 
     assert scenario.annotations["description"] == "A safety chatbot"

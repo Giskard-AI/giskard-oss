@@ -4,7 +4,30 @@ from typing import Any
 import numpy as np
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from ..utils.knowledge_base import KnowledgeBase
+
+
+class ScenarioContext(BaseModel):
+    """Run-wide context shared by all generators in a scan suite.
+
+    Carries everything every generator receives identically for a single
+    run. Per-generator values (scenario budget, RNG) are passed as separate
+    parameters to ``generate_scenario`` and are not part of this object.
+
+    Attributes:
+        description: Natural-language description of the agent under test.
+        languages: BCP-47 language codes the agent is expected to handle.
+        knowledge_base: Optional document context, ``None`` when the run has
+            no knowledge base. Generators that do not use it ignore it.
+    """
+
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    description: str
+    languages: list[str]
+    knowledge_base: KnowledgeBase | None = None
 
 
 class ScenarioGenerator(BaseModel):
@@ -15,26 +38,21 @@ class ScenarioGenerator(BaseModel):
 
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Generate a list of test scenarios for the described agent.
 
         Args:
-            description: Natural-language description of the agent under test.
-            languages: BCP-47 language codes the agent is expected to handle.
+            context: Run-wide :class:`ScenarioContext` describing the agent,
+                its languages, and optional shared knowledge base.
             max_scenarios: Upper bound on the number of scenarios to return.
                 ``None`` means no limit (generator-specific default applies).
             rng: Seeded NumPy random generator for reproducible sampling.
-                When used in a multi-generator context, each generator receives
-                an independent child RNG spawned from a shared parent via
-                ``rng.spawn()``, ensuring statistical independence while
-                maintaining reproducibility. Direct callers typically pass a
-                fresh generator or ``None`` to let the implementation create
-                one.
-
+                In a multi-generator context, each generator receives an
+                independent child RNG spawned from a shared parent via
+                ``rng.spawn()``.
         Returns:
             A list of :class:`~giskard.checks.core.scenario.Scenario` objects
             ready to be collected into a :class:`~giskard.checks.scenarios.Suite`.
@@ -64,22 +82,19 @@ class DatasetScenarioGenerator(ScenarioGenerator):
 
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Load and optionally subsample scenarios from the bundled dataset.
 
         Args:
-            description: Forwarded to each scenario's annotations so that
-                downstream judges know which agent is under test.
-            languages: Forwarded to each scenario's annotations.
+            context: Run-wide context providing description and languages
+                forwarded to each scenario's annotations.
             max_scenarios: Maximum number of scenarios to return.  When
                 ``None``, the full dataset is returned.
             rng: Random generator used for subset sampling.  A fresh
                 ``np.random.default_rng()`` is created if ``None``.
-
         Returns:
             A list of annotated :class:`~giskard.checks.core.scenario.Scenario`
             objects, ordered by their original dataset position.
@@ -104,8 +119,8 @@ class DatasetScenarioGenerator(ScenarioGenerator):
                 scenario = scenario.with_annotations(
                     {
                         **scenario.annotations,
-                        "description": description,
-                        "languages": languages,
+                        "description": context.description,
+                        "languages": context.languages,
                     }
                 )
                 if self.tags:
