@@ -1,5 +1,7 @@
+import json
 from pathlib import Path
 
+import giskard.scan.generators.base as base_mod
 import numpy as np
 import pytest
 from giskard.scan.generators.base import DatasetScenarioGenerator
@@ -11,10 +13,6 @@ class _StubDatasetGenerator(DatasetScenarioGenerator):
 
 async def test_dataset_generator_no_budget_returns_all(tmp_path, monkeypatch):
     """With max_scenarios=None the generator returns every scenario."""
-    import json
-
-    import giskard.scan.generators.base as base_mod
-
     stub_file = tmp_path / "stub.jsonl"
     stub_file.write_text(
         "\n".join(
@@ -37,10 +35,6 @@ async def test_dataset_generator_no_budget_returns_all(tmp_path, monkeypatch):
 
 async def test_dataset_generator_budget_subsamples(tmp_path, monkeypatch):
     """With max_scenarios=2, only 2 scenarios are returned."""
-    import json
-
-    import giskard.scan.generators.base as base_mod
-
     stub_file = tmp_path / "stub.jsonl"
     stub_file.write_text(
         "\n".join(
@@ -60,10 +54,6 @@ async def test_dataset_generator_budget_larger_than_dataset_returns_all(
     tmp_path, monkeypatch
 ):
     """With max_scenarios > dataset size, all scenarios are returned."""
-    import json
-
-    import giskard.scan.generators.base as base_mod
-
     stub_file = tmp_path / "stub.jsonl"
     stub_file.write_text(
         "\n".join(
@@ -81,10 +71,6 @@ async def test_dataset_generator_budget_larger_than_dataset_returns_all(
 
 async def test_dataset_generator_budget_reproducible(tmp_path, monkeypatch):
     """Same seed always picks the same subset."""
-    import json
-
-    import giskard.scan.generators.base as base_mod
-
     stub_file = tmp_path / "stub.jsonl"
     stub_file.write_text(
         "\n".join(
@@ -104,7 +90,6 @@ async def test_dataset_generator_budget_reproducible(tmp_path, monkeypatch):
 
 async def test_dataset_generator_missing_file_raises_runtime_error(monkeypatch):
     """Pointing _DATA_DIR at a non-existent path raises RuntimeError with 'not found'."""
-    import giskard.scan.generators.base as base_mod
 
     monkeypatch.setattr(
         base_mod, "_DATA_DIR", Path("/nonexistent/path/that/does/not/exist")
@@ -118,7 +103,6 @@ async def test_dataset_generator_malformed_jsonl_raises_value_error(
     tmp_path, monkeypatch
 ):
     """A malformed JSONL line raises ValueError that includes the filename or line number."""
-    import giskard.scan.generators.base as base_mod
 
     stub_file = tmp_path / "stub.jsonl"
     stub_file.write_text(
@@ -128,3 +112,21 @@ async def test_dataset_generator_malformed_jsonl_raises_value_error(
     gen = _StubDatasetGenerator()
     with pytest.raises(ValueError, match=r"stub\.jsonl|line 2"):
         await gen.generate_scenario("desc", ["en"])
+
+
+async def test_dataset_generator_reads_utf8_content(tmp_path, monkeypatch):
+    """Non-ASCII scenario content is decoded correctly as UTF-8 regardless of locale."""
+    stub_file = tmp_path / "stub.jsonl"
+    stub_file.write_text(
+        json.dumps(
+            {"name": "Café Ñoño 日本語 Привет", "steps": [], "annotations": {}},
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
+    gen = _StubDatasetGenerator()
+    result = await gen.generate_scenario("desc", ["en"])
+    assert len(result) == 1
+    assert result[0].name == "Café Ñoño 日本語 Привет"

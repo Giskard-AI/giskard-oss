@@ -63,7 +63,7 @@ markers = [
 
 [dependency-groups]
 test = [
-    "pytest==9.0.3",
+    "pytest==9.1.0",
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
     "pytest-timeout==2.4.0",
@@ -73,7 +73,7 @@ dev = [
     "giskard-llm[openai,google,anthropic]>=1.0.0a1",
     "giskard-agents[litellm]>=1.0.0a1",
     "giskard-checks[regorus]>=1.0.0a1",
-    "ipykernel==7.2.0",
-    "pip-audit==2.10.0",
+    "ipykernel==7.3.0",
+    "pip-audit==2.10.1",
     "pylint-pydantic==0.4.1",
 ]
