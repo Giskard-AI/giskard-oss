@@ -5,6 +5,7 @@ import warnings
 from giskard.checks import SuiteResult, Target, Trace
 
 from .catalog import generate_suite
+from .generators.base import TargetMode
 from .generators.knowledge_base import KnowledgeBaseScenarioGenerator
 from .registry import SuiteGeneratorRegistry
 from .utils.knowledge_base import KnowledgeBase, normalize_knowledge_base
@@ -28,6 +29,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     group_by: str | None = "quality",
     parallel: bool = True,
     max_concurrency: int | None = None,
+    target_mode: TargetMode = "multiturn",
 ) -> SuiteResult:
     """Generate and run the standard quality scan suite.
 
@@ -48,6 +50,10 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         parallel: When ``True``, run scenarios concurrently (default).
         max_concurrency: Cap on concurrent scenarios when ``parallel=True``.
             ``None`` runs all scenarios at once.
+        target_mode: Whether the agent under test supports single-turn or
+            multi-turn conversations. ``"singleturn"`` skips generators that
+            are multi-turn by design and caps turn budgets to 1 on others.
+            Defaults to ``"multiturn"``.
 
     Returns:
         The completed suite result for the quality scan.
@@ -62,6 +68,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         generators=quality_suite_generator_registry.generators(),
         max_scenarios=max_scenarios,
         seed=seed,
+        target_mode=target_mode,
         knowledge_base=knowledge_base,
     )
 

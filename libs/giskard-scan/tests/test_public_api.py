@@ -44,6 +44,17 @@ def test_vulnerability_scan_accepts_target_mode_param():
     assert sig.parameters["target_mode"].default == "multiturn"
 
 
+def test_quality_scan_accepts_target_mode_param():
+    """quality_scan must expose target_mode, mirroring vulnerability_scan."""
+    import inspect
+
+    from giskard.scan import quality_scan
+
+    sig = inspect.signature(quality_scan)
+    assert "target_mode" in sig.parameters
+    assert sig.parameters["target_mode"].default == "multiturn"
+
+
 def test_quality_suite_generator_registry_contains_builtin_generators():
     types = {type(g) for g in quality_suite_generator_registry.generators()}
     assert KnowledgeBaseScenarioGenerator in types

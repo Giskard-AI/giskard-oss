@@ -3,8 +3,9 @@ from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
-from giskard.checks.core.interaction import Trace
+from giskard.checks.core.interaction import Interact, Trace
 from giskard.checks.core.scenario import Scenario
+from giskard.checks.generators import BaseLLMGenerator
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..utils.knowledge_base import KnowledgeBase
@@ -132,8 +133,9 @@ class DatasetScenarioGenerator(ScenarioGenerator):
             rng: Random generator used for subset sampling.  A fresh
                 ``np.random.default_rng()`` is created if ``None``.
             target_mode: Desired conversation mode for generated scenarios.
-                ``"singleturn"`` generates single-turn test cases. ``"multiturn"``
-                (default) generates multi-turn test cases.
+                ``"singleturn"`` caps each interaction generator to a single
+                step; ``"multiturn"`` (default) keeps the dataset's own turn
+                budgets.
 
         Returns:
             A list of annotated :class:`~giskard.checks.core.scenario.Scenario`
@@ -172,4 +174,26 @@ class DatasetScenarioGenerator(ScenarioGenerator):
             indices = rng.choice(len(scenarios), size=max_scenarios, replace=False)
             scenarios = [scenarios[i] for i in sorted(indices)]
 
+        if target_mode == "singleturn":
+            for scenario in scenarios:
+                self._cap_scenario_to_single_turn(scenario)
+
         return scenarios
+
+    @staticmethod
+    def _cap_scenario_to_single_turn(
+        scenario: Scenario[Any, Any, Trace[Any, Any]],
+    ) -> None:
+        """Cap every interaction generator in ``scenario`` to a single step.
+
+        Bundled dataset scenarios may encode multi-step interactions; in
+        ``singleturn`` mode those generators are clamped to ``max_steps=1`` in
+        place so the scenario cannot drive a multi-turn conversation against an
+        agent declared single-turn.
+        """
+        for step in scenario.steps:
+            for interact in step.interacts:
+                if isinstance(interact, Interact) and isinstance(
+                    interact.inputs, BaseLLMGenerator
+                ):
+                    interact.inputs.max_steps = 1
