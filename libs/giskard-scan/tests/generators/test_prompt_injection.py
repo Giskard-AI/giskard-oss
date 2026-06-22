@@ -1,3 +1,4 @@
+from giskard.scan.generators.base import ScenarioContext
 from giskard.scan.generators.prompt_injection import (
     PromptInjectionScenarioGenerator,
 )
@@ -6,7 +7,7 @@ from giskard.scan.generators.prompt_injection import (
 async def test_prompt_injection_generator_loads_scenarios():
     gen = PromptInjectionScenarioGenerator()
     scenarios = await gen.generate_scenario(
-        description="A documentation chatbot", languages=["en"]
+        ScenarioContext(description="A documentation chatbot", languages=["en"])
     )
     assert len(scenarios) == 1  # LLM01 JSONL entry has 1 scenario
 
@@ -16,7 +17,7 @@ async def test_prompt_injection_generator_injects_annotations():
     description = "A customer support chatbot"
     languages = ["en", "fr"]
     scenarios = await gen.generate_scenario(
-        description=description, languages=languages
+        ScenarioContext(description=description, languages=languages)
     )
     for scenario in scenarios:
         assert scenario.annotations.get("description") == description

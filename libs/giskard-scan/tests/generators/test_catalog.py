@@ -5,7 +5,8 @@ import pytest
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
 from giskard.scan.catalog import generate_suite
-from giskard.scan.generators.base import ScenarioGenerator, WithKnowledgeBase
+from giskard.scan.generators.base import ScenarioContext, ScenarioGenerator
+from giskard.scan.utils.knowledge_base import KnowledgeBase
 from giskard.scan.vulnerability import vulnerability_suite_generator_registry
 
 
@@ -17,8 +18,7 @@ class _StubGenerator(ScenarioGenerator):
 
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
@@ -87,8 +87,7 @@ async def test_generate_suite_max_scenarios_distributed_across_generators():
 
         async def generate_scenario(
             self,
-            description: str,
-            languages: list[str],
+            context: ScenarioContext,
             max_scenarios: int | None = None,
             rng: np.random.Generator | None = None,
         ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
@@ -117,8 +116,7 @@ async def test_generate_suite_no_max_passes_none_to_generators():
 
         async def generate_scenario(
             self,
-            description: str,
-            languages: list[str],
+            context: ScenarioContext,
             max_scenarios: int | None = None,
             rng: np.random.Generator | None = None,
         ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
@@ -136,17 +134,14 @@ async def test_generate_suite_no_max_passes_none_to_generators():
 async def test_generate_suite_forwards_knowledge_base_to_generators():
     received: list[object] = []
 
-    class _KnowledgeBaseTrackingGenerator(ScenarioGenerator, WithKnowledgeBase):
+    class _KnowledgeBaseTrackingGenerator(ScenarioGenerator):
         async def generate_scenario(
             self,
-            description: str,
-            languages: list[str],
+            context: ScenarioContext,
             max_scenarios: int | None = None,
             rng: np.random.Generator | None = None,
-            *,
-            knowledge_base: object = None,
         ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
-            received.append(knowledge_base)
+            received.append(context.knowledge_base)
             return []
 
     await generate_suite(
@@ -156,7 +151,34 @@ async def test_generate_suite_forwards_knowledge_base_to_generators():
         knowledge_base=["reference document"],
     )
 
-    assert received == [["reference document"]]
+    assert len(received) == 1
+    kb = received[0]
+    assert isinstance(kb, KnowledgeBase)
+    assert [doc.content for doc in kb.documents] == ["reference document"]
+
+
+async def test_generate_suite_passes_context_to_all_generators():
+    seen: list[str] = []
+
+    class _ContextReader(ScenarioGenerator):
+        name: str = "reader"
+
+        async def generate_scenario(
+            self,
+            context: ScenarioContext,
+            max_scenarios: int | None = None,
+            rng: np.random.Generator | None = None,
+        ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+            seen.append(context.description)
+            return []
+
+    await generate_suite(
+        "My chatbot",
+        languages=["en"],
+        generators=[_ContextReader(), _ContextReader()],
+    )
+
+    assert seen == ["My chatbot", "My chatbot"]
 
 
 async def test_generate_suite_registry_generators_not_mutated():
@@ -190,6 +212,30 @@ async def test_generate_suite_max_scenarios_zero_returns_empty():
     assert suite.scenarios == []
 
 
+async def test_generate_suite_non_kb_generator_ignores_knowledge_base():
+    """A generator that does not use context.knowledge_base still runs normally."""
+
+    class _KbIgnoringGenerator(ScenarioGenerator):
+        async def generate_scenario(
+            self,
+            context: ScenarioContext,
+            max_scenarios: int | None = None,
+            rng: np.random.Generator | None = None,
+        ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+            # Deliberately never reads context.knowledge_base.
+            return [Scenario(name="kb-ignored")]
+
+    suite = await generate_suite(
+        "My chatbot",
+        languages=["en"],
+        generators=[_KbIgnoringGenerator()],
+        knowledge_base=["some doc"],
+    )
+
+    assert len(suite.scenarios) == 1
+    assert suite.scenarios[0].name == "kb-ignored"
+
+
 async def test_generate_suite_reproducibility():
     """Same seed produces identical per-generator scenario name allocation."""
 
@@ -198,8 +244,7 @@ async def test_generate_suite_reproducibility():
 
         async def generate_scenario(
             self,
-            description: str,
-            languages: list[str],
+            context: ScenarioContext,
             max_scenarios: int | None = None,
             rng: np.random.Generator | None = None,
         ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:

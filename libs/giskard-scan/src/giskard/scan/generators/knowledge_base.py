@@ -1,6 +1,6 @@
 """Knowledge-base scenario generator for document-grounded quality scans."""
 
-from typing import Any, override
+from typing import Any
 
 import numpy as np
 from giskard.checks import Groundedness
@@ -9,12 +9,8 @@ from giskard.checks.core.scenario import Scenario
 from giskard.checks.generators import LLMGenerator
 from pydantic import Field
 
-from ..utils.knowledge_base import (
-    Document,
-    KnowledgeBase,
-    normalize_knowledge_base,
-)
-from .base import ScenarioGenerator, WithKnowledgeBase
+from ..utils.knowledge_base import Document
+from .base import ScenarioContext, ScenarioGenerator
 
 DEFAULT_KNOWLEDGE_BASE_SCENARIOS = 5
 DEFAULT_KNOWLEDGE_BASE_CONTEXT_DOCUMENTS = 4
@@ -22,49 +18,42 @@ DEFAULT_KNOWLEDGE_BASE_MAX_TURNS = 3
 KNOWLEDGE_BASE_QUALITY_TAG = "quality:raget"
 
 
-class KnowledgeBaseScenarioGenerator(WithKnowledgeBase, ScenarioGenerator):
+class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
     """Generate document-grounded quality scenarios from a knowledge base.
 
     The generator samples seed documents, retrieves their nearest neighbors,
     and builds multi-turn scenarios that use an LLM-generated user simulator
-    grounded in those documents.
+    grounded in those documents. The knowledge base is supplied run-wide via
+    :class:`~giskard.scan.generators.base.ScenarioContext`; when the context
+    has no knowledge base this generator produces no scenarios.
     """
 
-    knowledge_base: KnowledgeBase | list[str] | None = None
     context_documents: int = Field(
         default=DEFAULT_KNOWLEDGE_BASE_CONTEXT_DOCUMENTS, ge=1
     )
     max_turns: int = Field(default=DEFAULT_KNOWLEDGE_BASE_MAX_TURNS, ge=1)
 
-    @override
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
-        *,
-        knowledge_base: KnowledgeBase | list[str] | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Generate scenarios from nearest-neighbor knowledge base contexts.
 
         Args:
-            description: Natural-language description of the agent under test.
-            languages: BCP-47 language codes the generated questions should use.
+            context: Run-wide context; its ``knowledge_base`` drives sampling.
+                When ``None``, an empty list is returned.
             max_scenarios: Maximum number of scenarios to generate. ``None``
                 uses :data:`DEFAULT_KNOWLEDGE_BASE_SCENARIOS`.
             rng: Random generator used for reproducible seed document sampling.
-            knowledge_base: Optional knowledge base overriding the generator
-                instance configuration for this call.
 
         Returns:
-            Generated scenarios, or an empty list when no knowledge base is
-            configured.
+            Generated scenarios, or an empty list when the context carries no
+            knowledge base.
         """
-        resolved_knowledge_base = normalize_knowledge_base(
-            knowledge_base if knowledge_base is not None else self.knowledge_base
-        )
-        if resolved_knowledge_base is None:
+        knowledge_base = context.knowledge_base
+        if knowledge_base is None:
             return []
 
         scenario_count = (
@@ -75,19 +64,21 @@ class KnowledgeBaseScenarioGenerator(WithKnowledgeBase, ScenarioGenerator):
 
         rng = rng or np.random.default_rng()
         seed_indices = self._sample_seed_indices(
-            len(resolved_knowledge_base.documents), scenario_count, rng
+            len(knowledge_base.documents), scenario_count, rng
         )
-        sampled_languages = self._sample_languages(languages, scenario_count, rng)
+        sampled_languages = self._sample_languages(
+            context.languages, scenario_count, rng
+        )
 
         scenarios = []
         for seed_index, language in zip(seed_indices, sampled_languages):
-            context_documents = await resolved_knowledge_base.closest_documents(
+            context_documents = await knowledge_base.closest_documents(
                 int(seed_index), self.context_documents
             )
             scenarios.append(
                 self._build_scenario(
-                    description=description,
-                    languages=languages,
+                    description=context.description,
+                    languages=context.languages,
                     language=language,
                     seed_index=int(seed_index),
                     context_documents=context_documents,

@@ -1,9 +1,13 @@
-from giskard.scan.generators.base import DatasetScenarioGenerator, ScenarioGenerator
+from giskard.scan.generators.base import (
+    DatasetScenarioGenerator,
+    ScenarioContext,
+    ScenarioGenerator,
+)
 
 
 class _Stub(ScenarioGenerator):
     async def generate_scenario(
-        self, description, languages, max_scenarios=None, rng=None
+        self, context: ScenarioContext, max_scenarios=None, rng=None
     ):
         return []
 

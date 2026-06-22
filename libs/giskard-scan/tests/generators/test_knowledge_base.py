@@ -3,6 +3,7 @@ import pytest
 from giskard.checks.core import Interact
 from giskard.checks.generators import LLMGenerator
 from giskard.checks.judges import Groundedness
+from giskard.scan.generators.base import ScenarioContext
 from giskard.scan.generators.knowledge_base import (
     DEFAULT_KNOWLEDGE_BASE_CONTEXT_DOCUMENTS,
     DEFAULT_KNOWLEDGE_BASE_MAX_TURNS,
@@ -26,21 +27,22 @@ def _knowledge_base() -> KnowledgeBase:
 async def test_knowledge_base_generator_returns_empty_without_knowledge_base():
     generator = KnowledgeBaseScenarioGenerator()
 
-    scenarios = await generator.generate_scenario("Support agent", ["en"])
+    scenarios = await generator.generate_scenario(
+        ScenarioContext(description="Support agent", languages=["en"])
+    )
 
     assert scenarios == []
 
 
 async def test_knowledge_base_generator_builds_groundedness_scenario():
-    generator = KnowledgeBaseScenarioGenerator(
-        knowledge_base=_knowledge_base(),
-        context_documents=2,
-        max_turns=4,
-    )
+    generator = KnowledgeBaseScenarioGenerator(context_documents=2, max_turns=4)
 
     scenarios = await generator.generate_scenario(
-        "Support agent",
-        ["en", "fr"],
+        ScenarioContext(
+            description="Support agent",
+            languages=["en", "fr"],
+            knowledge_base=_knowledge_base(),
+        ),
         max_scenarios=1,
         rng=np.random.default_rng(1),
     )
@@ -69,17 +71,23 @@ async def test_knowledge_base_generator_builds_groundedness_scenario():
 
 
 async def test_knowledge_base_generator_budget_subsamples_reproducibly():
-    generator = KnowledgeBaseScenarioGenerator(knowledge_base=_knowledge_base())
+    generator = KnowledgeBaseScenarioGenerator()
 
     first = await generator.generate_scenario(
-        "Support agent",
-        ["en"],
+        ScenarioContext(
+            description="Support agent",
+            languages=["en"],
+            knowledge_base=_knowledge_base(),
+        ),
         max_scenarios=2,
         rng=np.random.default_rng(42),
     )
     second = await generator.generate_scenario(
-        "Support agent",
-        ["en"],
+        ScenarioContext(
+            description="Support agent",
+            languages=["en"],
+            knowledge_base=_knowledge_base(),
+        ),
         max_scenarios=2,
         rng=np.random.default_rng(42),
     )
@@ -94,11 +102,14 @@ async def test_knowledge_base_generator_budget_subsamples_reproducibly():
 
 
 async def test_knowledge_base_generator_samples_without_replacement_below_document_count():
-    generator = KnowledgeBaseScenarioGenerator(knowledge_base=_knowledge_base())
+    generator = KnowledgeBaseScenarioGenerator()
 
     scenarios = await generator.generate_scenario(
-        "Support agent",
-        ["en"],
+        ScenarioContext(
+            description="Support agent",
+            languages=["en"],
+            knowledge_base=_knowledge_base(),
+        ),
         max_scenarios=2,
         rng=np.random.default_rng(42),
     )
@@ -111,11 +122,14 @@ async def test_knowledge_base_generator_samples_without_replacement_below_docume
 
 
 async def test_knowledge_base_generator_covers_all_documents_before_replacement():
-    generator = KnowledgeBaseScenarioGenerator(knowledge_base=_knowledge_base())
+    generator = KnowledgeBaseScenarioGenerator()
 
     scenarios = await generator.generate_scenario(
-        "Support agent",
-        ["en"],
+        ScenarioContext(
+            description="Support agent",
+            languages=["en"],
+            knowledge_base=_knowledge_base(),
+        ),
         max_scenarios=5,
         rng=np.random.default_rng(42),
     )
@@ -128,11 +142,14 @@ async def test_knowledge_base_generator_covers_all_documents_before_replacement(
 
 
 async def test_knowledge_base_generator_samples_language_per_scenario():
-    generator = KnowledgeBaseScenarioGenerator(knowledge_base=_knowledge_base())
+    generator = KnowledgeBaseScenarioGenerator()
 
     scenarios = await generator.generate_scenario(
-        "Support agent",
-        ["en", "fr"],
+        ScenarioContext(
+            description="Support agent",
+            languages=["en", "fr"],
+            knowledge_base=_knowledge_base(),
+        ),
         max_scenarios=4,
         rng=np.random.default_rng(42),
     )

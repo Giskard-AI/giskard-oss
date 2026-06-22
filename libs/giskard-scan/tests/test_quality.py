@@ -6,7 +6,7 @@ import pytest
 from giskard.checks import Equals, Scenario, Trace
 from giskard.checks.core.result import SuiteResult
 from giskard.checks.scenarios.suite import Suite
-from giskard.scan.generators.base import ScenarioGenerator
+from giskard.scan.generators.base import ScenarioContext, ScenarioGenerator
 from giskard.scan.generators.knowledge_base import KnowledgeBaseScenarioGenerator
 from giskard.scan.quality import quality_scan, quality_suite_generator_registry
 from giskard.scan.utils.knowledge_base import KnowledgeBase
@@ -15,8 +15,7 @@ from giskard.scan.utils.knowledge_base import KnowledgeBase
 class _DeterministicQualityGenerator(ScenarioGenerator):
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
@@ -210,7 +209,6 @@ async def test_quality_scan_warns_and_skips_empty_raw_knowledge_base(
     assert captured_knowledge_bases == [None]
     generator = captured_generators[0]
     assert isinstance(generator, KnowledgeBaseScenarioGenerator)
-    assert generator.knowledge_base is None
 
 
 async def test_quality_scan_configures_knowledge_base_generator(
@@ -261,4 +259,3 @@ async def test_quality_scan_configures_knowledge_base_generator(
     ]
     generator = captured_generators[0]
     assert isinstance(generator, KnowledgeBaseScenarioGenerator)
-    assert generator.knowledge_base is None

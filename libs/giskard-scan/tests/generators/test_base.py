@@ -4,7 +4,7 @@ from pathlib import Path
 import giskard.scan.generators.base as base_mod
 import numpy as np
 import pytest
-from giskard.scan.generators.base import DatasetScenarioGenerator
+from giskard.scan.generators.base import DatasetScenarioGenerator, ScenarioContext
 
 
 class _StubDatasetGenerator(DatasetScenarioGenerator):
@@ -29,7 +29,9 @@ async def test_dataset_generator_no_budget_returns_all(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
     gen = _StubDatasetGenerator()
-    result = await gen.generate_scenario("desc", ["en"])
+    result = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"])
+    )
     assert len(result) == 5
 
 
@@ -46,7 +48,9 @@ async def test_dataset_generator_budget_subsamples(tmp_path, monkeypatch):
     monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
     rng = np.random.default_rng(42)
     gen = _StubDatasetGenerator()
-    result = await gen.generate_scenario("desc", ["en"], max_scenarios=2, rng=rng)
+    result = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"]), max_scenarios=2, rng=rng
+    )
     assert len(result) == 2
 
 
@@ -65,7 +69,11 @@ async def test_dataset_generator_budget_larger_than_dataset_returns_all(
     monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
     rng = np.random.default_rng(42)
     gen = _StubDatasetGenerator()
-    result = await gen.generate_scenario("desc", ["en"], max_scenarios=100, rng=rng)
+    result = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"]),
+        max_scenarios=100,
+        rng=rng,
+    )
     assert len(result) == 3
 
 
@@ -83,8 +91,16 @@ async def test_dataset_generator_budget_reproducible(tmp_path, monkeypatch):
     rng_a = np.random.default_rng(7)
     rng_b = np.random.default_rng(7)
     gen = _StubDatasetGenerator()
-    result_a = await gen.generate_scenario("desc", ["en"], max_scenarios=3, rng=rng_a)
-    result_b = await gen.generate_scenario("desc", ["en"], max_scenarios=3, rng=rng_b)
+    result_a = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"]),
+        max_scenarios=3,
+        rng=rng_a,
+    )
+    result_b = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"]),
+        max_scenarios=3,
+        rng=rng_b,
+    )
     assert [s.name for s in result_a] == [s.name for s in result_b]
 
 
@@ -96,7 +112,9 @@ async def test_dataset_generator_missing_file_raises_runtime_error(monkeypatch):
     )
     gen = _StubDatasetGenerator()
     with pytest.raises(RuntimeError, match="not found"):
-        await gen.generate_scenario("desc", ["en"])
+        await gen.generate_scenario(
+            ScenarioContext(description="desc", languages=["en"])
+        )
 
 
 async def test_dataset_generator_malformed_jsonl_raises_value_error(
@@ -111,7 +129,9 @@ async def test_dataset_generator_malformed_jsonl_raises_value_error(
     monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
     gen = _StubDatasetGenerator()
     with pytest.raises(ValueError, match=r"stub\.jsonl|line 2"):
-        await gen.generate_scenario("desc", ["en"])
+        await gen.generate_scenario(
+            ScenarioContext(description="desc", languages=["en"])
+        )
 
 
 async def test_dataset_generator_reads_utf8_content(tmp_path, monkeypatch):
@@ -127,6 +147,8 @@ async def test_dataset_generator_reads_utf8_content(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
     gen = _StubDatasetGenerator()
-    result = await gen.generate_scenario("desc", ["en"])
+    result = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"])
+    )
     assert len(result) == 1
     assert result[0].name == "Café Ñoño 日本語 Привет"
