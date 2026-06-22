@@ -113,7 +113,7 @@ generate-licenses: ## Generate licenses
 	uvx licensecheck --license MIT \
 		--format markdown --file THIRD_PARTY_NOTICES.md \
 		--groups all-extras \
-		--hide-output-parameters size \
+		--hide-output-parameters SIZE \
 		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm giskard-scan
 
 check-licenses: ## Check for licenses
@@ -127,7 +127,7 @@ check-licenses-file: ## Check that THIRD_PARTY_NOTICES.md is up to date (run mak
 	uvx licensecheck --license MIT \
 		--format markdown --file $$TMPFILE \
 		--groups all-extras \
-		--hide-output-parameters size \
+		--hide-output-parameters SIZE \
 		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm giskard-scan && \
 	sed -e 's/[[:space:]]*$$//' $$TMPFILE | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}' > $$TMPFILE2 && \
 	sed -e 's/[[:space:]]*$$//' THIRD_PARTY_NOTICES.md | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}' > $$TMPFILE3 && \
