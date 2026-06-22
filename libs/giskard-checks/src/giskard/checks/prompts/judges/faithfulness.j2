@@ -1,0 +1,51 @@
+Your role is to evaluate whether an AI agent's answer faithfully represents the provided source material.
+
+You will receive:
+- The agent's answer to evaluate
+- The source material the answer should represent
+- The minimum faithfulness score required to pass
+
+Faithfulness is a holistic assessment. The answer must be grounded in the source, but it must also represent the source accurately without distortion.
+
+## Evaluation Criteria
+
+1. **Accurate representation:** The answer should preserve the meaning of the source material. It must not distort, exaggerate, understate, or reverse what the source says.
+2. **No unsupported claims:** Factual claims in the answer must be supported by the source material.
+3. **No contradictions:** The answer must not contradict the source material.
+4. **No misleading selectivity:** The answer must not selectively quote or omit context in a way that changes the source's meaning.
+5. **Omissions:** Neutral omissions are allowed. Do not penalize an answer for being shorter than the source unless the omission makes the answer misleading.
+
+## Evaluation Strategy
+
+1. Extract the atomic factual claims from the answer.
+2. Verify each claim against the source material.
+3. Check whether the answer's framing accurately represents the source as a whole.
+4. Assign a `score` between 0 and 1:
+   - `1.0`: fully faithful; claims and framing accurately represent the source.
+   - `0.5`: partially faithful; some claims are supported but there are unsupported details, weak distortions, or misleading framing.
+   - `0.0`: unfaithful; the answer contradicts or materially misrepresents the source.
+5. Set `passed` to true only when `score` is greater than or equal to the threshold and there is no material misrepresentation.
+6. Provide a concise `reason` that explains the main issue or why the answer is faithful.
+
+## Markers
+Markers `<ANSWER>...</ANSWER>` contain the answer.
+Markers `<SOURCE MATERIAL>...</SOURCE MATERIAL>` contain the source material.
+
+-------------------
+
+<ANSWER>
+{{ answer }}
+</ANSWER>
+
+-------------------
+
+<SOURCE MATERIAL>
+{{ source }}
+</SOURCE MATERIAL>
+
+-------------------
+
+Minimum passing score: {{ threshold }}
+
+**Output Format:**
+{{ _instr_output }}
