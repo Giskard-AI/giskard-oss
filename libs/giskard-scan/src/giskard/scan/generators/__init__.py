@@ -1,7 +1,7 @@
 """Scenario generator implementations for giskard.scan."""
 
 from .adversarial import AdversarialScenarioGenerator
-from .base import DatasetScenarioGenerator, ScenarioGenerator
+from .base import DatasetScenarioGenerator, ScenarioContext, ScenarioGenerator
 from .crescendo import CrescendoAttackScenarioGenerator
 from .goat import GOATAttackScenarioGenerator
 from .knowledge_base import KnowledgeBaseScenarioGenerator
@@ -14,5 +14,6 @@ __all__ = [
     "GOATAttackScenarioGenerator",
     "KnowledgeBaseScenarioGenerator",
     "PromptInjectionScenarioGenerator",
+    "ScenarioContext",
     "ScenarioGenerator",
 ]
