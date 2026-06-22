@@ -115,7 +115,7 @@ security: ## Check for security vulnerabilities
 LICENSECHECK_VERSION := 2026.0.8
 LICENSECHECK := uv run --with licensecheck==$(LICENSECHECK_VERSION) licensecheck --license MIT
 
-generate-licenses: ## Generate licenses
+generate-notices: ## Generate THIRD_PARTY_NOTICES.md
 	$(LICENSECHECK) \
 		--format markdown --file THIRD_PARTY_NOTICES.md \
 		--groups all-extras \
@@ -128,7 +128,7 @@ check-licenses: ## Check for licenses
 		--groups all-extras \
 		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm giskard-scan
 
-check-licenses-file: ## Check that THIRD_PARTY_NOTICES.md is up to date (run make generate-licenses if this fails)
+check-notices: ## Check that THIRD_PARTY_NOTICES.md is up to date (run make generate-notices if this fails)
 	@TMPFILE=$$(mktemp) && TMPFILE2=$$(mktemp) && TMPFILE3=$$(mktemp) && \
 	$(LICENSECHECK) \
 		--format markdown --file $$TMPFILE \
@@ -139,12 +139,12 @@ check-licenses-file: ## Check that THIRD_PARTY_NOTICES.md is up to date (run mak
 	sed -e 's/[[:space:]]*$$//' THIRD_PARTY_NOTICES.md | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}' > $$TMPFILE3 && \
 	if ! diff $$TMPFILE2 $$TMPFILE3; then \
 		rm -f $$TMPFILE $$TMPFILE2 $$TMPFILE3; \
-		echo "THIRD_PARTY_NOTICES.md is out of date. Run: make generate-licenses"; \
+		echo "THIRD_PARTY_NOTICES.md is out of date. Run: make generate-notices"; \
 		exit 1; \
 	fi; \
 	rm -f $$TMPFILE $$TMPFILE2 $$TMPFILE3
 
-check: lint check-format check-compat typecheck security check-licenses check-licenses-file ## Run all checks
+check: lint check-format check-compat typecheck security check-licenses check-notices ## Run all checks
 
 clean: ## Clean up build artifacts and caches
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
