@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Any, Literal
 
@@ -7,6 +8,8 @@ from giskard.checks.core.scenario import Scenario
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..utils.knowledge_base import KnowledgeBase
+
+logger = logging.getLogger(__name__)
 
 
 class ScenarioContext(BaseModel):
@@ -66,6 +69,30 @@ class ScenarioGenerator(BaseModel):
             ready to be collected into a :class:`~giskard.checks.scenarios.Suite`.
         """
         raise NotImplementedError
+
+    @staticmethod
+    def _effective_max_turns(max_turns: int, target_mode: TargetMode) -> int:
+        """Resolve the per-scenario turn budget for ``target_mode``.
+
+        ``"singleturn"`` collapses any configured ``max_turns`` to ``1``;
+        ``"multiturn"`` leaves it unchanged.
+        """
+        return 1 if target_mode == "singleturn" else max_turns
+
+    def _skip_for_singleturn(self, target_mode: TargetMode) -> bool:
+        """Whether this multi-turn-only generator should skip ``target_mode``.
+
+        Returns ``True`` and logs a warning when ``target_mode="singleturn"``,
+        signalling the caller to return no scenarios. Generators that are
+        multi-turn by design call this first in :meth:`generate_scenario`.
+        """
+        if target_mode == "singleturn":
+            logger.warning(
+                "%s requires multiturn mode; skipping (target_mode='singleturn').",
+                type(self).__name__,
+            )
+            return True
+        return False
 
 
 _DATA_DIR = Path(__file__).parent / "data"

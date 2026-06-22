@@ -67,7 +67,7 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
         if scenario_count <= 0:
             return []
 
-        effective_max_turns = 1 if target_mode == "singleturn" else self.max_turns
+        effective_max_turns = self._effective_max_turns(self.max_turns, target_mode)
 
         rng = rng or np.random.default_rng()
         seed_indices = self._sample_seed_indices(

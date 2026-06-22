@@ -144,7 +144,7 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
         Returns:
             One scenario per generated rule, ordered by category then rule.
         """
-        effective_max_steps = 1 if target_mode == "singleturn" else self.max_turns
+        effective_max_steps = self._effective_max_turns(self.max_turns, target_mode)
         n_cats = len(ADVERSARIAL_CATEGORIES)
 
         if max_scenarios is not None:
