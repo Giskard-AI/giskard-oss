@@ -78,7 +78,6 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
             scenarios.append(
                 self._build_scenario(
                     description=context.description,
-                    languages=context.languages,
                     language=language,
                     seed_index=int(seed_index),
                     context_documents=context_documents,
@@ -122,7 +121,6 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
     def _build_scenario(
         self,
         description: str,
-        languages: list[str],
         language: str,
         seed_index: int,
         context_documents: list[Document],
@@ -141,7 +139,6 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
             .with_annotations(
                 {
                     "description": description,
-                    "languages": languages,
                     "language": language,
                     "seed_document_index": seed_index,
                     "reference_context": context,

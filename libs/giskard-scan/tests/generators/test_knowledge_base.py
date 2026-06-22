@@ -51,7 +51,6 @@ async def test_knowledge_base_generator_builds_groundedness_scenario():
     assert scenario.name.startswith("Knowledge Base Question - Document ")
     assert scenario.tags == [KNOWLEDGE_BASE_QUALITY_TAG]
     assert scenario.annotations["description"] == "Support agent"
-    assert scenario.annotations["languages"] == ["en", "fr"]
     assert scenario.annotations["language"] in {"en", "fr"}
     assert len(scenario.annotations["reference_context"]) == 2
 

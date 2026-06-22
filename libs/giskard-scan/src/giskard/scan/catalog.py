@@ -20,34 +20,28 @@ async def _generate_scenarios(
 ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
     rng = np.random.default_rng(seed)
 
-    tasks = []
-    async with TaskGroup() as task_group:
-        if max_scenarios is not None and len(generators) > 0:
-            counts = rng.multinomial(
+    # Split the optional budget before spawning so child seeds stay stable: a
+    # shared rng would be drawn from in scheduling-dependent order under
+    # TaskGroup, breaking reproducibility despite the seed.
+    if max_scenarios is not None and len(generators) > 0:
+        counts = [
+            int(n)
+            for n in rng.multinomial(
                 max_scenarios, np.ones(len(generators)) / len(generators)
             )
-            child_rngs = rng.spawn(len(generators))
-            for generator, n, child_rng in zip(generators, counts, child_rngs):
-                tasks.append(
-                    task_group.create_task(
-                        generator.generate_scenario(
-                            context, max_scenarios=int(n), rng=child_rng
-                        )
-                    )
+        ]
+    else:
+        counts = [None] * len(generators)
+    child_rngs = rng.spawn(len(generators))
+
+    tasks = []
+    async with TaskGroup() as task_group:
+        for generator, n, child_rng in zip(generators, counts, child_rngs):
+            tasks.append(
+                task_group.create_task(
+                    generator.generate_scenario(context, max_scenarios=n, rng=child_rng)
                 )
-        else:
-            # Each concurrent generator gets its own child stream: a shared rng
-            # would be drawn from in scheduling-dependent order under TaskGroup,
-            # breaking reproducibility despite the seed.
-            child_rngs = rng.spawn(len(generators))
-            for generator, child_rng in zip(generators, child_rngs):
-                tasks.append(
-                    task_group.create_task(
-                        generator.generate_scenario(
-                            context, max_scenarios=None, rng=child_rng
-                        )
-                    )
-                )
+            )
 
     return [scenario for task in tasks for scenario in task.result()]
 

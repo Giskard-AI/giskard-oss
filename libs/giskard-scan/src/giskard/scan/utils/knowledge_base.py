@@ -36,6 +36,9 @@ class KnowledgeBase(WithEmbeddingMixin):
 
     documents: tuple[Document, ...]
     _embedding_lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
+    # Validated embedding matrix and per-row norms, computed once from the
+    # frozen documents and reused across every closest_documents call.
+    _matrix_cache: tuple[np.ndarray, np.ndarray] | None = PrivateAttr(default=None)
 
     @classmethod
     def from_texts(cls, texts: list[str]) -> Self:
@@ -84,10 +87,7 @@ class KnowledgeBase(WithEmbeddingMixin):
                 )
 
             for document, embedding in zip(self.documents, embeddings):
-                document.embeddings = [
-                    float(value)
-                    for value in np.asarray(embedding, dtype=float).tolist()
-                ]
+                document.embeddings = np.asarray(embedding, dtype=float).tolist()
 
     async def closest_documents(
         self, seed_index: int, max_documents: int
@@ -108,12 +108,17 @@ class KnowledgeBase(WithEmbeddingMixin):
             return []
 
         await self.ensure_embeddings()
-        matrix = self._embedding_matrix()
-        similarities = self._cosine_similarity(matrix[seed_index], matrix)
+        matrix, row_norms = self._embedding_matrix()
+        similarities = (matrix @ matrix[seed_index]) / (
+            row_norms * row_norms[seed_index]
+        )
         indices = np.argsort(-similarities)[:max_documents]
         return [self.documents[int(index)] for index in indices]
 
-    def _embedding_matrix(self) -> np.ndarray:
+    def _embedding_matrix(self) -> tuple[np.ndarray, np.ndarray]:
+        if self._matrix_cache is not None:
+            return self._matrix_cache
+
         embeddings = [doc.embeddings for doc in self.documents]
         if any(embedding is None for embedding in embeddings):
             raise ValueError("KnowledgeBase embeddings are incomplete")
@@ -128,13 +133,12 @@ class KnowledgeBase(WithEmbeddingMixin):
             raise ValueError(
                 "KnowledgeBase embeddings must not contain non-finite values"
             )
-        if np.any(np.linalg.norm(matrix, axis=1) == 0):
+        row_norms = np.linalg.norm(matrix, axis=1)
+        if np.any(row_norms == 0):
             raise ValueError("KnowledgeBase embeddings must not contain zero vectors")
-        return matrix
 
-    @staticmethod
-    def _cosine_similarity(seed: np.ndarray, matrix: np.ndarray) -> np.ndarray:
-        return matrix @ seed / (np.linalg.norm(matrix, axis=1) * np.linalg.norm(seed))
+        self._matrix_cache = (matrix, row_norms)
+        return self._matrix_cache
 
 
 def normalize_knowledge_base(
