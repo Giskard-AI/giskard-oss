@@ -109,22 +109,28 @@ typecheck: ## Run type checking with basedpyright
 security: ## Check for security vulnerabilities
 	uv run pip-audit --skip-editable
 
+# Run licensecheck INSIDE the synced project env (uv run --with, not uvx): it reads
+# each package's version from the installed env via importlib, so output is pinned to
+# uv.lock instead of whatever PyPI resolves to at runtime. Pinned for reproducibility.
+LICENSECHECK_VERSION := 2026.0.8
+LICENSECHECK := uv run --with licensecheck==$(LICENSECHECK_VERSION) licensecheck --license MIT
+
 generate-licenses: ## Generate licenses
-	uvx licensecheck --license MIT \
+	$(LICENSECHECK) \
 		--format markdown --file THIRD_PARTY_NOTICES.md \
 		--groups all-extras \
 		--hide-output-parameters SIZE \
 		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm giskard-scan
 
 check-licenses: ## Check for licenses
-	uvx licensecheck --license MIT \
+	$(LICENSECHECK) \
 		--show-only-failing --zero \
 		--groups all-extras \
 		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm giskard-scan
 
 check-licenses-file: ## Check that THIRD_PARTY_NOTICES.md is up to date (run make generate-licenses if this fails)
 	@TMPFILE=$$(mktemp) && TMPFILE2=$$(mktemp) && TMPFILE3=$$(mktemp) && \
-	uvx licensecheck --license MIT \
+	$(LICENSECHECK) \
 		--format markdown --file $$TMPFILE \
 		--groups all-extras \
 		--hide-output-parameters SIZE \

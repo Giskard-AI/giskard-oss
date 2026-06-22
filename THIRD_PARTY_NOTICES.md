@@ -91,7 +91,7 @@ Find a list of packages below
 |✔|yarl|
 |✔|zipp|
 
-### aiohappyeyeballs-2.6.2
+### aiohappyeyeballs-2.6.1
 
 - HomePage:
 - Author: J. Nick Koston
@@ -126,14 +126,14 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### anthropic-0.109.2
+### anthropic-0.96.0
 
 - HomePage:
 - Author: Anthropic
 - License: MIT License
 - Compatible: True
 
-### anyio-4.14.0
+### anyio-4.13.0
 
 - HomePage:
 - Author: Alex Grönholm
@@ -161,7 +161,7 @@ Find a list of packages below
 - License: Apache Software License;; BSD License;; MIT License
 - Compatible: True
 
-### certifi-2026.6.17
+### certifi-2026.2.25
 
 - HomePage: https://github.com/certifi/python-certifi
 - Author: Kenneth Reitz
@@ -182,11 +182,11 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### click-8.4.1
+### click-8.1.8
 
 - HomePage:
 - Author:
-- License: BSD-3-Clause
+- License: BSD License
 - Compatible: True
 
 ### colorama-0.4.6
@@ -224,7 +224,7 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### filelock-3.29.4
+### filelock-3.28.0
 
 - HomePage:
 - Author:
@@ -238,21 +238,21 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2026.6.0
+### fsspec-2026.3.0
 
 - HomePage:
 - Author:
 - License: BSD-3-Clause
 - Compatible: True
 
-### google-auth-2.55.0
+### google-auth-2.49.2
 
-- HomePage: https://github.com/googleapis/google-cloud-python/tree/main/packages/google-auth
+- HomePage: https://github.com/googleapis/google-auth-library-python
 - Author: Google Cloud Platform
 - License: Apache Software License
 - Compatible: True
 
-### google-genai-2.8.0
+### google-genai-2.4.0
 
 - HomePage:
 - Author: Google LLC
@@ -287,7 +287,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### hf-xet-1.5.1
+### hf-xet-1.4.3
 
 - HomePage:
 - Author:
@@ -308,25 +308,25 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### huggingface-hub-1.19.0
+### huggingface-hub-1.11.0
 
 - HomePage: https://github.com/huggingface/huggingface_hub
 - Author: Hugging Face, Inc.
 - License: Apache Software License
 - Compatible: True
 
-### idna-3.18
+### idna-3.15
 
 - HomePage:
 - Author: Kim Davies
 - License: BSD-3-Clause
 - Compatible: True
 
-### importlib-metadata-9.0.0
+### importlib-metadata-8.5.0
 
 - HomePage:
 - Author: "Jason R. Coombs"
-- License: Apache-2.0
+- License: Apache Software License
 - Compatible: True
 
 ### jinja2-3.1.6
@@ -336,7 +336,7 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### jiter-0.15.0
+### jiter-0.14.0
 
 - HomePage: https://github.com/pydantic/jiter/
 - Author: Samuel Colvin
@@ -350,11 +350,11 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### jsonschema-4.26.0
+### jsonschema-4.23.0
 
 - HomePage:
 - Author: Julian Berman
-- License: MIT
+- License: MIT License
 - Compatible: True
 
 ### jsonschema-specifications-2025.9.1
@@ -364,21 +364,21 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### litellm-1.89.1
+### litellm-1.87.0
 
 - HomePage:
 - Author: BerriAI
 - License: MIT
 - Compatible: True
 
-### logfire-api-4.37.0
+### logfire-api-4.32.1
 
 - HomePage:
 - Author: Pydantic Team
 - License: MIT
 - Compatible: True
 
-### markdown-it-py-4.2.0
+### markdown-it-py-4.0.0
 
 - HomePage:
 - Author: Chris Sewell
@@ -406,35 +406,35 @@ Find a list of packages below
 - License: Apache License 2.0
 - Compatible: True
 
-### numpy-2.4.6
+### numpy-2.4.4
 
 - HomePage:
 - Author: Travis E. Oliphant et al.
 - License: 0BSD;; BSD-3-Clause;; CC0-1.0;; MIT;; Zlib
 - Compatible: True
 
-### openai-2.42.0
+### openai-2.24.0
 
 - HomePage:
 - Author: OpenAI
 - License: Apache Software License
 - Compatible: True
 
-### packaging-26.2
+### packaging-26.1
 
 - HomePage:
 - Author: Donald Stufft
 - License: Apache-2.0;; BSD-2-Clause
 - Compatible: True
 
-### posthog-7.19.1
+### posthog-7.12.0
 
 - HomePage: https://github.com/posthog/posthog-python
 - Author: Posthog
 - License: MIT License
 - Compatible: True
 
-### propcache-0.5.2
+### propcache-0.4.1
 
 - HomePage: https://github.com/aio-libs/propcache
 - Author: Andrew Svetlov
@@ -504,14 +504,14 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### regex-2026.5.9
+### regex-2026.4.4
 
 - HomePage:
 - Author: Matthew Barnett
 - License: Apache-2.0;; CNRI-Python
 - Compatible: True
 
-### requests-2.34.2
+### requests-2.33.1
 
 - HomePage:
 - Author: Kenneth Reitz
@@ -525,7 +525,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### rpds-py-2026.5.1
+### rpds-py-0.30.0
 
 - HomePage:
 - Author: Julian Berman
@@ -553,28 +553,28 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### tiktoken-0.13.0
+### tiktoken-0.12.0
 
 - HomePage:
 - Author: Shantanu Jain
 - License: MIT License
 - Compatible: True
 
-### tokenizers-0.23.1
+### tokenizers-0.22.2
 
 - HomePage:
 - Author: Nicolas Patry
 - License: Apache Software License
 - Compatible: True
 
-### tqdm-4.68.2
+### tqdm-4.67.3
 
 - HomePage:
 - Author:
 - License: MIT;; MPL-2.0
 - Compatible: True
 
-### typer-0.26.7
+### typer-0.23.1
 
 - HomePage:
 - Author: Sebastián Ramírez
@@ -609,14 +609,14 @@ Find a list of packages below
 - License: BSD-3-Clause
 - Compatible: True
 
-### yarl-1.24.2
+### yarl-1.23.0
 
 - HomePage: https://github.com/aio-libs/yarl
 - Author: Andrew Svetlov
 - License: Apache-2.0
 - Compatible: True
 
-### zipp-4.1.0
+### zipp-3.23.1
 
 - HomePage:
 - Author: "Jason R. Coombs"
