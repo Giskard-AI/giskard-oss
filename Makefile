@@ -114,35 +114,31 @@ security: ## Check for security vulnerabilities
 # uv.lock instead of whatever PyPI resolves to at runtime. Pinned for reproducibility.
 LICENSECHECK_VERSION := 2026.0.8
 LICENSECHECK := uv run --with licensecheck==$(LICENSECHECK_VERSION) licensecheck --license MIT
+# all-extras pulls in the provider extras' transitive deps; skip the workspace libs
+# themselves (LIBS) so the notices list only third-party packages.
+LICENSECHECK_FLAGS := --groups all-extras --skip-dependencies $(LIBS)
+# licensecheck markdown output is not byte-stable (trailing whitespace, blank-line
+# runs), so canonicalize it before writing/diffing: strip trailing whitespace and
+# collapse consecutive blank lines.
+NORMALIZE := sed -e 's/[[:space:]]*$$//' | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}'
 
 generate-notices: ## Generate THIRD_PARTY_NOTICES.md
-	$(LICENSECHECK) \
-		--format markdown --file THIRD_PARTY_NOTICES.md \
-		--groups all-extras \
-		--hide-output-parameters SIZE \
-		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm giskard-scan
+	$(LICENSECHECK) $(LICENSECHECK_FLAGS) \
+		--format markdown --hide-output-parameters SIZE --file /dev/stdout \
+		| $(NORMALIZE) > THIRD_PARTY_NOTICES.md
 
 check-licenses: ## Check for licenses
-	$(LICENSECHECK) \
-		--show-only-failing --zero \
-		--groups all-extras \
-		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm giskard-scan
+	$(LICENSECHECK) $(LICENSECHECK_FLAGS) --show-only-failing --zero
 
 check-notices: ## Check that THIRD_PARTY_NOTICES.md is up to date (run make generate-notices if this fails)
-	@TMPFILE=$$(mktemp) && TMPFILE2=$$(mktemp) && TMPFILE3=$$(mktemp) && \
-	$(LICENSECHECK) \
-		--format markdown --file $$TMPFILE \
-		--groups all-extras \
-		--hide-output-parameters SIZE \
-		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-llm giskard-scan && \
-	sed -e 's/[[:space:]]*$$//' $$TMPFILE | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}' > $$TMPFILE2 && \
-	sed -e 's/[[:space:]]*$$//' THIRD_PARTY_NOTICES.md | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}' > $$TMPFILE3 && \
-	if ! diff $$TMPFILE2 $$TMPFILE3; then \
-		rm -f $$TMPFILE $$TMPFILE2 $$TMPFILE3; \
+	@TMPFILE=$$(mktemp); trap 'rm -f "$$TMPFILE"' EXIT; \
+	$(LICENSECHECK) $(LICENSECHECK_FLAGS) \
+		--format markdown --hide-output-parameters SIZE --file /dev/stdout \
+		| $(NORMALIZE) > $$TMPFILE && \
+	if ! diff $$TMPFILE THIRD_PARTY_NOTICES.md; then \
 		echo "THIRD_PARTY_NOTICES.md is out of date. Run: make generate-notices"; \
 		exit 1; \
-	fi; \
-	rm -f $$TMPFILE $$TMPFILE2 $$TMPFILE3
+	fi
 
 check: lint check-format check-compat typecheck security check-licenses check-notices ## Run all checks
 
