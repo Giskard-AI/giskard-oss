@@ -119,6 +119,21 @@ async def test_non_string_value_fails() -> None:
     assert "is not a string" in result.message
 
 
+@pytest.mark.parametrize("outputs", ["", "   \n\t  "])
+async def test_empty_text_fails(outputs: str) -> None:
+    check = Readability()
+    trace = await Trace.from_interactions(
+        Interaction(inputs="Explain", outputs=outputs)
+    )
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.FAIL
+    assert result.failed
+    assert result.message is not None
+    assert "empty or contains only whitespace" in result.message
+
+
 async def test_missing_textstat_returns_error(monkeypatch: pytest.MonkeyPatch) -> None:
     def raise_missing_textstat(name: str) -> Any:
         raise ModuleNotFoundError(name=name)
@@ -137,6 +152,29 @@ async def test_missing_textstat_returns_error(monkeypatch: pytest.MonkeyPatch) -
     assert result.message is not None
     assert "giskard-checks[nlp]" in result.message
     assert result.details["error"] == result.message
+
+
+async def test_score_computation_error_returns_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def raise_value_error(
+        self: Readability[Any, Any, Trace[Any, Any]], text: str
+    ) -> float:
+        raise ValueError("cannot compute readability")
+
+    monkeypatch.setattr(Readability, "_compute_score", raise_value_error)
+
+    check = Readability()
+    trace = await Trace.from_interactions(
+        Interaction(inputs="Explain", outputs=SIMPLE_TEXT)
+    )
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.ERROR
+    assert result.errored
+    assert result.message == "cannot compute readability"
+    assert result.details["error"] == "cannot compute readability"
 
 
 def test_threshold_validation() -> None:

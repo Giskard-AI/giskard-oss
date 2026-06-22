@@ -91,9 +91,15 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
                 details=details,
             )
 
+        if not text.strip():
+            return CheckResult.failure(
+                message=f"Value for key '{self.key}' is empty or contains only whitespace.",
+                details=details,
+            )
+
         try:
             score = self._compute_score(text)
-        except RuntimeError as err:
+        except Exception as err:
             details["error"] = str(err)
             return CheckResult.error(message=str(err), details=details)
 
