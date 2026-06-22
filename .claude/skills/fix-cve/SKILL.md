@@ -42,7 +42,19 @@ Or invoke `/check` (the project verification-gate skill).
 
 - **Always upgrade in the lockfile, not the environment.** Use `uv lock --upgrade-package <package>`, NOT `pip install` / `uv pip install`. The lockfile is the source of truth; a `pip install` fix is lost on the next `uv sync`.
 - **Transitive deps are fixed the same way.** Most flagged packages (e.g. `msgpack`, pulled in by `cachecontrol`) are not in any `pyproject.toml`. You still upgrade them by name with `uv lock --upgrade-package <package>` — no `pyproject.toml` edit needed. Do NOT add a direct dependency just to pin it.
-- **Pin only if the bare upgrade won't reach the fix version.** `uv lock --upgrade-package <package>` takes the newest version the constraints allow. If a constraint caps it below the fix version, pin explicitly: `uv lock --upgrade-package "<package>>=<fix-version>"`. Check the resulting `uv.lock` entry to confirm the version actually moved.
+- **`uv lock --upgrade-package <package>` takes the newest version the constraints allow.** Check the resulting `uv.lock` entry to confirm the version actually moved to the fix version — a cap may have held it below.
+
+### When a constraint caps the version below the fix
+
+If another dependency caps the package below the fix version, the bare upgrade silently stays on the old version, and forcing it with `uv lock --upgrade-package "<package>>=<fix-version>"` **fails with a resolution error** (`No solution found...`) — uv constraints can only *narrow* the version set, never expand past a cap. Escalate in this order:
+
+1. **Upgrade the capping parent.** Find who imposes the cap (`uv tree --invert --package <package>`), then `uv lock --upgrade-package <parent>`. A newer parent often relaxes the cap. Preferred — keeps the dependency graph honest.
+2. **Override the transitive dep** if no parent upgrade resolves it. Add to `pyproject.toml`:
+   ```toml
+   [tool.uv]
+   override-dependencies = ["<package>>=<fix-version>"]
+   ```
+   Overrides *expand* the allowed set (the only escape hatch a cap can't block), then re-run `uv lock`. Use sparingly — it ignores the parent's declared constraint, so re-verify nothing breaks with the full gate.
 - **Lockfile-only changes have no "affected lib".** Run the full `make test-unit` (all packages), not a single `PACKAGE=<lib>` scope — the dep could affect any lib.
 
 ## Verifying the fix
@@ -59,6 +71,7 @@ Do not assert "fixed" — show evidence:
 |---------|-----|
 | `pip install <pkg>==<ver>` to fix it | Use `uv lock --upgrade-package <pkg>`; pip changes don't persist in the lockfile |
 | Editing `pyproject.toml` for a transitive dep | Not needed — `uv lock --upgrade-package` handles transitive deps by name |
-| Skipping re-audit, assuming the upgrade worked | Re-run `uv run pip-audit --skip-editable`; a constraint may have capped the version below the fix |
+| Skipping re-audit, assuming the upgrade worked | Re-run `uv run pip-audit --skip-editable`; a constraint may have silently capped the version below the fix |
+| Force-pinning past a cap with `"<pkg>>=<fix>"` and hitting `No solution found` | Constraints can't expand past a cap — upgrade the capping parent, or use `[tool.uv] override-dependencies` |
 | Guessing the verification command | Run `/check` or `make format && make check && make test-unit`; `make check` includes `pip-audit` |
 | Scoping tests to one `PACKAGE=` | A lockfile change has no single affected lib; run all unit tests |
