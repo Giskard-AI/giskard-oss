@@ -156,4 +156,11 @@ def normalize_knowledge_base(
     """
     if knowledge_base is None or isinstance(knowledge_base, KnowledgeBase):
         return knowledge_base
+    # A bare str is a valid Iterable[str], so from_texts would silently treat it
+    # as one document per character. Reject it before that footgun fires.
+    if isinstance(knowledge_base, str):
+        raise TypeError(
+            "knowledge_base must be a list of strings or a KnowledgeBase, "
+            "not a single string"
+        )
     return KnowledgeBase.from_texts(knowledge_base)

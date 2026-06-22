@@ -50,6 +50,12 @@ def test_normalize_knowledge_base_accepts_existing_instance_and_texts():
     assert normalized.documents[0].content == "beta"
 
 
+def test_normalize_knowledge_base_rejects_single_string():
+    """A bare str must raise, not become one document per character."""
+    with pytest.raises(TypeError, match="not a single string"):
+        normalize_knowledge_base("my document")  # pyright: ignore[reportArgumentType]
+
+
 def test_knowledge_base_drops_empty_documents():
     knowledge_base = KnowledgeBase.from_texts(["valid", "  ", "also valid"])
 
