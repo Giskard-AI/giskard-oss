@@ -156,8 +156,8 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
         return scenarios
 
 
-class DatasetScenarioGenerator(BaseDatasetScenarioGenerator):
-    """Scenario generator backed by a static JSONL dataset.
+class LocalDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
+    """Scenario generator backed by a static JSONL dataset bundled in the package.
 
     Reads scenarios from ``<data_dir>/<dataset_name>.jsonl``, one JSON object
     per line, and annotates each with the caller-supplied ``description`` and

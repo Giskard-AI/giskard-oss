@@ -1,4 +1,7 @@
-from giskard.scan.generators.base import DatasetScenarioGenerator, ScenarioGenerator
+from giskard.scan.generators.base import (
+    LocalDatasetScenarioGenerator,
+    ScenarioGenerator,
+)
 
 
 class _Stub(ScenarioGenerator):
@@ -14,7 +17,7 @@ def test_scenario_generator_is_importable():
 
 
 def test_dataset_generator_has_dataset_name_field():
-    class _DS(DatasetScenarioGenerator):
+    class _DS(LocalDatasetScenarioGenerator):
         dataset_name: str = "stub"
 
     gen = _DS()

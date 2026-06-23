@@ -4,10 +4,10 @@ from pathlib import Path
 import giskard.scan.generators.base as base_mod
 import numpy as np
 import pytest
-from giskard.scan.generators.base import DatasetScenarioGenerator
+from giskard.scan.generators.base import LocalDatasetScenarioGenerator
 
 
-class _StubDatasetGenerator(DatasetScenarioGenerator):
+class _StubDatasetGenerator(LocalDatasetScenarioGenerator):
     dataset_name: str = "stub"
 
 
