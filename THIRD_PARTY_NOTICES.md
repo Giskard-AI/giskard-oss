@@ -252,7 +252,7 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### google-genai-2.9.0
+### google-genai-2.4.0
 
 - HomePage:
 - Author: Google LLC
