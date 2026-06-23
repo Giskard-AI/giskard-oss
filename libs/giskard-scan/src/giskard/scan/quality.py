@@ -6,12 +6,19 @@ from giskard.checks import SuiteResult, Target, Trace
 
 from .catalog import generate_suite
 from .generators.base import TargetMode
-from .generators.knowledge_base import KnowledgeBaseScenarioGenerator
+from .generators.knowledge_base import (
+    HallucinationScenarioGenerator,
+    SycophancyScenarioGenerator,
+)
 from .registry import SuiteGeneratorRegistry
 from .utils.knowledge_base import KnowledgeBase, normalize_knowledge_base
 
-QUALITY_GENERATOR_TYPES: tuple[type[KnowledgeBaseScenarioGenerator],] = (
-    KnowledgeBaseScenarioGenerator,
+QUALITY_GENERATOR_TYPES: tuple[
+    type[HallucinationScenarioGenerator],
+    type[SycophancyScenarioGenerator],
+] = (
+    HallucinationScenarioGenerator,
+    SycophancyScenarioGenerator,
 )
 
 quality_suite_generator_registry = SuiteGeneratorRegistry()
