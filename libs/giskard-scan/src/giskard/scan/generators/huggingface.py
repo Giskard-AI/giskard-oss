@@ -14,6 +14,24 @@ logger = logging.getLogger(__name__)
 _LANGUAGE_PLACEHOLDER = "{language}"
 
 
+def _resolve_data_files(data_files: Any) -> list[str]:
+    """Flatten a config's ``data_files`` into a list of repo file paths.
+
+    Expects the shape our datasets use: a list of ``{split, path}`` dicts with a
+    string ``path``. Malformed entries (non-dict, or a missing/non-string
+    ``path``) are skipped. Returns ``[]`` for ``None`` or an empty list.
+    """
+    if not data_files:
+        return []
+    paths: list[str] = []
+    for entry in data_files:
+        if isinstance(entry, dict):
+            path = entry.get("path")
+            if isinstance(path, str):
+                paths.append(path)
+    return paths
+
+
 @lru_cache(maxsize=32)
 def _list_available_languages(repo_id: str, filename: str) -> dict[str, str]:
     """Map available language code -> repo filename via the template.

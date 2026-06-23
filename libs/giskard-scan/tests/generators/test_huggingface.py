@@ -2,7 +2,39 @@ import json
 
 import pytest
 from giskard.scan.generators import huggingface as hf_mod
-from giskard.scan.generators.huggingface import HuggingFaceDatasetScenarioGenerator
+from giskard.scan.generators.huggingface import (
+    HuggingFaceDatasetScenarioGenerator,
+    _resolve_data_files,
+)
+
+
+def test_resolve_data_files_single_entry():
+    assert _resolve_data_files([{"split": "test", "path": "donotanswer.en.jsonl"}]) == [
+        "donotanswer.en.jsonl"
+    ]
+
+
+def test_resolve_data_files_multiple_entries():
+    data_files = [
+        {"split": "test", "path": "a.jsonl"},
+        {"split": "test", "path": "b.jsonl"},
+    ]
+    assert _resolve_data_files(data_files) == ["a.jsonl", "b.jsonl"]
+
+
+def test_resolve_data_files_skips_malformed_entries():
+    data_files = [
+        {"split": "test", "path": "ok.jsonl"},
+        {"split": "test"},  # missing path
+        "not-a-dict",
+        {"split": "test", "path": 123},  # non-string path
+    ]
+    assert _resolve_data_files(data_files) == ["ok.jsonl"]
+
+
+def test_resolve_data_files_none_or_empty():
+    assert _resolve_data_files(None) == []
+    assert _resolve_data_files([]) == []
 
 
 def _scenario_line(name: str) -> str:
