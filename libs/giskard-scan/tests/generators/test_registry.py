@@ -4,15 +4,14 @@ import numpy as np
 import pytest
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
-from giskard.scan.generators.base import ScenarioGenerator
+from giskard.scan.generators.base import ScenarioContext, ScenarioGenerator
 from giskard.scan.registry import SuiteGeneratorRegistry
 
 
 class _GenA(ScenarioGenerator):
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
@@ -24,8 +23,7 @@ class _GenB(ScenarioGenerator):
 
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:

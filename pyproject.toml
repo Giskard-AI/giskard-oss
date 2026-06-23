@@ -90,7 +90,7 @@ markers = [
 
 [dependency-groups]
 test = [
-    "pytest==9.0.3",
+    "pytest==9.1.0",
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
     "pytest-timeout==2.4.0",
@@ -98,7 +98,7 @@ test = [
 dev = [
     { include-group = "test" },
     "giskard[full]",
-    "ipykernel==7.2.0",
+    "ipykernel==7.3.0",
     "pip-audit==2.10.0",
     "pylint-pydantic==0.4.1",
 ]

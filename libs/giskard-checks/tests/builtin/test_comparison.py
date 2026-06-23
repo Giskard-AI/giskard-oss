@@ -6,8 +6,10 @@ Tests cover different types (numbers, strings) and various comparison scenarios:
 - TypeError handling (missing methods and incompatible types)
 """
 
+import pytest
 from giskard.checks import (
     CheckStatus,
+    Equals,
     GreaterEquals,
     GreaterThan,
     Interaction,
@@ -900,3 +902,29 @@ class TestNotEquals:
         assert result.failed
         assert result.details["actual_value"] == [1, 2]
         assert result.details["expected_value"] == [1, 2]
+
+
+class TestComparisonSentinelDefault:
+    """Regression tests for issue #2501: omitting expected_value must raise an error."""
+
+    @pytest.mark.parametrize(
+        "check_cls",
+        [Equals, GreaterThan, LesserThan, GreaterEquals, LesserThanEquals, NotEquals],
+    )
+    def test_omitting_both_raises(self, check_cls):
+        """Omitting both expected_value and expected_value_key must raise ValueError."""
+        with pytest.raises(ValueError, match="expected_value"):
+            check_cls(key="trace.last.outputs")
+
+    def test_explicit_none_is_valid(self):
+        """explicit expected_value=None must be accepted (compares against None)."""
+        check = Equals(key="trace.last.outputs", expected_value=None)
+        assert check.expected_value is None
+
+    def test_expected_value_key_is_valid(self):
+        """Providing expected_value_key without expected_value must be accepted."""
+        check = Equals(
+            key="trace.last.outputs",
+            expected_value_key="trace.last.metadata.expected",
+        )
+        assert check.expected_value_key == "trace.last.metadata.expected"

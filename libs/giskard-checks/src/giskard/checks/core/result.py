@@ -2,7 +2,10 @@ from collections import defaultdict
 from collections.abc import Mapping
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
+
+if TYPE_CHECKING:
+    from giskard.checks.scenarios.suite import Suite
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -512,6 +515,9 @@ class SuiteResult(BaseResult, frozen=True):
         Scenario results produced during the suite execution.
     duration_ms : int
         Total execution time in milliseconds.
+    suite : Suite | None
+        The Suite that produced this result. Excluded from serialization
+        (``None`` after a serialize/deserialize round-trip).
     passed_count : int
         Number of scenarios that passed.
     failed_count : int
@@ -528,6 +534,9 @@ class SuiteResult(BaseResult, frozen=True):
         ..., description="List of scenario results"
     )
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
+    suite: "Suite[Any, Any] | None" = Field(
+        default=None, exclude=True, description="The Suite that produced this result"
+    )
 
     @computed_field
     @property

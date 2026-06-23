@@ -206,8 +206,13 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         target = target if not isinstance(target, NotProvided) else self.target
         has_target = not isinstance(target, NotProvided)
 
-        if parallel and max_concurrency is not None and max_concurrency < 1:
-            raise ValueError("max_concurrency must be greater than 0")
+        if max_concurrency is not None:
+            if not isinstance(max_concurrency, int) or isinstance(
+                max_concurrency, bool
+            ):
+                raise TypeError("max_concurrency must be None or a positive integer")
+            if max_concurrency < 1:
+                raise ValueError("max_concurrency must be greater than 0")
 
         with telemetry_run_context():
             telemetry_tag("giskard_component", "suite")
@@ -236,6 +241,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             suite_result = SuiteResult(
                 results=results,
                 duration_ms=int((end_time - start_time) * 1000),
+                suite=self,
             )
 
             telemetry_capture(
@@ -315,3 +321,9 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
                 raise exc_group.exceptions[0]
             raise
         return [task.result() for task in tasks]
+
+
+# `SuiteResult.suite` is a forward reference to `Suite`, which is only imported
+# under `TYPE_CHECKING` in result.py to avoid a circular import. Rebuild the model
+# here, where `Suite` exists at runtime, so Pydantic can resolve the annotation.
+SuiteResult.model_rebuild()
