@@ -116,7 +116,7 @@ LICENSECHECK_VERSION := 2026.0.8
 LICENSECHECK := uv run --with licensecheck==$(LICENSECHECK_VERSION) licensecheck --license MIT
 # all-extras pulls in the provider extras' transitive deps; skip the workspace libs
 # themselves (LIBS) so the notices list only third-party packages.
-LICENSECHECK_FLAGS := --groups all-extras --skip-dependencies $(LIBS)
+LICENSECHECK_FLAGS := --extras full --skip-dependencies $(LIBS)
 # licensecheck markdown output is not byte-stable (trailing whitespace, blank-line
 # runs), so canonicalize it before writing/diffing: strip trailing whitespace and
 # collapse consecutive blank lines.
