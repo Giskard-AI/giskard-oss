@@ -238,3 +238,23 @@ def test_faithfulness_serialization_roundtrip() -> None:
     assert restored.answer_key == "trace.last.outputs.answer"
     assert restored.source_key == "trace.last.metadata.source"
     assert restored.threshold == 0.9
+
+
+async def test_unresolved_answer_raises_value_error() -> None:
+    check = Faithfulness(
+        answer_key="trace.last.outputs.non_existent",
+        source="Refunds are available within 30 days.",
+    )
+
+    with pytest.raises(ValueError, match="Could not resolve answer"):
+        await check.run(Trace())
+
+
+async def test_unresolved_source_raises_value_error() -> None:
+    check = Faithfulness(
+        answer="Refunds are available within 30 days.",
+        source_key="trace.last.metadata.non_existent",
+    )
+
+    with pytest.raises(ValueError, match="Could not resolve source"):
+        await check.run(Trace())

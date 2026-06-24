@@ -68,7 +68,18 @@ class Faithfulness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             key=self.answer_key,
             value=provide_not_none(self.answer),
         )
+        if answer is None or isinstance(answer, NoMatch):
+            raise ValueError(
+                f"Could not resolve answer from trace using key '{self.answer_key}' "
+                "and no direct answer was provided."
+            )
+
         source = self._resolve_source(trace)
+        if source is None or isinstance(source, NoMatch):
+            raise ValueError(
+                f"Could not resolve source from trace using key '{self.source_key}' "
+                "and no direct source was provided."
+            )
 
         return {
             "answer": answer,
