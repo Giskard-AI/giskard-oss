@@ -1,13 +1,13 @@
 """Knowledge-base scenario generators for document-grounded quality scans."""
 
-from typing import Any, ClassVar, override
+from typing import Any, ClassVar, Unpack, override
 
 import numpy as np
 from giskard.checks import Groundedness
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
 from giskard.checks.generators import LLMGenerator
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from ..utils.knowledge_base import Document
 from .base import ScenarioContext, ScenarioGenerator, TargetMode
@@ -35,6 +35,13 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
     scenario_name_prefix: ClassVar[str] = ""
     prompt_path: ClassVar[str] = ""
     quality_tag: ClassVar[str] = ""
+
+    def __init_subclass__(cls, **kwargs: Unpack[ConfigDict]) -> None:
+        super().__init_subclass__(**kwargs)
+        if not cls.scenario_name_prefix or not cls.prompt_path or not cls.quality_tag:
+            raise TypeError(
+                f"Subclass {cls.__name__} must define non-empty scenario_name_prefix, prompt_path, and quality_tag."
+            )
 
     context_documents: int = Field(
         default=DEFAULT_KNOWLEDGE_BASE_CONTEXT_DOCUMENTS, ge=1
@@ -142,16 +149,6 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
         context_documents: list[Document],
         max_turns: int,
     ) -> Scenario[Any, Any, Trace[Any, Any]]:
-        if (
-            not self.scenario_name_prefix
-            or not self.prompt_path
-            or not self.quality_tag
-        ):
-            raise NotImplementedError(
-                "KnowledgeBaseScenarioGenerator subclasses must define "
-                + "scenario_name_prefix, prompt_path, and quality_tag."
-            )
-
         context = [document.content for document in context_documents]
         return (
             Scenario(f"{self.scenario_name_prefix} - Document {seed_index}")
