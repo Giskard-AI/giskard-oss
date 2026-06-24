@@ -20,4 +20,4 @@ def to_hub_format(result: SuiteResult) -> dict[str, Any]:
     dict[str, Any]
         JSON-serializable representation of the suite result
     """
-    return result.model_dump(mode="json")
+    return result.model_dump(mode="json", fallback=str)
