@@ -2,6 +2,7 @@ import json
 from types import SimpleNamespace
 from typing import Any
 
+import giskard.scan.generators.base as base_mod
 import pytest
 from giskard.scan.generators import huggingface as hf_mod
 from giskard.scan.generators.base import ScenarioContext
@@ -150,6 +151,19 @@ async def test_loads_single_requested_language(hf_repo):
     gen = _make_gen()
     scenarios = await gen.generate_scenario(_context(languages=["en"]))
     assert [s.name for s in scenarios] == ["en1", "en2"]
+
+
+async def test_default_max_scenarios_subsamples_large_dataset(hf_repo):
+    """HF datasets inherit the shared default cap when max_scenarios is omitted."""
+    default_cap = base_mod._DEFAULT_MAX_SCENARIOS
+    hf_repo.add_subset(
+        "en",
+        "donotanswer.en.jsonl",
+        *(f"s{i}" for i in range(default_cap + 5)),
+    )
+    gen = _make_gen()
+    scenarios = await gen.generate_scenario(_context(languages=["en"]))
+    assert len(scenarios) == default_cap
 
 
 async def test_multi_file_language_concatenates(hf_repo):

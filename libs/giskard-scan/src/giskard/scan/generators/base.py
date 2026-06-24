@@ -14,6 +14,8 @@ from ..utils.knowledge_base import KnowledgeBase
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_MAX_SCENARIOS = 20
+
 
 class ScenarioContext(BaseModel):
     """Run-wide context shared by all generators in a scan suite.
@@ -188,7 +190,7 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
             context: Run-wide context providing description and languages
                 forwarded to each scenario's annotations.
             max_scenarios: Maximum number of scenarios to return.  When
-                ``None``, the full dataset is returned.
+                ``None``, defaults to :data:`_DEFAULT_MAX_SCENARIOS` (20).
             rng: Random generator used for subset sampling.  A fresh
                 ``np.random.default_rng()`` is created if ``None``.
             target_mode: Desired conversation mode for generated scenarios.
@@ -207,7 +209,11 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
             self.load_scenarios, context.description, context.languages
         )
 
-        if max_scenarios is not None and max_scenarios < len(scenarios):
+        max_scenarios = (
+            max_scenarios if max_scenarios is not None else _DEFAULT_MAX_SCENARIOS
+        )
+
+        if max_scenarios < len(scenarios):
             rng = rng if rng is not None else np.random.default_rng()
             indices = rng.choice(len(scenarios), size=max_scenarios, replace=False)
             scenarios = [scenarios[i] for i in sorted(indices)]
