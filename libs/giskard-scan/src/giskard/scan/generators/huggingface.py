@@ -47,24 +47,31 @@ def _handle_hub_outage(repo_id: str, exc: BaseException) -> bool:
     return True
 
 
-def _resolve_data_files(data_files: list[Any] | None) -> list[str]:
+def _resolve_data_files(data_files: Any) -> list[str]:
     """Return string ``path`` values from a config's ``data_files`` list."""
     if not data_files:
         return []
-    paths: list[str] = []
-    for entry in data_files:
-        if isinstance(entry, dict):
-            path = entry.get("path")
-            if isinstance(path, str):
-                paths.append(path)
-    return paths
+    if isinstance(data_files, str):
+        return [data_files]
+    if isinstance(data_files, list):
+        paths: list[str] = []
+        for entry in data_files:
+            if isinstance(entry, str):
+                paths.append(entry)
+            elif isinstance(entry, dict):
+                path = entry.get("path")
+                if isinstance(path, str):
+                    paths.append(path)
+        return paths
+    return []
 
 
 @lru_cache(maxsize=32)
 def _language_subsets(repo_id: str) -> dict[str, list[str]]:
     """Map each config name to repo files present in the dataset (cached per repo)."""
     card = DatasetCard.load(repo_id, repo_type="dataset")
-    configs = getattr(card.data, "configs", None) or []
+    card_data = getattr(card, "data", None)
+    configs = getattr(card_data, "configs", None) or [] if card_data is not None else []
     repo_files = set(list_repo_files(repo_id, repo_type="dataset"))
 
     subsets: dict[str, list[str]] = {}
@@ -75,13 +82,7 @@ def _language_subsets(repo_id: str) -> dict[str, list[str]]:
         if not name:
             continue
         data_files = config.get("data_files")
-        present = [
-            p
-            for p in _resolve_data_files(
-                data_files if isinstance(data_files, list) else None
-            )
-            if p in repo_files
-        ]
+        present = [p for p in _resolve_data_files(data_files) if p in repo_files]
         if present:
             subsets[name] = present
     return subsets

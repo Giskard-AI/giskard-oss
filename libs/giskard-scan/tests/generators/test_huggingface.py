@@ -50,10 +50,27 @@ def test_resolve_data_files_skips_malformed_entries():
     data_files = [
         {"split": "test", "path": "ok.jsonl"},
         {"split": "test"},
-        "not-a-dict",
+        123,
+        None,
         {"split": "test", "path": 123},
     ]
     assert _resolve_data_files(data_files) == ["ok.jsonl"]
+
+
+def test_resolve_data_files_plain_string():
+    assert _resolve_data_files("data.jsonl") == ["data.jsonl"]
+
+
+def test_resolve_data_files_string_list():
+    assert _resolve_data_files(["a.jsonl", "b.jsonl"]) == ["a.jsonl", "b.jsonl"]
+
+
+def test_resolve_data_files_mixed_string_and_dict():
+    data_files = [
+        "plain.jsonl",
+        {"split": "test", "path": "dict.jsonl"},
+    ]
+    assert _resolve_data_files(data_files) == ["plain.jsonl", "dict.jsonl"]
 
 
 def test_resolve_data_files_none_or_empty():
@@ -162,6 +179,16 @@ def test_language_subsets_omits_config_with_no_present_files(hf_repo):
 
 
 def test_language_subsets_no_configs_returns_empty(hf_repo):
+    assert hf_mod._language_subsets("org/dataset") == {}
+
+
+def test_language_subsets_no_card_data_returns_empty(monkeypatch):
+    monkeypatch.setattr(
+        hf_mod.DatasetCard,
+        "load",
+        staticmethod(lambda repo_id, repo_type=None: SimpleNamespace(data=None)),
+    )
+    monkeypatch.setattr(hf_mod, "list_repo_files", lambda repo_id, repo_type=None: [])
     assert hf_mod._language_subsets("org/dataset") == {}
 
 
