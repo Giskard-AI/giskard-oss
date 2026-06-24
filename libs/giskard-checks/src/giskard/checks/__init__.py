@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from giskard.agents import add_prompts_path
+from giskard.core.utils import get_lib_version
 
 from . import builtin, judges
 from .builtin import (
@@ -19,6 +20,7 @@ from .builtin import (
     Not,
     NotEquals,
     RegexMatching,
+    RegoPolicy,
     SemanticSimilarity,
     StringMatching,
     from_fn,
@@ -27,6 +29,8 @@ from .core import (
     Check,
     CheckResult,
     CheckStatus,
+    GroupedSuiteResult,
+    GroupStats,
     InputGenerationException,
     Interact,
     Interaction,
@@ -36,12 +40,14 @@ from .core import (
     ScenarioResult,
     Step,
     SuiteResult,
+    Target,
     TestCase,
     TestCaseResult,
     Trace,
     resolve,
 )
 from .generators.base import BaseLLMGenerator, LLMGenerator
+from .generators.dataset import DatasetInputGenerator
 from .generators.user import UserSimulator
 from .judges import (
     AnswerRelevance,
@@ -52,12 +58,13 @@ from .judges import (
     LLMJudge,
     Toxicity,
 )
-from .scenarios.catalog import ScenarioCategory, generate_suite
 from .scenarios.runner import ScenarioRunner
 from .scenarios.suite import Suite
 from .settings import get_default_generator, set_default_generator
 from .testing import WithSpy
 from .testing.runner import TestCaseRunner
+
+__version__ = get_lib_version("giskard-checks")
 
 # Install rich.pretty for better REPL output (including Pydantic models)
 # Can be disabled by setting GISKARD_CHECKS_DISABLE_RICH_PRETTY=1
@@ -74,6 +81,7 @@ add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.checks")
 
 
 __all__ = [
+    "__version__",
     # Modules
     "builtin",
     "judges",
@@ -81,11 +89,14 @@ __all__ = [
     "Check",
     "CheckResult",
     "CheckStatus",
+    "GroupedSuiteResult",
+    "GroupStats",
     "Metric",
     "Scenario",
     "ScenarioResult",
     "Step",
     "SuiteResult",
+    "Target",
     "TestCase",
     "TestCaseResult",
     "Trace",
@@ -109,6 +120,7 @@ __all__ = [
     "GreaterEquals",
     "FnCheck",
     "JsonValid",
+    "RegoPolicy",
     "from_fn",
     "Groundedness",
     "LLMJudge",
@@ -122,10 +134,8 @@ __all__ = [
     "BaseLLMGenerator",
     "LLMGenerator",
     # Generators
+    "DatasetInputGenerator",
     "UserSimulator",
-    # Suite generation
-    "ScenarioCategory",
-    "generate_suite",
     # Testing
     "WithSpy",
     "TestCaseRunner",

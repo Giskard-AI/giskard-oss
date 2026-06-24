@@ -1,8 +1,12 @@
+from typing import TYPE_CHECKING
+
 from giskard.core import Discriminated, discriminated_base
 from pydantic import Field
 
 from .interaction import Trace
-from .result import CheckResult
+
+if TYPE_CHECKING:
+    from .result import CheckResult
 
 
 @discriminated_base
@@ -18,7 +22,7 @@ class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     name: str | None = Field(default=None, description="Check name")
     description: str | None = Field(default=None, description="Check description")
 
-    async def run(self, trace: TraceType) -> CheckResult:
+    async def run(self, trace: TraceType) -> "CheckResult":
         """Execute the check against the provided trace.
 
         Subclasses must override this method and return a `CheckResult`. The

@@ -5,15 +5,25 @@ mocked ``litellm.acompletion``. They are marked ``litellm`` so they are
 automatically skipped when the optional ``litellm`` extra is not installed.
 """
 
+import re
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from giskard.agents.generators.base import GenerationParams
+from giskard.agents.generators.base import BaseGenerator, GenerationParams
+from giskard.agents.generators.litellm_generator import (
+    LiteLLMGenerator,
+    LiteLLMRetryMiddleware,
+    RetryPolicy,
+)
+from giskard.llm.types import UserMessageParam
+from pydantic import BaseModel
 
 litellm = pytest.importorskip("litellm")
 
 pytestmark = pytest.mark.litellm
+
+_USER_MESSAGE: list[UserMessageParam] = [{"role": "user", "content": "Hi"}]
 
 
 def _make_litellm_response(content: str = "Mock response") -> Any:
@@ -31,47 +41,56 @@ def _make_litellm_response(content: str = "Mock response") -> Any:
 
 
 @pytest.fixture
-def mock_litellm_response() -> Any:
-    return _make_litellm_response()
+def mock_acompletion() -> Any:
+    """Patch ``litellm.acompletion`` with a canned response and yield the mock."""
+    with patch("litellm.acompletion", return_value=_make_litellm_response()) as mock:
+        yield mock
 
 
-async def test_litellm_generator_completion(mock_litellm_response: Any) -> None:
+async def test_litellm_generator_completion(mock_acompletion: Any) -> None:
     """``LiteLLMGenerator._call_model`` routes through ``litellm.acompletion``."""
-    from giskard.agents.generators.litellm_generator import LiteLLMGenerator
-
-    generator = LiteLLMGenerator(model="gemini/gemini-2.0-flash")
-    with patch(
-        "giskard.agents.generators.litellm_generator.acompletion",
-        return_value=mock_litellm_response,
-    ) as mock_acompletion:
-        response = await generator.complete(
-            messages=[{"role": "user", "content": "Hi"}]
-        )
+    generator = LiteLLMGenerator(model="gemini/gemini-3.5-flash")
+    response = await generator.complete(messages=_USER_MESSAGE)
 
     assert response.choices[0].message.role == "assistant"
     assert response.choices[0].message.content == "Mock response"
     assert response.choices[0].finish_reason == "stop"
     mock_acompletion.assert_called_once()
-    assert mock_acompletion.call_args.kwargs["model"] == "gemini/gemini-2.0-flash"
+    assert mock_acompletion.call_args.kwargs["model"] == "gemini/gemini-3.5-flash"
 
 
-async def test_litellm_generator_forwards_params(mock_litellm_response: Any) -> None:
+async def test_litellm_generator_forwards_params(mock_acompletion: Any) -> None:
     """Generator params and call-site params are merged and forwarded."""
-    from giskard.agents.generators.litellm_generator import LiteLLMGenerator
-
     generator = LiteLLMGenerator(model="test-model").with_params(temperature=0.3)
-    with patch(
-        "giskard.agents.generators.litellm_generator.acompletion",
-        return_value=mock_litellm_response,
-    ) as mock_acompletion:
-        await generator.complete(
-            messages=[{"role": "user", "content": "Hi"}],
-            params=GenerationParams(max_tokens=50),
-        )
+    await generator.complete(
+        messages=_USER_MESSAGE, params=GenerationParams(max_tokens=50)
+    )
 
     kwargs = mock_acompletion.call_args.kwargs
     assert kwargs["temperature"] == 0.3
     assert kwargs["max_tokens"] == 50
+
+
+async def test_litellm_generator_sanitizes_response_format_schema_name(
+    mock_acompletion: Any,
+) -> None:
+    """Bracketed generic model names are sanitized to a provider-safe schema name."""
+
+    class _Wrapper[T](BaseModel):
+        value: T | None = None
+
+    assert _Wrapper[str].__name__ == "_Wrapper[str]"
+
+    generator = LiteLLMGenerator(model="azure/gpt-4o")
+    await generator.complete(
+        messages=_USER_MESSAGE,
+        params=GenerationParams(response_format=_Wrapper[str]),
+    )
+
+    response_format = mock_acompletion.call_args.kwargs["response_format"]
+    assert isinstance(response_format, dict)
+    name = response_format["json_schema"]["name"]
+    assert re.fullmatch(r"[a-zA-Z0-9_-]+", name), name
 
 
 @pytest.mark.parametrize(
@@ -86,11 +105,6 @@ def test_litellm_retry_middleware_should_retry(
     status_code: int, expected: bool
 ) -> None:
     """Retry middleware defers to ``litellm._should_retry`` via ``status_code``."""
-    from giskard.agents.generators.litellm_generator import (
-        LiteLLMRetryMiddleware,
-        RetryPolicy,
-    )
-
     mw = LiteLLMRetryMiddleware(retry_policy=RetryPolicy(max_attempts=2))
     err = Exception("boom")
     err.status_code = status_code  # pyright: ignore[reportAttributeAccessIssue]
@@ -100,13 +114,10 @@ def test_litellm_retry_middleware_should_retry(
 
 def test_litellm_generator_registered_as_kind() -> None:
     """The real ``LiteLLMGenerator`` owns the ``"litellm"`` discriminator kind."""
-    from giskard.agents.generators.base import BaseGenerator
-    from giskard.agents.generators.litellm_generator import LiteLLMGenerator
-
-    instance = LiteLLMGenerator(model="gemini/gemini-2.0-flash")
+    instance = LiteLLMGenerator(model="gemini/gemini-3.5-flash")
     dumped = instance.model_dump()
     assert dumped["kind"] == "litellm"
 
     reconstructed = BaseGenerator.model_validate(dumped)
     assert isinstance(reconstructed, LiteLLMGenerator)
-    assert reconstructed.model == "gemini/gemini-2.0-flash"
+    assert reconstructed.model == "gemini/gemini-3.5-flash"

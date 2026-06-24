@@ -6,11 +6,12 @@ import sys
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import cast
 
 from posthog import Posthog, identify_context, set_context_session, tag
+
+from ..utils import GISKARD_LIBS_VERSIONS
 
 _DISABLING_ENV_VARS = [
     "DO_NOT_TRACK",
@@ -42,13 +43,6 @@ def _should_disable_geoip() -> bool:
     )
 
 
-def _get_lib_version(lib: str) -> str:
-    try:
-        return version(lib)
-    except PackageNotFoundError:
-        return "not_installed"
-
-
 def _get_environment_info() -> str:
     # Detect CI (standard across GH Actions, GitLab, Jenkins, etc.)
     is_ci = _is_true_str(os.getenv("CI")) or _is_true_str(os.getenv("TF_BUILD"))
@@ -75,9 +69,10 @@ def _get_env_information() -> dict[str, str]:
     if not ENV_INFORMATION:
         ENV_INFORMATION.update(
             {
-                "giskard_core_version": _get_lib_version("giskard-core"),
-                "giskard_checks_version": _get_lib_version("giskard-checks"),
-                "giskard_agents_version": _get_lib_version("giskard-agents"),
+                **{
+                    f"{lib.replace('-', '_')}_version": lib_version
+                    for lib, lib_version in GISKARD_LIBS_VERSIONS.items()
+                },
                 "environment": _get_environment_info(),
             }
         )

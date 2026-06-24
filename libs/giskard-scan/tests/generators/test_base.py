@@ -1,0 +1,178 @@
+import json
+from pathlib import Path
+
+import giskard.scan.generators.base as base_mod
+import numpy as np
+import pytest
+from giskard.scan.generators.base import LocalDatasetScenarioGenerator, ScenarioContext
+
+
+class _StubDatasetGenerator(LocalDatasetScenarioGenerator):
+    dataset_name: str = "stub"
+
+
+async def test_dataset_generator_default_max_scenarios_subsamples(
+    tmp_path, monkeypatch
+):
+    """With max_scenarios=None, datasets larger than the default cap are subsampled."""
+    default_cap = base_mod._DEFAULT_MAX_SCENARIOS
+    stub_file = tmp_path / "stub.jsonl"
+    stub_file.write_text(
+        "\n".join(
+            json.dumps({"name": f"s{i}", "steps": [], "annotations": {}})
+            for i in range(default_cap + 10)
+        )
+        + "\n"
+    )
+    monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
+    rng = np.random.default_rng(42)
+    gen = _StubDatasetGenerator()
+    result = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"]), rng=rng
+    )
+    assert len(result) == default_cap
+
+
+async def test_dataset_generator_default_max_scenarios_returns_all_when_smaller(
+    tmp_path, monkeypatch
+):
+    """With max_scenarios=None, datasets at or below the default cap return every scenario."""
+    stub_file = tmp_path / "stub.jsonl"
+    stub_file.write_text(
+        "\n".join(
+            json.dumps(
+                {
+                    "name": f"s{i}",
+                    "steps": [],
+                    "annotations": {},
+                }
+            )
+            for i in range(5)
+        )
+        + "\n"
+    )
+    monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
+    gen = _StubDatasetGenerator()
+    result = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"])
+    )
+    assert len(result) == 5
+
+
+async def test_dataset_generator_budget_subsamples(tmp_path, monkeypatch):
+    """With max_scenarios=2, only 2 scenarios are returned."""
+    stub_file = tmp_path / "stub.jsonl"
+    stub_file.write_text(
+        "\n".join(
+            json.dumps({"name": f"s{i}", "steps": [], "annotations": {}})
+            for i in range(10)
+        )
+        + "\n"
+    )
+    monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
+    rng = np.random.default_rng(42)
+    gen = _StubDatasetGenerator()
+    result = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"]), max_scenarios=2, rng=rng
+    )
+    assert len(result) == 2
+
+
+async def test_dataset_generator_budget_larger_than_dataset_returns_all(
+    tmp_path, monkeypatch
+):
+    """With max_scenarios > dataset size, all scenarios are returned."""
+    stub_file = tmp_path / "stub.jsonl"
+    stub_file.write_text(
+        "\n".join(
+            json.dumps({"name": f"s{i}", "steps": [], "annotations": {}})
+            for i in range(3)
+        )
+        + "\n"
+    )
+    monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
+    rng = np.random.default_rng(42)
+    gen = _StubDatasetGenerator()
+    result = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"]),
+        max_scenarios=100,
+        rng=rng,
+    )
+    assert len(result) == 3
+
+
+async def test_dataset_generator_budget_reproducible(tmp_path, monkeypatch):
+    """Same seed always picks the same subset."""
+    stub_file = tmp_path / "stub.jsonl"
+    stub_file.write_text(
+        "\n".join(
+            json.dumps({"name": f"s{i}", "steps": [], "annotations": {}})
+            for i in range(10)
+        )
+        + "\n"
+    )
+    monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
+    rng_a = np.random.default_rng(7)
+    rng_b = np.random.default_rng(7)
+    gen = _StubDatasetGenerator()
+    result_a = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"]),
+        max_scenarios=3,
+        rng=rng_a,
+    )
+    result_b = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"]),
+        max_scenarios=3,
+        rng=rng_b,
+    )
+    assert [s.name for s in result_a] == [s.name for s in result_b]
+
+
+async def test_dataset_generator_missing_file_raises_runtime_error(monkeypatch):
+    """Pointing _DATA_DIR at a non-existent path raises RuntimeError with 'not found'."""
+
+    monkeypatch.setattr(
+        base_mod, "_DATA_DIR", Path("/nonexistent/path/that/does/not/exist")
+    )
+    gen = _StubDatasetGenerator()
+    with pytest.raises(RuntimeError, match="not found"):
+        await gen.generate_scenario(
+            ScenarioContext(description="desc", languages=["en"])
+        )
+
+
+async def test_dataset_generator_malformed_jsonl_raises_value_error(
+    tmp_path, monkeypatch
+):
+    """A malformed JSONL line raises ValueError that includes the filename or line number."""
+
+    stub_file = tmp_path / "stub.jsonl"
+    stub_file.write_text(
+        '{"name": "ok", "steps": [], "annotations": {}}\n{not valid json\n'
+    )
+    monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
+    gen = _StubDatasetGenerator()
+    with pytest.raises(ValueError, match=r"stub\.jsonl|line 2"):
+        await gen.generate_scenario(
+            ScenarioContext(description="desc", languages=["en"])
+        )
+
+
+async def test_dataset_generator_reads_utf8_content(tmp_path, monkeypatch):
+    """Non-ASCII scenario content is decoded correctly as UTF-8 regardless of locale."""
+    stub_file = tmp_path / "stub.jsonl"
+    stub_file.write_text(
+        json.dumps(
+            {"name": "Café Ñoño 日本語 Привет", "steps": [], "annotations": {}},
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
+    gen = _StubDatasetGenerator()
+    result = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"])
+    )
+    assert len(result) == 1
+    assert result[0].name == "Café Ñoño 日本語 Привет"

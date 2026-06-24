@@ -11,6 +11,8 @@ from giskard.llm import LLMClient
 from giskard.llm.errors import AuthenticationError, LLMError, UnsupportedOperationError
 from giskard.llm.types import ResponseFunctionToolCall, ToolDefParam
 
+from .helpers import azure_foundry_v1_base_url
+
 pytestmark = pytest.mark.functional
 
 # -- Provider parametrization -------------------------------------------------
@@ -18,16 +20,25 @@ pytestmark = pytest.mark.functional
 _RESPONSE_MODELS = {
     "openai": os.getenv("TEST_OPENAI_MODEL", "openai/gpt-4.1-nano"),
     "google": os.getenv("TEST_GOOGLE_MODEL", "google/gemini-2.5-flash"),
+    "azure_foundry_v1": os.getenv(
+        "TEST_AZURE_FOUNDRY_V1_MODEL", "azure_foundry_v1/gpt-4.1-nano"
+    ),
 }
 
 _CONFIGURE_PARAMS = {  # pragma: allowlist secret
     "openai": {"provider": "openai", "api_key": "os.environ/OPENAI_API_KEY"},
     "google": {"provider": "google", "api_key": "os.environ/GOOGLE_API_KEY"},
+    "azure_foundry_v1": {
+        "provider": "openai",
+        "api_key": "os.environ/AZURE_AI_API_KEY",  # pragma: allowlist secret
+        "base_url": azure_foundry_v1_base_url(),
+    },
 }
 
 _PROVIDER_MARKS = {
     "openai": pytest.mark.openai,
     "google": pytest.mark.google,
+    "azure_foundry_v1": pytest.mark.azure_foundry_v1,
 }
 
 _PROVIDER_PARAMS = [
