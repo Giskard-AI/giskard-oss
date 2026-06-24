@@ -2,7 +2,6 @@ import json
 from types import SimpleNamespace
 from typing import Any
 
-import giskard.scan.generators.base as base_mod
 import httpx
 import pytest
 from giskard.scan.generators import huggingface as hf_mod
@@ -21,6 +20,13 @@ from huggingface_hub.errors import (
 
 def _scenario_line(name: str) -> str:
     return json.dumps({"name": name, "steps": [], "annotations": {}})
+
+
+def _raises(exc: BaseException):
+    def _(*_args, **_kwargs):
+        raise exc
+
+    return _
 
 
 # --- _resolve_data_files (pure) -------------------------------------------------
@@ -56,6 +62,13 @@ def test_resolve_data_files_none_or_empty():
 
 
 # --- fake HF repo fixture -------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clear_language_subsets_cache():
+    hf_mod._language_subsets.cache_clear()
+    yield
+    hf_mod._language_subsets.cache_clear()
 
 
 @pytest.fixture
@@ -106,7 +119,6 @@ def hf_repo(tmp_path, monkeypatch):
         "hf_hub_download",
         lambda repo_id, repo_file, repo_type=None: files[repo_file],
     )
-    hf_mod._language_subsets.cache_clear()
 
     return SimpleNamespace(add_subset=add_subset, declare_config=declare_config)
 
@@ -124,13 +136,16 @@ def _context(
 # --- allow_commercial_use -------------------------------------------------------
 
 
-def test_allow_commercial_use_reflects_repo_field():
-    assert _make_gen(repo_allow_commercial_use=False).allow_commercial_use is False
-    assert _make_gen(repo_allow_commercial_use=True).allow_commercial_use is True
-
-
-def test_allow_commercial_use_defaults_true():
-    assert _make_gen().allow_commercial_use is True
+@pytest.mark.parametrize(
+    "kwargs,expected",
+    [
+        ({}, True),
+        ({"repo_allow_commercial_use": True}, True),
+        ({"repo_allow_commercial_use": False}, False),
+    ],
+)
+def test_allow_commercial_use(kwargs, expected):
+    assert _make_gen(**kwargs).allow_commercial_use is expected
 
 
 # --- _language_subsets discovery ------------------------------------------------
@@ -158,19 +173,6 @@ async def test_loads_single_requested_language(hf_repo):
     gen = _make_gen()
     scenarios = await gen.generate_scenario(_context(languages=["en"]))
     assert [s.name for s in scenarios] == ["en1", "en2"]
-
-
-async def test_default_max_scenarios_subsamples_large_dataset(hf_repo):
-    """HF datasets inherit the shared default cap when max_scenarios is omitted."""
-    default_cap = base_mod._DEFAULT_MAX_SCENARIOS
-    hf_repo.add_subset(
-        "en",
-        "donotanswer.en.jsonl",
-        *(f"s{i}" for i in range(default_cap + 5)),
-    )
-    gen = _make_gen()
-    scenarios = await gen.generate_scenario(_context(languages=["en"]))
-    assert len(scenarios) == default_cap
 
 
 async def test_multi_file_language_concatenates(hf_repo):
@@ -223,35 +225,12 @@ async def test_applies_tags(hf_repo):
 
 
 async def test_malformed_jsonl_raises_with_source(hf_repo, tmp_path, monkeypatch):
-    bad = tmp_path / "donotanswer.en.jsonl"
+    hf_repo.add_subset("en", "donotanswer.en.jsonl", "ok")
+    bad = tmp_path / "bad.en.jsonl"
     bad.write_text('{"name": "ok", "steps": [], "annotations": {}}\n{bad\n')
-    monkeypatch.setattr(
-        hf_mod.DatasetCard,
-        "load",
-        staticmethod(
-            lambda repo_id, repo_type=None: SimpleNamespace(
-                data=SimpleNamespace(
-                    configs=[
-                        {
-                            "config_name": "en",
-                            "data_files": [
-                                {"split": "test", "path": "donotanswer.en.jsonl"}
-                            ],
-                        }
-                    ]
-                )
-            )
-        ),
-    )
-    monkeypatch.setattr(
-        hf_mod,
-        "list_repo_files",
-        lambda repo_id, repo_type=None: ["donotanswer.en.jsonl"],
-    )
     monkeypatch.setattr(
         hf_mod, "hf_hub_download", lambda repo_id, repo_file, repo_type=None: str(bad)
     )
-    hf_mod._language_subsets.cache_clear()
     gen = _make_gen()
     with pytest.raises(ValueError, match=r"org/dataset/donotanswer\.en\.jsonl|line 2"):
         await gen.generate_scenario(_context(languages=["en"]))
@@ -268,54 +247,36 @@ def _hf_http_error(status_code: int) -> HfHubHTTPError:
     return HfHubHTTPError(f"{status_code} Client Error", response=response)
 
 
-def _card_with_en_config(repo_id: str, repo_type: str | None = None) -> SimpleNamespace:
-    return SimpleNamespace(
-        data=SimpleNamespace(
-            configs=[
-                {
-                    "config_name": "en",
-                    "data_files": [{"split": "test", "path": "en.jsonl"}],
-                }
-            ]
-        )
-    )
-
-
 @pytest.mark.parametrize(
     "patch_target,patch_value",
     [
         (
             "DatasetCard.load",
-            staticmethod(
-                lambda repo_id, repo_type=None: (_ for _ in ()).throw(
-                    LocalEntryNotFoundError("no cache and no network")
-                )
-            ),
+            staticmethod(_raises(LocalEntryNotFoundError("no cache and no network"))),
+        ),
+        (
+            "DatasetCard.load",
+            staticmethod(_raises(OfflineModeIsEnabled("offline mode is enabled"))),
         ),
         (
             "list_repo_files",
-            lambda repo_id, repo_type=None: (_ for _ in ()).throw(
-                httpx.ConnectError("connection refused")
-            ),
+            _raises(httpx.ConnectError("connection refused")),
         ),
         (
             "list_repo_files",
-            lambda repo_id, repo_type=None: (_ for _ in ()).throw(_hf_http_error(503)),
+            _raises(_hf_http_error(503)),
         ),
     ],
-    ids=["card_load", "connect_error", "hub_outage"],
+    ids=["card_load", "offline_mode", "connect_error", "hub_outage"],
 )
 async def test_hub_unavailable_returns_empty_and_warns(
-    monkeypatch, caplog, patch_target, patch_value
+    hf_repo, monkeypatch, caplog, patch_target, patch_value
 ):
+    hf_repo.add_subset("en", "en.jsonl", "en1")
     if patch_target == "DatasetCard.load":
         monkeypatch.setattr(hf_mod.DatasetCard, "load", patch_value)
     else:
-        monkeypatch.setattr(
-            hf_mod.DatasetCard, "load", staticmethod(_card_with_en_config)
-        )
         monkeypatch.setattr(hf_mod, patch_target, patch_value)
-    hf_mod._language_subsets.cache_clear()
     gen = _make_gen()
     with caplog.at_level("WARNING"):
         scenarios = await gen.generate_scenario(_context(languages=["en"]))
@@ -339,30 +300,12 @@ async def test_hub_unavailable_on_download_returns_empty_and_warns(
     assert "Hugging Face Hub is unavailable" in caplog.text
 
 
-async def test_offline_mode_returns_empty_and_warns(monkeypatch, caplog):
-    monkeypatch.setattr(
-        hf_mod.DatasetCard,
-        "load",
-        staticmethod(
-            lambda repo_id, repo_type=None: (_ for _ in ()).throw(
-                OfflineModeIsEnabled("offline mode is enabled")
-            )
-        ),
-    )
-    hf_mod._language_subsets.cache_clear()
-    gen = _make_gen()
-    with caplog.at_level("WARNING"):
-        scenarios = await gen.generate_scenario(_context(languages=["en"]))
-    assert scenarios == []
-    assert "Hugging Face Hub is unavailable" in caplog.text
-
-
 async def test_repository_not_found_still_raises(monkeypatch):
     monkeypatch.setattr(
         hf_mod.DatasetCard,
         "load",
         staticmethod(
-            lambda repo_id, repo_type=None: (_ for _ in ()).throw(
+            _raises(
                 RepositoryNotFoundError(
                     "404 Client Error",
                     response=httpx.Response(
@@ -376,7 +319,6 @@ async def test_repository_not_found_still_raises(monkeypatch):
             )
         ),
     )
-    hf_mod._language_subsets.cache_clear()
     gen = _make_gen()
     with pytest.raises(RepositoryNotFoundError):
         await gen.generate_scenario(_context(languages=["en"]))

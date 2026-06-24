@@ -1,5 +1,6 @@
 import logging
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, override
 
 import httpx
@@ -26,31 +27,28 @@ _HUB_UNAVAILABLE_ERRORS = (
 _HUB_LOAD_ERRORS = _HUB_UNAVAILABLE_ERRORS + (HfHubHTTPError,)
 
 
-def _is_hub_outage(error: HfHubHTTPError) -> bool:
-    return error.response.status_code in (502, 503, 504)
-
-
 def _hub_unavailable(exc: BaseException) -> bool:
     if isinstance(exc, _HUB_UNAVAILABLE_ERRORS):
         return True
-    return isinstance(exc, HfHubHTTPError) and _is_hub_outage(exc)
+    if isinstance(exc, HfHubHTTPError):
+        return exc.response.status_code in (502, 503, 504)
+    return False
 
 
-def _warn_hub_unavailable(repo_id: str, exc: BaseException) -> None:
+def _handle_hub_outage(repo_id: str, exc: BaseException) -> bool:
+    """Log and swallow hub-outage errors. Returns True when handled."""
+    if not _hub_unavailable(exc):
+        return False
     logger.warning(
         "Hugging Face Hub is unavailable for %s (%s); returning no scenarios.",
         repo_id,
         exc,
     )
+    return True
 
 
-def _resolve_data_files(data_files: Any) -> list[str]:
-    """Flatten a config's ``data_files`` into a list of repo file paths.
-
-    Expects the shape our datasets use: a list of ``{split, path}`` dicts with a
-    string ``path``. Malformed entries (non-dict, or a missing/non-string
-    ``path``) are skipped. Returns ``[]`` for ``None`` or an empty list.
-    """
+def _resolve_data_files(data_files: list[Any] | None) -> list[str]:
+    """Return string ``path`` values from a config's ``data_files`` list."""
     if not data_files:
         return []
     paths: list[str] = []
@@ -64,27 +62,25 @@ def _resolve_data_files(data_files: Any) -> list[str]:
 
 @lru_cache(maxsize=32)
 def _language_subsets(repo_id: str) -> dict[str, list[str]]:
-    """Map each subset (config) name to the repo files it resolves to.
-
-    Reads the dataset card's ``configs`` declaration, then keeps each config's
-    ``data_files`` paths that actually exist in the repo. A subset is treated as
-    a language: requesting ``"en"`` loads the ``"en"`` config's files. Configs
-    that resolve to no present file are dropped.
-
-    Cached per ``repo_id``: the card and file list are static within a run, so
-    this avoids hitting the Hub on every scan.
-    """
+    """Map each config name to repo files present in the dataset (cached per repo)."""
     card = DatasetCard.load(repo_id, repo_type="dataset")
     configs = getattr(card.data, "configs", None) or []
     repo_files = set(list_repo_files(repo_id, repo_type="dataset"))
 
     subsets: dict[str, list[str]] = {}
     for config in configs:
+        if not isinstance(config, dict):
+            continue
         name = config.get("config_name")
         if not name:
             continue
+        data_files = config.get("data_files")
         present = [
-            p for p in _resolve_data_files(config.get("data_files")) if p in repo_files
+            p
+            for p in _resolve_data_files(
+                data_files if isinstance(data_files, list) else None
+            )
+            if p in repo_files
         ]
         if present:
             subsets[name] = present
@@ -128,9 +124,8 @@ class HuggingFaceDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
         try:
             subsets = _language_subsets(self.repo_id)
         except _HUB_LOAD_ERRORS as exc:
-            if not _hub_unavailable(exc):
+            if not _handle_hub_outage(self.repo_id, exc):
                 raise
-            _warn_hub_unavailable(self.repo_id, exc)
             return []
 
         compatible = [language for language in languages if language in subsets]
@@ -152,7 +147,7 @@ class HuggingFaceDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
                     local_path = hf_hub_download(
                         self.repo_id, repo_file, repo_type="dataset"
                     )
-                    with open(local_path, encoding="utf-8") as f:
+                    with Path(local_path).open(encoding="utf-8") as f:
                         scenarios.extend(
                             self._parse_scenarios(
                                 f,
@@ -162,9 +157,8 @@ class HuggingFaceDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
                             )
                         )
         except _HUB_LOAD_ERRORS as exc:
-            if not _hub_unavailable(exc):
+            if not _handle_hub_outage(self.repo_id, exc):
                 raise
-            _warn_hub_unavailable(self.repo_id, exc)
             return []
 
         return scenarios
