@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Self, override
 
-from giskard.core import NOT_PROVIDED, NotProvided, provide_not_none
 from pydantic import Field, model_validator
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
 from ..core.check import Check
@@ -35,13 +35,13 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     key: JSONPathStr = Field(
         ..., description="The key to extract the actual value from the trace"
     )
-    expected_value: ExpectedType | NotProvided = Field(
-        default=NOT_PROVIDED,
+    expected_value: ExpectedType | MISSING = Field(
+        default=MISSING,
         description="The expected value to compare against. If omitted, the expected value is extracted from the trace using expected_value_key. Explicit None is valid and compares against None.",
     )
-    expected_value_key: JSONPathStr | NotProvided = Field(
-        default=NOT_PROVIDED,
-        description="The key to extract the expected value from the trace. If None, the expected value is used as is. If provided, the expected value is extracted from the trace using the expected_value_key.",
+    expected_value_key: JSONPathStr | MISSING = Field(
+        default=MISSING,
+        description="The key to extract the expected value from the trace. If omitted, use expected_value directly. If provided, the expected value is extracted from the trace using this key.",
     )
     normalization_form: NormalizationForm | None = Field(
         default="NFKC",
@@ -68,11 +68,9 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     @model_validator(mode="after")
     def validate_expected_value_or_expected_value_key(self) -> Self:
         """Validate that exactly one of expected_value or expected_value_key is provided."""
-        if isinstance(self.expected_value, NotProvided) and isinstance(
-            self.expected_value_key, NotProvided
-        ):
+        if (self.expected_value is MISSING) == (self.expected_value_key is MISSING):
             raise ValueError(
-                "Either 'expected_value' or 'expected_value_key' must be provided"
+                "Exactly one of 'expected_value' or 'expected_value_key' must be provided"
             )
         return self
 
@@ -82,7 +80,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         actual_value = resolve(trace, self.key)
         expected_value = provided_or_resolve(
             trace,
-            key=provide_not_none(self.expected_value_key),
+            key=self.expected_value_key,
             value=self.expected_value,
         )
 

@@ -4,15 +4,39 @@ from pathlib import Path
 import giskard.scan.generators.base as base_mod
 import numpy as np
 import pytest
-from giskard.scan.generators.base import DatasetScenarioGenerator, ScenarioContext
+from giskard.scan.generators.base import LocalDatasetScenarioGenerator, ScenarioContext
 
 
-class _StubDatasetGenerator(DatasetScenarioGenerator):
+class _StubDatasetGenerator(LocalDatasetScenarioGenerator):
     dataset_name: str = "stub"
 
 
-async def test_dataset_generator_no_budget_returns_all(tmp_path, monkeypatch):
-    """With max_scenarios=None the generator returns every scenario."""
+async def test_dataset_generator_default_max_scenarios_subsamples(
+    tmp_path, monkeypatch
+):
+    """With max_scenarios=None, datasets larger than the default cap are subsampled."""
+    default_cap = base_mod._DEFAULT_MAX_SCENARIOS
+    stub_file = tmp_path / "stub.jsonl"
+    stub_file.write_text(
+        "\n".join(
+            json.dumps({"name": f"s{i}", "steps": [], "annotations": {}})
+            for i in range(default_cap + 10)
+        )
+        + "\n"
+    )
+    monkeypatch.setattr(base_mod, "_DATA_DIR", tmp_path)
+    rng = np.random.default_rng(42)
+    gen = _StubDatasetGenerator()
+    result = await gen.generate_scenario(
+        ScenarioContext(description="desc", languages=["en"]), rng=rng
+    )
+    assert len(result) == default_cap
+
+
+async def test_dataset_generator_default_max_scenarios_returns_all_when_smaller(
+    tmp_path, monkeypatch
+):
+    """With max_scenarios=None, datasets at or below the default cap return every scenario."""
     stub_file = tmp_path / "stub.jsonl"
     stub_file.write_text(
         "\n".join(

@@ -138,3 +138,37 @@ def test_generators_returns_copy():
     snapshot = registry.generators()
     snapshot.clear()
     assert len(registry.generators()) == 1
+
+
+# --- commercial_use filter ---
+
+
+class _NonCommercialGen(ScenarioGenerator):
+    @property
+    def allow_commercial_use(self) -> bool:
+        return False
+
+    async def generate_scenario(
+        self,
+        context: ScenarioContext,
+        max_scenarios: int | None = None,
+        rng: np.random.Generator | None = None,
+        target_mode: TargetMode = "multiturn",
+    ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+        return []
+
+
+def test_generators_commercial_use_false_returns_all():
+    registry = SuiteGeneratorRegistry()
+    registry.register(_GenA)
+    registry.register(_NonCommercialGen)
+    assert len(registry.generators(commercial_use=False)) == 2
+
+
+def test_generators_commercial_use_true_excludes_non_commercial():
+    registry = SuiteGeneratorRegistry()
+    registry.register(_GenA)
+    registry.register(_NonCommercialGen)
+    commercial = registry.generators(commercial_use=True)
+    assert len(commercial) == 1
+    assert isinstance(commercial[0], _GenA)

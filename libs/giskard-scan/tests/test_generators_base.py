@@ -1,5 +1,5 @@
 from giskard.scan.generators.base import (
-    DatasetScenarioGenerator,
+    LocalDatasetScenarioGenerator,
     ScenarioContext,
     ScenarioGenerator,
 )
@@ -42,7 +42,7 @@ async def test_scenario_generator_generate_scenario_accepts_target_mode():
 
 
 def test_dataset_generator_has_dataset_name_field():
-    class _DS(DatasetScenarioGenerator):
+    class _DS(LocalDatasetScenarioGenerator):
         dataset_name: str = "stub"
 
     gen = _DS()

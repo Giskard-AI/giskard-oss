@@ -5,8 +5,8 @@ from contextlib import contextmanager, nullcontext
 from typing import Any, Generic, Self, TypeVar
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
-from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
+from pydantic.experimental.missing_sentinel import MISSING
 from rich.console import RenderableType
 from rich.progress import (
     BarColumn,
@@ -111,7 +111,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         Suite identifier.
     scenarios : list[Scenario]
         List of scenarios to execute.
-    target : Any | NotProvided
+    target : Target | MISSING
         Optional suite-level target SUT.
 
     Examples
@@ -134,8 +134,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     scenarios: list[Scenario[InputType, OutputType, Trace[Any, Any]]] = Field(
         default_factory=list, description="Scenarios in the suite"
     )
-    target: Target[InputType, OutputType, Trace[Any, Any]] | NotProvided = Field(
-        default=NOT_PROVIDED,
+    target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = Field(
+        default=MISSING,
         description="Suite-level target SUT that will override any scenario-level target.",
     )
 
@@ -160,9 +160,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
     async def run(
         self,
-        target: Target[InputType, OutputType, Trace[Any, Any]] | NotProvided = (
-            NOT_PROVIDED
-        ),
+        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
@@ -172,7 +170,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
         Parameters
         ----------
-        target : Any | NotProvided
+        target : Target | MISSING, optional
             Override target for all scenarios in the suite. If provided, this
             overrides both the suite-level target and any scenario-level targets.
         return_exception : bool
@@ -203,8 +201,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         result_v2 = await suite.run(target=my_sut_v2)
         ```
         """
-        target = target if not isinstance(target, NotProvided) else self.target
-        has_target = not isinstance(target, NotProvided)
+        target = target if target is not MISSING else self.target
+        has_target = target is not MISSING
 
         if max_concurrency is not None:
             if not isinstance(max_concurrency, int) or isinstance(
