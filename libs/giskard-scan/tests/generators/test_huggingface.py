@@ -3,12 +3,19 @@ from types import SimpleNamespace
 from typing import Any
 
 import giskard.scan.generators.base as base_mod
+import httpx
 import pytest
 from giskard.scan.generators import huggingface as hf_mod
 from giskard.scan.generators.base import ScenarioContext
 from giskard.scan.generators.huggingface import (
     HuggingFaceDatasetScenarioGenerator,
     _resolve_data_files,
+)
+from huggingface_hub.errors import (
+    HfHubHTTPError,
+    LocalEntryNotFoundError,
+    OfflineModeIsEnabled,
+    RepositoryNotFoundError,
 )
 
 
@@ -247,4 +254,129 @@ async def test_malformed_jsonl_raises_with_source(hf_repo, tmp_path, monkeypatch
     hf_mod._language_subsets.cache_clear()
     gen = _make_gen()
     with pytest.raises(ValueError, match=r"org/dataset/donotanswer\.en\.jsonl|line 2"):
+        await gen.generate_scenario(_context(languages=["en"]))
+
+
+# --- Hub unavailability ---------------------------------------------------------
+
+
+def _hf_http_error(status_code: int) -> HfHubHTTPError:
+    request = httpx.Request(
+        "GET", "https://huggingface.co/api/datasets/org/dataset/tree/main"
+    )
+    response = httpx.Response(status_code, request=request)
+    return HfHubHTTPError(f"{status_code} Client Error", response=response)
+
+
+def _card_with_en_config(repo_id: str, repo_type: str | None = None) -> SimpleNamespace:
+    return SimpleNamespace(
+        data=SimpleNamespace(
+            configs=[
+                {
+                    "config_name": "en",
+                    "data_files": [{"split": "test", "path": "en.jsonl"}],
+                }
+            ]
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "patch_target,patch_value",
+    [
+        (
+            "DatasetCard.load",
+            staticmethod(
+                lambda repo_id, repo_type=None: (_ for _ in ()).throw(
+                    LocalEntryNotFoundError("no cache and no network")
+                )
+            ),
+        ),
+        (
+            "list_repo_files",
+            lambda repo_id, repo_type=None: (_ for _ in ()).throw(
+                httpx.ConnectError("connection refused")
+            ),
+        ),
+        (
+            "list_repo_files",
+            lambda repo_id, repo_type=None: (_ for _ in ()).throw(_hf_http_error(503)),
+        ),
+    ],
+    ids=["card_load", "connect_error", "hub_outage"],
+)
+async def test_hub_unavailable_returns_empty_and_warns(
+    monkeypatch, caplog, patch_target, patch_value
+):
+    if patch_target == "DatasetCard.load":
+        monkeypatch.setattr(hf_mod.DatasetCard, "load", patch_value)
+    else:
+        monkeypatch.setattr(
+            hf_mod.DatasetCard, "load", staticmethod(_card_with_en_config)
+        )
+        monkeypatch.setattr(hf_mod, patch_target, patch_value)
+    hf_mod._language_subsets.cache_clear()
+    gen = _make_gen()
+    with caplog.at_level("WARNING"):
+        scenarios = await gen.generate_scenario(_context(languages=["en"]))
+    assert scenarios == []
+    assert "Hugging Face Hub is unavailable" in caplog.text
+
+
+async def test_hub_unavailable_on_download_returns_empty_and_warns(
+    hf_repo, monkeypatch, caplog
+):
+    hf_repo.add_subset("en", "en.jsonl", "en1")
+
+    def failing_download(repo_id, repo_file, repo_type=None):
+        raise LocalEntryNotFoundError("download failed")
+
+    monkeypatch.setattr(hf_mod, "hf_hub_download", failing_download)
+    gen = _make_gen()
+    with caplog.at_level("WARNING"):
+        scenarios = await gen.generate_scenario(_context(languages=["en"]))
+    assert scenarios == []
+    assert "Hugging Face Hub is unavailable" in caplog.text
+
+
+async def test_offline_mode_returns_empty_and_warns(monkeypatch, caplog):
+    monkeypatch.setattr(
+        hf_mod.DatasetCard,
+        "load",
+        staticmethod(
+            lambda repo_id, repo_type=None: (_ for _ in ()).throw(
+                OfflineModeIsEnabled("offline mode is enabled")
+            )
+        ),
+    )
+    hf_mod._language_subsets.cache_clear()
+    gen = _make_gen()
+    with caplog.at_level("WARNING"):
+        scenarios = await gen.generate_scenario(_context(languages=["en"]))
+    assert scenarios == []
+    assert "Hugging Face Hub is unavailable" in caplog.text
+
+
+async def test_repository_not_found_still_raises(monkeypatch):
+    monkeypatch.setattr(
+        hf_mod.DatasetCard,
+        "load",
+        staticmethod(
+            lambda repo_id, repo_type=None: (_ for _ in ()).throw(
+                RepositoryNotFoundError(
+                    "404 Client Error",
+                    response=httpx.Response(
+                        404,
+                        request=httpx.Request(
+                            "GET",
+                            "https://huggingface.co/api/datasets/org/dataset",
+                        ),
+                    ),
+                )
+            )
+        ),
+    )
+    hf_mod._language_subsets.cache_clear()
+    gen = _make_gen()
+    with pytest.raises(RepositoryNotFoundError):
         await gen.generate_scenario(_context(languages=["en"]))

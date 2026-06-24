@@ -2,14 +2,46 @@ import logging
 from functools import lru_cache
 from typing import Any, override
 
+import httpx
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
 from huggingface_hub import DatasetCard, hf_hub_download, list_repo_files
+from huggingface_hub.errors import (
+    HfHubHTTPError,
+    LocalEntryNotFoundError,
+    OfflineModeIsEnabled,
+)
 from pydantic import Field
 
 from .base import BaseDatasetScenarioGenerator
 
 logger = logging.getLogger(__name__)
+
+_HUB_UNAVAILABLE_ERRORS = (
+    LocalEntryNotFoundError,
+    OfflineModeIsEnabled,
+    httpx.NetworkError,
+    httpx.ProxyError,
+)
+_HUB_LOAD_ERRORS = _HUB_UNAVAILABLE_ERRORS + (HfHubHTTPError,)
+
+
+def _is_hub_outage(error: HfHubHTTPError) -> bool:
+    return error.response.status_code in (502, 503, 504)
+
+
+def _hub_unavailable(exc: BaseException) -> bool:
+    if isinstance(exc, _HUB_UNAVAILABLE_ERRORS):
+        return True
+    return isinstance(exc, HfHubHTTPError) and _is_hub_outage(exc)
+
+
+def _warn_hub_unavailable(repo_id: str, exc: BaseException) -> None:
+    logger.warning(
+        "Hugging Face Hub is unavailable for %s (%s); returning no scenarios.",
+        repo_id,
+        exc,
+    )
 
 
 def _resolve_data_files(data_files: Any) -> list[str]:
@@ -93,7 +125,14 @@ class HuggingFaceDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
     def load_scenarios(
         self, description: str, languages: list[str]
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
-        subsets = _language_subsets(self.repo_id)
+        try:
+            subsets = _language_subsets(self.repo_id)
+        except _HUB_LOAD_ERRORS as exc:
+            if not _hub_unavailable(exc):
+                raise
+            _warn_hub_unavailable(self.repo_id, exc)
+            return []
+
         compatible = [language for language in languages if language in subsets]
 
         if not compatible:
@@ -107,19 +146,25 @@ class HuggingFaceDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
             return []
 
         scenarios: list[Scenario[Any, Any, Trace[Any, Any]]] = []
-        for language in compatible:
-            for repo_file in subsets[language]:
-                local_path = hf_hub_download(
-                    self.repo_id, repo_file, repo_type="dataset"
-                )
-                with open(local_path, encoding="utf-8") as f:
-                    scenarios.extend(
-                        self._parse_scenarios(
-                            f,
-                            description=description,
-                            languages=languages,
-                            source=f"{self.repo_id}/{repo_file}",
-                        )
+        try:
+            for language in compatible:
+                for repo_file in subsets[language]:
+                    local_path = hf_hub_download(
+                        self.repo_id, repo_file, repo_type="dataset"
                     )
+                    with open(local_path, encoding="utf-8") as f:
+                        scenarios.extend(
+                            self._parse_scenarios(
+                                f,
+                                description=description,
+                                languages=languages,
+                                source=f"{self.repo_id}/{repo_file}",
+                            )
+                        )
+        except _HUB_LOAD_ERRORS as exc:
+            if not _hub_unavailable(exc):
+                raise
+            _warn_hub_unavailable(self.repo_id, exc)
+            return []
 
         return scenarios
