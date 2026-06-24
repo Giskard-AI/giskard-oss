@@ -153,9 +153,14 @@ class ScenarioRunner:
                 step_result = TestCaseResult(
                     results=[
                         CheckResult.skip(
-                            message=f"Step {i + 1} was skipped due to previous failure"
+                            message=f"Step {i + 1} was skipped due to previous failure",
+                            details={
+                                "check_kind": check.kind,
+                                "check_name": check.name,
+                                "check_description": check.description,
+                            },
                         )
-                        for _ in steps[i].checks
+                        for check in steps[i].checks
                     ],
                     duration_ms=0,
                 )
