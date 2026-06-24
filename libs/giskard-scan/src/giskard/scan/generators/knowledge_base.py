@@ -3,7 +3,7 @@
 from typing import Any, ClassVar, Unpack, override
 
 import numpy as np
-from giskard.checks import Groundedness
+from giskard.checks import Contradiction
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
 from giskard.checks.generators import LLMGenerator
@@ -15,16 +15,21 @@ from .base import ScenarioContext, ScenarioGenerator, TargetMode
 DEFAULT_KNOWLEDGE_BASE_SCENARIOS = 5
 DEFAULT_KNOWLEDGE_BASE_CONTEXT_DOCUMENTS = 4
 DEFAULT_KNOWLEDGE_BASE_MAX_TURNS = 3
-KNOWLEDGE_BASE_QUALITY_TAG = "quality:raget"
-SYCOPHANCY_QUALITY_TAG = "quality:sycophancy"
+
+DIRECT_QUESTIONS_QUALITY_TAGS = [
+    "quality:direct-questions",
+    "component:llm",
+    "component:retriever",
+]
+SYCOPHANCY_QUALITY_TAGS = ["quality:sycophancy", "component:llm"]
 
 
 class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
     """Base class for document-grounded quality scenarios from a knowledge base.
 
-    Subclasses configure the prompt, scenario name, and tag while this base
+    Subclasses configure the prompt, scenario name, and tags while this base
     class owns seed document sampling, nearest-neighbor retrieval, language
-    sampling, turn-budget handling, and the default groundedness scenario shape.
+    sampling, turn-budget handling, and the default contradiction scenario shape.
 
     Attributes:
         context_documents: Maximum number of nearest-neighbor documents used as
@@ -34,13 +39,13 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
 
     scenario_name_prefix: ClassVar[str] = ""
     prompt_path: ClassVar[str] = ""
-    quality_tag: ClassVar[str] = ""
+    quality_tags: ClassVar[list[str]] = []
 
     def __init_subclass__(cls, **kwargs: Unpack[ConfigDict]) -> None:
         super().__init_subclass__(**kwargs)
-        if not cls.scenario_name_prefix or not cls.prompt_path or not cls.quality_tag:
+        if not cls.scenario_name_prefix or not cls.prompt_path or not cls.quality_tags:
             raise TypeError(
-                f"Subclass {cls.__name__} must define non-empty scenario_name_prefix, prompt_path, and quality_tag."
+                f"Subclass {cls.__name__} must define non-empty scenario_name_prefix, prompt_path, and quality_tags."
             )
 
     context_documents: int = Field(
@@ -159,7 +164,7 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
                 ),
                 metadata={"context": context},
             )
-            .check(Groundedness(context_key="trace.last.metadata.context"))
+            .check(Contradiction(context_key="trace.last.metadata.context"))
             .with_annotations(
                 {
                     "description": description,
@@ -168,7 +173,7 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
                     "reference_context": context,
                 }
             )
-            .with_tags([self.quality_tag])
+            .with_tags(list(self.quality_tags))
         )
 
 
@@ -177,13 +182,13 @@ class HallucinationScenarioGenerator(KnowledgeBaseScenarioGenerator):
 
     The generator samples seed documents, retrieves their nearest neighbors,
     and builds multi-turn scenarios that use an LLM-generated user simulator
-    grounded in those documents. The groundedness check flags target responses
-    that add facts unsupported by the retrieved context.
+    grounded in those documents. The contradiction check flags target responses
+    that clearly conflict with the retrieved context.
     """
 
     scenario_name_prefix: ClassVar[str] = "Knowledge Base Direct Questions"
     prompt_path: ClassVar[str] = "giskard.scan::scenarios/knowledge_base_question.j2"
-    quality_tag: ClassVar[str] = KNOWLEDGE_BASE_QUALITY_TAG
+    quality_tags: ClassVar[list[str]] = DIRECT_QUESTIONS_QUALITY_TAGS
 
 
 class SycophancyScenarioGenerator(KnowledgeBaseScenarioGenerator):
@@ -194,6 +199,6 @@ class SycophancyScenarioGenerator(KnowledgeBaseScenarioGenerator):
     a plausible premise explicitly contradicted by those documents.
     """
 
-    scenario_name_prefix: ClassVar[str] = "Sycophancy Knowledge Base Challenge"
+    scenario_name_prefix: ClassVar[str] = "Knowledge Base Sycophantic Questions"
     prompt_path: ClassVar[str] = "giskard.scan::scenarios/knowledge_base_sycophancy.j2"
-    quality_tag: ClassVar[str] = SYCOPHANCY_QUALITY_TAG
+    quality_tags: ClassVar[list[str]] = SYCOPHANCY_QUALITY_TAGS

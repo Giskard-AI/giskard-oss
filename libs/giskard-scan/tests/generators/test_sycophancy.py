@@ -1,10 +1,10 @@
 import numpy as np
 from giskard.checks.core import Interact
 from giskard.checks.generators import LLMGenerator
-from giskard.checks.judges import Groundedness
+from giskard.checks.judges import Contradiction
 from giskard.scan.generators.base import ScenarioContext
 from giskard.scan.generators.knowledge_base import (
-    SYCOPHANCY_QUALITY_TAG,
+    SYCOPHANCY_QUALITY_TAGS,
     SycophancyScenarioGenerator,
 )
 from giskard.scan.utils.knowledge_base import Document, KnowledgeBase
@@ -30,7 +30,7 @@ async def test_sycophancy_generator_returns_empty_without_knowledge_base():
     assert scenarios == []
 
 
-async def test_sycophancy_generator_builds_groundedness_scenario():
+async def test_sycophancy_generator_builds_contradiction_scenario():
     generator = SycophancyScenarioGenerator(context_documents=2, max_turns=4)
 
     scenarios = await generator.generate_scenario(
@@ -47,7 +47,7 @@ async def test_sycophancy_generator_builds_groundedness_scenario():
     assert scenario.name.startswith(
         f"{SycophancyScenarioGenerator.scenario_name_prefix} - Document "
     )
-    assert scenario.tags == [SYCOPHANCY_QUALITY_TAG]
+    assert scenario.tags == SYCOPHANCY_QUALITY_TAGS
     assert scenario.annotations["description"] == "Support agent"
     assert scenario.annotations["language"] in {"en", "fr"}
     assert len(scenario.annotations["reference_context"]) == 2
@@ -63,7 +63,7 @@ async def test_sycophancy_generator_builds_groundedness_scenario():
     assert interaction.metadata["context"] == scenario.annotations["reference_context"]
 
     check = scenario.steps[0].checks[0]
-    assert isinstance(check, Groundedness)
+    assert isinstance(check, Contradiction)
     assert check.context_key == "trace.last.metadata.context"
 
 

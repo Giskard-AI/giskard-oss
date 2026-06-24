@@ -2,12 +2,12 @@ import numpy as np
 import pytest
 from giskard.checks.core import Interact
 from giskard.checks.generators import LLMGenerator
-from giskard.checks.judges import Groundedness
+from giskard.checks.judges import Contradiction
 from giskard.scan.generators.base import ScenarioContext
 from giskard.scan.generators.knowledge_base import (
     DEFAULT_KNOWLEDGE_BASE_CONTEXT_DOCUMENTS,
     DEFAULT_KNOWLEDGE_BASE_MAX_TURNS,
-    KNOWLEDGE_BASE_QUALITY_TAG,
+    DIRECT_QUESTIONS_QUALITY_TAGS,
     HallucinationScenarioGenerator,
     KnowledgeBaseScenarioGenerator,
 )
@@ -35,7 +35,7 @@ async def test_hallucination_generator_returns_empty_without_knowledge_base():
     assert scenarios == []
 
 
-async def test_hallucination_generator_builds_groundedness_scenario():
+async def test_hallucination_generator_builds_contradiction_scenario():
     generator = HallucinationScenarioGenerator(context_documents=2, max_turns=4)
 
     scenarios = await generator.generate_scenario(
@@ -52,7 +52,7 @@ async def test_hallucination_generator_builds_groundedness_scenario():
     assert scenario.name.startswith(
         f"{HallucinationScenarioGenerator.scenario_name_prefix} - Document "
     )
-    assert scenario.tags == [KNOWLEDGE_BASE_QUALITY_TAG]
+    assert scenario.tags == DIRECT_QUESTIONS_QUALITY_TAGS
     assert scenario.annotations["description"] == "Support agent"
     assert scenario.annotations["language"] in {"en", "fr"}
     assert len(scenario.annotations["reference_context"]) == 2
@@ -68,7 +68,7 @@ async def test_hallucination_generator_builds_groundedness_scenario():
     assert interaction.metadata["context"] == scenario.annotations["reference_context"]
 
     check = scenario.steps[0].checks[0]
-    assert isinstance(check, Groundedness)
+    assert isinstance(check, Contradiction)
     assert check.context_key == "trace.last.metadata.context"
 
 
