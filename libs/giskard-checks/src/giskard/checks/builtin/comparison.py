@@ -68,9 +68,9 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     @model_validator(mode="after")
     def validate_expected_value_or_expected_value_key(self) -> Self:
         """Validate that exactly one of expected_value or expected_value_key is provided."""
-        if self.expected_value is MISSING and self.expected_value_key is MISSING:
+        if (self.expected_value is MISSING) == (self.expected_value_key is MISSING):
             raise ValueError(
-                "Either 'expected_value' or 'expected_value_key' must be provided"
+                "Exactly one of 'expected_value' or 'expected_value_key' must be provided"
             )
         return self
 

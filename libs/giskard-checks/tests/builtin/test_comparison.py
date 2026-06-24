@@ -928,3 +928,12 @@ class TestComparisonSentinelDefault:
             expected_value_key="trace.last.metadata.expected",
         )
         assert check.expected_value_key == "trace.last.metadata.expected"
+
+    def test_cannot_provide_both_expected_value_and_expected_value_key(self):
+        """Providing both expected_value and expected_value_key must raise ValueError."""
+        with pytest.raises(ValueError, match="Exactly one"):
+            Equals(
+                key="trace.last.outputs",
+                expected_value=42,
+                expected_value_key="trace.last.metadata.expected",
+            )

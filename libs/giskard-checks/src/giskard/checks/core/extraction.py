@@ -88,7 +88,7 @@ def resolve[TraceType: Trace](trace: TraceType, key: str) -> Any:  # pyright: ig
     return matches[0].value if matches else NoMatch(key=key)
 
 
-def provided_or_resolve[T, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+def provided_or_resolve[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     trace: TraceType,
     key: str | MISSING = MISSING,
     value: Any = MISSING,
