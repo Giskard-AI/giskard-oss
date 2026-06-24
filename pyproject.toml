@@ -34,6 +34,7 @@ azure = ["giskard-llm[azure]>=1.0.0b4,<2"]
 litellm = ["giskard-agents[litellm]>=1.0.2b4,<2"]
 
 # Optional checks dependencies
+readability = ["giskard-checks[readability]>=1.0.2b4,<2"]
 regorus = ["giskard-checks[regorus]>=1.0.2b4,<2"]
 
 # Optional giskard libs

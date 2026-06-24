@@ -11,8 +11,41 @@ from ..core.extraction import JSONPathStr, NoMatch, resolve
 from ..core.result import CheckResult, CheckStatus, Metric
 
 ReadabilityMetric = Literal[
-    "flesch_reading_ease", "flesch_kincaid_grade", "gunning_fog"
+    "flesch_reading_ease",
+    "flesch_kincaid_grade",
+    "gunning_fog",
+    "automated_readability_index",
+    "coleman_liau_index",
+    "dale_chall_readability_score",
 ]
+
+
+READABILITY_SCORE_GUIDE: dict[ReadabilityMetric, str] = {
+    "flesch_reading_ease": (
+        "Usually interpreted on a 0-100 scale where higher is easier to read; "
+        "60-70 is commonly considered plain English."
+    ),
+    "flesch_kincaid_grade": (
+        "Approximate US school grade level where lower is easier to read; "
+        "8-10 is often appropriate for a general audience."
+    ),
+    "gunning_fog": (
+        "Approximate years of formal education needed to understand the text; "
+        "scores below 12 are usually easier for broad audiences."
+    ),
+    "automated_readability_index": (
+        "Approximate US school grade level where lower is easier to read; "
+        "8-10 is often appropriate for a general audience."
+    ),
+    "coleman_liau_index": (
+        "Approximate US school grade level where lower is easier to read; "
+        "8-10 is often appropriate for a general audience."
+    ),
+    "dale_chall_readability_score": (
+        "Lower scores are easier to read; scores around 6 or below are easier, "
+        "7-8 is more difficult, and 9+ is very difficult."
+    ),
+}
 
 
 class TextstatModule(Protocol):
@@ -21,6 +54,12 @@ class TextstatModule(Protocol):
     def flesch_kincaid_grade(self, text: str) -> float: ...
 
     def gunning_fog(self, text: str) -> float: ...
+
+    def automated_readability_index(self, text: str) -> float: ...
+
+    def coleman_liau_index(self, text: str) -> float: ...
+
+    def dale_chall_readability_score(self, text: str) -> float: ...
 
 
 def _load_textstat() -> TextstatModule:
@@ -31,7 +70,7 @@ def _load_textstat() -> TextstatModule:
             raise
         raise RuntimeError(
             "The textstat package is required to use Readability. "
-            "Install it with `giskard-checks[nlp]`."
+            "Install it with `giskard-checks[readability]`."
         ) from err
 
 
@@ -47,15 +86,25 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
     )
     metric: ReadabilityMetric = Field(
         default="flesch_reading_ease",
-        description="Readability metric to compute.",
+        description=(
+            "Readability metric to compute. Flesch reading ease uses a "
+            "higher-is-easier scale; the other metrics estimate grade level "
+            "or reading difficulty where lower is easier."
+        ),
     )
     min_score: float | None = Field(
         default=None,
-        description="Optional minimum accepted readability score.",
+        description=(
+            "Optional minimum accepted readability score. This is most useful "
+            "for higher-is-easier metrics such as flesch_reading_ease."
+        ),
     )
     max_score: float | None = Field(
         default=None,
-        description="Optional maximum accepted readability score.",
+        description=(
+            "Optional maximum accepted readability score. This is most useful "
+            "for grade-level or difficulty metrics where lower is easier."
+        ),
     )
 
     @model_validator(mode="after")
@@ -75,6 +124,7 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
             "key": self.key,
             "text": text,
             "metric": self.metric,
+            "score_guide": READABILITY_SCORE_GUIDE[self.metric],
             "min_score": self.min_score,
             "max_score": self.max_score,
         }
@@ -88,7 +138,7 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
         if not isinstance(text, str):
             return CheckResult.failure(
                 message=f"Value for key '{self.key}' is not a string, expected string but got {type(text).__name__}.",
-                details=details,
+                details={**details, "text": str(text)},
             )
 
         if not text.strip():

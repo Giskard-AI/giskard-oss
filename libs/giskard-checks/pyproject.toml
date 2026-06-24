@@ -18,9 +18,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-nlp = ["textstat>=0.7.10,<0.8"]
+readability = ["textstat>=0.7.10,<0.8"]
 regorus = ["celine-regorus>=0.9.1"]
-all = ["giskard-checks[regorus]"] # Install all optional dependencies
+all = ["giskard-checks[readability,regorus]"] # Install all optional dependencies
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]

@@ -50,6 +50,7 @@ Find a list of packages below
 |✔|importlib-metadata|
 |✔|jinja2|
 |✔|jiter|
+|✔|joblib|
 |✔|jsonpath-ng|
 |✔|jsonschema|
 |✔|jsonschema-specifications|
@@ -59,6 +60,7 @@ Find a list of packages below
 |✔|markupsafe|
 |✔|mdurl|
 |✔|multidict|
+|✔|nltk|
 |✔|numpy|
 |✔|openai|
 |✔|packaging|
@@ -70,6 +72,7 @@ Find a list of packages below
 |✔|pydantic|
 |✔|pydantic-core|
 |✔|pygments|
+|✔|pyphen|
 |✔|python-dotenv|
 |✔|pyyaml|
 |✔|referencing|
@@ -77,9 +80,11 @@ Find a list of packages below
 |✔|requests|
 |✔|rich|
 |✔|rpds-py|
+|✔|setuptools|
 |✔|shellingham|
 |✔|sniffio|
 |✔|tenacity|
+|✔|textstat|
 |✔|tiktoken|
 |✔|tokenizers|
 |✔|tqdm|
@@ -343,6 +348,13 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
+### joblib-1.5.3
+
+- HomePage:
+- Author: Gael Varoquaux
+- License: BSD-3-Clause
+- Compatible: True
+
 ### jsonpath-ng-1.8.0
 
 - HomePage: https://github.com/h2non/jsonpath-ng
@@ -404,6 +416,13 @@ Find a list of packages below
 - HomePage: https://github.com/aio-libs/multidict
 - Author: Andrew Svetlov
 - License: Apache License 2.0
+- Compatible: True
+
+### nltk-3.9.4
+
+- HomePage: https://www.nltk.org/
+- Author: NLTK Team
+- License: Apache Software License
 - Compatible: True
 
 ### numpy-2.5.0
@@ -483,6 +502,13 @@ Find a list of packages below
 - License: BSD-2-Clause
 - Compatible: True
 
+### pyphen-0.17.2
+
+- HomePage:
+- Author: Guillaume Ayoub
+- License: GNU General Public License v2;; GNU Lesser General Public License v2;; Mozilla Public License 1.1 _MPL 1.1_;; later _GPLv2__;; later _LGPLv2__
+- Compatible: True
+
 ### python-dotenv-1.2.2
 
 - HomePage:
@@ -532,6 +558,13 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
+### setuptools-82.0.1
+
+- HomePage:
+- Author: Python Packaging Authority
+- License: MIT
+- Compatible: True
+
 ### shellingham-1.5.4
 
 - HomePage: https://github.com/sarugaku/shellingham
@@ -551,6 +584,13 @@ Find a list of packages below
 - HomePage: https://github.com/jd/tenacity
 - Author: Julien Danjou
 - License: Apache Software License
+- Compatible: True
+
+### textstat-0.7.13
+
+- HomePage: https://github.com/textstat/textstat
+- Author: Shivam Bansal, Chaitanya Aggarwal
+- License: MIT
 - Compatible: True
 
 ### tiktoken-0.13.0

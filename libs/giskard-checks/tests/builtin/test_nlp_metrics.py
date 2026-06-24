@@ -47,7 +47,14 @@ async def test_flesch_reading_ease_fails_for_complex_text() -> None:
 
 @pytest.mark.parametrize(
     "metric",
-    ["flesch_reading_ease", "flesch_kincaid_grade", "gunning_fog"],
+    [
+        "flesch_reading_ease",
+        "flesch_kincaid_grade",
+        "gunning_fog",
+        "automated_readability_index",
+        "coleman_liau_index",
+        "dale_chall_readability_score",
+    ],
 )
 async def test_readability_supports_metric_variants(
     metric: nlp_metrics.ReadabilityMetric,
@@ -63,6 +70,7 @@ async def test_readability_supports_metric_variants(
     assert result.metrics[0].name == metric
     assert isinstance(result.metrics[0].value, float)
     assert result.details["metric"] == metric
+    assert result.details["score_guide"] == nlp_metrics.READABILITY_SCORE_GUIDE[metric]
 
 
 async def test_max_score_threshold_fails_when_score_is_too_high() -> None:
@@ -117,6 +125,10 @@ async def test_non_string_value_fails() -> None:
     assert result.failed
     assert result.message is not None
     assert "is not a string" in result.message
+    assert (
+        result.details["text"]
+        == "{'answer': 'The cat sat on the mat. It was a sunny day.'}"
+    )
 
 
 @pytest.mark.parametrize("outputs", ["", "   \n\t  "])
@@ -150,7 +162,7 @@ async def test_missing_textstat_returns_error(monkeypatch: pytest.MonkeyPatch) -
     assert result.status == CheckStatus.ERROR
     assert result.errored
     assert result.message is not None
-    assert "giskard-checks[nlp]" in result.message
+    assert "giskard-checks[readability]" in result.message
     assert result.details["error"] == result.message
 
 
