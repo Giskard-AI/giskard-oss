@@ -1,12 +1,42 @@
 import asyncio
+import logging
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, override
+from typing import Any, Literal, override
 
 import numpy as np
-from giskard.checks.core.interaction import Trace
+from giskard.checks.core.interaction import Interact, Trace
 from giskard.checks.core.scenario import Scenario
-from pydantic import BaseModel, Field, ValidationError
+from giskard.checks.generators import BaseLLMGenerator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from ..utils.knowledge_base import KnowledgeBase
+
+logger = logging.getLogger(__name__)
+
+
+class ScenarioContext(BaseModel):
+    """Run-wide context shared by all generators in a scan suite.
+
+    Carries everything every generator receives identically for a single
+    run. Per-generator values (scenario budget, RNG) are passed as separate
+    parameters to ``generate_scenario`` and are not part of this object.
+
+    Attributes:
+        description: Natural-language description of the agent under test.
+        languages: BCP-47 language codes the agent is expected to handle.
+        knowledge_base: Optional document context, ``None`` when the run has
+            no knowledge base. Generators that do not use it ignore it.
+    """
+
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    description: str
+    languages: list[str]
+    knowledge_base: KnowledgeBase | None = None
+
+
+TargetMode = Literal["singleturn", "multiturn"]
 
 
 class ScenarioGenerator(BaseModel):
@@ -26,31 +56,55 @@ class ScenarioGenerator(BaseModel):
 
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
+        target_mode: TargetMode = "multiturn",
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Generate a list of test scenarios for the described agent.
 
         Args:
-            description: Natural-language description of the agent under test.
-            languages: BCP-47 language codes the agent is expected to handle.
+            context: Run-wide :class:`ScenarioContext` describing the agent,
+                its languages, and optional shared knowledge base.
             max_scenarios: Upper bound on the number of scenarios to return.
                 ``None`` means no limit (generator-specific default applies).
             rng: Seeded NumPy random generator for reproducible sampling.
-                When used in a multi-generator context, each generator receives
-                an independent child RNG spawned from a shared parent via
-                ``rng.spawn()``, ensuring statistical independence while
-                maintaining reproducibility. Direct callers typically pass a
-                fresh generator or ``None`` to let the implementation create
-                one.
+                In a multi-generator context, each generator receives an
+                independent child RNG spawned from a shared parent via
+                ``rng.spawn()``.
+            target_mode: Desired conversation mode for generated scenarios.
+                ``"singleturn"`` generates single-turn test cases. ``"multiturn"``
+                (default) generates multi-turn test cases.
 
         Returns:
             A list of :class:`~giskard.checks.core.scenario.Scenario` objects
             ready to be collected into a :class:`~giskard.checks.scenarios.Suite`.
         """
         raise NotImplementedError
+
+    @staticmethod
+    def _effective_max_turns(max_turns: int, target_mode: TargetMode) -> int:
+        """Resolve the per-scenario turn budget for ``target_mode``.
+
+        ``"singleturn"`` collapses any configured ``max_turns`` to ``1``;
+        ``"multiturn"`` leaves it unchanged.
+        """
+        return 1 if target_mode == "singleturn" else max_turns
+
+    def _skip_for_singleturn(self, target_mode: TargetMode) -> bool:
+        """Whether this multi-turn-only generator should skip ``target_mode``.
+
+        Returns ``True`` and logs a warning when ``target_mode="singleturn"``,
+        signalling the caller to return no scenarios. Generators that are
+        multi-turn by design call this first in :meth:`generate_scenario`.
+        """
+        if target_mode == "singleturn":
+            logger.warning(
+                "%s requires multiturn mode; skipping (target_mode='singleturn').",
+                type(self).__name__,
+            )
+            return True
+        return False
 
 
 _DATA_DIR = Path(__file__).parent / "data"
@@ -123,21 +177,24 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
     @override
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
+        target_mode: TargetMode = "multiturn",
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Load and optionally subsample scenarios from the bundled dataset.
 
         Args:
-            description: Forwarded to each scenario's annotations so that
-                downstream judges know which agent is under test.
-            languages: Forwarded to each scenario's annotations.
+            context: Run-wide context providing description and languages
+                forwarded to each scenario's annotations.
             max_scenarios: Maximum number of scenarios to return.  When
                 ``None``, the full dataset is returned.
             rng: Random generator used for subset sampling.  A fresh
                 ``np.random.default_rng()`` is created if ``None``.
+            target_mode: Desired conversation mode for generated scenarios.
+                ``"singleturn"`` caps each interaction generator to a single
+                step; ``"multiturn"`` (default) keeps the dataset's own turn
+                budgets.
 
         Returns:
             A list of annotated :class:`~giskard.checks.core.scenario.Scenario`
@@ -146,14 +203,38 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
         # load_scenarios does blocking I/O (file reads, and network for the HF
         # subclass). Generators run concurrently via asyncio.TaskGroup, so offload
         # to a thread to avoid stalling the event loop and the other generators.
-        scenarios = await asyncio.to_thread(self.load_scenarios, description, languages)
+        scenarios = await asyncio.to_thread(
+            self.load_scenarios, context.description, context.languages
+        )
 
         if max_scenarios is not None and max_scenarios < len(scenarios):
             rng = rng if rng is not None else np.random.default_rng()
             indices = rng.choice(len(scenarios), size=max_scenarios, replace=False)
             scenarios = [scenarios[i] for i in sorted(indices)]
 
+        if target_mode == "singleturn":
+            for scenario in scenarios:
+                self._cap_scenario_to_single_turn(scenario)
+
         return scenarios
+
+    @staticmethod
+    def _cap_scenario_to_single_turn(
+        scenario: Scenario[Any, Any, Trace[Any, Any]],
+    ) -> None:
+        """Cap every interaction generator in ``scenario`` to a single step.
+
+        Bundled dataset scenarios may encode multi-step interactions; in
+        ``singleturn`` mode those generators are clamped to ``max_steps=1`` in
+        place so the scenario cannot drive a multi-turn conversation against an
+        agent declared single-turn.
+        """
+        for step in scenario.steps:
+            for interact in step.interacts:
+                if isinstance(interact, Interact) and isinstance(
+                    interact.inputs, BaseLLMGenerator
+                ):
+                    interact.inputs.max_steps = 1
 
 
 class LocalDatasetScenarioGenerator(BaseDatasetScenarioGenerator):

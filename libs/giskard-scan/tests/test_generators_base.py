@@ -1,12 +1,17 @@
 from giskard.scan.generators.base import (
     LocalDatasetScenarioGenerator,
+    ScenarioContext,
     ScenarioGenerator,
 )
 
 
 class _Stub(ScenarioGenerator):
     async def generate_scenario(
-        self, description, languages, max_scenarios=None, rng=None
+        self,
+        context: ScenarioContext,
+        max_scenarios=None,
+        rng=None,
+        target_mode="multiturn",
     ):
         return []
 
@@ -14,6 +19,26 @@ class _Stub(ScenarioGenerator):
 def test_scenario_generator_is_importable():
     gen = _Stub()
     assert isinstance(gen, ScenarioGenerator)
+
+
+async def test_scenario_generator_generate_scenario_accepts_target_mode():
+    """generate_scenario must accept target_mode without raising TypeError."""
+    from giskard.scan.generators.base import ScenarioGenerator
+
+    class _Stub(ScenarioGenerator):
+        async def generate_scenario(
+            self,
+            context: ScenarioContext,
+            max_scenarios=None,
+            rng=None,
+            target_mode="multiturn",
+        ):
+            return []
+
+    gen = _Stub()
+    context = ScenarioContext(description="desc", languages=["en"])
+    result = await gen.generate_scenario(context, target_mode="singleturn")
+    assert result == []
 
 
 def test_dataset_generator_has_dataset_name_field():

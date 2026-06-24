@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 from giskard.scan.generators import huggingface as hf_mod
+from giskard.scan.generators.base import ScenarioContext
 from giskard.scan.generators.huggingface import (
     HuggingFaceDatasetScenarioGenerator,
     _resolve_data_files,
@@ -106,6 +107,12 @@ def _make_gen(**kwargs) -> HuggingFaceDatasetScenarioGenerator:
     return HuggingFaceDatasetScenarioGenerator(repo_id="org/dataset", **kwargs)
 
 
+def _context(
+    description: str = "desc", languages: list[str] | None = None
+) -> ScenarioContext:
+    return ScenarioContext(description=description, languages=languages or ["en"])
+
+
 # --- allow_commercial_use -------------------------------------------------------
 
 
@@ -141,7 +148,7 @@ def test_language_subsets_no_configs_returns_empty(hf_repo):
 async def test_loads_single_requested_language(hf_repo):
     hf_repo.add_subset("en", "donotanswer.en.jsonl", "en1", "en2")
     gen = _make_gen()
-    scenarios = await gen.generate_scenario("desc", ["en"])
+    scenarios = await gen.generate_scenario(_context(languages=["en"]))
     assert [s.name for s in scenarios] == ["en1", "en2"]
 
 
@@ -149,7 +156,7 @@ async def test_multi_file_language_concatenates(hf_repo):
     hf_repo.add_subset("en", "en.part1.jsonl", "en1")
     hf_repo.add_subset("en", "en.part2.jsonl", "en2")
     gen = _make_gen()
-    scenarios = await gen.generate_scenario("desc", ["en"])
+    scenarios = await gen.generate_scenario(_context(languages=["en"]))
     assert sorted(s.name for s in scenarios) == ["en1", "en2"]
 
 
@@ -157,14 +164,14 @@ async def test_returns_all_compatible_languages(hf_repo):
     hf_repo.add_subset("en", "en.jsonl", "en1")
     hf_repo.add_subset("fr", "fr.jsonl", "fr1")
     gen = _make_gen()
-    scenarios = await gen.generate_scenario("desc", ["fr", "en"])
+    scenarios = await gen.generate_scenario(_context(languages=["fr", "en"]))
     assert sorted(s.name for s in scenarios) == ["en1", "fr1"]
 
 
 async def test_skips_incompatible_language(hf_repo):
     hf_repo.add_subset("en", "en.jsonl", "en1")
     gen = _make_gen()
-    scenarios = await gen.generate_scenario("desc", ["en", "xx"])
+    scenarios = await gen.generate_scenario(_context(languages=["en", "xx"]))
     assert [s.name for s in scenarios] == ["en1"]
 
 
@@ -172,7 +179,7 @@ async def test_no_compatible_language_returns_empty_and_warns(hf_repo, caplog):
     hf_repo.add_subset("en", "en.jsonl", "en1")
     gen = _make_gen()
     with caplog.at_level("WARNING"):
-        scenarios = await gen.generate_scenario("desc", ["xx", "yy"])
+        scenarios = await gen.generate_scenario(_context(languages=["xx", "yy"]))
     assert scenarios == []
     assert "No compatible language" in caplog.text
 
@@ -180,7 +187,9 @@ async def test_no_compatible_language_returns_empty_and_warns(hf_repo, caplog):
 async def test_injects_description_and_languages(hf_repo):
     hf_repo.add_subset("en", "en.jsonl", "en1")
     gen = _make_gen()
-    scenarios = await gen.generate_scenario("my agent", ["en", "fr"])
+    scenarios = await gen.generate_scenario(
+        _context(description="my agent", languages=["en", "fr"])
+    )
     assert scenarios[0].annotations["description"] == "my agent"
     assert scenarios[0].annotations["languages"] == ["en", "fr"]
 
@@ -188,7 +197,7 @@ async def test_injects_description_and_languages(hf_repo):
 async def test_applies_tags(hf_repo):
     hf_repo.add_subset("en", "en.jsonl", "en1")
     gen = _make_gen(tags=["dataset:do-not-answer"])
-    scenarios = await gen.generate_scenario("desc", ["en"])
+    scenarios = await gen.generate_scenario(_context(languages=["en"]))
     assert scenarios[0].tags == ["dataset:do-not-answer"]
 
 
@@ -224,4 +233,4 @@ async def test_malformed_jsonl_raises_with_source(hf_repo, tmp_path, monkeypatch
     hf_mod._language_subsets.cache_clear()
     gen = _make_gen()
     with pytest.raises(ValueError, match=r"org/dataset/donotanswer\.en\.jsonl|line 2"):
-        await gen.generate_scenario("desc", ["en"])
+        await gen.generate_scenario(_context(languages=["en"]))
