@@ -149,6 +149,11 @@ class ScenarioRunner:
                 break
 
         if len(steps_results) < len(steps):
+            # Skipped steps own no new interaction; point them at the trace as it stood
+            # when execution stopped so the index is never left unset.
+            skipped_trace_index = (
+                len(trace.interactions) - 1 if trace.interactions else None
+            )
             for i in range(len(steps_results), len(steps)):
                 step_result = TestCaseResult(
                     results=[
@@ -163,6 +168,7 @@ class ScenarioRunner:
                         for check in steps[i].checks
                     ],
                     duration_ms=0,
+                    trace_index=skipped_trace_index,
                 )
                 steps_results.append(step_result)
 
