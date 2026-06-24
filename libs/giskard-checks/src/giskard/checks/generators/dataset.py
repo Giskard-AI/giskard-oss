@@ -1,7 +1,7 @@
 import asyncio
 import hashlib
 import json
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping, Sequence, Set
 from typing import Any, override
 
 from pydantic import BaseModel, Field, model_validator
@@ -66,21 +66,22 @@ def _replace(value: Any, prompt: str) -> tuple[Any, bool]:
             data[name], hit = _replace(getattr(value, name), prompt)
             replaced |= hit
         return type(value).model_validate(data), replaced
-    if isinstance(value, list):
+    if isinstance(value, Mapping):
+        replaced = False
+        out: dict[Any, Any] = {}
+        for k, v in value.items():
+            out[k], hit = _replace(v, prompt)
+            replaced |= hit
+        return type(value)(**out), replaced
+    if isinstance(value, (Sequence, Set)) and not isinstance(value, (str, bytes)):
         replaced = False
         items: list[Any] = []
         for item in value:
             new_item, hit = _replace(item, prompt)
             items.append(new_item)
             replaced |= hit
-        return items, replaced
-    if isinstance(value, dict):
-        replaced = False
-        out: dict[Any, Any] = {}
-        for k, v in value.items():
-            out[k], hit = _replace(v, prompt)
-            replaced |= hit
-        return out, replaced
+        return type(value)(items), replaced  # pyright: ignore[reportCallIssue]
+
     return value, False
 
 

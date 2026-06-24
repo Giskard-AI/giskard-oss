@@ -89,6 +89,24 @@ def test_substitute_prompt_in_plain_dict():
     assert out == {"q": "X", "lang": "en"}
 
 
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        pytest.param([PROMPT_PLACEHOLDER], ["hello"], id="list"),
+        pytest.param((PROMPT_PLACEHOLDER, "keep"), ("hello", "keep"), id="tuple"),
+        pytest.param({PROMPT_PLACEHOLDER}, {"hello"}, id="set"),
+        pytest.param(
+            frozenset({PROMPT_PLACEHOLDER}), frozenset({"hello"}), id="frozenset"
+        ),
+    ],
+)
+def test_substitute_prompt_in_sequence_and_set_containers(value, expected):
+    # Multi-character prompt: must not split strings into individual chars.
+    out = substitute_prompt(value, "hello")
+    assert out == expected
+    assert type(out) is type(value)
+
+
 def test_substitute_prompt_replaces_all_occurrences():
     msg = Email(
         title=PROMPT_PLACEHOLDER, body=f"{PROMPT_PLACEHOLDER} {PROMPT_PLACEHOLDER}"
