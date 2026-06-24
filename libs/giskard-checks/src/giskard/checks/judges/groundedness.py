@@ -1,8 +1,8 @@
 from typing import override
 
 from giskard.agents.workflow import TemplateReference
-from giskard.core import provide_not_none
 from pydantic import Field
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
 from ..core.check import Check
@@ -21,15 +21,17 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
 
     Attributes
     ----------
-    answer : str | None
-        The answer text to evaluate for groundedness.
+    answer : str | MISSING
+        The answer text to evaluate for groundedness. If omitted, extracted from
+        the trace using ``answer_key``.
     answer_key : str
         JSONPath expression to extract the answer from the trace
         (default: "trace.last.outputs").
 
         Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
-    context : list[str] | None
-        List of context documents that should support the answer.
+    context : str | list[str] | MISSING
+        Context documents that should support the answer. If omitted, extracted
+        from the trace using ``context_key``.
     context_key : str
         JSONPath expression to extract the context from the trace
         (default: "trace.last.metadata.context").
@@ -48,15 +50,15 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     ... )
     """
 
-    answer: str | None = Field(
-        default=None, description="Input source for the answer to evaluate"
+    answer: str | MISSING = Field(
+        default=MISSING, description="Input source for the answer to evaluate"
     )
     answer_key: JSONPathStr = Field(
         default="trace.last.outputs",
         description="Key to extract the answer from the trace",
     )
-    context: str | list[str] | None = Field(
-        default=None, description="Input source for the reference context"
+    context: str | list[str] | MISSING = Field(
+        default=MISSING, description="Input source for the reference context"
     )
     context_key: JSONPathStr = Field(
         default="trace.last.metadata.context",
@@ -86,14 +88,14 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
                 provided_or_resolve(
                     trace,
                     key=self.answer_key,
-                    value=provide_not_none(self.answer),
+                    value=self.answer,
                 )
             ),
             "context": str(
                 provided_or_resolve(
                     trace,
                     key=self.context_key,
-                    value=provide_not_none(self.context),
+                    value=self.context,
                 )
             ),
         }
