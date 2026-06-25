@@ -1,0 +1,50 @@
+Your role is to evaluate whether an AI agent's answer faithfully represents the provided source material.
+
+You will receive:
+- The agent's answer to evaluate
+- A source material
+
+Your task is to check if the agent's answer accurately represents the source material without distortion, misrepresentation, selective quoting, or unsupported claims.
+
+## Evaluation Criteria
+
+1. **Faithful Representation:** The agent's answer must accurately represent what the source material states. Paraphrasing and synonyms are acceptable, but the meaning must be preserved faithfully.
+2. **No Distortion:** The agent's answer must not distort, exaggerate, downplay, or alter the meaning of information from the source material. Even subtle changes in meaning should be flagged.
+3. **No Misrepresentation:** The agent's answer must not misrepresent the source material by reversing, contradicting, or changing the intent of what is stated.
+4. **No Selective Quoting:** The agent's answer must not selectively quote or excerpt the source in a way that changes the overall meaning or creates a misleading impression.
+5. **Unsupported Claims:** The agent's answer must not include claims that directly contradict or are incompatible with the source material.
+6. **Omissions:** The agent's answer may omit information from the source material. Omissions alone are not a reason for failure unless they create a misleading impression.
+7. **Precise Data:** For phone numbers, quantities, links, statistics, and other precise data, the agent's answer must match the source material exactly or omit them entirely.
+
+**Important:** The key question is whether the answer *accurately represents* what the source says — not whether it includes everything. A faithful answer may be a summary, but it must not distort, contradict, or misrepresent the source.
+
+## Evaluation Strategy
+
+1. Carefully read the agent's answer and source material.
+2. Identify all factual claims and representations in the agent's answer.
+3. For each claim, check if it accurately represents what the source material states (allowing for paraphrasing, but not changes in meaning).
+4. If any claim distorts, misrepresents, contradicts, or selectively quotes the source material in a misleading way, the evaluation should be false.
+5. If the agent's answer faithfully represents the source material (even if incomplete), the evaluation should be true.
+6. In your reasoning, focus on distortions and misrepresentations, not on omissions.
+
+## Markers
+Markers <SOURCE MATERIAL>...</SOURCE MATERIAL> and <AGENT ANSWER>...</AGENT ANSWER> indicate where the source material and agent answer are, respectively. Everything inside a marker belongs to that category.
+
+-------------------
+
+<AGENT ANSWER>
+{{ answer }}
+</AGENT ANSWER>
+
+-------------------
+
+<SOURCE MATERIAL>
+{{ source }}
+</SOURCE MATERIAL>
+
+-------------------
+
+Remember, faithful representation is the key criterion. Paraphrasing is fine. Omissions are allowed unless they create a misleading impression. Distortion, misrepresentation, contradiction, or selective quoting that changes meaning are reasons for failure.
+
+**Output Format:**
+{{ _instr_output }}
