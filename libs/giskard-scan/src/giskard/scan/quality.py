@@ -9,6 +9,9 @@ from .generators.base import TargetMode
 from .generators.knowledge_base import (
     HallucinationScenarioGenerator,
     KnowledgeBaseScenarioGenerator,
+    MultiTopicScenarioGenerator,
+    OutOfScopeScenarioGenerator,
+    SplitQuestionsScenarioGenerator,
     SycophancyScenarioGenerator,
 )
 from .registry import SuiteGeneratorRegistry
@@ -17,6 +20,9 @@ from .utils.knowledge_base import KnowledgeBase, normalize_knowledge_base
 QUALITY_GENERATOR_TYPES: tuple[type[KnowledgeBaseScenarioGenerator], ...] = (
     HallucinationScenarioGenerator,
     SycophancyScenarioGenerator,
+    SplitQuestionsScenarioGenerator,
+    MultiTopicScenarioGenerator,
+    OutOfScopeScenarioGenerator,
 )
 
 quality_suite_generator_registry = SuiteGeneratorRegistry()

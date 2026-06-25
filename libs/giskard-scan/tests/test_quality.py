@@ -9,6 +9,9 @@ from giskard.checks.scenarios.suite import Suite
 from giskard.scan.generators.base import ScenarioContext, ScenarioGenerator
 from giskard.scan.generators.knowledge_base import (
     HallucinationScenarioGenerator,
+    MultiTopicScenarioGenerator,
+    OutOfScopeScenarioGenerator,
+    SplitQuestionsScenarioGenerator,
     SycophancyScenarioGenerator,
 )
 from giskard.scan.quality import quality_scan, quality_suite_generator_registry
@@ -175,6 +178,9 @@ async def test_quality_scan_warns_and_skips_empty_raw_knowledge_base(
 ):
     quality_suite_generator_registry.register(HallucinationScenarioGenerator())
     quality_suite_generator_registry.register(SycophancyScenarioGenerator())
+    quality_suite_generator_registry.register(SplitQuestionsScenarioGenerator())
+    quality_suite_generator_registry.register(MultiTopicScenarioGenerator())
+    quality_suite_generator_registry.register(OutOfScopeScenarioGenerator())
     captured_generators: list[ScenarioGenerator] = []
     captured_knowledge_bases: list[object] = []
 
@@ -210,11 +216,14 @@ async def test_quality_scan_warns_and_skips_empty_raw_knowledge_base(
             knowledge_base=["", "  "],
         )
 
-    assert len(captured_generators) == 2
+    assert len(captured_generators) == 5
     assert captured_knowledge_bases == [None]
     assert {type(generator) for generator in captured_generators} == {
         HallucinationScenarioGenerator,
         SycophancyScenarioGenerator,
+        SplitQuestionsScenarioGenerator,
+        MultiTopicScenarioGenerator,
+        OutOfScopeScenarioGenerator,
     }
 
 
@@ -223,6 +232,9 @@ async def test_quality_scan_configures_knowledge_base_generator(
 ):
     quality_suite_generator_registry.register(HallucinationScenarioGenerator())
     quality_suite_generator_registry.register(SycophancyScenarioGenerator())
+    quality_suite_generator_registry.register(SplitQuestionsScenarioGenerator())
+    quality_suite_generator_registry.register(MultiTopicScenarioGenerator())
+    quality_suite_generator_registry.register(OutOfScopeScenarioGenerator())
     captured_generators: list[ScenarioGenerator] = []
     captured_knowledge_bases: list[object] = []
     printed_reports: list[str | None] = []
@@ -259,7 +271,7 @@ async def test_quality_scan_configures_knowledge_base_generator(
     )
 
     assert printed_reports == ["quality"]
-    assert len(captured_generators) == 2
+    assert len(captured_generators) == 5
     assert len(captured_knowledge_bases) == 1
     assert isinstance(captured_knowledge_bases[0], KnowledgeBase)
     assert [document.content for document in captured_knowledge_bases[0].documents] == [
@@ -268,4 +280,7 @@ async def test_quality_scan_configures_knowledge_base_generator(
     assert {type(generator) for generator in captured_generators} == {
         HallucinationScenarioGenerator,
         SycophancyScenarioGenerator,
+        SplitQuestionsScenarioGenerator,
+        MultiTopicScenarioGenerator,
+        OutOfScopeScenarioGenerator,
     }
