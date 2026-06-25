@@ -125,6 +125,6 @@ class GCGInjectionScenarioGenerator(HuggingFaceDatasetScenarioGenerator):
                 f"(DatasetInputGenerator), got {type(interact.inputs).__name__}"
             )
         suffixed_inputs = interact.inputs.model_copy(
-            update={"prompt": interact.inputs.prompt + suffix}
+            update={"prompt": f"{interact.inputs.prompt.rstrip()} {suffix}"}
         )
         return interact.model_copy(update={"inputs": suffixed_inputs})

@@ -62,7 +62,7 @@ def test_cross_product_count_and_prompts(monkeypatch):
     # 2 base prompts x 13 suffixes, every (prompt, suffix) pair exactly once
     assert len(scenarios) == 2 * len(_SUFFIXES)
     assert {_prompt_of(s) for s in scenarios} == {
-        f"{prompt}{suffix}"
+        f"{prompt} {suffix}"
         for prompt in ("PROMPT_A", "PROMPT_B")
         for suffix in _SUFFIXES
     }
