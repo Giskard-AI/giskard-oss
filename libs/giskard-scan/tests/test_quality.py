@@ -7,7 +7,10 @@ from giskard.checks import Equals, Scenario, Trace
 from giskard.checks.core.result import SuiteResult
 from giskard.checks.scenarios.suite import Suite
 from giskard.scan.generators.base import ScenarioContext, ScenarioGenerator
-from giskard.scan.generators.knowledge_base import KnowledgeBaseScenarioGenerator
+from giskard.scan.generators.knowledge_base import (
+    HallucinationScenarioGenerator,
+    SycophancyScenarioGenerator,
+)
 from giskard.scan.quality import quality_scan, quality_suite_generator_registry
 from giskard.scan.utils.knowledge_base import KnowledgeBase
 
@@ -170,7 +173,8 @@ async def test_quality_scan_uses_empty_registry_by_default(
 async def test_quality_scan_warns_and_skips_empty_raw_knowledge_base(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    quality_suite_generator_registry.register(KnowledgeBaseScenarioGenerator())
+    quality_suite_generator_registry.register(HallucinationScenarioGenerator())
+    quality_suite_generator_registry.register(SycophancyScenarioGenerator())
     captured_generators: list[ScenarioGenerator] = []
     captured_knowledge_bases: list[object] = []
 
@@ -206,16 +210,19 @@ async def test_quality_scan_warns_and_skips_empty_raw_knowledge_base(
             knowledge_base=["", "  "],
         )
 
-    assert len(captured_generators) == 1
+    assert len(captured_generators) == 2
     assert captured_knowledge_bases == [None]
-    generator = captured_generators[0]
-    assert isinstance(generator, KnowledgeBaseScenarioGenerator)
+    assert {type(generator) for generator in captured_generators} == {
+        HallucinationScenarioGenerator,
+        SycophancyScenarioGenerator,
+    }
 
 
 async def test_quality_scan_configures_knowledge_base_generator(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    quality_suite_generator_registry.register(KnowledgeBaseScenarioGenerator())
+    quality_suite_generator_registry.register(HallucinationScenarioGenerator())
+    quality_suite_generator_registry.register(SycophancyScenarioGenerator())
     captured_generators: list[ScenarioGenerator] = []
     captured_knowledge_bases: list[object] = []
     printed_reports: list[str | None] = []
@@ -252,11 +259,13 @@ async def test_quality_scan_configures_knowledge_base_generator(
     )
 
     assert printed_reports == ["quality"]
-    assert len(captured_generators) == 1
+    assert len(captured_generators) == 2
     assert len(captured_knowledge_bases) == 1
     assert isinstance(captured_knowledge_bases[0], KnowledgeBase)
     assert [document.content for document in captured_knowledge_bases[0].documents] == [
         "alpha"
     ]
-    generator = captured_generators[0]
-    assert isinstance(generator, KnowledgeBaseScenarioGenerator)
+    assert {type(generator) for generator in captured_generators} == {
+        HallucinationScenarioGenerator,
+        SycophancyScenarioGenerator,
+    }

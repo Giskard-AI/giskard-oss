@@ -46,7 +46,7 @@ Generate a natural follow-up message in this language: {{ trace.annotations.lang
 Use the previous answer to ask for clarification, missing detail, or supporting evidence from the same private background.
 The follow-up must remain answerable from the private background documents.
 
-Set goal_reached to true only if the previous response already answered the knowledge-base question completely and no useful grounded follow-up remains.
+Set goal_reached to true only when the target answer is clearly contradicting the reference documents. Keep goal_reached false otherwise.
 {% endif %}
 
 ## Conversation So Far

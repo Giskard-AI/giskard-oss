@@ -3,10 +3,12 @@ from giskard.scan import (
     CrescendoAttackScenarioGenerator,
     Document,
     GOATAttackScenarioGenerator,
+    HallucinationScenarioGenerator,
     KnowledgeBase,
     KnowledgeBaseScenarioGenerator,
     PromptInjectionScenarioGenerator,
     SuiteGeneratorRegistry,
+    SycophancyScenarioGenerator,
     generate_suite,
     quality_scan,
     quality_suite_generator_registry,
@@ -57,4 +59,6 @@ def test_quality_scan_accepts_target_mode_param():
 
 def test_quality_suite_generator_registry_contains_builtin_generators():
     types = {type(g) for g in quality_suite_generator_registry.generators()}
-    assert KnowledgeBaseScenarioGenerator in types
+    assert HallucinationScenarioGenerator in types
+    assert KnowledgeBaseScenarioGenerator not in types
+    assert SycophancyScenarioGenerator in types

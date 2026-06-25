@@ -1,13 +1,13 @@
-"""Knowledge-base scenario generator for document-grounded quality scans."""
+"""Knowledge-base scenario generators for document-grounded quality scans."""
 
-from typing import Any
+from typing import Any, ClassVar, Unpack, override
 
 import numpy as np
-from giskard.checks import Groundedness
+from giskard.checks import Contradiction
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.scenario import Scenario
 from giskard.checks.generators import LLMGenerator
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from ..utils.knowledge_base import Document
 from .base import ScenarioContext, ScenarioGenerator, TargetMode
@@ -15,24 +15,45 @@ from .base import ScenarioContext, ScenarioGenerator, TargetMode
 DEFAULT_KNOWLEDGE_BASE_SCENARIOS = 5
 DEFAULT_KNOWLEDGE_BASE_CONTEXT_DOCUMENTS = 4
 DEFAULT_KNOWLEDGE_BASE_MAX_TURNS = 3
-KNOWLEDGE_BASE_QUALITY_TAG = "quality:raget"
+
+DIRECT_QUESTIONS_QUALITY_TAGS = [
+    "quality:direct-questions",
+    "component:llm",
+    "component:retriever",
+]
+SYCOPHANCY_QUALITY_TAGS = ["quality:sycophancy", "component:llm"]
 
 
 class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
-    """Generate document-grounded quality scenarios from a knowledge base.
+    """Base class for document-grounded quality scenarios from a knowledge base.
 
-    The generator samples seed documents, retrieves their nearest neighbors,
-    and builds multi-turn scenarios that use an LLM-generated user simulator
-    grounded in those documents. The knowledge base is supplied run-wide via
-    :class:`~giskard.scan.generators.base.ScenarioContext`; when the context
-    has no knowledge base this generator produces no scenarios.
+    Subclasses configure the prompt, scenario name, and tags while this base
+    class owns seed document sampling, nearest-neighbor retrieval, language
+    sampling, turn-budget handling, and the default contradiction scenario shape.
+
+    Attributes:
+        context_documents: Maximum number of nearest-neighbor documents used as
+            private reference context for each scenario.
+        max_turns: Maximum number of user-simulator turns per scenario.
     """
+
+    scenario_name_prefix: ClassVar[str] = ""
+    prompt_path: ClassVar[str] = ""
+    quality_tags: ClassVar[list[str]] = []
+
+    def __init_subclass__(cls, **kwargs: Unpack[ConfigDict]) -> None:
+        super().__init_subclass__(**kwargs)
+        if not cls.scenario_name_prefix or not cls.prompt_path or not cls.quality_tags:
+            raise TypeError(
+                f"Subclass {cls.__name__} must define non-empty scenario_name_prefix, prompt_path, and quality_tags."
+            )
 
     context_documents: int = Field(
         default=DEFAULT_KNOWLEDGE_BASE_CONTEXT_DOCUMENTS, ge=1
     )
     max_turns: int = Field(default=DEFAULT_KNOWLEDGE_BASE_MAX_TURNS, ge=1)
 
+    @override
     async def generate_scenario(
         self,
         context: ScenarioContext,
@@ -48,10 +69,9 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
             max_scenarios: Maximum number of scenarios to generate. ``None``
                 uses :data:`DEFAULT_KNOWLEDGE_BASE_SCENARIOS`.
             rng: Random generator used for reproducible seed document sampling.
-            target_mode: Desired conversation mode. ``"singleturn"`` caps each
-                scenario's user simulator to a single grounded question;
-                ``"multiturn"`` (default) allows follow-up turns up to
-                ``max_turns``.
+            target_mode: Desired conversation mode. ``"singleturn"`` caps the
+                user simulator to one turn; ``"multiturn"`` (default) allows
+                follow-up turns up to ``max_turns``.
 
         Returns:
             Generated scenarios, or an empty list when the context carries no
@@ -136,15 +156,15 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
     ) -> Scenario[Any, Any, Trace[Any, Any]]:
         context = [document.content for document in context_documents]
         return (
-            Scenario(f"Knowledge Base Question - Document {seed_index}")
+            Scenario(f"{self.scenario_name_prefix} - Document {seed_index}")
             .interact(
                 LLMGenerator(
-                    prompt_path="giskard.scan::scenarios/knowledge_base_question.j2",
+                    prompt_path=self.prompt_path,
                     max_steps=max_turns,
                 ),
                 metadata={"context": context},
             )
-            .check(Groundedness(context_key="trace.last.metadata.context"))
+            .check(Contradiction(context_key="trace.last.metadata.context"))
             .with_annotations(
                 {
                     "description": description,
@@ -153,5 +173,32 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
                     "reference_context": context,
                 }
             )
-            .with_tags([KNOWLEDGE_BASE_QUALITY_TAG])
+            .with_tags(list(self.quality_tags))
         )
+
+
+class HallucinationScenarioGenerator(KnowledgeBaseScenarioGenerator):
+    """Generate document-grounded hallucination quality scenarios.
+
+    The generator samples seed documents, retrieves their nearest neighbors,
+    and builds multi-turn scenarios that use an LLM-generated user simulator
+    grounded in those documents. The contradiction check flags target responses
+    that clearly conflict with the retrieved context.
+    """
+
+    scenario_name_prefix: ClassVar[str] = "Knowledge Base Direct Questions"
+    prompt_path: ClassVar[str] = "giskard.scan::scenarios/knowledge_base_question.j2"
+    quality_tags: ClassVar[list[str]] = DIRECT_QUESTIONS_QUALITY_TAGS
+
+
+class SycophancyScenarioGenerator(KnowledgeBaseScenarioGenerator):
+    """Generate document-grounded sycophancy quality scenarios.
+
+    The generator samples seed documents and nearest neighbors from the run
+    knowledge base, then asks an LLM user simulator to pressure the target with
+    a plausible premise explicitly contradicted by those documents.
+    """
+
+    scenario_name_prefix: ClassVar[str] = "Knowledge Base Sycophantic Questions"
+    prompt_path: ClassVar[str] = "giskard.scan::scenarios/knowledge_base_sycophancy.j2"
+    quality_tags: ClassVar[list[str]] = SYCOPHANCY_QUALITY_TAGS
