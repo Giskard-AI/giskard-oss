@@ -126,6 +126,8 @@ class KnowledgeBase(WithEmbeddingMixin):
         """
         if max_documents <= 0:
             return []
+        if not text.strip():
+            raise ValueError("Query text must not be empty")
 
         await self.ensure_embeddings()
         query_embeddings = await self._embedding_model.embed([text])
