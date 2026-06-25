@@ -38,12 +38,10 @@ class GCGInjectionScenarioGenerator(HuggingFaceDatasetScenarioGenerator):
     This generator reuses a harmful-prompt dataset as its base. By subclassing
     :class:`HuggingFaceDatasetScenarioGenerator` it inherits the dataset's
     per-language subset handling (so requested ``languages`` are respected and
-    unsupported ones skipped) and the dataset's own safety judge. It then **fans
-    each loaded scenario out into one scenario per suffix**: for a base prompt
-    *p* it emits ``len(_SUFFIXES)`` single-turn scenarios, each sending
-    ``p + suffix`` to the target. With *N* loaded prompts the result is
-    ``N * len(_SUFFIXES)`` scenarios, mirroring the original probe's
-    prompt x suffix cross-product.
+    unsupported ones skipped) and the dataset's own safety judge. It then
+    appends one adversarial suffix to each loaded scenario, rotating through
+    ``_SUFFIXES`` by scenario index (``index % len(_SUFFIXES)``) so the output
+    count matches the base dataset and ``max_scenarios`` is not inflated.
 
     The suffixes are English-tuned and appended verbatim regardless of the base
     prompt's language; per the upstream probe, they may not generalize to
@@ -63,26 +61,10 @@ class GCGInjectionScenarioGenerator(HuggingFaceDatasetScenarioGenerator):
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         base_scenarios = super().load_scenarios(description, languages)
         return [
-            suffixed
-            for scenario in base_scenarios
-            for suffixed in self._fan_out_suffixes(scenario)
-        ]
-
-    def _fan_out_suffixes(
-        self, scenario: Scenario[Any, Any, Trace[Any, Any]]
-    ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
-        """Expand one base scenario into one copy per adversarial suffix.
-
-        Each copy appends the suffix to every ``DatasetInputGenerator`` prompt in
-        the scenario and is tagged with the suffix index so findings can be
-        traced back to a specific suffix. Copies are built with shallow
-        ``model_copy(update=...)`` rather than ``deep=True`` because scenarios
-        carry a pydantic ``MISSING`` sentinel (the default target/outputs) that
-        cannot be deep-copied; only the prompt strings need fresh instances.
-        """
-        return [
-            self._with_suffix(scenario, suffix, index)
-            for index, suffix in enumerate(_SUFFIXES)
+            self._with_suffix(
+                scenario, _SUFFIXES[index % len(_SUFFIXES)], index % len(_SUFFIXES)
+            )
+            for index, scenario in enumerate(base_scenarios)
         ]
 
     def _with_suffix(
@@ -90,8 +72,8 @@ class GCGInjectionScenarioGenerator(HuggingFaceDatasetScenarioGenerator):
     ) -> Scenario[Any, Any, Trace[Any, Any]]:
         """Return a copy of ``scenario`` with ``suffix`` appended to every prompt.
 
-        The copy is renamed with a ``GCG`` prefix and the suffix index so each of
-        the fanned-out variants has a unique, traceable name, and is tagged with
+        The copy is renamed with a ``GCG`` prefix and the suffix index so each
+        variant has a unique, traceable name, and is tagged with
         ``gcg-suffix:<index>`` for grouping.
         """
         new_steps = [

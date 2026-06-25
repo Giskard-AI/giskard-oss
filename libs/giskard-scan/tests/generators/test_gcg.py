@@ -55,34 +55,33 @@ def test_defaults_point_at_harmbench():
     assert gen.allow_commercial_use is True
 
 
-def test_cross_product_count_and_prompts(monkeypatch):
+def test_one_suffix_per_scenario_via_modulo(monkeypatch):
     base = [_base_scenario("PROMPT_A", name="A"), _base_scenario("PROMPT_B", name="B")]
     scenarios = _load(monkeypatch, base)
 
-    # 2 base prompts x 13 suffixes, every (prompt, suffix) pair exactly once
-    assert len(scenarios) == 2 * len(_SUFFIXES)
-    assert {_prompt_of(s) for s in scenarios} == {
-        f"{prompt} {suffix}"
-        for prompt in ("PROMPT_A", "PROMPT_B")
-        for suffix in _SUFFIXES
-    }
+    assert len(scenarios) == len(base)
+    assert _prompt_of(scenarios[0]) == f"PROMPT_A {_SUFFIXES[0]}"
+    assert _prompt_of(scenarios[1]) == f"PROMPT_B {_SUFFIXES[1]}"
 
 
 def test_names_are_unique_and_gcg_prefixed(monkeypatch):
     scenarios = _load(monkeypatch, [_base_scenario("PROMPT_A", name="HarmBench #0")])
     names = [s.name for s in scenarios]
 
-    assert len(set(names)) == len(_SUFFIXES)  # all unique
-    assert all(name.startswith("GCG - HarmBench #0 [suffix #") for name in names)
-    assert "GCG - HarmBench #0 [suffix #0]" in names
+    assert len(set(names)) == 1
+    assert names == ["GCG - HarmBench #0 [suffix #0]"]
 
 
-def test_each_base_prompt_tagged_with_every_suffix_index(monkeypatch):
-    scenarios = _load(monkeypatch, [_base_scenario("PROMPT_A", name="A")])
-    suffix_tags = sorted(
-        tag for s in scenarios for tag in s.tags if tag.startswith("gcg-suffix:")
-    )
-    assert suffix_tags == sorted(f"gcg-suffix:{i}" for i in range(len(_SUFFIXES)))
+def test_suffix_index_rotates_with_scenario_position(monkeypatch):
+    base = [
+        _base_scenario(f"PROMPT_{i}", name=f"A{i}") for i in range(len(_SUFFIXES) + 2)
+    ]
+    scenarios = _load(monkeypatch, base)
+
+    suffix_tags = [
+        next(tag for tag in s.tags if tag.startswith("gcg-suffix:")) for s in scenarios
+    ]
+    assert suffix_tags == [f"gcg-suffix:{i % len(_SUFFIXES)}" for i in range(len(base))]
 
 
 def test_dataset_tags_are_preserved(monkeypatch):
