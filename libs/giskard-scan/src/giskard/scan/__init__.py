@@ -10,13 +10,12 @@ from .generators.adversarial import AdversarialScenarioGenerator
 from .generators.base import LocalDatasetScenarioGenerator, ScenarioGenerator
 from .generators.crescendo import CrescendoAttackScenarioGenerator
 from .generators.goat import GOATAttackScenarioGenerator
+from .generators.huggingface import HuggingFaceDatasetScenarioGenerator
 from .generators.knowledge_base import (
     HallucinationScenarioGenerator,
     KnowledgeBaseScenarioGenerator,
     SycophancyScenarioGenerator,
 )
-from .generators.huggingface import HuggingFaceDatasetScenarioGenerator
-from .generators.knowledge_base import KnowledgeBaseScenarioGenerator
 from .generators.prompt_injection import PromptInjectionScenarioGenerator
 from .quality import quality_scan, quality_suite_generator_registry
 from .registry import SuiteGeneratorRegistry
