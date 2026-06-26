@@ -4,10 +4,15 @@ from typing import Any, override
 import pytest
 from giskard import agents
 from giskard.agents.errors import WorkflowError
-from giskard.agents.generators.base import Response
-from giskard.agents.tools import Function, ToolCall
 from giskard.agents.workflow import ErrorPolicy
-from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
+from giskard.llm.types import (
+    AssistantMessage,
+    ChatMessage,
+    Choice,
+    CompletionResponse,
+    ToolCall,
+    ToolCallFunction,
+)
 from pydantic import Field, PrivateAttr
 
 
@@ -44,32 +49,40 @@ class UnknownToolCallGenerator(agents.generators.BaseGenerator):
     @override
     async def _call_model(
         self,
-        messages: list[agents.chat.Message],
+        messages: Sequence[ChatMessage],
         params: agents.generators.GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
+    ) -> CompletionResponse:
         self._num_calls += 1
 
         if self._num_calls == 1:
-            return Response(
-                message=agents.chat.Message(
-                    role="assistant",
-                    tool_calls=[
-                        ToolCall(
-                            id="call_unknown_1",
-                            function=Function(name="missing_tool", arguments="{}"),
-                        )
-                    ],
-                ),
-                finish_reason="tool_calls",
+            return CompletionResponse(
+                choices=[
+                    Choice(
+                        message=AssistantMessage(
+                            tool_calls=[
+                                ToolCall(
+                                    id="call_unknown_1",
+                                    function=ToolCallFunction(
+                                        name="missing_tool", arguments={}
+                                    ),
+                                )
+                            ],
+                        ),
+                        finish_reason="tool_calls",
+                        index=0,
+                    )
+                ],
             )
 
-        return Response(
-            message=agents.chat.Message(
-                role="assistant",
-                content="unexpected second completion",
-            ),
-            finish_reason="stop",
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content="unexpected second completion"),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ],
         )
 
 
