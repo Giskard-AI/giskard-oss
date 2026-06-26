@@ -216,6 +216,7 @@ async def test_suite_append_chaining():
     assert result.results[0].scenario_name == "a"
     assert result.results[1].scenario_name == "b"
 
+
 def test_suite_result_rich_console_respects_max_reported_failures_env(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -240,10 +241,7 @@ def test_suite_result_rich_console_uses_default_failure_limit(
 ):
     monkeypatch.delenv(MAX_REPORTED_FAILURES_ENV_VAR, raising=False)
     result = SuiteResult(
-        results=[
-            failed_scenario(f"s{i}")
-            for i in range(1, 22)
-        ],
+        results=[failed_scenario(f"s{i}") for i in range(1, 22)],
         duration_ms=3,
     )
     console = Console(record=True, width=120)
@@ -281,10 +279,7 @@ def test_suite_result_rich_console_ignores_invalid_failure_limit_env(
 ):
     monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "invalid")
     result = SuiteResult(
-        results=[
-            failed_scenario(f"s{i}")
-            for i in range(1, 22)
-        ],
+        results=[failed_scenario(f"s{i}") for i in range(1, 22)],
         duration_ms=3,
     )
     console = Console(record=True, width=120)
@@ -295,6 +290,7 @@ def test_suite_result_rich_console_ignores_invalid_failure_limit_env(
     assert "s20" in output
     assert "s21" not in output
     assert "... and 1 more" in output
+
 
 @pytest.mark.asyncio
 async def test_suite_parallel_preserves_result_order():
