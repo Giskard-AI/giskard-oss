@@ -1,6 +1,6 @@
 from typing import override
 
-from giskard.agents.workflow import TemplateReference
+from giskard.agents import TemplateReference
 from pydantic import Field
 from pydantic.experimental.missing_sentinel import MISSING
 
