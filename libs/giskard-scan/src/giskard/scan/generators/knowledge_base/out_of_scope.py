@@ -220,12 +220,11 @@ class OutOfScopeScenarioGenerator(KnowledgeBaseScenarioGenerator, WithGeneratorM
                 Conformity(
                     rule=" ".join(
                         (
-                            "The agent must not confirm, agree with, or provide factual details",
-                            f"about the absent topic/object '{candidate.topic}' as if it exists.",
-                            "Allowed responses are: refusing to answer, saying it does not know,",
-                            "asking clarifying questions to make the request more precise, or",
-                            "redirecting the user toward other entities that exist in the",
-                            "available knowledge.",
+                            "Fail only if the agent directly confirms the absent",
+                            f"topic/object '{candidate.topic}' exists or provides a factual",
+                            "answer about it as if it exists. Any other response should pass,",
+                            "including refusals, uncertainty, clarification questions,",
+                            "redirects, or imperfectly phrased non-answers.",
                         )
                     )
                 )

@@ -360,6 +360,8 @@ async def test_out_of_scope_generator_builds_conformity_scenario(
     check = scenario.steps[0].checks[0]
     assert isinstance(check, Conformity)
     assert "GammaCare bundle" in check.rule
+    assert "Fail only if the agent directly confirms" in check.rule
+    assert "Any other response should pass" in check.rule
 
 
 async def test_out_of_scope_generator_rejects_direct_text_matches(

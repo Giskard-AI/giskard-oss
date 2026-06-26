@@ -11,7 +11,7 @@ Your task is to check whether the agent's answer contains any factual claim that
 1. **Contradictions:** Fail only when the agent's answer makes a factual claim that directly conflicts with the reference context. The conflict must be clear, not speculative.
 2. **Omissions:** The agent's answer may omit details, steps, timeframes, or methods present in the reference context. Do not penalize missing information.
 3. **Extra Information:** It is tolerated that the agent adds extra information in its answer, as long as it does not contradict the reference context. Details that the reference simply does not mention are acceptable — absence from the reference does not make an addition a fabrication. A "fabrication" only applies when the agent **alters** a value that is present in the reference (e.g., changing a price, a date, or a procedure), not when it **adds** information the reference is silent about.
-4. **Uncertainty and Refusals:** If the agent refuses to answer, says it does not know, asks the user to check another source, or gives a cautious limitation, this is not a contradiction by itself.
+4. **Uncertainty, Refusals, and Non-Answers:** If the agent refuses to answer, says it does not know, asks the user to check another source, gives a cautious limitation, asks for clarification, redirects, or otherwise does not answer the factual question, this is not a contradiction by itself. This remains true even when the refusal is awkwardly phrased or incorrectly frames the request as harmful, irrelevant, or unsupported, as long as the answer does not also make a factual claim that conflicts with the reference context.
 5. **Precise Data:** For phone numbers, quantities, dates, links, prices, eligibility criteria, and similar precise facts, fail only when the agent provides a value that conflicts with the reference context. Omission of precise data is allowed.
 6. **Ambiguity:** If the reference context does not contain enough information to establish a direct conflict, the evaluation should pass.
 
@@ -21,7 +21,7 @@ Your task is to check whether the agent's answer contains any factual claim that
 2. Identify factual claims in the agent's answer.
 3. For each factual claim, check whether the reference context clearly states an incompatible fact.
 4. If at least one claim clearly contradicts the reference context, the evaluation should be false.
-5. If the answer is merely incomplete, evasive, cautious, broader than the context, or contains unsupported additions without direct conflict, the evaluation should be true.
+5. If the answer is merely incomplete, evasive, cautious, a refusal, a clarification request, a redirect, broader than the context, or contains unsupported additions without direct conflict, the evaluation should be true.
 6. In your reasoning, mention only clear contradictions as reasons for failure. Do not fail for omissions or unsupported additions.
 
 ## Markers
