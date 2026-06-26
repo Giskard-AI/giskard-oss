@@ -1,19 +1,12 @@
-# Giskard Core
+# giskard-core
 
-Core shared utilities and foundational components for the Giskard library ecosystem.
-
-## Installation
+Shared utilities for the Giskard library ecosystem (discriminated unions, rate limiting, telemetry).
 
 ```bash
-uv add giskard-core
-# or
 pip install giskard-core
 ```
 
-## Requirements
-
-- Python >= 3.12
-- pydantic >= 2.11.0, < 3
+Requires Python 3.12+.
 
 ## Telemetry
 
@@ -58,13 +51,8 @@ The client and helpers are exported from `giskard.core`: `telemetry`, `telemetry
 
 ## Development
 
+From the repository root — see [CONTRIBUTING.md](../../CONTRIBUTING.md):
+
 ```bash
-make setup    # Install dependencies
-make test     # Run tests
-make lint     # Run linting
-make format   # Format code
+make test-unit PACKAGE=giskard-core
 ```
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

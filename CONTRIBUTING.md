@@ -34,7 +34,24 @@ Custom and domain-based checks are welcome. If you have an idea, you can inform 
 
 Checks can be built using the `@Check.register("kind")` decorator and the fluent Scenario API. See the [checks documentation](https://docs.giskard.ai/oss/checks) for end-user usage.
 
-For contributing built-in checks, prompts, and interaction specs in this repo, see **Creating Custom Checks and Interaction Specs** in the [`giskard-checks` README](libs/giskard-checks/README.md#creating-custom-checks-and-interaction-specs).
+To contribute built-in checks, prompts, or interaction specs in this repo:
+
+1. Register a `Check` subclass with `@Check.register("kind")` and implement `async def run(self, trace: Trace) -> CheckResult`.
+2. For custom interaction specs, register an `InteractionSpec` subclass with `@InteractionSpec.register("kind")`.
+3. Add tests under `libs/giskard-checks/tests/` mirroring the package layout.
+4. Import every custom type before calling `model_validate()` on serialized objects.
+
+```python
+from giskard.checks import Check, CheckResult, Trace
+
+
+@Check.register("my_check")
+class MyCheck(Check):
+    async def run(self, trace: Trace) -> CheckResult:
+        if trace.last.outputs:
+            return CheckResult.success("Output present")
+        return CheckResult.failure("Missing output")
+```
 
 If you are willing to contribute the check yourself, let us know so we can best guide you.
 
