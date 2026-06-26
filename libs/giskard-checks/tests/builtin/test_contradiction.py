@@ -77,6 +77,22 @@ async def test_single_string_context_is_passed_to_judge() -> None:
     assert result.details["inputs"]["context"] == "The Eiffel Tower is in Paris."
 
 
+async def test_prompt_tolerates_refusals_without_conflicting_factual_claims() -> None:
+    generator = MockGenerator(passed=True, reason="Refusal is not a contradiction")
+    contradiction = Contradiction(
+        generator=generator,
+        answer="I can't help with harmful requests.",
+        context=["ZephyrBank accounts are available to eligible applicants."],
+    )
+
+    result = await contradiction.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    prompt = generator.calls[0][0].transcript
+    assert "incorrectly frames the request as harmful" in prompt
+    assert "does not also make a factual claim that conflicts" in prompt
+
+
 async def test_answer_and_context_from_trace() -> None:
     generator = MockGenerator(passed=True, reason=None)
     contradiction = Contradiction(generator=generator)
