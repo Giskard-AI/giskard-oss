@@ -107,7 +107,9 @@ class OutOfScopeScenarioGenerator(KnowledgeBaseScenarioGenerator, WithGeneratorM
                 language,
                 self._document_contents(context_documents),
             )
-            if not candidate.topic.strip() or self._has_direct_text_match(candidate.topic, knowledge_base_documents):
+            if not candidate.topic.strip() or self._has_direct_text_match(
+                candidate.topic, knowledge_base_documents
+            ):
                 continue
 
             validation_documents = await knowledge_base.closest_documents_to_text(
