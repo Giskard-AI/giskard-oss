@@ -1,5 +1,7 @@
 """giskard-llm -- lightweight LLM routing over native provider SDKs."""
 
+from giskard.core.utils import get_lib_version
+
 from . import chat
 from .errors import (
     AuthenticationError,
@@ -23,6 +25,7 @@ from .types import (
     EmbeddingUsage,
     FunctionCallOutputParam,
     FunctionDefParam,
+    ResponseFunctionToolCall,
     ResponseOutputItem,
     ResponseOutputText,
     ResponseResult,
@@ -32,7 +35,10 @@ from .types import (
     Usage,
 )
 
+__version__ = get_lib_version("giskard-llm")
+
 __all__ = [
+    "__version__",
     # Chat functions
     "chat",
     # Functions
@@ -66,7 +72,7 @@ __all__ = [
     # Types — Response
     "ResponseResult",
     "ResponseOutputText",
-    "ResponseOutputFunctionCall",
+    "ResponseFunctionToolCall",
     "ResponseOutputItem",
     # Errors
     "LLMError",

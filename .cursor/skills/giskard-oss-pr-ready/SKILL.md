@@ -37,7 +37,7 @@ If checks fail from missing tools, run **`make install`** and **`make install-to
 1. At the **repository root**, create a `.env` file (already listed in `.gitignore`—do not commit secrets).
 2. Define credentials for the models your tests use. The integration workflow sets:
    - `GEMINI_API_KEY` — required for the default Gemini routes used by functional tests.
-   - `TEST_MODEL` — optional; default `gemini/gemini-2.0-flash` (see `libs/giskard-agents/tests/conftest.py`).
+   - `TEST_MODEL` — optional; default `gemini/gemini-3.5-flash` (see `libs/giskard-agents/tests/conftest.py`).
    - `TEST_EMBEDDING_MODEL` — optional; default `gemini/gemini-embedding-001`.
 3. The repo does not auto-load `.env` in pytest—**export variables into the shell** before running tests, for example:
 
@@ -47,6 +47,16 @@ If checks fail from missing tools, run **`make install`** and **`make install-to
    ```
 
    Use valid shell assignments in `.env` (e.g. `GEMINI_API_KEY=...`). If you point `TEST_MODEL` / `TEST_EMBEDDING_MODEL` at another provider, add whatever API keys that provider expects (LiteLLM / the underlying SDK).
+
+## Verification gate
+
+Before declaring a branch merge-ready, include the following evidence in your response:
+
+1. Last line(s) of `make check` output — must show no errors.
+2. Pytest summary from `make test-unit` — e.g. `52 passed, 0 failed`.
+3. If any step was skipped or failed, state it explicitly.
+
+"It should pass" is not evidence. Show actual output.
 
 ## Library-specific rules
 

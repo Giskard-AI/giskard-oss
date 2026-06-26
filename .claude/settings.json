@@ -1,0 +1,33 @@
+{
+  "enabledPlugins": {
+    "pyright-lsp@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{ read -r json; fp=$(printf '%s' \"$json\" | jq -r '.tool_input.file_path' 2>/dev/null); case \"$fp\" in libs/*.py|*/libs/*.py) uv run ruff format \"$fp\" && uv run ruff check --fix \"$fp\";; esac; } 2>/dev/null || true",
+            "statusMessage": "Running ruff format + check..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c '[[ ! -d \"$PWD/.venv\" ]] && make -C \"$PWD\" setup >&2 || true'",
+            "async": true,
+            "statusMessage": "Running make setup..."
+          }
+        ]
+      }
+    ]
+  }
+}

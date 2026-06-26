@@ -18,11 +18,11 @@ class MyModel(BaseModel):
 
 @InputGenerator.register("test_typed_generator")
 class TypedGenerator(InputGenerator[ConcreteTrace]):
-    received_input_type: type | None = None
+    received_input_type: type[Any] | None = None
 
     @override
     async def __call__(
-        self, trace: ConcreteTrace, input_type: type[str | BaseModel] | None = None
+        self, trace: ConcreteTrace, input_type: type[Any] | None = None
     ) -> AsyncGenerator[Any, ConcreteTrace]:
         self.received_input_type = input_type
 

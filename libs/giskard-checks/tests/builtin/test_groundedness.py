@@ -1,39 +1,8 @@
-import json
-from collections.abc import Sequence
-from typing import Any, cast, override
+from typing import cast
 
-from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import CheckStatus, Groundedness, Interaction, Trace
-from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
-from pydantic import Field
 
-
-class MockGenerator(BaseGenerator):
-    passed: bool
-    reason: str | None
-    calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
-
-    @override
-    async def _call_model(
-        self,
-        messages: Sequence[ChatMessage],
-        params: GenerationParams,
-        metadata: dict[str, Any] | None = None,
-    ) -> CompletionResponse:
-        self.calls.append(messages)
-        return CompletionResponse(
-            choices=[
-                Choice(
-                    message=AssistantMessage(
-                        content=json.dumps(
-                            {"passed": self.passed, "reason": self.reason}
-                        )
-                    ),
-                    finish_reason="stop",
-                    index=0,
-                )
-            ]
-        )
+from ..testing_utils import MockJudgeGenerator as MockGenerator
 
 
 async def test_run_returns_success() -> None:
@@ -64,6 +33,22 @@ async def test_run_returns_failure() -> None:
     assert result.details["reason"] == "Answer is not grounded in context"
 
     assert len(generator.calls) == 1
+
+
+async def test_prompt_allows_explicit_refusals_without_context_support() -> None:
+    generator = MockGenerator(passed=True, reason="Explicit refusal")
+    groundedness = Groundedness(
+        generator=generator,
+        answer="I can't help with that request.",
+        context=["The Eiffel Tower is a landmark in Paris."],
+    )
+    result = await groundedness.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    prompt = generator.calls[0][0].transcript
+    assert "do not flag that refusal as ungrounded" in prompt
+    assert "Treat the refusal itself as allowed" in prompt
+    assert "Any additional factual claims" in prompt
 
 
 async def test_answer_and_context_from_trace() -> None:

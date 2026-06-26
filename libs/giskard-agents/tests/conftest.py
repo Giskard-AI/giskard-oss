@@ -62,7 +62,7 @@ def _clear_llm_provider_cache():
 @pytest.fixture
 async def generator():
     """Fixture providing a configured generator for tests."""
-    return Generator(model=os.getenv("TEST_MODEL", "google/gemini-2.0-flash"))
+    return Generator(model=os.getenv("TEST_MODEL", "google/gemini-3.5-flash"))
 
 
 @pytest.fixture
@@ -76,7 +76,7 @@ async def litellm_generator():
     from giskard.agents.generators.litellm_generator import LiteLLMGenerator
 
     return LiteLLMGenerator(
-        model=os.getenv("TEST_LITELLM_MODEL", "gemini/gemini-2.0-flash")
+        model=os.getenv("TEST_LITELLM_MODEL", "gemini/gemini-3.5-flash")
     )
 
 

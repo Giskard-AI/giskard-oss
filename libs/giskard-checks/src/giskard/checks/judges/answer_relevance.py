@@ -1,8 +1,8 @@
 from typing import Any, override
 
 from giskard.agents.workflow import TemplateReference
-from giskard.core import provide_not_none
 from pydantic import Field
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
 from ..core.check import Check
@@ -27,21 +27,23 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
 
     Attributes
     ----------
-    question : str | None
+    question : str | MISSING
         The question to evaluate relevance against. When provided, takes priority
-        over ``question_key``.
+        over ``question_key``. If omitted, extracted from the trace using ``question_key``.
     question_key : JSONPathStr
         JSONPath expression to extract the question from the trace
         (default: ``"trace.last.inputs"``).
-    answer : str | None
+    answer : str | MISSING
         The answer to evaluate. When provided, takes priority over ``answer_key``.
+        If omitted, extracted from the trace using ``answer_key``.
     answer_key : JSONPathStr
         JSONPath expression to extract the answer from the trace
         (default: ``"trace.last.outputs"``).
-    context : str | None
+    context : str | MISSING
         Optional domain context that describes the chatbot's purpose or scope
         (e.g., ``"This is a chatbot that answers questions about programming languages"``).
-        Not extracted from the trace—must be supplied directly when needed.
+        Not extracted from the trace—supply directly when needed. Defaults to an
+        empty string when omitted.
 
     Examples
     --------
@@ -54,24 +56,24 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
     ... )
     """
 
-    question: str | None = Field(
-        default=None,
+    question: str | MISSING = Field(
+        default=MISSING,
         description="The question to evaluate relevance against. Takes priority over question_key.",
     )
     question_key: JSONPathStr = Field(
         default="trace.last.inputs",
         description="JSONPath to extract the question from the trace.",
     )
-    answer: str | None = Field(
-        default=None,
+    answer: str | MISSING = Field(
+        default=MISSING,
         description="The answer to evaluate. Takes priority over answer_key.",
     )
     answer_key: JSONPathStr = Field(
         default="trace.last.outputs",
         description="JSONPath to extract the answer from the trace.",
     )
-    context: str | None = Field(
-        default=None,
+    context: str | MISSING = Field(
+        default=MISSING,
         description=(
             "Optional domain context describing the chatbot's purpose or scope. "
             "Not extracted from the trace—supply directly when needed."
@@ -102,17 +104,17 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         question = provided_or_resolve(
             trace,
             key=self.question_key,
-            value=provide_not_none(self.question),
+            value=self.question,
         )
         answer = provided_or_resolve(
             trace,
             key=self.answer_key,
-            value=provide_not_none(self.answer),
+            value=self.answer,
         )
 
         return {
             "question": question,
             "answer": answer,
             "history": trace,
-            "context": self.context or "",
+            "context": self.context if self.context is not MISSING else "",
         }

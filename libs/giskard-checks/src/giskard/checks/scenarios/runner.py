@@ -9,12 +9,11 @@ import time
 from typing import Any, cast
 
 from giskard.core import (
-    NOT_PROVIDED,
-    NotProvided,
     scoped_telemetry,
     telemetry_capture,
     telemetry_tag,
 )
+from pydantic.experimental.missing_sentinel import MISSING
 
 from .._telemetry_props import scenario_shape_properties
 from ..core import Trace
@@ -22,7 +21,8 @@ from ..core.interaction import Interact
 from ..core.result import CheckResult, ScenarioResult, TestCaseResult
 from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
-from ..core.types import ProviderType
+from ..core.types import Target
+from ..utils.inference import _infer_trace_type
 
 
 def _validate_multiple_runs(value: int | None) -> int | None:
@@ -37,36 +37,41 @@ def _validate_multiple_runs(value: int | None) -> int | None:
 
 def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
-    target: (
-        ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, TraceType], OutputType]
-        | NotProvided
-    ),
+    target: Target[InputType, OutputType, TraceType] | MISSING,
 ) -> list[Step[InputType, OutputType, TraceType]]:
     """Build steps with target bound to Interact outputs where needed.
 
     If no target is provided, returns the scenario's steps as-is. Otherwise,
-    returns new Step objects with interacts that have NOT_PROVIDED outputs
+    returns new Step objects with interacts that have MISSING outputs
     replaced by the given target.
     """
-    target = target if not isinstance(target, NotProvided) else scenario.target
+    target = target if target is not MISSING else scenario.target
 
-    if isinstance(target, NotProvided):
+    if target is MISSING:
         return scenario.steps
 
     steps = []
     for step in scenario.steps:
         interacts = []
         for interact in step.interacts:
-            if isinstance(interact, Interact) and isinstance(
-                interact.outputs, NotProvided
-            ):
+            if isinstance(interact, Interact) and interact.outputs is MISSING:
                 interact = interact.model_copy().set_outputs(target)
             interacts.append(interact)
 
         steps.append(step.model_copy(update={"interacts": interacts}))
 
     return steps
+
+
+def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
+    scenario: Scenario[InputType, OutputType, TraceType],
+    run_target: Target[InputType, OutputType, TraceType] | MISSING,
+) -> type[TraceType]:
+    if scenario.trace_type is not None:
+        return scenario.trace_type
+    effective_target = run_target if run_target is not MISSING else scenario.target
+    inferred = _infer_trace_type(effective_target)
+    return cast(type[TraceType], inferred if inferred is not None else Trace)
 
 
 class ScenarioRunner:
@@ -104,29 +109,19 @@ class ScenarioRunner:
     async def _run_once[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ) = NOT_PROVIDED,
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
         return_exception: bool = False,
     ) -> ScenarioResult[TraceType]:
         start_time = time.perf_counter()
         telemetry_tag("giskard_component", "scenario_runner")
         telemetry_tag("giskard_operation", "scenario_run")
 
-        trace = (
-            scenario.trace_type(annotations=scenario.annotations)
-            if scenario.trace_type is not None
-            else cast(
-                TraceType,
-                Trace[InputType, OutputType](annotations=scenario.annotations),
-            )
-        )
+        trace_cls = _resolve_trace_type(scenario, target)
+        trace = cast(TraceType, trace_cls(annotations=scenario.annotations))
 
         steps = _build_steps(scenario, target)
         steps_results: list[TestCaseResult] = []
-        has_target = target is not NOT_PROVIDED
+        has_target = target is not MISSING
         shape_props = scenario_shape_properties(
             scenario,
             has_target=has_target,
@@ -172,6 +167,7 @@ class ScenarioRunner:
             steps=steps_results,
             duration_ms=duration_ms,
             final_trace=trace,
+            tags=list(scenario.tags),
         )
 
         telemetry_capture(
@@ -188,11 +184,7 @@ class ScenarioRunner:
     async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ) = NOT_PROVIDED,
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
         return_exception: bool = False,
         multiple_runs: int | None = None,
     ) -> ScenarioResult[TraceType]:
@@ -207,8 +199,8 @@ class ScenarioRunner:
         ----------
         scenario : Scenario
             The scenario to execute.
-        target : ProviderType | NotProvided
-            Optional target override used to replace `NOT_PROVIDED` interaction outputs.
+        target : Target | MISSING, optional
+            Optional target override used to replace ``MISSING`` interaction outputs.
         return_exception : bool
             If True, return results even when exceptions occur instead of raising.
         multiple_runs : int | None
