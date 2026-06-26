@@ -1,6 +1,7 @@
 import asyncio
 import time
 from contextlib import nullcontext
+from typing import Any
 
 import pytest
 from giskard.checks import Equals, Scenario, Suite
@@ -43,7 +44,7 @@ def identity_sut():
     return lambda inputs: inputs
 
 
-def failed_scenario(name: str) -> ScenarioResult[Trace]:
+def failed_scenario(name: str) -> ScenarioResult[Trace[Any, Any]]:
     return ScenarioResult(
         scenario_name=name,
         steps=[
