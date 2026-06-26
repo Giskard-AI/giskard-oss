@@ -672,11 +672,7 @@ class SuiteResult(BaseResult, frozen=True):
 
         if failures_and_errors:
             max_reported_failures = _max_reported_failures_from_env()
-            reported_failures = (
-                failures_and_errors
-                if max_reported_failures is None
-                else failures_and_errors[:max_reported_failures]
-            )
+            reported_failures = failures_and_errors[:max_reported_failures]
             n_hidden = len(failures_and_errors) - len(reported_failures)
 
             # Details
