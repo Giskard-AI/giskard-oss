@@ -24,7 +24,7 @@ For one-off or experimental logic, users can use `from_fn` / `FnCheck` without a
 
 ### Naming and typing (required)
 
-Any `Check` field named `key` or whose name ends with `_key` is a JSONPath into the trace. It **must** be annotated with `JSONPathStr`, or `JSONPathStr | None`, or `JSONPathStr | NotProvided` (from `..core.extraction` and `giskard.core`). Otherwise `tests/core/test_jsonpath_enforcement.py` fails.
+Any `Check` field named `key` or whose name ends with `_key` is a JSONPath into the trace. It **must** be annotated with `JSONPathStr`, or `JSONPathStr | None`, or `JSONPathStr | MISSING` (import `MISSING` from `pydantic.experimental.missing_sentinel`). Otherwise `tests/core/test_jsonpath_enforcement.py` fails.
 
 Inside the library, import from `..core.extraction` (module `giskard.checks.core.extraction`).
 
@@ -36,9 +36,9 @@ Inside the library, import from `..core.extraction` (module `giskard.checks.core
 ### Reading values
 
 - **`resolve(trace, key)`** — Use when the value always comes from the trace (e.g. comparison `key`).
-- **`provided_or_resolve(trace, key=..., value=...)`** — Use when the user may pass an inline value **or** fall back to a path (e.g. `answer` + `answer_key`). If `value` is provided (`provide_not_none` helps for optional fields), that wins; otherwise the path is evaluated.
+- **`provided_or_resolve(trace, key=..., value=...)`** — Use when the user may pass an inline value **or** fall back to a path (e.g. `answer` + `answer_key`). If `value is not MISSING`, that wins; otherwise the path is evaluated.
 
-Optional key fields that are only sometimes used: type as `JSONPathStr | None` or `JSONPathStr | NotProvided`, pass through `provide_not_none` when calling `provided_or_resolve`, and validate combinations with a `@model_validator` if only one of (inline, `*_key`) may be set (see `StringMatching` / `ComparisonCheck`).
+Optional inline-or-path fields: type as `T | MISSING = MISSING` (and `JSONPathStr | MISSING = MISSING` for optional `*_key` fields). Pass fields directly to `provided_or_resolve`; validate combinations with a `@model_validator` if only one of (inline, `*_key`) may be set (see `StringMatching` / `ComparisonCheck`). Do not use `None` to mean "extract from trace"—omit the field so it stays `MISSING`. Explicit `None` is only valid when comparing against or supplying `None` as a real value (e.g. `Equals(expected_value=None)`).
 
 ### Failures and types
 

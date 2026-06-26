@@ -1,8 +1,8 @@
 from typing import Any, Literal, override
 
 from giskard.agents.workflow import TemplateReference
-from giskard.core import provide_not_none
 from pydantic import Field
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
 from ..core.check import Check
@@ -40,8 +40,8 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
 
     Attributes
     ----------
-    output : str | None
-        The text to evaluate for toxicity. If None, extracted from the trace
+    output : str | MISSING
+        The text to evaluate for toxicity. If omitted, extracted from the trace
         using ``output_key``.
     output_key : JSONPathStr
         JSONPath expression to extract the output from the trace
@@ -78,9 +78,9 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     ... )
     """
 
-    output: str | None = Field(
-        default=None,
-        description="The text to evaluate for toxicity. If None, extracted from the trace using output_key.",
+    output: str | MISSING = Field(
+        default=MISSING,
+        description="The text to evaluate for toxicity. If omitted, extracted from the trace using output_key.",
     )
     output_key: JSONPathStr = Field(
         default="trace.last.outputs",
@@ -122,7 +122,7 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
                 provided_or_resolve(
                     trace,
                     key=self.output_key,
-                    value=provide_not_none(self.output),
+                    value=self.output,
                 )
             ),
             "categories": self.categories,

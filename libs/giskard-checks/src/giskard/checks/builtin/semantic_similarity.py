@@ -1,8 +1,8 @@
 from typing import override
 
 import numpy as np
-from giskard.core import provide_not_none
 from pydantic import Field
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
 from ..core.check import Check
@@ -58,9 +58,9 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
     threshold : float
         The minimum cosine similarity score required for the check to pass
         (default: 0.95).
-    reference_text : str | None
-        The reference text to compare the output against. If None, the reference
-        text will be extracted from the trace using `reference_text_key`.
+    reference_text : str | MISSING
+        The reference text to compare the output against. If omitted, extracted
+        from the trace using ``reference_text_key``.
     reference_text_key : str
         JSONPath expression to extract the reference text from the trace
         (default: "trace.last.metadata.reference_text").
@@ -87,8 +87,8 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
     threshold: float = Field(
         default=0.95, description="The threshold for the semantic similarity"
     )
-    reference_text: str | None = Field(
-        default=None, description="The reference text to compare the output with"
+    reference_text: str | MISSING = Field(
+        default=MISSING, description="The reference text to compare the output with"
     )
     reference_text_key: JSONPathStr = Field(
         default="trace.last.metadata.reference_text",
@@ -117,8 +117,8 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         """
         reference_text = provided_or_resolve(
             trace,
-            key=provide_not_none(self.reference_text_key),
-            value=provide_not_none(self.reference_text),
+            key=self.reference_text_key,
+            value=self.reference_text,
         )
         if isinstance(reference_text, NoMatch):
             return CheckResult.failure(

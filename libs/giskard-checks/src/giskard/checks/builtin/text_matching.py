@@ -9,8 +9,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Self, override
 
 import regex
-from giskard.core import provide_not_none
 from pydantic import Field, model_validator
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
 from ..core.check import Check
@@ -32,16 +32,16 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
 
     Attributes
     ----------
-    text : str | None
-        The text string to search within. If None, will be extracted from
-        trace using `text_key`.
+    text : str | MISSING
+        The text string to search within. If omitted, extracted from
+        trace using ``text_key``.
     text_key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
     """
 
-    text: str | None = Field(
-        default=None,
+    text: str | MISSING = Field(
+        default=MISSING,
         description="The text string to search within.",
     )
     text_key: JSONPathStr = Field(
@@ -52,8 +52,8 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
     def _extract_and_validate(
         self,
         trace: TraceType,
-        target_value: str | None,
-        target_key: JSONPathStr | None,
+        target_value: str | MISSING,
+        target_key: JSONPathStr | MISSING,
         target_name: str,
     ) -> tuple[str, str, dict[str, Any]] | tuple[None, None, CheckResult]:
         """Extract and validate text and target from trace or direct values.
@@ -62,9 +62,9 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
         ----------
         trace : TraceType
             The trace to extract values from.
-        target_value : str | None
+        target_value : str | MISSING
             Direct target value (keyword/pattern).
-        target_key : JSONPathStr | None
+        target_key : JSONPathStr | MISSING
             JSONPath key to extract target from trace.
         target_name : str
             Name of the target parameter (for error messages).
@@ -75,13 +75,11 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
             Either (text, target, details) on success, or (None, None, error_result) on failure.
         """
         # Extract text and target
-        text = provided_or_resolve(
-            trace, key=self.text_key, value=provide_not_none(self.text)
-        )
+        text = provided_or_resolve(trace, key=self.text_key, value=self.text)
         target = provided_or_resolve(
             trace,
-            key=provide_not_none(target_key),
-            value=provide_not_none(target_value),
+            key=target_key,
+            value=target_value,
         )
 
         details = {"text": text, target_name: target}
@@ -156,18 +154,18 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
 
     Attributes
     ----------
-    text : str | None
-        The text string to search within. If None, will be extracted from
-        trace using `text_key`.
+    text : str | MISSING
+        The text string to search within. If omitted, extracted from
+        trace using ``text_key``.
     text_key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
-    keyword : str | None
-        The keyword to search for within the text. If None, must provide
-        `keyword_key` to extract from trace.
-    keyword_key : JSONPathStr | None
+    keyword : str | MISSING
+        The keyword to search for within the text. If omitted, must provide
+        ``keyword_key`` to extract from trace.
+    keyword_key : JSONPathStr | MISSING
         JSONPath expression to extract the keyword from the trace. Either
-        `keyword` or `keyword_key` must be provided.
+        ``keyword`` or ``keyword_key`` must be provided.
     normalization_form : NormalizationForm | None
         Unicode normalization form to apply before matching. Options:
         - "NFC": Canonical Composition
@@ -204,12 +202,12 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
         )
     """
 
-    keyword: str | None = Field(
-        default=None,
+    keyword: str | MISSING = Field(
+        default=MISSING,
         description="The keyword to search for within the text. Either this or keyword_key must be provided.",
     )
-    keyword_key: JSONPathStr | None = Field(
-        default=None,
+    keyword_key: JSONPathStr | MISSING = Field(
+        default=MISSING,
         description="JSONPath expression to extract the keyword from the trace (e.g., 'trace.last.inputs.expected'). Either this or keyword must be provided.",
     )
     normalization_form: NormalizationForm | None = Field(
@@ -235,7 +233,7 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
         ValueError
             If neither or both keyword and keyword_key are provided.
         """
-        if (self.keyword is None) == (self.keyword_key is None):
+        if (self.keyword is MISSING) == (self.keyword_key is MISSING):
             raise ValueError(
                 "Exactly one of 'keyword' or 'keyword_key' must be provided, not both or neither."
             )
@@ -335,15 +333,15 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
 
     Attributes
     ----------
-    text : str | None
-        The text string to search within. If None, will be extracted from
-        trace using `text_key`.
+    text : str | MISSING
+        The text string to search within. If omitted, extracted from
+        trace using ``text_key``.
     text_key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
-    pattern : str | None
-        The regex pattern to search for. Either this or pattern_key must be provided.
-    pattern_key : JSONPathStr | None
+    pattern : str | MISSING
+        The regex pattern to search for. Either this or ``pattern_key`` must be provided.
+    pattern_key : JSONPathStr | MISSING
         JSONPath expression to extract pattern from trace.
     match_timeout_seconds : float
         Upper bound on how long matching may take before the check raises an error.
@@ -394,12 +392,12 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         )
     """
 
-    pattern: str | None = Field(
-        default=None,
+    pattern: str | MISSING = Field(
+        default=MISSING,
         description="The regex pattern to search for within the text.",
     )
-    pattern_key: JSONPathStr | None = Field(
-        default=None,
+    pattern_key: JSONPathStr | MISSING = Field(
+        default=MISSING,
         description="JSONPath expression to extract the pattern from the trace.",
     )
     match_timeout_seconds: float = Field(
@@ -422,7 +420,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         ValueError
             If neither or both pattern and pattern_key are provided.
         """
-        if (self.pattern is None) == (self.pattern_key is None):
+        if (self.pattern is MISSING) == (self.pattern_key is MISSING):
             raise ValueError(
                 "Exactly one of 'pattern' or 'pattern_key' must be provided, not both or neither."
             )

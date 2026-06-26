@@ -28,7 +28,7 @@ def _annotation_has_marker(annotation) -> bool:
     This handles complex type annotations like:
     - Annotated[str, AfterValidator(...), _JSONPathStrMarker()]
     - JSONPathStr | None
-    - JSONPathStr | NotProvided
+    - JSONPathStr | MISSING
     """
     if get_origin(annotation) is Annotated:
         return any(isinstance(m, _JSONPathStrMarker) for m in get_args(annotation)[1:])
@@ -43,7 +43,7 @@ def _has_jsonpath_marker(field_info) -> bool:
 
     Pydantic v2 stores Annotated metadata in two places depending on the type:
     - Simple `JSONPathStr`: marker is in field_info.metadata
-    - Union `JSONPathStr | None` / `JSONPathStr | NotProvided`: marker is
+    - Union `JSONPathStr | None` / `JSONPathStr | MISSING`: marker is
       inside field_info.annotation (the Annotated[str, ...] is preserved within
       the Union at the annotation level)
     """
@@ -74,6 +74,6 @@ def test_all_jsonpath_fields_use_jsonpath_str():
     assert not violations, (
         "The following JSONPath fields do not use JSONPathStr.\n"
         "All fields named 'key' or ending in '_key' must be annotated as JSONPathStr "
-        "(or JSONPathStr | None / JSONPathStr | NotProvided):\n"
+        "(or JSONPathStr | None / JSONPathStr | MISSING):\n"
         + "\n".join(f"  - {v}" for v in violations)
     )
