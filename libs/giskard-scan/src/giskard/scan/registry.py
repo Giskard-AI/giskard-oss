@@ -41,5 +41,9 @@ class SuiteGeneratorRegistry:
     def clear(self) -> None:
         self._generators.clear()
 
-    def generators(self) -> list[ScenarioGenerator]:
-        return list(self._generators)
+    def generators(self, commercial_use: bool = False) -> list[ScenarioGenerator]:
+        return [
+            generator
+            for generator in self._generators
+            if not commercial_use or generator.allow_commercial_use
+        ]

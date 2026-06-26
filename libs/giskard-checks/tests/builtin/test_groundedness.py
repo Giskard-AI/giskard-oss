@@ -35,6 +35,22 @@ async def test_run_returns_failure() -> None:
     assert len(generator.calls) == 1
 
 
+async def test_prompt_allows_explicit_refusals_without_context_support() -> None:
+    generator = MockGenerator(passed=True, reason="Explicit refusal")
+    groundedness = Groundedness(
+        generator=generator,
+        answer="I can't help with that request.",
+        context=["The Eiffel Tower is a landmark in Paris."],
+    )
+    result = await groundedness.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    prompt = generator.calls[0][0].transcript
+    assert "do not flag that refusal as ungrounded" in prompt
+    assert "Treat the refusal itself as allowed" in prompt
+    assert "Any additional factual claims" in prompt
+
+
 async def test_answer_and_context_from_trace() -> None:
     generator = MockGenerator(passed=True, reason=None)
     groundedness = Groundedness(generator=generator)

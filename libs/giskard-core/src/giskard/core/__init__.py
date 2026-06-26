@@ -23,10 +23,7 @@ from .telemetry import (
 )
 from .utils import (
     GISKARD_LIBS_VERSIONS,
-    NOT_PROVIDED,
-    NotProvided,
     get_lib_version,
-    provide_not_none,
 )
 
 LEGACY_GISKARD_PACKAGE_NAME = "giskard"
@@ -54,9 +51,6 @@ __all__ = [
     # Error handling
     "Error",
     # Utilities
-    "NotProvided",
-    "NOT_PROVIDED",
-    "provide_not_none",
     "GISKARD_LIBS_VERSIONS",
     # Limiter
     "MinIntervalRateLimiter",
