@@ -113,21 +113,20 @@ Use Giskard Scan to:
 
 - **Red-team your agent** — automatically generate adversarial inputs across OWASP LLM Top-10 threat categories
 - **Run prompt-injection probes** — built-in dataset of injection payloads ready to use
-- **Extend with custom generators** — register your own `ScenarioGenerator` via `suite_generator_registry`
+- **Extend with custom generators** — pass your own `ScenarioGenerator` instances to `generate_suite`, or register them on `vulnerability_suite_generator_registry`
 
 ### Quickstart
 
 ```python
 import asyncio
-from giskard.scan import generate_suite
+from giskard.scan import vulnerability_scan
 
 async def main():
-    suite = await generate_suite(
+    await vulnerability_scan(
+        target=my_agent,
         description="A customer support chatbot for an e-commerce platform.",
         languages=["en"],
     )
-    results = await suite.run(my_agent)
-    results.print_report()
 
 asyncio.run(main())
 ```

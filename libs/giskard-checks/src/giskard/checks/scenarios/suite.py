@@ -5,8 +5,8 @@ from contextlib import contextmanager, nullcontext
 from typing import Any, Generic, Self, TypeVar
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
-from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
+from pydantic.experimental.missing_sentinel import MISSING
 from rich.console import RenderableType
 from rich.progress import (
     BarColumn,
@@ -31,7 +31,7 @@ from ..core.result import (
     format_status_count_text,
 )
 from ..core.scenario import Scenario
-from ..core.types import ProviderType
+from ..core.types import Target
 
 InputType = TypeVar("InputType", infer_variance=True)
 OutputType = TypeVar("OutputType", infer_variance=True)
@@ -111,7 +111,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         Suite identifier.
     scenarios : list[Scenario]
         List of scenarios to execute.
-    target : Any | NotProvided
+    target : Target | MISSING
         Optional suite-level target SUT.
 
     Examples
@@ -134,12 +134,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     scenarios: list[Scenario[InputType, OutputType, Trace[Any, Any]]] = Field(
         default_factory=list, description="Scenarios in the suite"
     )
-    target: (
-        ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, Trace[Any, Any]], OutputType]
-        | NotProvided
-    ) = Field(
-        default=NOT_PROVIDED,
+    target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = Field(
+        default=MISSING,
         description="Suite-level target SUT that will override any scenario-level target.",
     )
 
@@ -164,13 +160,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
     async def run(
         self,
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[
-                [InputType, Trace[Any, Any]], OutputType
-            ]  # Trace[Any, Any] because scenarios in suite have different TraceType
-            | NotProvided
-        ) = NOT_PROVIDED,
+        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
@@ -180,7 +170,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
         Parameters
         ----------
-        target : Any | NotProvided
+        target : Target | MISSING, optional
             Override target for all scenarios in the suite. If provided, this
             overrides both the suite-level target and any scenario-level targets.
         return_exception : bool
@@ -211,11 +201,16 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         result_v2 = await suite.run(target=my_sut_v2)
         ```
         """
-        target = target if not isinstance(target, NotProvided) else self.target
-        has_target = not isinstance(target, NotProvided)
+        target = target if target is not MISSING else self.target
+        has_target = target is not MISSING
 
-        if parallel and max_concurrency is not None and max_concurrency < 1:
-            raise ValueError("max_concurrency must be greater than 0")
+        if max_concurrency is not None:
+            if not isinstance(max_concurrency, int) or isinstance(
+                max_concurrency, bool
+            ):
+                raise TypeError("max_concurrency must be None or a positive integer")
+            if max_concurrency < 1:
+                raise ValueError("max_concurrency must be greater than 0")
 
         with telemetry_run_context():
             telemetry_tag("giskard_component", "suite")
@@ -244,6 +239,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             suite_result = SuiteResult(
                 results=results,
                 duration_ms=int((end_time - start_time) * 1000),
+                suite=self,
             )
 
             telemetry_capture(
@@ -323,3 +319,9 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
                 raise exc_group.exceptions[0]
             raise
         return [task.result() for task in tasks]
+
+
+# `SuiteResult.suite` is a forward reference to `Suite`, which is only imported
+# under `TYPE_CHECKING` in result.py to avoid a circular import. Rebuild the model
+# here, where `Suite` exists at runtime, so Pydantic can resolve the annotation.
+SuiteResult.model_rebuild()

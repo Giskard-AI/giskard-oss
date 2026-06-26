@@ -30,6 +30,8 @@ from .core import (
     Check,
     CheckResult,
     CheckStatus,
+    GroupedSuiteResult,
+    GroupStats,
     InputGenerationException,
     Interact,
     Interaction,
@@ -39,17 +41,20 @@ from .core import (
     ScenarioResult,
     Step,
     SuiteResult,
+    Target,
     TestCase,
     TestCaseResult,
     Trace,
     resolve,
 )
 from .generators.base import BaseLLMGenerator, LLMGenerator
+from .generators.dataset import DatasetInputGenerator
 from .generators.user import UserSimulator
 from .judges import (
     AnswerRelevance,
     BaseLLMCheck,
     Conformity,
+    Contradiction,
     Groundedness,
     LLMCheckResult,
     LLMJudge,
@@ -86,11 +91,14 @@ __all__ = [
     "Check",
     "CheckResult",
     "CheckStatus",
+    "GroupedSuiteResult",
+    "GroupStats",
     "Metric",
     "Scenario",
     "ScenarioResult",
     "Step",
     "SuiteResult",
+    "Target",
     "TestCase",
     "TestCaseResult",
     "Trace",
@@ -106,6 +114,7 @@ __all__ = [
     "BaseLLMCheck",
     "LLMCheckResult",
     "Conformity",
+    "Contradiction",
     "Equals",
     "NotEquals",
     "LesserThan",
@@ -129,6 +138,7 @@ __all__ = [
     "BaseLLMGenerator",
     "LLMGenerator",
     # Generators
+    "DatasetInputGenerator",
     "UserSimulator",
     # Testing
     "WithSpy",
