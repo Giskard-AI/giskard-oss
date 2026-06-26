@@ -3,9 +3,9 @@
 ## JSONPath enforcement and helpers
 
 - **Source**: `libs/giskard-checks/src/giskard/checks/core/extraction.py` — `JSONPathStr`, `resolve`, `provided_or_resolve`, `NoMatch`.
-- **Enforcement**: `libs/giskard-checks/tests/core/test_jsonpath_enforcement.py` — field names `key` or `*_key` must carry the `JSONPathStr` marker (including inside unions with `None` or `NotProvided`).
-- **`NotProvided` pattern** (`ComparisonCheck`): `expected_value_key: JSONPathStr | NotProvided` with `default=NOT_PROVIDED`; in `run`, use `provided_or_resolve(trace, key=provide_not_none(self.expected_value_key), value=self.expected_value)` so a literal `expected_value` skips the path.
-- **`None` optional path** (`StringMatching.keyword_key`): `JSONPathStr | None` with a validator that requires exactly one of inline value or key—do not use a bare `str` annotation for any `*_key` field.
+- **Enforcement**: `libs/giskard-checks/tests/core/test_jsonpath_enforcement.py` — field names `key` or `*_key` must carry the `JSONPathStr` marker (including inside unions with `None` or `MISSING`).
+- **`MISSING` inline-or-path** (`ComparisonCheck`): `expected_value: ExpectedType | MISSING = MISSING` and `expected_value_key: JSONPathStr | MISSING = MISSING`; validate with `is MISSING` checks; in `run`, call `provided_or_resolve(trace, key=self.expected_value_key, value=self.expected_value)` so an inline `expected_value` (including explicit `None`) skips the path.
+- **`MISSING` optional path** (`StringMatching.keyword_key`): `JSONPathStr | MISSING = MISSING` with a validator that requires exactly one of inline value or key—do not use a bare `str` annotation for any `*_key` field.
 - **Multi-match**: `resolve` returns a list when the expression yields multiple matches or the parsed path is list-like (`Slice`, `Union`, etc.); single-match paths return one value or `NoMatch`.
 
 ## Non-LLM `Check`

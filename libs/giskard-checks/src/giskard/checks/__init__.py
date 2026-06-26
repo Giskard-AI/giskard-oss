@@ -19,6 +19,7 @@ from .builtin import (
     LesserThanEquals,
     Not,
     NotEquals,
+    Readability,
     RegexMatching,
     RegoPolicy,
     SemanticSimilarity,
@@ -48,11 +49,13 @@ from .core import (
 )
 from .core.mixin import WithGeneratorMixin
 from .generators.base import BaseLLMGenerator, LLMGenerator
+from .generators.dataset import DatasetInputGenerator
 from .generators.user import UserSimulator
 from .judges import (
     AnswerRelevance,
     BaseLLMCheck,
     Conformity,
+    Contradiction,
     Groundedness,
     LLMCheckResult,
     LLMJudge,
@@ -113,6 +116,7 @@ __all__ = [
     "BaseLLMCheck",
     "LLMCheckResult",
     "Conformity",
+    "Contradiction",
     "Equals",
     "NotEquals",
     "LesserThan",
@@ -125,6 +129,7 @@ __all__ = [
     "from_fn",
     "Groundedness",
     "LLMJudge",
+    "Readability",
     "SemanticSimilarity",
     "Toxicity",
     "StringMatching",
@@ -135,6 +140,7 @@ __all__ = [
     "BaseLLMGenerator",
     "LLMGenerator",
     # Generators
+    "DatasetInputGenerator",
     "UserSimulator",
     # Testing
     "WithSpy",

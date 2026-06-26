@@ -173,10 +173,16 @@ class _StepRunner:
             return
 
         for tool_call in chat.last.tool_calls:
-            if tool_call.function.name not in self._workflow.tools:
-                continue  # TODO: raise an error?
+            tool_name = tool_call.function.name or "<missing>"
+            if tool_name not in self._workflow.tools:
+                registered_tools = ", ".join(sorted(self._workflow.tools)) or "<none>"
+                raise ValueError(
+                    f"Unknown tool call '{tool_name}' "
+                    f"(tool_call_id='{tool_call.id}'). "
+                    f"Registered tools: {registered_tools}."
+                )
 
-            tool = self._workflow.tools[tool_call.function.name]
+            tool = self._workflow.tools[tool_name]
             tool_content = await tool.run(
                 deserialize_arguments(tool_call.function.arguments),
                 ctx=chat.context,
