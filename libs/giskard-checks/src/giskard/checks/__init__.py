@@ -47,7 +47,7 @@ from .core import (
     Trace,
     resolve,
 )
-from .core.mixin import WithGeneratorMixin
+from .core.mixin import WithEmbeddingMixin, WithGeneratorMixin
 from .generators.base import BaseLLMGenerator, LLMGenerator
 from .generators.dataset import DatasetInputGenerator
 from .generators.user import UserSimulator
@@ -108,6 +108,7 @@ __all__ = [
     "Interaction",
     "InteractionSpec",
     "WithGeneratorMixin",
+    "WithEmbeddingMixin",
     # Builtin and LLM-based checks
     "AnswerRelevance",
     "AllOf",

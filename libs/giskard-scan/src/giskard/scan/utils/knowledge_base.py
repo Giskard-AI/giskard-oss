@@ -4,7 +4,7 @@ import asyncio
 from typing import ClassVar, Self
 
 import numpy as np
-from giskard.checks.core.mixin import WithEmbeddingMixin
+from giskard.checks import WithEmbeddingMixin
 from pydantic import BaseModel, ConfigDict, PrivateAttr, field_validator
 
 
