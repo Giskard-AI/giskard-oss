@@ -19,6 +19,7 @@ from .generators.knowledge_base import (
     SplitQuestionsScenarioGenerator,
     SycophancyScenarioGenerator,
 )
+from .generators.past_tense import PastTenseAttackScenarioGenerator
 from .generators.prompt_injection import PromptInjectionScenarioGenerator
 from .quality import quality_scan, quality_suite_generator_registry
 from .registry import SuiteGeneratorRegistry
@@ -37,6 +38,7 @@ __all__ = [
     "AdversarialScenarioGenerator",
     "CrescendoAttackScenarioGenerator",
     "GOATAttackScenarioGenerator",
+    "PastTenseAttackScenarioGenerator",
     "HuggingFaceDatasetScenarioGenerator",
     "PromptInjectionScenarioGenerator",
     "KnowledgeBaseScenarioGenerator",

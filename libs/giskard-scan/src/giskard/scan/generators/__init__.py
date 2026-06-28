@@ -12,6 +12,7 @@ from .knowledge_base import (
     SplitQuestionsScenarioGenerator,
     SycophancyScenarioGenerator,
 )
+from .past_tense import PastTenseAttackScenarioGenerator
 from .prompt_injection import PromptInjectionScenarioGenerator
 
 __all__ = [
@@ -23,6 +24,7 @@ __all__ = [
     "KnowledgeBaseScenarioGenerator",
     "MultiTopicScenarioGenerator",
     "OutOfScopeScenarioGenerator",
+    "PastTenseAttackScenarioGenerator",
     "PromptInjectionScenarioGenerator",
     "ScenarioContext",
     "ScenarioGenerator",
