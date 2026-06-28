@@ -6,6 +6,7 @@ from .conformity import Conformity
 from .contradiction import Contradiction
 from .groundedness import Groundedness
 from .judge import LLMJudge
+from .prompt_injection import PromptInjection
 from .toxicity import Toxicity
 
 __all__ = [
@@ -16,5 +17,6 @@ __all__ = [
     "Contradiction",
     "Groundedness",
     "LLMJudge",
+    "PromptInjection",
     "Toxicity",
 ]
