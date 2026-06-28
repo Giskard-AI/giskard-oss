@@ -54,6 +54,7 @@ from .generators.user import UserSimulator
 from .judges import (
     AnswerRelevance,
     BaseLLMCheck,
+    Bias,
     Conformity,
     Contradiction,
     Groundedness,
@@ -128,6 +129,7 @@ __all__ = [
     "JsonValid",
     "RegoPolicy",
     "from_fn",
+    "Bias",
     "Groundedness",
     "LLMJudge",
     "Readability",
