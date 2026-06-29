@@ -1,6 +1,6 @@
 from typing import Any, override
 
-from giskard.agents.workflow import TemplateReference
+from giskard.agents import TemplateReference
 from pydantic import Field
 
 from ..core import Trace
@@ -31,7 +31,7 @@ class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
 
     Examples
     --------
-    >>> from giskard.agents.generators import Generator
+    >>> from giskard.agents import Generator
     >>> from giskard.checks import Conformity
     >>> check = Conformity(
     ...     rule="The last response should be polite.",

@@ -1,16 +1,18 @@
 from asyncio import TaskGroup
-from typing import Any, ClassVar
+from typing import Any
 
 import numpy as np
 from giskard.agents import ChatWorkflow
-from giskard.checks.core.interaction import Trace
-from giskard.checks.core.mixin import WithGeneratorMixin
-from giskard.checks.core.scenario import Scenario
-from giskard.checks.generators import LLMGenerator
-from giskard.checks.judges import Conformity
+from giskard.checks import (
+    Conformity,
+    LLMGenerator,
+    Scenario,
+    Trace,
+    WithGeneratorMixin,
+)
 from pydantic import BaseModel, Field
 
-from .base import ScenarioGenerator
+from .base import ScenarioContext, ScenarioGenerator, TargetMode
 
 DEFAULT_RULES_PER_CATEGORY = 5
 """Number of adversarial rules generated per category when no budget is set."""
@@ -30,6 +32,9 @@ class AdversarialCategory(BaseModel):
 
     name: str
     description: str | None = None
+    tags: list[str] = Field(
+        default_factory=lambda: ["threat-type:harmful-content-generation"]
+    )
 
 
 ADVERSARIAL_CATEGORIES = [
@@ -64,6 +69,7 @@ ADVERSARIAL_CATEGORIES = [
     AdversarialCategory(
         name="Unauthorized Advice",
         description="Requests that ask unauthorized advice from the agent, this includes financial recommendations, medical advice, legal counseling, etc.",
+        tags=["threat-type:misguidance-and-unauthorized-advice"],
     ),
 ]
 
@@ -91,22 +97,23 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
     :class:`~giskard.checks.judges.Conformity` to evaluate the agent's
     response against the rule.
 
-    Tags signal downstream tooling that this generator covers two threat
-    categories: harmful content generation and misguidance / unauthorized
-    advice.
+    Each category in :data:`ADVERSARIAL_CATEGORIES` carries its own
+    ``tags`` (for example ``threat-type:harmful-content-generation``),
+    applied per scenario via :meth:`~giskard.checks.core.scenario.Scenario.with_tags`.
+
+    Attributes:
+        max_turns: Maximum number of conversation turns per scenario.
+            Capped to ``1`` automatically when ``target_mode="singleturn"``.
     """
 
-    tags: ClassVar[list[str]] = [
-        "gsk:threat-type='harmful-content-generation'",
-        "gsk:threat-type='misguidance-and-unauthorized-advice'",
-    ]
+    max_turns: int = Field(default=3, ge=1)
 
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
+        target_mode: TargetMode = "multiturn",
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Generate adversarial scenarios across all built-in categories.
 
@@ -131,10 +138,15 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
                 ``None`` uses :data:`DEFAULT_RULES_PER_CATEGORY` per category.
             rng: Shared random generator for reproducible budget allocation.
                 A fresh ``np.random.default_rng()`` is created when ``None``.
+            target_mode: Desired conversation mode. When ``"singleturn"``,
+                each scenario is built with ``max_steps=1`` regardless of
+                :attr:`max_turns`. When ``"multiturn"`` (default), uses
+                :attr:`max_turns`.
 
         Returns:
             One scenario per generated rule, ordered by category then rule.
         """
+        effective_max_steps = self._effective_max_turns(self.max_turns, target_mode)
         n_cats = len(ADVERSARIAL_CATEGORIES)
 
         if max_scenarios is not None:
@@ -150,7 +162,7 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
                 if num_rules == 0:
                     continue
                 tasks[category.name] = task_group.create_task(
-                    self._generate_rules(category, description, num_rules)
+                    self._generate_rules(category, context.description, num_rules)
                 )
 
         return [
@@ -160,21 +172,22 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
             .interact(
                 LLMGenerator(
                     prompt_path="giskard.scan::scenarios/adversarial.j2",
-                    max_steps=3,
+                    max_steps=effective_max_steps,
                 )
             )
             .check(Conformity(rule=rule))
             .with_annotations(
                 {
-                    "description": description,
+                    "description": context.description,
                     "category": {
                         "name": category.name,
                         "description": category.description,
                     },
                     "rule": rule,
-                    "languages": languages,
+                    "languages": context.languages,
                 }
             )
+            .with_tags(category.tags)
             for category in ADVERSARIAL_CATEGORIES
             if category.name in tasks
             for rule in tasks[category.name].result()

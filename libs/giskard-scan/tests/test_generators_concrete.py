@@ -1,3 +1,4 @@
+from giskard.scan.generators.base import ScenarioContext
 from giskard.scan.generators.prompt_injection import PromptInjectionScenarioGenerator
 
 
@@ -6,6 +7,12 @@ def test_prompt_injection_generator_is_importable():
     assert gen.dataset_name == "prompt_injection"
 
 
-def test_prompt_injection_generator_has_tags():
+async def test_prompt_injection_scenarios_have_tags():
     gen = PromptInjectionScenarioGenerator()
-    assert any("prompt-injection" in t for t in gen.tags)
+    scenarios = await gen.generate_scenario(
+        ScenarioContext(description="Support agent", languages=["en"])
+    )
+    assert len(scenarios) >= 1
+    assert all(
+        "threat-type:prompt-injection" in scenario.tags for scenario in scenarios
+    )

@@ -2,9 +2,6 @@
 
 from collections.abc import Iterable
 from importlib.metadata import PackageNotFoundError, version
-from typing import Literal
-
-from pydantic import BaseModel
 
 GISKARD_LIBS = frozenset(
     [
@@ -15,19 +12,6 @@ GISKARD_LIBS = frozenset(
         "giskard-llm",
     ]
 )
-
-
-class NotProvided(BaseModel):
-    """Sentinel class to indicate that a value was not provided."""
-
-    __type__: Literal["not_provided"] = "not_provided"
-
-
-NOT_PROVIDED = NotProvided()
-
-
-def provide_not_none[T](value: T | None) -> T | NotProvided:
-    return value if value is not None else NOT_PROVIDED
 
 
 def get_lib_version(lib: str, default: str = "unknown") -> str:
