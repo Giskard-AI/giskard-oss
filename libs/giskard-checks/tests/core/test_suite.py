@@ -237,7 +237,7 @@ def test_suite_result_rich_console_respects_max_reported_failures_env(
     assert "... and 1 more" in output
 
 
-def test_suite_result_rich_console_uses_default_failure_limit(
+def test_suite_result_rich_console_reports_all_failures_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.delenv(MAX_REPORTED_FAILURES_ENV_VAR, raising=False)
@@ -252,8 +252,8 @@ def test_suite_result_rich_console_uses_default_failure_limit(
     output = console.export_text()
     assert "s1" in output
     assert "s20" in output
-    assert "s21" not in output
-    assert "... and 1 more" in output
+    assert "s21" in output
+    assert "... and" not in output
 
 
 def test_suite_result_rich_console_can_hide_all_failure_details(
@@ -289,8 +289,8 @@ def test_suite_result_rich_console_ignores_invalid_failure_limit_env(
 
     output = console.export_text()
     assert "s20" in output
-    assert "s21" not in output
-    assert "... and 1 more" in output
+    assert "s21" in output
+    assert "... and" not in output
 
 
 @pytest.mark.asyncio

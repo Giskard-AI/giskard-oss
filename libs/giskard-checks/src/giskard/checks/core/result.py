@@ -46,7 +46,6 @@ STATUS_MAPPING = {
 }
 
 MAX_REPORTED_FAILURES_ENV_VAR = "GISKARD_CHECKS_MAX_REPORTED_FAILURES"
-DEFAULT_MAX_REPORTED_FAILURES = 20
 STATUS_SUMMARY_ORDER: tuple[tuple[str, str], ...] = (
     ("error", "errored"),
     ("fail", "failed"),
@@ -83,17 +82,21 @@ def _pluralize(count: int, word: str, plural: str | None = None) -> str:
     return f"{count} {plural}"
 
 
-def _max_reported_failures_from_env() -> int:
+def _max_reported_failures_from_env() -> int | None:
+    """Return failure cap from env, or ``None`` for unlimited reporting."""
     raw_value = os.getenv(MAX_REPORTED_FAILURES_ENV_VAR)
     if raw_value is None:
-        return DEFAULT_MAX_REPORTED_FAILURES
+        return None
 
     try:
         value = int(raw_value)
     except ValueError:
-        return DEFAULT_MAX_REPORTED_FAILURES
+        return None
 
-    return max(0, value)
+    if value < 0:
+        return None
+
+    return value
 
 
 class CheckStatus(str, Enum):
