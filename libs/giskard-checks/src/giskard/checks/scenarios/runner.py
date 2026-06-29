@@ -28,7 +28,7 @@ from ..utils.inference import _infer_trace_type
 def _validate_multiple_runs(value: int | None) -> int | None:
     if value is None:
         return None
-    if isinstance(value, bool):
+    if not isinstance(value, int) or isinstance(value, bool):
         raise ValueError("multiple_runs must be an integer greater than or equal to 1")
     if value < 1:
         raise ValueError("multiple_runs must be greater than or equal to 1")
