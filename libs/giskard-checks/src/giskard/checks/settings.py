@@ -1,5 +1,4 @@
-from giskard.agents.embeddings import BaseEmbeddingModel, EmbeddingModel
-from giskard.agents.generators import BaseGenerator, Generator
+from giskard.agents import BaseEmbeddingModel, BaseGenerator, EmbeddingModel, Generator
 
 # Global default generator
 _default_generator: BaseGenerator | None = None
