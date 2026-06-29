@@ -1,5 +1,6 @@
 """Quality scan entry points for giskard.scan."""
 
+import logging
 import warnings
 
 from giskard.checks import SuiteResult, Target, Trace
@@ -16,7 +17,9 @@ from .generators.knowledge_base import (
 )
 from .registry import SuiteGeneratorRegistry
 from .utils.knowledge_base import KnowledgeBase, normalize_knowledge_base
-from .utils.recommendation import QualityScanResult, generate_quality_recommendation
+from .utils.recommendation import generate_quality_recommendation
+
+logger = logging.getLogger(__name__)
 
 QUALITY_GENERATOR_TYPES: tuple[type[KnowledgeBaseScenarioGenerator], ...] = (
     HallucinationScenarioGenerator,
@@ -42,7 +45,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     parallel: bool = True,
     max_concurrency: int | None = None,
     target_mode: TargetMode = "multiturn",
-) -> QualityScanResult:
+) -> SuiteResult:
     """Generate and run the standard quality scan suite.
 
     Builds a suite from the quality scenario generator registry, runs it
@@ -95,12 +98,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     except Exception:
         logger.exception("Quality recommendation generation failed")
         recommendation = "Quality recommendation generation failed"
-    quality_result = QualityScanResult(
-        results=result.results,
-        duration_ms=result.duration_ms,
-        suite=result.suite,
-        recommendation=recommendation,
-    )
+    quality_result = result.model_copy(update={"recommendation": recommendation})
     quality_result.print_report(group_by=group_by)
     return quality_result
 

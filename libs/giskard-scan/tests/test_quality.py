@@ -1,4 +1,3 @@
-import json
 from collections.abc import Sequence
 from typing import Any, override
 
@@ -21,9 +20,7 @@ from giskard.scan.generators.knowledge_base import (
 )
 from giskard.scan.quality import quality_scan, quality_suite_generator_registry
 from giskard.scan.utils.knowledge_base import KnowledgeBase
-from giskard.scan.utils.recommendation import QualityScanResult
 from pydantic import Field
-from rich.console import Console
 
 
 class _DeterministicQualityGenerator(ScenarioGenerator):
@@ -48,7 +45,7 @@ class _DeterministicQualityGenerator(ScenarioGenerator):
 
 
 class _MockRecommendationGenerator(BaseGenerator):
-    responses: list[dict[str, Any]]
+    responses: list[str]
     index: int = 0
     calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
 
@@ -61,7 +58,7 @@ class _MockRecommendationGenerator(BaseGenerator):
     ) -> CompletionResponse:
         _ = params, metadata
         self.calls.append(messages)
-        message = AssistantMessage(content=json.dumps(self.responses[self.index]))
+        message = AssistantMessage(content=self.responses[self.index])
         self.index += 1
         return CompletionResponse(
             choices=[Choice(message=message, finish_reason="stop", index=0)]
@@ -76,7 +73,7 @@ async def test_quality_scan_runs_registry_scenarios_and_returns_suite_result(
 ):
     quality_suite_generator_registry.register(_DeterministicQualityGenerator())
     recommendation_generator = _MockRecommendationGenerator(
-        responses=[{"recommendation": "- Improve retrieval grounding."}]
+        responses=["- Improve retrieval grounding."]
     )
     monkeypatch.setattr(settings, "_default_generator", recommendation_generator)
     printed_reports: list[tuple[SuiteResult, str | None]] = []
@@ -104,7 +101,7 @@ async def test_quality_scan_runs_registry_scenarios_and_returns_suite_result(
         group_by="quality",
     )
 
-    assert isinstance(result, QualityScanResult)
+    assert type(result) is SuiteResult
     assert result.recommendation == "- Improve retrieval grounding."
     assert result.passed_count == 1
     assert result.failed_count == 1
@@ -333,7 +330,7 @@ async def test_quality_scan_does_not_generate_recommendation_without_failures(
 ):
     quality_suite_generator_registry.register(_DeterministicQualityGenerator())
     recommendation_generator = _MockRecommendationGenerator(
-        responses=[{"recommendation": "This should not be used."}]
+        responses=["This should not be used."]
     )
     monkeypatch.setattr(settings, "_default_generator", recommendation_generator)
     monkeypatch.setattr(SuiteResult, "print_report", lambda self, **_: None)
@@ -351,20 +348,3 @@ async def test_quality_scan_does_not_generate_recommendation_without_failures(
 
     assert result.recommendation == ""
     assert recommendation_generator.calls == []
-
-
-def test_quality_scan_result_renders_recommendation_after_group_table():
-    result = QualityScanResult(
-        results=[],
-        duration_ms=0,
-        recommendation="- Improve LLM answers for conciseness failures.",
-    )
-    console = Console(record=True, width=100)
-
-    console.print(result.group_by("component"))
-
-    output = console.export_text()
-    assert "Results by component" in output
-    assert "Quality Recommendation" in output
-    assert output.index("Results by component") < output.index("Quality Recommendation")
-    assert "Improve LLM answers for conciseness failures." in output

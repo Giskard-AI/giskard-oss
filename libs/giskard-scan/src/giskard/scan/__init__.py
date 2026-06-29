@@ -24,7 +24,6 @@ from .quality import quality_scan, quality_suite_generator_registry
 from .registry import SuiteGeneratorRegistry
 from .types import ScanOptions
 from .utils.knowledge_base import Document, KnowledgeBase
-from .utils.recommendation import QualityScanResult
 from .vulnerability import vulnerability_scan, vulnerability_suite_generator_registry
 
 add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.scan")
@@ -50,7 +49,6 @@ __all__ = [
     "KnowledgeBase",
     "ScanOptions",
     "SuiteGeneratorRegistry",
-    "QualityScanResult",
     "quality_suite_generator_registry",
     "quality_scan",
     "vulnerability_suite_generator_registry",

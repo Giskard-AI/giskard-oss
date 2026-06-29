@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
@@ -549,6 +550,8 @@ class SuiteResult(BaseResult, frozen=True):
     suite : Suite | None
         The Suite that produced this result. Excluded from serialization
         (``None`` after a serialize/deserialize round-trip).
+    recommendation : str | None
+        Optional Markdown-friendly guidance attached by scan or suite producers.
     passed_count : int
         Number of scenarios that passed.
     failed_count : int
@@ -567,6 +570,10 @@ class SuiteResult(BaseResult, frozen=True):
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
     suite: "Suite[Any, Any] | None" = Field(
         default=None, exclude=True, description="The Suite that produced this result"
+    )
+    recommendation: str | None = Field(
+        default=None,
+        description="Optional Markdown-friendly recommendation for this suite result",
     )
 
     @computed_field
@@ -682,64 +689,80 @@ class SuiteResult(BaseResult, frozen=True):
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        yield Rule("Suite Results", style="bold blue")
-
-        # Dots view
-        yield "".join(
-            f"[{STATUS_MAPPING[r.status]['color']}]{STATUS_MAPPING[r.status]['symbol']}[/{STATUS_MAPPING[r.status]['color']}]"
-            for r in self.results
+        yield from _suite_rich_console(
+            self, console, options, include_recommendation=True
         )
-        yield ""
 
-        failures_and_errors = self.failures_and_errors
 
-        if failures_and_errors:
-            max_reported_failures = _max_reported_failures_from_env()
-            reported_failures = failures_and_errors[:max_reported_failures]
-            n_hidden = len(failures_and_errors) - len(reported_failures)
+def _suite_rich_console(
+    result: SuiteResult,
+    console: Console,
+    options: ConsoleOptions,
+    *,
+    include_recommendation: bool,
+) -> RenderResult:
+    yield Rule("Suite Results", style="bold blue")
 
-            # Details
-            yield Rule("FAILURES", characters="=", style="grey")
-            for f in reported_failures:
-                yield Panel(
-                    f,
-                    title=f.scenario_name,
-                    border_style=f"{STATUS_MAPPING[f.status]['color']} bold",
-                )
-            if n_hidden > 0:
-                yield f"  ... and {n_hidden} more"
+    # Dots view
+    yield "".join(
+        f"[{STATUS_MAPPING[r.status]['color']}]{STATUS_MAPPING[r.status]['symbol']}[/{STATUS_MAPPING[r.status]['color']}]"
+        for r in result.results
+    )
+    yield ""
 
-            # Summary
-            yield Rule("SUMMARY", characters="=", style="grey")
-            for f in reported_failures:
-                status = STATUS_MAPPING[f.status]
-                yield f"[{status['color']} bold]{f.scenario_name}[/{status['color']} bold]\t[{status['color']}]{f.status.value.upper()}[/{status['color']}]"
-                for tc in f.failures_and_errors:
-                    for c in tc.failures_and_errors:
-                        yield from (
-                            f"\t{line}" for line in c.__rich_console__(console, options)
-                        )
-            if n_hidden > 0:
-                yield f"  ... and {n_hidden} more"
+    failures_and_errors = result.failures_and_errors
 
-        yield Rule(style="bold blue")
+    if failures_and_errors:
+        max_reported_failures = _max_reported_failures_from_env()
+        reported_failures = failures_and_errors[:max_reported_failures]
+        n_hidden = len(failures_and_errors) - len(reported_failures)
 
-        # Summary metrics
-        count_parts = [
-            f"[{STATUS_MAPPING['total']['color']} bold]{len(self.results)} total[/{STATUS_MAPPING['total']['color']} bold]"
-        ]
-        count_parts.extend(
-            format_status_count_parts(
-                {
-                    "error": self.errored_count,
-                    "fail": self.failed_count,
-                    "skip": self.skipped_count,
-                    "pass": self.passed_count,
-                }
+        # Details
+        yield Rule("FAILURES", characters="=", style="grey")
+        for f in reported_failures:
+            yield Panel(
+                f,
+                title=f.scenario_name,
+                border_style=f"{STATUS_MAPPING[f.status]['color']} bold",
             )
+        if n_hidden > 0:
+            yield f"  ... and {n_hidden} more"
+
+        # Summary
+        yield Rule("SUMMARY", characters="=", style="grey")
+        for f in reported_failures:
+            status = STATUS_MAPPING[f.status]
+            yield f"[{status['color']} bold]{f.scenario_name}[/{status['color']} bold]\t[{status['color']}]{f.status.value.upper()}[/{status['color']}]"
+            for tc in f.failures_and_errors:
+                for c in tc.failures_and_errors:
+                    yield from (
+                        f"\t{line}" for line in c.__rich_console__(console, options)
+                    )
+        if n_hidden > 0:
+            yield f"  ... and {n_hidden} more"
+
+    yield Rule(style="bold blue")
+
+    # Summary metrics
+    count_parts = [
+        f"[{STATUS_MAPPING['total']['color']} bold]{len(result.results)} total[/{STATUS_MAPPING['total']['color']} bold]"
+    ]
+    count_parts.extend(
+        format_status_count_parts(
+            {
+                "error": result.errored_count,
+                "fail": result.failed_count,
+                "skip": result.skipped_count,
+                "pass": result.passed_count,
+            }
         )
-        summary = ", ".join(count_parts)
-        yield f"Summary: {summary} | Pass Rate: [default bold]{self.pass_rate:.1%}[/default bold] | Total Duration: {self.duration_ms}ms"
+    )
+    summary = ", ".join(count_parts)
+    yield f"Summary: {summary} | Pass Rate: [default bold]{result.pass_rate:.1%}[/default bold] | Total Duration: {result.duration_ms}ms"
+
+    recommendation = result.recommendation
+    if include_recommendation and recommendation and recommendation.strip():
+        yield _recommendation_panel(recommendation)
 
 
 def _parse_tag(tag: str) -> tuple[str, str]:
@@ -798,7 +821,9 @@ class GroupedSuiteResult(BaseResult, frozen=True):
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        yield from self.suite_result.__rich_console__(console, options)
+        yield from _suite_rich_console(
+            self.suite_result, console, options, include_recommendation=False
+        )
 
         table = Table(title=f"Results by {self.key}")
         table.add_column(self.key, style="bold")
@@ -819,3 +844,14 @@ class GroupedSuiteResult(BaseResult, frozen=True):
             table.add_row(display_name, rate)
 
         yield table
+        recommendation = self.suite_result.recommendation
+        if recommendation and recommendation.strip():
+            yield _recommendation_panel(recommendation)
+
+
+def _recommendation_panel(recommendation: str) -> Panel:
+    return Panel(
+        Markdown(recommendation),
+        title="Recommendation",
+        border_style="blue",
+    )
