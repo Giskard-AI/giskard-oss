@@ -11,7 +11,7 @@ from pydantic import ValidationError
 @pytest.mark.parametrize(
     ("outputs", "expected_parsed"),
     [
-        ('{\"name\": \"Alice\", \"age\": 30}', {"name": "Alice", "age": 30}),
+        ('{"name": "Alice", "age": 30}', {"name": "Alice", "age": 30}),
         ("null", None),
         ("true", True),
         ("42", 42),
@@ -97,12 +97,12 @@ async def test_nested_jsonpath_extraction() -> None:
                 "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
                 "required": ["name", "age"],
             },
-            '{\"name\": \"Alice\", \"age\": 30}',
+            '{"name": "Alice", "age": 30}',
             True,
             {"name": "Alice", "age": 30},
         ),
         ({"type": "integer"}, 42, False, 42),
-        ({"type": "string", "minLength": 3, "maxLength": 7}, '\"hello\"', True, "hello"),
+        ({"type": "string", "minLength": 3, "maxLength": 7}, '"hello"', True, "hello"),
     ],
 )
 async def test_schema_validation_passes(
@@ -128,7 +128,7 @@ async def test_schema_validation_passes(
                 "properties": {"age": {"type": "integer"}},
                 "required": ["age"],
             },
-            '{\"age\": \"old\"}',
+            '{"age": "old"}',
             True,
             "'old' is not of type 'integer'",
         ),
