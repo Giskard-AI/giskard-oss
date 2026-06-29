@@ -1,9 +1,13 @@
 from collections.abc import AsyncGenerator
 from typing import Any, Self, override
 
-from giskard.agents.errors.workflow_errors import ModelRefusalError, WorkflowError
-from giskard.agents.templates import MessageTemplate
-from giskard.agents.workflow import ChatWorkflow, TemplateReference
+from giskard.agents import (
+    ChatWorkflow,
+    MessageTemplate,
+    ModelRefusalError,
+    TemplateReference,
+    WorkflowError,
+)
 from giskard.llm import chat
 from giskard.llm.types import ChatMessage
 from pydantic import BaseModel, Field, model_validator

@@ -3,11 +3,13 @@ from typing import Any
 
 import numpy as np
 from giskard.agents import ChatWorkflow
-from giskard.checks.core.interaction import Trace
-from giskard.checks.core.mixin import WithGeneratorMixin
-from giskard.checks.core.scenario import Scenario
-from giskard.checks.generators import LLMGenerator
-from giskard.checks.judges import Conformity
+from giskard.checks import (
+    Conformity,
+    LLMGenerator,
+    Scenario,
+    Trace,
+    WithGeneratorMixin,
+)
 from pydantic import BaseModel, Field
 
 from .base import ScenarioContext, ScenarioGenerator, TargetMode
