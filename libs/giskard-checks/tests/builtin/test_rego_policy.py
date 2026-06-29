@@ -1,10 +1,13 @@
 """Tests for the RegoPolicy check."""
 
+import importlib
 import importlib.util
+import json
 from typing import Any
 
 import pytest
 from giskard.checks import Check, CheckStatus, Interaction, RegoPolicy, Trace
+from giskard.checks.utils import optional_deps
 from pydantic import ValidationError
 
 BOOLEAN_POLICY = """\
@@ -41,6 +44,39 @@ def _check(**kwargs: Any) -> RegoPolicy:  # pyright: ignore[reportMissingTypeArg
     }
     defaults.update(kwargs)
     return RegoPolicy(**defaults)
+
+
+@pytest.fixture
+def block_regorus_import(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_import_module = importlib.import_module
+
+    def fake_import_module(name: str, /, *args, **kwargs):
+        if name == "regorus":
+            raise ImportError("missing regorus")
+        return real_import_module(name, *args, **kwargs)
+
+    monkeypatch.setattr(optional_deps.importlib, "import_module", fake_import_module)
+
+
+def test_rego_policy_requires_regorus_on_instantiation(
+    block_regorus_import: None,
+) -> None:
+    with pytest.raises(ValidationError, match="giskard-checks\\[regorus\\]"):
+        _check()
+
+
+def test_rego_policy_requires_regorus_on_model_validate_json(
+    block_regorus_import: None,
+) -> None:
+    payload = json.dumps(
+        {
+            "kind": "rego_policy",
+            "policy": BOOLEAN_POLICY,
+            "rule": "data.giskard.allow",
+        }
+    )
+    with pytest.raises(ValidationError, match="giskard-checks\\[regorus\\]"):
+        Check.model_validate_json(payload)
 
 
 async def test_no_match_on_key_fails() -> None:
