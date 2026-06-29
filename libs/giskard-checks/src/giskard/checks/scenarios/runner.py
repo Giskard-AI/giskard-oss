@@ -134,14 +134,14 @@ class ScenarioRunner:
 
         for step in steps:
             trace = await trace.with_interactions(*step.interacts)
-            trace_index = len(trace.interactions) - 1 if trace.interactions else None
+            last_interaction_index = len(trace.interactions) - 1 if trace.interactions else None
 
             test_case = TestCase(
                 trace=trace,
                 checks=step.checks,
             )
             step_result = await test_case.run(return_exception)
-            step_result = step_result.model_copy(update={"trace_index": trace_index})
+            step_result = step_result.model_copy(update={"last_interaction_index": last_interaction_index})
             steps_results.append(step_result)
 
             # Stop on first failure
@@ -151,7 +151,7 @@ class ScenarioRunner:
         if len(steps_results) < len(steps):
             # Skipped steps own no new interaction; point them at the trace as it stood
             # when execution stopped so the index is never left unset.
-            skipped_trace_index = (
+            skipped_last_interaction_index = (
                 len(trace.interactions) - 1 if trace.interactions else None
             )
             for i in range(len(steps_results), len(steps)):
@@ -168,7 +168,7 @@ class ScenarioRunner:
                         for check in steps[i].checks
                     ],
                     duration_ms=0,
-                    trace_index=skipped_trace_index,
+                    last_interaction_index=skipped_last_interaction_index,
                 )
                 steps_results.append(step_result)
 

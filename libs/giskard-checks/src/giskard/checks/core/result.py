@@ -404,7 +404,7 @@ class TestCaseResult(BaseResult, frozen=True):
         Check results produced during the test case execution.
     duration_ms : int
         Total execution time in milliseconds.
-    trace_index : int | None
+    last_interaction_index : int | None
         0-based index, in the scenario's final trace, of the last interaction
         this step added before its checks ran. ``None`` when the step added no
         interactions (e.g. skipped). Consumers (such as the Giskard Hub upload
@@ -423,7 +423,7 @@ class TestCaseResult(BaseResult, frozen=True):
 
     results: list[CheckResult] = Field(..., description="Check results for each run")
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
-    trace_index: int | None = Field(
+    last_interaction_index: int | None = Field(
         default=None,
         description=(
             "0-based index of the last trace interaction added by this step's "
