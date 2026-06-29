@@ -3,10 +3,7 @@
 from typing import Any, override
 
 import numpy as np
-from giskard.checks.core.interaction import Trace
-from giskard.checks.core.scenario import Scenario
-from giskard.checks.generators import LLMGenerator
-from giskard.checks.judges import LLMJudge
+from giskard.checks import LLMGenerator, LLMJudge, Scenario, Trace
 from pydantic import Field
 
 from .base import ScenarioContext, ScenarioGenerator, TargetMode

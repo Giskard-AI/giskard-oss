@@ -3,10 +3,7 @@
 from typing import Any, ClassVar, Unpack, override
 
 import numpy as np
-from giskard.checks import Contradiction
-from giskard.checks.core.interaction import Trace
-from giskard.checks.core.scenario import Scenario
-from giskard.checks.generators import LLMGenerator
+from giskard.checks import Contradiction, LLMGenerator, Scenario, Trace
 from pydantic import ConfigDict, Field
 
 from ..utils.knowledge_base import Document
