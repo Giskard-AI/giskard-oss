@@ -28,7 +28,7 @@ from ..utils.inference import _infer_trace_type
 def _validate_multiple_runs(value: int | None) -> int | None:
     if value is None:
         return None
-    if not isinstance(value, int) or isinstance(value, bool):
+    if isinstance(value, bool):
         raise ValueError("multiple_runs must be an integer greater than or equal to 1")
     if value < 1:
         raise ValueError("multiple_runs must be greater than or equal to 1")
@@ -37,7 +37,7 @@ def _validate_multiple_runs(value: int | None) -> int | None:
 
 def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
-    target: Target[InputType, OutputType, TraceType] | MISSING,
+    target: Target[InputType, OutputType, TraceType] | MISSING,  # pyright: ignore[reportInvalidTypeForm]
 ) -> list[Step[InputType, OutputType, TraceType]]:
     """Build steps with target bound to Interact outputs where needed.
 
@@ -65,7 +65,7 @@ def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
 
 def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
-    run_target: Target[InputType, OutputType, TraceType] | MISSING,
+    run_target: Target[InputType, OutputType, TraceType] | MISSING,  # pyright: ignore[reportInvalidTypeForm]
 ) -> type[TraceType]:
     if scenario.trace_type is not None:
         return scenario.trace_type
@@ -109,7 +109,7 @@ class ScenarioRunner:
     async def _run_once[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,  # pyright: ignore[reportInvalidTypeForm]
         return_exception: bool = False,
     ) -> ScenarioResult[TraceType]:
         start_time = time.perf_counter()
@@ -117,7 +117,7 @@ class ScenarioRunner:
         telemetry_tag("giskard_operation", "scenario_run")
 
         trace_cls = _resolve_trace_type(scenario, target)
-        trace = cast(TraceType, trace_cls(annotations=scenario.annotations))
+        trace = trace_cls(annotations=scenario.annotations)
 
         steps = _build_steps(scenario, target)
         steps_results: list[TestCaseResult] = []
@@ -134,14 +134,18 @@ class ScenarioRunner:
 
         for step in steps:
             trace = await trace.with_interactions(*step.interacts)
-            last_interaction_index = len(trace.interactions) - 1 if trace.interactions else None
+            last_interaction_index = (
+                len(trace.interactions) - 1 if trace.interactions else None
+            )
 
             test_case = TestCase(
                 trace=trace,
                 checks=step.checks,
             )
             step_result = await test_case.run(return_exception)
-            step_result = step_result.model_copy(update={"last_interaction_index": last_interaction_index})
+            step_result = step_result.model_copy(
+                update={"last_interaction_index": last_interaction_index}
+            )
             steps_results.append(step_result)
 
             # Stop on first failure
@@ -197,7 +201,7 @@ class ScenarioRunner:
     async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,  # pyright: ignore[reportInvalidTypeForm]
         return_exception: bool = False,
         multiple_runs: int | None = None,
     ) -> ScenarioResult[TraceType]:
