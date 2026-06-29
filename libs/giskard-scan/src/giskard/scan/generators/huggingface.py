@@ -4,8 +4,7 @@ from pathlib import Path
 from typing import Any, override
 
 import httpx
-from giskard.checks.core.interaction import Trace
-from giskard.checks.core.scenario import Scenario
+from giskard.checks import Scenario, Trace
 from huggingface_hub import DatasetCard, hf_hub_download, list_repo_files
 from huggingface_hub.errors import (
     HfHubHTTPError,

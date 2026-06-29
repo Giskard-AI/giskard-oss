@@ -5,9 +5,7 @@ from pathlib import Path
 from typing import Any, Literal, override
 
 import numpy as np
-from giskard.checks.core.interaction import Interact, Trace
-from giskard.checks.core.scenario import Scenario
-from giskard.checks.generators import BaseLLMGenerator
+from giskard.checks import BaseLLMGenerator, Interact, Scenario, Trace
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..utils.knowledge_base import KnowledgeBase

@@ -1,3 +1,4 @@
+import os
 from collections import defaultdict
 from collections.abc import Mapping
 from enum import Enum
@@ -44,6 +45,7 @@ STATUS_MAPPING = {
     },
 }
 
+MAX_REPORTED_FAILURES_ENV_VAR = "GISKARD_CHECKS_MAX_REPORTED_FAILURES"
 STATUS_SUMMARY_ORDER: tuple[tuple[str, str], ...] = (
     ("error", "errored"),
     ("fail", "failed"),
@@ -78,6 +80,23 @@ def _pluralize(count: int, word: str, plural: str | None = None) -> str:
     if plural is None:
         plural = word + "s"
     return f"{count} {plural}"
+
+
+def _max_reported_failures_from_env() -> int | None:
+    """Return failure cap from env, or ``None`` for unlimited reporting."""
+    raw_value = os.getenv(MAX_REPORTED_FAILURES_ENV_VAR)
+    if raw_value is None:
+        return None
+
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return None
+
+    if value < 0:
+        return None
+
+    return value
 
 
 class CheckStatus(str, Enum):
@@ -652,22 +671,24 @@ class SuiteResult(BaseResult, frozen=True):
         failures_and_errors = self.failures_and_errors
 
         if failures_and_errors:
-            n_loggable_failures = 20  # TODO: make this configurable
+            max_reported_failures = _max_reported_failures_from_env()
+            reported_failures = failures_and_errors[:max_reported_failures]
+            n_hidden = len(failures_and_errors) - len(reported_failures)
 
             # Details
             yield Rule("FAILURES", characters="=", style="grey")
-            for f in failures_and_errors[:n_loggable_failures]:
+            for f in reported_failures:
                 yield Panel(
                     f,
                     title=f.scenario_name,
                     border_style=f"{STATUS_MAPPING[f.status]['color']} bold",
                 )
-            if len(failures_and_errors) > n_loggable_failures:
-                yield f"  ... and {len(failures_and_errors) - n_loggable_failures} more"
+            if n_hidden > 0:
+                yield f"  ... and {n_hidden} more"
 
             # Summary
             yield Rule("SUMMARY", characters="=", style="grey")
-            for f in failures_and_errors[:n_loggable_failures]:
+            for f in reported_failures:
                 status = STATUS_MAPPING[f.status]
                 yield f"[{status['color']} bold]{f.scenario_name}[/{status['color']} bold]\t[{status['color']}]{f.status.value.upper()}[/{status['color']}]"
                 for tc in f.failures_and_errors:
@@ -675,8 +696,8 @@ class SuiteResult(BaseResult, frozen=True):
                         yield from (
                             f"\t{line}" for line in c.__rich_console__(console, options)
                         )
-            if len(failures_and_errors) > n_loggable_failures:
-                yield f"  ... and {len(failures_and_errors) - n_loggable_failures} more"
+            if n_hidden > 0:
+                yield f"  ... and {n_hidden} more"
 
         yield Rule(style="bold blue")
 

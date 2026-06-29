@@ -1,11 +1,25 @@
 import asyncio
 import time
 from contextlib import nullcontext
+from typing import Any
 
 import pytest
 from giskard.checks import Equals, Scenario, Suite
-from giskard.checks.core.result import GroupedSuiteResult, GroupStats, ScenarioStatus
+from giskard.checks.core.interaction import Trace
+from giskard.checks.core.result import (
+    MAX_REPORTED_FAILURES_ENV_VAR,
+    CheckResult,
+    GroupedSuiteResult,
+    GroupStats,
+    ScenarioResult,
+    ScenarioStatus,
+    SuiteResult,
+)
+from giskard.checks.core.result import (
+    TestCaseResult as CheckTestCaseResult,
+)
 from giskard.checks.scenarios.suite import _OverallOnly, _SuiteProgress
+from rich.console import Console
 from rich.progress import MofNCompleteColumn, Progress
 from rich.text import Text
 
@@ -28,6 +42,25 @@ def sut3():
 @pytest.fixture
 def identity_sut():
     return lambda inputs: inputs
+
+
+def failed_scenario(name: str) -> ScenarioResult[Trace[Any, Any]]:
+    return ScenarioResult(
+        scenario_name=name,
+        steps=[
+            CheckTestCaseResult(
+                results=[
+                    CheckResult.failure(
+                        message=f"{name} failed",
+                        details={"check_name": "ExampleCheck"},
+                    )
+                ],
+                duration_ms=1,
+            )
+        ],
+        duration_ms=1,
+        final_trace=Trace(interactions=[]),
+    )
 
 
 @pytest.mark.asyncio
@@ -185,6 +218,81 @@ async def test_suite_append_chaining():
     assert result.results[1].scenario_name == "b"
 
 
+def test_suite_result_rich_console_respects_max_reported_failures_env(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "2")
+    result = SuiteResult(
+        results=[failed_scenario("s1"), failed_scenario("s2"), failed_scenario("s3")],
+        duration_ms=3,
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "s1" in output
+    assert "s2" in output
+    assert "s3" not in output
+    assert "... and 1 more" in output
+
+
+def test_suite_result_rich_console_reports_all_failures_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.delenv(MAX_REPORTED_FAILURES_ENV_VAR, raising=False)
+    result = SuiteResult(
+        results=[failed_scenario(f"s{i}") for i in range(1, 22)],
+        duration_ms=3,
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "s1" in output
+    assert "s20" in output
+    assert "s21" in output
+    assert "... and" not in output
+
+
+def test_suite_result_rich_console_can_hide_all_failure_details(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "0")
+    result = SuiteResult(
+        results=[failed_scenario("s1"), failed_scenario("s2"), failed_scenario("s3")],
+        duration_ms=3,
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "s1" not in output
+    assert "s2" not in output
+    assert "s3" not in output
+    assert "... and 3 more" in output
+
+
+def test_suite_result_rich_console_ignores_invalid_failure_limit_env(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "invalid")
+    result = SuiteResult(
+        results=[failed_scenario(f"s{i}") for i in range(1, 22)],
+        duration_ms=3,
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "s20" in output
+    assert "s21" in output
+    assert "... and" not in output
+
+
 @pytest.mark.asyncio
 async def test_suite_parallel_preserves_result_order():
     delays = {"first": 0.09, "second": 0.01, "third": 0.05}
@@ -211,7 +319,6 @@ async def test_suite_parallel_preserves_result_order():
 @pytest.mark.asyncio
 async def test_suite_parallel_runs_concurrently():
     sleep_s = 0.06
-    n = 3
 
     async def delayed_identity(inputs):
         await asyncio.sleep(sleep_s)
@@ -222,12 +329,15 @@ async def test_suite_parallel_runs_concurrently():
     suite.append(Scenario("b").interact("b"))
     suite.append(Scenario("c").interact("c"))
 
-    start = time.perf_counter()
-    await suite.run(parallel=True)
-    parallel_duration = time.perf_counter() - start
+    serial_start = time.perf_counter()
+    await suite.run()
+    serial_duration = time.perf_counter() - serial_start
 
-    # Must complete faster than running all scenarios serially
-    assert parallel_duration < sleep_s * n
+    parallel_start = time.perf_counter()
+    await suite.run(parallel=True)
+    parallel_duration = time.perf_counter() - parallel_start
+
+    assert parallel_duration < serial_duration
 
 
 @pytest.mark.asyncio

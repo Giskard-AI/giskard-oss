@@ -3,9 +3,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
-from giskard.checks.core.interaction import Trace
-from giskard.checks.core.scenario import Scenario
-from giskard.checks.scenarios.suite import Suite
+from giskard.checks import Scenario, Suite, Trace
 
 from .generators.base import ScenarioContext, ScenarioGenerator, TargetMode
 from .registry import _normalize_generator
