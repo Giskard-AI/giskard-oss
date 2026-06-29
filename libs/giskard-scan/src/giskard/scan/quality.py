@@ -90,7 +90,11 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         parallel=parallel,
         max_concurrency=max_concurrency,
     )
-    recommendation = await generate_quality_recommendation(result)
+    try:
+        recommendation = await generate_quality_recommendation(result)
+    except Exception:
+        logger.exception("Quality recommendation generation failed")
+        recommendation = "Quality recommendation generation failed"
     quality_result = QualityScanResult(
         results=result.results,
         duration_ms=result.duration_ms,
