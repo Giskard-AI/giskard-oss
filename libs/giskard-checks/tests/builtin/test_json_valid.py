@@ -198,3 +198,65 @@ def test_json_valid_serialization_roundtrip() -> None:
     assert isinstance(restored, JsonValid)
     assert restored.key == "trace.last.outputs.response"
     assert restored.expected_schema == {"type": "object"}
+
+
+async def test_parse_false_accepts_plain_string() -> None:
+    check = JsonValid(parse=False)
+    trace = await Trace.from_interactions(
+        Interaction(inputs="Return JSON", outputs="value")
+    )
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["parsed_value"] == "value"
+
+
+async def test_parse_true_rejects_plain_string() -> None:
+    check = JsonValid(parse=True)
+    trace = await Trace.from_interactions(
+        Interaction(inputs="Return JSON", outputs="value")
+    )
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "not valid JSON" in result.message
+
+
+async def test_parse_true_rejects_non_string() -> None:
+    check = JsonValid(parse=True)
+    trace = await Trace.from_interactions(
+        Interaction(inputs="Return JSON", outputs={"name": "Alice"})
+    )
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "is not a string" in result.message
+
+
+async def test_parse_false_schema_match_on_string() -> None:
+    check = JsonValid(parse=False, schema={"type": "string"})
+    trace = await Trace.from_interactions(
+        Interaction(inputs="Return JSON", outputs="value")
+    )
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.PASS
+
+
+async def test_parse_false_schema_mismatch_on_string() -> None:
+    check = JsonValid(parse=False, schema={"type": "number"})
+    trace = await Trace.from_interactions(
+        Interaction(inputs="Return JSON", outputs="value")
+    )
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "does not match the provided schema" in result.message
