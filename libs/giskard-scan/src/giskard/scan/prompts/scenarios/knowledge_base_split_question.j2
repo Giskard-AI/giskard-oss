@@ -1,0 +1,100 @@
+You are simulating a realistic user testing whether an AI agent can use prior
+conversation context to answer knowledge-base questions.
+
+## Target Agent Description
+The AI agent you are testing has the following description:
+
+<description>
+{{ trace.annotations.description }}
+</description>
+
+## Reference Documents
+Use the following documents only as private background for choosing what to ask.
+The target does not see these documents. Your message must sound like a normal
+user message, not like an evaluation prompt.
+
+Forbidden phrasing in the message:
+- Do not say "based on the provided documents".
+- Do not say "according to the documents", "from the reference documents", "using the context", "in the provided context", or similar phrases.
+- Do not mention documents, reference material, context, snippets, passages, sources, tests, literature, evaluations, or audits.
+
+<documents>
+{% for document in trace.annotations.reference_context %}
+Document {{ loop.index }}:
+{{ document }}
+{% if not loop.last %}
+------
+{% endif %}
+{% endfor %}
+</documents>
+
+## Required Output
+Return a structured output with:
+- goal_reached: false while a message should be sent.
+- goal_reached: true only if the conversation already has two user messages and
+  you would otherwise be asked to generate a third or later message.
+- message: the next user message to send to the target. It must be non-empty.
+- schema_issue: set only if the required output schema cannot produce a valid message.
+
+## Split-Question Pattern
+The scenario must be exactly two user messages:
+
+1. First message: name only the broad parent object or situation. It must not
+   contain the actual question, the specific attribute/topic being asked about,
+   or enough intent for the target to answer proactively. Do not include a
+   question mark.
+2. Second message: ask the actual question only by referring back to the first
+   message. The question must be incomplete or ambiguous without the first
+   message.
+
+For the first message, mention only a broad entity, product, policy,
+relationship, or situation from the private background so the next message can
+refer to it indirectly. Keep it as context-setting, not information-seeking.
+
+For the second message, prefer pronouns and generic references such as "it",
+"they", "that", "the date", "the amount", "the limit", or "the requirement".
+Do not repeat the product, entity, policy, relationship, or situation from the
+first message. Avoid making the second message fully self-contained.
+
+Good first messages:
+- "I am looking at the metal card."
+- "I am considering the business account option."
+- "I am reviewing the eligibility policy."
+
+Bad first messages:
+- "I am interested in the fees of the metal card."
+- "I need to know whether the business account has international transfers."
+- "I am checking the eligibility requirements for this policy."
+
+Good second messages:
+- "How high are they the fees?"
+- "Does it include international transfers?"
+- "Who qualifies for it?"
+
+Bad second messages:
+- "Does the business account include international transfers?"
+- "Who qualifies for the eligibility policy?"
+
+{% if not trace.interactions %}
+## First Message Instructions
+Generate the first message in this language: {{ trace.annotations.language }}.
+Set goal_reached to false.
+{% else %}
+## Second Message Instructions
+Generate the second message in this language: {{ trace.annotations.language }}.
+This message must contain the question. The question must not be understandable
+without the context established in the first message. Use a natural reference
+such as "it", "that product", "this policy", "the requirement", or another
+context-dependent phrase. Do not repeat product names, entities, policies,
+relationships, or situations mentioned in the first message.
+Set goal_reached to false.
+{% endif %}
+
+## Conversation So Far
+<history>
+{{ trace }}
+</history>
+
+Generate concrete user messages only; never use placeholders.
+
+{{ _instr_output }}

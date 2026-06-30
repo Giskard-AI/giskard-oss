@@ -3,10 +3,8 @@ from giskard.checks.core import Interact
 from giskard.checks.generators import LLMGenerator
 from giskard.checks.judges import Contradiction
 from giskard.scan.generators.base import ScenarioContext
-from giskard.scan.generators.knowledge_base import (
-    SYCOPHANCY_QUALITY_TAGS,
-    SycophancyScenarioGenerator,
-)
+from giskard.scan.generators.knowledge_base import SycophancyScenarioGenerator
+from giskard.scan.generators.knowledge_base.sycophancy import SYCOPHANCY_QUALITY_TAGS
 from giskard.scan.utils.knowledge_base import Document, KnowledgeBase
 
 
