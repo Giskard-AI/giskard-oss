@@ -5,7 +5,7 @@ from typing import Any, ClassVar, Unpack, override
 
 import numpy as np
 from giskard.checks import Contradiction, LLMGenerator, Scenario, Trace
-from pydantic import ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ...utils.knowledge_base import Document, KnowledgeBase
 from ..base import ScenarioContext, ScenarioGenerator, TargetMode
@@ -15,12 +15,10 @@ DEFAULT_KNOWLEDGE_BASE_CONTEXT_DOCUMENTS = 4
 DEFAULT_KNOWLEDGE_BASE_MAX_TURNS = 3
 
 
-class _KnowledgeBaseGenerationParams(BaseModel):
+class _KnowledgeBaseGenerationParams(
+    BaseModel, arbitrary_types_allowed=True, frozen=True
+):
     """Shared generation parameters for knowledge-base scenario generators."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(
-        arbitrary_types_allowed=True, frozen=True
-    )
 
     knowledge_base: KnowledgeBase
     scenario_count: int
