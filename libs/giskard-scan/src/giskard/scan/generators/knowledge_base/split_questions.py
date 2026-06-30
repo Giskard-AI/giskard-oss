@@ -3,8 +3,7 @@
 from typing import Any, ClassVar, override
 
 import numpy as np
-from giskard.checks.core.interaction import Trace
-from giskard.checks.core.scenario import Scenario
+from giskard.checks import Scenario, Trace
 from pydantic import Field
 
 from ..base import ScenarioContext, TargetMode
