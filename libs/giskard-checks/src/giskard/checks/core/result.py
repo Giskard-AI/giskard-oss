@@ -689,17 +689,14 @@ class SuiteResult(BaseResult, frozen=True):
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        yield from _suite_rich_console(
-            self, console, options, include_recommendation=True
-        )
+        yield from _suite_report_renderables(self, console, options)
+        yield from _recommendation_renderables(self.recommendation)
 
 
-def _suite_rich_console(
+def _suite_report_renderables(
     result: SuiteResult,
     console: Console,
     options: ConsoleOptions,
-    *,
-    include_recommendation: bool,
 ) -> RenderResult:
     yield Rule("Suite Results", style="bold blue")
 
@@ -760,10 +757,6 @@ def _suite_rich_console(
     summary = ", ".join(count_parts)
     yield f"Summary: {summary} | Pass Rate: [default bold]{result.pass_rate:.1%}[/default bold] | Total Duration: {result.duration_ms}ms"
 
-    recommendation = result.recommendation
-    if include_recommendation and recommendation and recommendation.strip():
-        yield _recommendation_panel(recommendation)
-
 
 def _parse_tag(tag: str) -> tuple[str, str]:
     key, _, value = tag.partition(":")
@@ -821,9 +814,7 @@ class GroupedSuiteResult(BaseResult, frozen=True):
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        yield from _suite_rich_console(
-            self.suite_result, console, options, include_recommendation=False
-        )
+        yield from _suite_report_renderables(self.suite_result, console, options)
 
         table = Table(title=f"Results by {self.key}")
         table.add_column(self.key, style="bold")
@@ -844,9 +835,12 @@ class GroupedSuiteResult(BaseResult, frozen=True):
             table.add_row(display_name, rate)
 
         yield table
-        recommendation = self.suite_result.recommendation
-        if recommendation and recommendation.strip():
-            yield _recommendation_panel(recommendation)
+        yield from _recommendation_renderables(self.suite_result.recommendation)
+
+
+def _recommendation_renderables(recommendation: str | None) -> RenderResult:
+    if recommendation and recommendation.strip():
+        yield _recommendation_panel(recommendation)
 
 
 def _recommendation_panel(recommendation: str) -> Panel:
