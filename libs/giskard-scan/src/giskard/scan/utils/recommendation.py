@@ -1,7 +1,6 @@
 """Recommendation helpers for scan results."""
 
-from giskard.checks import SuiteResult
-from giskard.checks.settings import get_default_generator
+from giskard.checks import SuiteResult, get_default_generator
 
 type QualitySummaryRow = dict[str, str | int | float | None]
 
