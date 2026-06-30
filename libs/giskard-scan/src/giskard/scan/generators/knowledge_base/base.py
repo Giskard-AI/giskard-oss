@@ -1,24 +1,31 @@
-"""Knowledge-base scenario generators for document-grounded quality scans."""
+"""Shared primitives for knowledge-base quality scenario generators."""
 
+import re
+from collections.abc import Collection
 from typing import Any, ClassVar, Unpack, override
 
 import numpy as np
 from giskard.checks import Contradiction, LLMGenerator, Scenario, Trace
-from pydantic import ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from ..utils.knowledge_base import Document
-from .base import ScenarioContext, ScenarioGenerator, TargetMode
+from ...utils.knowledge_base import Document, KnowledgeBase
+from ..base import ScenarioContext, ScenarioGenerator, TargetMode
 
 DEFAULT_KNOWLEDGE_BASE_SCENARIOS = 5
 DEFAULT_KNOWLEDGE_BASE_CONTEXT_DOCUMENTS = 4
 DEFAULT_KNOWLEDGE_BASE_MAX_TURNS = 3
 
-DIRECT_QUESTIONS_QUALITY_TAGS = [
-    "quality:direct-questions",
-    "component:llm",
-    "component:retriever",
-]
-SYCOPHANCY_QUALITY_TAGS = ["quality:sycophancy", "component:llm"]
+
+class _KnowledgeBaseGenerationParams(
+    BaseModel, arbitrary_types_allowed=True, frozen=True
+):
+    """Shared generation parameters for knowledge-base scenario generators."""
+
+    knowledge_base: KnowledgeBase
+    scenario_count: int
+    rng: np.random.Generator
+    sampled_languages: list[str]
+    max_turns: int
 
 
 class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
@@ -74,29 +81,22 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
             Generated scenarios, or an empty list when the context carries no
             knowledge base.
         """
-        knowledge_base = context.knowledge_base
-        if knowledge_base is None:
-            return []
-
-        scenario_count = (
-            DEFAULT_KNOWLEDGE_BASE_SCENARIOS if max_scenarios is None else max_scenarios
+        params = self._prepare_generation_params(
+            context,
+            max_scenarios=max_scenarios,
+            rng=rng,
+            target_mode=target_mode,
         )
-        if scenario_count <= 0:
+        if params is None:
             return []
 
-        effective_max_turns = self._effective_max_turns(self.max_turns, target_mode)
-
-        rng = rng or np.random.default_rng()
         seed_indices = self._sample_seed_indices(
-            len(knowledge_base.documents), scenario_count, rng
-        )
-        sampled_languages = self._sample_languages(
-            context.languages, scenario_count, rng
+            len(params.knowledge_base.documents), params.scenario_count, params.rng
         )
 
         scenarios = []
-        for seed_index, language in zip(seed_indices, sampled_languages):
-            context_documents = await knowledge_base.closest_documents(
+        for seed_index, language in zip(seed_indices, params.sampled_languages):
+            context_documents = await params.knowledge_base.closest_documents(
                 int(seed_index), self.context_documents
             )
             scenarios.append(
@@ -105,11 +105,39 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
                     language=language,
                     seed_index=int(seed_index),
                     context_documents=context_documents,
-                    max_turns=effective_max_turns,
+                    max_turns=params.max_turns,
                 )
             )
 
         return scenarios
+
+    def _prepare_generation_params(
+        self,
+        context: ScenarioContext,
+        max_scenarios: int | None,
+        rng: np.random.Generator | None,
+        target_mode: TargetMode,
+    ) -> _KnowledgeBaseGenerationParams | None:
+        knowledge_base = context.knowledge_base
+        if knowledge_base is None:
+            return None
+
+        scenario_count = (
+            DEFAULT_KNOWLEDGE_BASE_SCENARIOS if max_scenarios is None else max_scenarios
+        )
+        if scenario_count <= 0:
+            return None
+
+        rng = rng or np.random.default_rng()
+        return _KnowledgeBaseGenerationParams(
+            knowledge_base=knowledge_base,
+            scenario_count=scenario_count,
+            rng=rng,
+            sampled_languages=self._sample_languages(
+                context.languages, scenario_count, rng
+            ),
+            max_turns=self._effective_max_turns(self.max_turns, target_mode),
+        )
 
     @staticmethod
     def _sample_seed_indices(
@@ -151,7 +179,7 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
         context_documents: list[Document],
         max_turns: int,
     ) -> Scenario[Any, Any, Trace[Any, Any]]:
-        context = [document.content for document in context_documents]
+        context = self._document_contents(context_documents)
         return (
             Scenario(f"{self.scenario_name_prefix} - Document {seed_index}")
             .interact(
@@ -173,29 +201,10 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
             .with_tags(list(self.quality_tags))
         )
 
-
-class HallucinationScenarioGenerator(KnowledgeBaseScenarioGenerator):
-    """Generate document-grounded hallucination quality scenarios.
-
-    The generator samples seed documents, retrieves their nearest neighbors,
-    and builds multi-turn scenarios that use an LLM-generated user simulator
-    grounded in those documents. The contradiction check flags target responses
-    that clearly conflict with the retrieved context.
-    """
-
-    scenario_name_prefix: ClassVar[str] = "Knowledge Base Direct Questions"
-    prompt_path: ClassVar[str] = "giskard.scan::scenarios/knowledge_base_question.j2"
-    quality_tags: ClassVar[list[str]] = DIRECT_QUESTIONS_QUALITY_TAGS
+    @staticmethod
+    def _document_contents(documents: Collection[Document]) -> list[str]:
+        return [document.content for document in documents]
 
 
-class SycophancyScenarioGenerator(KnowledgeBaseScenarioGenerator):
-    """Generate document-grounded sycophancy quality scenarios.
-
-    The generator samples seed documents and nearest neighbors from the run
-    knowledge base, then asks an LLM user simulator to pressure the target with
-    a plausible premise explicitly contradicted by those documents.
-    """
-
-    scenario_name_prefix: ClassVar[str] = "Knowledge Base Sycophantic Questions"
-    prompt_path: ClassVar[str] = "giskard.scan::scenarios/knowledge_base_sycophancy.j2"
-    quality_tags: ClassVar[list[str]] = SYCOPHANCY_QUALITY_TAGS
+def _normalize_for_match(text: str) -> str:
+    return re.sub(r"\s+", " ", text.casefold()).strip()

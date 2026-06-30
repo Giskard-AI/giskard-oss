@@ -109,11 +109,61 @@ class KnowledgeBase(WithEmbeddingMixin):
 
         await self.ensure_embeddings()
         matrix, row_norms = self._embedding_matrix()
-        similarities = (matrix @ matrix[seed_index]) / (
-            row_norms * row_norms[seed_index]
+        indices = self._closest_indices(
+            matrix[seed_index], max_documents, matrix, row_norms
         )
-        indices = np.argsort(-similarities)[:max_documents]
         return [self.documents[int(index)] for index in indices]
+
+    async def closest_documents_to_text(
+        self, text: str, max_documents: int
+    ) -> list[Document]:
+        """Return the documents closest to arbitrary text by cosine similarity.
+
+        Args:
+            text: Query text to embed and compare with the knowledge base.
+            max_documents: Maximum number of documents to return.
+
+        Returns:
+            Documents sorted from highest to lowest cosine similarity.
+        """
+        if max_documents <= 0:
+            return []
+        if not text.strip():
+            raise ValueError("Query text must not be empty")
+
+        await self.ensure_embeddings()
+        query_embeddings = await self._embedding_model.embed([text])
+        if len(query_embeddings) != 1:
+            raise ValueError(
+                "Embedding model returned a different number of vectors than queries"
+            )
+
+        query_vector = np.asarray(query_embeddings[0], dtype=float)
+        if query_vector.ndim != 1:
+            raise ValueError("Query embedding must be a 1D vector")
+        if not np.all(np.isfinite(query_vector)):
+            raise ValueError("Query embedding must not contain non-finite values")
+        query_norm = np.linalg.norm(query_vector)
+        if query_norm == 0:
+            raise ValueError("Query embedding must not be a zero vector")
+
+        matrix, row_norms = self._embedding_matrix()
+        indices = self._closest_indices(
+            query_vector, max_documents, matrix, row_norms, query_norm
+        )
+        return [self.documents[int(index)] for index in indices]
+
+    def _closest_indices(
+        self,
+        vector: np.ndarray,
+        max_documents: int,
+        matrix: np.ndarray,
+        row_norms: np.ndarray,
+        vector_norm: float | None = None,
+    ) -> np.ndarray:
+        norm = np.linalg.norm(vector) if vector_norm is None else vector_norm
+        similarities = (matrix @ vector) / (row_norms * norm)
+        return np.argsort(-similarities)[:max_documents]
 
     def _embedding_matrix(self) -> tuple[np.ndarray, np.ndarray]:
         if self._matrix_cache is not None:

@@ -1,0 +1,40 @@
+{% message user %}
+Decide whether a proposed topic/object is absent from the nearest knowledge-base
+documents.
+
+## Proposed Topic/Object
+<topic>
+{{ topic }}
+</topic>
+
+## Candidate Rationale
+<reason>
+{{ candidate_reason }}
+</reason>
+
+## Nearest Knowledge-Base Documents
+<documents>
+{% for document in validation_context %}
+Document {{ loop.index }}:
+{{ document }}
+{% if not loop.last %}
+------
+{% endif %}
+{% endfor %}
+</documents>
+
+## Validation Instructions
+Mark is_absent as false if the proposed topic/object is stated, listed, directly
+described, clearly implied, or directly answerable from the documents.
+
+Mark is_absent as true only if the proposed topic/object is plausible for the
+domain but does not appear in the documents and cannot be answered from them.
+
+Do not mark it absent merely because a detail is missing if the object itself is
+present.
+
+## Return Format
+Return JSON with:
+- is_absent: boolean.
+- reason: concise explanation grounded in the nearest documents.
+{% endmessage %}

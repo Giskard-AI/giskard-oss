@@ -14,6 +14,9 @@ from .generators.huggingface import HuggingFaceDatasetScenarioGenerator
 from .generators.knowledge_base import (
     HallucinationScenarioGenerator,
     KnowledgeBaseScenarioGenerator,
+    MultiTopicScenarioGenerator,
+    OutOfScopeScenarioGenerator,
+    SplitQuestionsScenarioGenerator,
     SycophancyScenarioGenerator,
 )
 from .generators.prompt_injection import PromptInjectionScenarioGenerator
@@ -38,6 +41,9 @@ __all__ = [
     "PromptInjectionScenarioGenerator",
     "KnowledgeBaseScenarioGenerator",
     "HallucinationScenarioGenerator",
+    "MultiTopicScenarioGenerator",
+    "OutOfScopeScenarioGenerator",
+    "SplitQuestionsScenarioGenerator",
     "SycophancyScenarioGenerator",
     "Document",
     "KnowledgeBase",

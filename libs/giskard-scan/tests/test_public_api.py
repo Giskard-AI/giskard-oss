@@ -6,7 +6,10 @@ from giskard.scan import (
     HallucinationScenarioGenerator,
     KnowledgeBase,
     KnowledgeBaseScenarioGenerator,
+    MultiTopicScenarioGenerator,
+    OutOfScopeScenarioGenerator,
     PromptInjectionScenarioGenerator,
+    SplitQuestionsScenarioGenerator,
     SuiteGeneratorRegistry,
     SycophancyScenarioGenerator,
     generate_suite,
@@ -61,4 +64,7 @@ def test_quality_suite_generator_registry_contains_builtin_generators():
     types = {type(g) for g in quality_suite_generator_registry.generators()}
     assert HallucinationScenarioGenerator in types
     assert KnowledgeBaseScenarioGenerator not in types
+    assert MultiTopicScenarioGenerator in types
+    assert OutOfScopeScenarioGenerator in types
+    assert SplitQuestionsScenarioGenerator in types
     assert SycophancyScenarioGenerator in types
