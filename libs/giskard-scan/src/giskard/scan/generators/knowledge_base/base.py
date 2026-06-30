@@ -178,7 +178,7 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
         context_documents: list[Document],
         max_turns: int,
     ) -> Scenario[Any, Any, Trace[Any, Any]]:
-        context = [document.content for document in context_documents]
+        context = self._document_contents(context_documents)
         return (
             Scenario(f"{self.scenario_name_prefix} - Document {seed_index}")
             .interact(
@@ -199,6 +199,10 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
             )
             .with_tags(list(self.quality_tags))
         )
+
+    @staticmethod
+    def _document_contents(documents: list[Document]) -> list[str]:
+        return [document.content for document in documents]
 
 
 def _normalize_for_match(text: str) -> str:

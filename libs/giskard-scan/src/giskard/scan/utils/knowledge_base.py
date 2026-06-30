@@ -109,7 +109,9 @@ class KnowledgeBase(WithEmbeddingMixin):
 
         await self.ensure_embeddings()
         matrix, row_norms = self._embedding_matrix()
-        indices = self._closest_indices(matrix[seed_index], max_documents, row_norms)
+        indices = self._closest_indices(
+            matrix[seed_index], max_documents, matrix, row_norms
+        )
         return [self.documents[int(index)] for index in indices]
 
     async def closest_documents_to_text(
@@ -147,7 +149,7 @@ class KnowledgeBase(WithEmbeddingMixin):
 
         matrix, row_norms = self._embedding_matrix()
         indices = self._closest_indices(
-            query_vector, max_documents, row_norms, query_norm
+            query_vector, max_documents, matrix, row_norms, query_norm
         )
         return [self.documents[int(index)] for index in indices]
 
@@ -155,10 +157,10 @@ class KnowledgeBase(WithEmbeddingMixin):
         self,
         vector: np.ndarray,
         max_documents: int,
+        matrix: np.ndarray,
         row_norms: np.ndarray,
         vector_norm: float | None = None,
     ) -> np.ndarray:
-        matrix, _ = self._embedding_matrix()
         norm = np.linalg.norm(vector) if vector_norm is None else vector_norm
         similarities = (matrix @ vector) / (row_norms * norm)
         return np.argsort(-similarities)[:max_documents]

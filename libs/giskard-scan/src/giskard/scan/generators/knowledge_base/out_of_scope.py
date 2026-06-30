@@ -96,9 +96,7 @@ class OutOfScopeScenarioGenerator(KnowledgeBaseScenarioGenerator, WithGeneratorM
         rng: np.random.Generator,
         max_turns: int,
     ) -> Scenario[Any, Any, Trace[Any, Any]] | None:
-        knowledge_base_documents = [
-            document.content for document in knowledge_base.documents
-        ]
+        knowledge_base_documents = self._document_contents(knowledge_base.documents)
         used_seed_indices: set[int] = set()
         for _ in range(OUT_OF_SCOPE_MAX_STRING_MATCH_RETRIES + 1):
             seed_index = self._sample_unused_seed_index(
@@ -111,7 +109,7 @@ class OutOfScopeScenarioGenerator(KnowledgeBaseScenarioGenerator, WithGeneratorM
             candidate = await self._generate_absent_candidate(
                 description,
                 language,
-                [document.content for document in context_documents],
+                self._document_contents(context_documents),
             )
             if self._has_direct_text_match(candidate.topic, knowledge_base_documents):
                 continue
@@ -122,7 +120,7 @@ class OutOfScopeScenarioGenerator(KnowledgeBaseScenarioGenerator, WithGeneratorM
             validation = await self._validate_absence(
                 candidate.topic,
                 candidate.reason,
-                [document.content for document in validation_documents],
+                self._document_contents(validation_documents),
             )
             if not validation.is_absent:
                 logger.warning(
@@ -205,8 +203,8 @@ class OutOfScopeScenarioGenerator(KnowledgeBaseScenarioGenerator, WithGeneratorM
         validation: OutOfScopeValidation,
         max_turns: int,
     ) -> Scenario[Any, Any, Trace[Any, Any]]:
-        reference_context = [document.content for document in context_documents]
-        validation_context = [document.content for document in validation_documents]
+        reference_context = self._document_contents(context_documents)
+        validation_context = self._document_contents(validation_documents)
         return (
             Scenario(f"{self.scenario_name_prefix} - Document {seed_index}")
             .interact(
