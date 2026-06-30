@@ -13,6 +13,10 @@ dependencies = [
     "huggingface-hub>=1.11.0,<2",
 ]
 
+[project.optional-dependencies]
+garak = ["garak>=0.15"]
+deepteam = ["deepteam>=1.0"]
+
 [build-system]
 requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
