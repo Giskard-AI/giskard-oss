@@ -348,3 +348,31 @@ async def test_quality_scan_does_not_generate_recommendation_without_failures(
 
     assert result.recommendation == ""
     assert recommendation_generator.calls == []
+
+
+async def test_quality_scan_hides_recommendation_when_generation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    quality_suite_generator_registry.register(_DeterministicQualityGenerator())
+    monkeypatch.setattr(SuiteResult, "print_report", lambda self, **_: None)
+
+    async def fail_recommendation(_: SuiteResult) -> str:
+        raise RuntimeError("generator unavailable")
+
+    monkeypatch.setattr(
+        quality_module, "generate_quality_recommendation", fail_recommendation
+    )
+
+    async def target(inputs: str) -> str:
+        return inputs
+
+    result = await quality_scan(
+        target=target,
+        description="Support agent",
+        languages=["en"],
+        knowledge_base=["reference document"],
+        max_scenarios=2,
+    )
+
+    assert result.failed_count == 1
+    assert result.recommendation == ""

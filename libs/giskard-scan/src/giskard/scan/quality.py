@@ -97,7 +97,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         recommendation = await generate_quality_recommendation(result)
     except Exception:
         logger.exception("Quality recommendation generation failed")
-        recommendation = "Quality recommendation generation failed"
+        recommendation = ""
     quality_result = result.model_copy(update={"recommendation": recommendation})
     quality_result.print_report(group_by=group_by)
     return quality_result
