@@ -1,6 +1,7 @@
 """Shared primitives for knowledge-base quality scenario generators."""
 
 import re
+from collections.abc import Collection
 from typing import Any, ClassVar, Unpack, override
 
 import numpy as np
@@ -201,7 +202,7 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
         )
 
     @staticmethod
-    def _document_contents(documents: list[Document]) -> list[str]:
+    def _document_contents(documents: Collection[Document]) -> list[str]:
         return [document.content for document in documents]
 
 
