@@ -42,4 +42,4 @@ class GiskardGenerator(_GarakBase):  # pyright: ignore[reportGeneralTypeIssues]
             response = asyncio.run(self._giskard_target(prompt))
         else:
             response = self._giskard_target(prompt)
-        return [response]
+        return [response if isinstance(response, str) else str(response)]
