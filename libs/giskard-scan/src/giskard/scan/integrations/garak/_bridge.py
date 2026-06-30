@@ -20,7 +20,6 @@ class GiskardGenerator(_GarakBase):  # pyright: ignore[reportGeneralTypeIssues]
     asyncio.run() is safe for async targets.
     """
 
-    name = "giskard"
     supports_multiple_generations = False
 
     def __init__(self, target: Any) -> None:  # pyright: ignore[reportMissingSuperCall]

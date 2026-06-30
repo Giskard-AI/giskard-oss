@@ -2,7 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from giskard.checks import CheckStatus
 
 # ---------------------------------------------------------------------------
@@ -107,29 +106,45 @@ def test_run_sync_builds_suite_result():
 
 
 # ---------------------------------------------------------------------------
-# GiskardGenerator bridge (requires garak installed)
+# GiskardGenerator bridge (mock-based, garak not required)
 # ---------------------------------------------------------------------------
 
 
 def test_giskard_generator_sync_target():
-    pytest.importorskip("garak")
     from giskard.scan.integrations.garak._bridge import GiskardGenerator
 
     target = MagicMock(return_value="sync response")
-    gen = GiskardGenerator(target)
-    results = gen._call_model("hello prompt")
+    with patch("giskard.scan.integrations.garak._bridge._garak_available", True):
+        gen = GiskardGenerator(target)
+        results = gen._call_model("hello prompt")
 
     target.assert_called_once_with("hello prompt")
     assert results == ["sync response"]
 
 
 def test_giskard_generator_async_target():
-    pytest.importorskip("garak")
     from giskard.scan.integrations.garak._bridge import GiskardGenerator
 
     async def async_target(prompt: str) -> str:
         return "async response"
 
-    gen = GiskardGenerator(async_target)
-    results = gen._call_model("hello prompt")
+    with patch("giskard.scan.integrations.garak._bridge._garak_available", True):
+        gen = GiskardGenerator(async_target)
+        results = gen._call_model("hello prompt")
+
     assert results == ["async response"]
+
+
+def test_giskard_generator_non_string_coercion():
+    from giskard.scan.integrations.garak._bridge import GiskardGenerator
+
+    class CustomObj:
+        def __str__(self) -> str:
+            return "coerced"
+
+    target = MagicMock(return_value=CustomObj())
+    with patch("giskard.scan.integrations.garak._bridge._garak_available", True):
+        gen = GiskardGenerator(target)
+        results = gen._call_model("hello prompt")
+
+    assert results == ["coerced"]
