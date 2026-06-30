@@ -55,7 +55,7 @@ def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
         interacts = []
         for interact in step.interacts:
             if isinstance(interact, Interact) and interact.outputs is MISSING:
-                interact = interact.model_copy().set_outputs(target)
+                interact = interact.model_copy(update={"outputs": target})
             interacts.append(interact)
 
         steps.append(step.model_copy(update={"interacts": interacts}))
