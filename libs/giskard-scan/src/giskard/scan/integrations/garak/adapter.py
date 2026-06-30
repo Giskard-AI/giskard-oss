@@ -36,15 +36,32 @@ def _load_plugin(name: str) -> Any:
     return garak._plugins.load_plugin(name)
 
 
+def _enumerate_probes() -> list[str]:
+    import garak._plugins
+
+    return [
+        name
+        for name, loadable in garak._plugins.enumerate_plugins("probes")
+        if loadable
+    ]
+
+
 class GarakAdapter:
     async def run(
         self,
         target: Target,  # pyright: ignore[reportMissingTypeArgument]
         *,
-        probes: list[str],
+        probes: list[str] | None = None,
         **kwargs: Any,
     ) -> SuiteResult:
-        """Run garak probes against target and return a SuiteResult."""
+        """Run garak probes against target and return a SuiteResult.
+
+        Args:
+            target: The Giskard Target callable to test.
+            probes: Garak probe names to run, e.g. ``["probes.dan.Dan_11_0"]``.
+                If omitted, all probes that can run without extra credentials
+                are discovered and run automatically.
+        """
         try:
             import garak._plugins  # noqa: F401
         except ImportError as e:
@@ -57,13 +74,14 @@ class GarakAdapter:
             None, lambda: self._run_sync(target, probes=probes)
         )
 
-    def _run_sync(self, target: Target, *, probes: list[str]) -> SuiteResult:  # pyright: ignore[reportMissingTypeArgument]
+    def _run_sync(self, target: Target, *, probes: list[str] | None) -> SuiteResult:  # pyright: ignore[reportMissingTypeArgument]
         _setup_garak()
+        probe_names = probes if probes is not None else _enumerate_probes()
         generator = GiskardGenerator(target)
         scenario_results: list[ScenarioResult] = []  # pyright: ignore[reportMissingTypeArgument]
         start = time.perf_counter()
 
-        for probe_name in probes:
+        for probe_name in probe_names:
             # load_plugin returns an instance, not a class
             probe = _load_plugin(probe_name)
             attempts = probe.probe(generator)
