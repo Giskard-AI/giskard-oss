@@ -75,19 +75,17 @@ def test_run_sync_builds_suite_result():
     mock_probe = MagicMock()
     mock_probe.__class__.__module__ = probe_module
     mock_probe.__class__.__name__ = probe_cls_name
-    mock_probe.detectors = ["detectors.dan.DAN"]
+    mock_probe.primary_detector = "dan.DAN"
+    mock_probe.extended_detectors = []
     mock_probe.probe.return_value = [attempt]
-
-    mock_probe_class = MagicMock(return_value=mock_probe)
 
     mock_detector = MagicMock()
     mock_detector.detect.return_value = [0.8]
-    mock_detector_class = MagicMock(return_value=mock_detector)
 
     def fake_load_plugin(name, *args, **kwargs):
         if "probes" in name:
-            return mock_probe_class
-        return mock_detector_class
+            return mock_probe  # load_plugin returns instance directly in garak 0.15
+        return mock_detector
 
     with (
         patch("giskard.scan.integrations.garak.adapter.GiskardGenerator"),
@@ -119,7 +117,7 @@ def test_giskard_generator_sync_target():
         results = gen._call_model("hello prompt")
 
     target.assert_called_once_with("hello prompt")
-    assert results == ["sync response"]
+    assert results[0].text == "sync response"
 
 
 def test_giskard_generator_async_target():
@@ -132,7 +130,7 @@ def test_giskard_generator_async_target():
         gen = GiskardGenerator(async_target)
         results = gen._call_model("hello prompt")
 
-    assert results == ["async response"]
+    assert results[0].text == "async response"
 
 
 def test_giskard_generator_non_string_coercion():
@@ -147,4 +145,4 @@ def test_giskard_generator_non_string_coercion():
         gen = GiskardGenerator(target)
         results = gen._call_model("hello prompt")
 
-    assert results == ["coerced"]
+    assert results[0].text == "coerced"
