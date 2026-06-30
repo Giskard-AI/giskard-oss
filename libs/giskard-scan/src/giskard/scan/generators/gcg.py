@@ -2,8 +2,7 @@
 
 from typing import Any, override
 
-from giskard.checks import Interact, Scenario, Trace
-from giskard.checks.generators.dataset import DatasetInputGenerator
+from giskard.checks import DatasetInputGenerator, Interact, Scenario, Trace
 from pydantic import Field
 
 from .huggingface import HuggingFaceDatasetScenarioGenerator
