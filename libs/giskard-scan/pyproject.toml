@@ -13,6 +13,11 @@ dependencies = [
     "huggingface-hub>=1.11.0,<2",
 ]
 
+
+[project.optional-dependencies]
+garak = ["garak>=0.15,<1"]
+all = ["giskard-scan[garak]"]
+
 [build-system]
 requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"

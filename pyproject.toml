@@ -39,10 +39,14 @@ regorus = ["giskard-checks[regorus]>=1.0.2b4,<2"]
 # Optional giskard libs
 scan = ["giskard-scan>=1.0.0b2,<2"]
 
+# Optional scan dependencies
+garak = ["giskard-scan[garak]>=1.0.0b2,<2"]
+
 # Aggregated packages
 all-llms = ["giskard-llm[all]>=1.0.0b4,<2"] # Install all native LLM providers
 all-checks = ["giskard-checks[all]>=1.0.2b4,<2"] # Install all optional checks dependencies
-full = ["giskard[all-llms,all-checks,scan,litellm]"]
+all-scan = ["giskard-scan[all]>=1.0.2b4,<2"] # Install all optional checks dependencies
+full = ["giskard[all-llms,all-checks,all-scan,litellm]"]
 
 [project.urls]
 "Homepage" = "https://giskard.ai"
