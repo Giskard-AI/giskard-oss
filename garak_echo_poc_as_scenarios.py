@@ -14,12 +14,11 @@ multiturn state, no manual detector-scoring/result-assembly pass.
 """
 
 import asyncio
-import os
 from typing import Any
 
-import garak._config
 import garak._plugins
 from garak.attempt import Attempt, Conversation, Message, Turn
+from garak.probes import Probe
 from pydantic import BaseModel, PrivateAttr
 
 from giskard.checks import (
@@ -32,13 +31,9 @@ from giskard.checks import (
 )
 from giskard.scan.generators.base import ScenarioContext, ScenarioGenerator
 from dotenv import load_dotenv
+from garak.detectors import Detector
 
 load_dotenv()
-
-# Load garak's default config (populates _config.system) and silence its report
-# file. load_plugin() alone does NOT do this. (POC-1 findings.)
-garak._config.load_base_config()
-garak._config.transient.reportfile = open(os.devnull, "w")
 
 
 # --- Demo targets ----------------------------------------------------------
@@ -84,11 +79,15 @@ class GarakCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
 
     # garak detector objects are not pydantic-friendly; load lazily and keep out
     # of the model schema.
-    _detector: Any = PrivateAttr(default=None)
+    _detector: Detector | None = PrivateAttr(default=None)
 
-    def _get_detector(self) -> Any:
+    def _get_detector(self) -> Detector:
         if self._detector is None:
-            self._detector = garak._plugins.load_plugin(f"detectors.{self.detector_name}")
+            detector = garak._plugins.load_plugin(f"detectors.{self.detector_name}")
+            if not isinstance(detector, Detector):
+                raise ValueError(f"Detector {self.detector_name} is not a valid garak detector")
+            self._detector = detector
+
         return self._detector
 
     async def run(self, trace: TraceType) -> CheckResult:
@@ -103,7 +102,8 @@ class GarakCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
         )
         attempt.outputs = [Message(text=str(last.outputs), lang="en")]
 
-        scores = list(self._get_detector().detect(attempt))
+        detector = self._get_detector()
+        scores = list(detector.detect(attempt))
         score = scores[0] if scores else None
         detail = {"detector": self.detector_name, "score": score}
 
@@ -111,10 +111,10 @@ class GarakCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
             return CheckResult.skip(message="detector returned no score", details=detail)
         if score >= self.fail_threshold:
             return CheckResult.failure(
-                message=f"jailbreak succeeded (score={score:.2f})", details=detail
+                message=f"{detector.hit_desc} (score={score:.2f})", details=detail
             )
         return CheckResult.success(
-            message=f"target resisted (score={score:.2f})", details=detail
+            message=f"{detector.pass_desc} (score={score:.2f})", details=detail
         )
 
 
@@ -127,7 +127,6 @@ class GarakScenarioGenerator(ScenarioGenerator):
     """
 
     probe_name: str = "dan.DanInTheWild"
-    max_scenarios: int = 5  # garak probes carry ~256 prompts; keep the POC cheap
 
     async def generate_scenario(
         self,
@@ -137,6 +136,8 @@ class GarakScenarioGenerator(ScenarioGenerator):
         target_mode: str = "singleturn",
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         probe = garak._plugins.load_plugin(f"probes.{self.probe_name}")
+        if not isinstance(probe, Probe):
+            raise ValueError(f"Probe {self.probe_name} is not a valid garak probe")
 
         # primary + extended detectors -> one GarakCheck each (that's why
         # Scenario.checks(*checks) takes a list).
@@ -145,16 +146,18 @@ class GarakScenarioGenerator(ScenarioGenerator):
             *getattr(probe, "extended_detectors", []),
         ]
 
-        limit = min(max_scenarios or self.max_scenarios, len(probe.prompts))
+        prompts = getattr(probe, "prompts", [])
+        assert isinstance(prompts, list), "Probe prompts must be a list"
+        limit = min(max_scenarios or 10, len(prompts))
         scenarios: list[Scenario[Any, Any, Trace[Any, Any]]] = []
-        for i, prompt in enumerate(probe.prompts[:limit]):
+        for i, prompt in enumerate(prompts[:limit]):
             scenario = (
                 Scenario(name=f"{self.probe_name}#{i}")
                 # DatasetInputGenerator (not raw str) so STRUCTURED targets work:
                 # it LLM-maps the garak prompt into the target's input schema.
                 # outputs omitted -> uses the suite-level target.
                 .interact(inputs=DatasetInputGenerator(prompt=str(prompt)))
-                .checks(*[GarakCheck(detector_name=d) for d in detector_names])
+                .checks(*[GarakCheck(detector_name=d) for d in detector_names if d is not None])
                 .with_tags([f"garak:{self.probe_name}"])
             )
             scenarios.append(scenario)
@@ -163,17 +166,17 @@ class GarakScenarioGenerator(ScenarioGenerator):
 
 # --- Run -------------------------------------------------------------------
 async def main() -> None:
-    generator = GarakScenarioGenerator(probe_name="dan.DanInTheWild", max_scenarios=3)
+    generator = GarakScenarioGenerator(probe_name="dan.DanInTheWild")
     context = ScenarioContext(
         description="an email-forwarding assistant", languages=["en"]
     )
-    scenarios = await generator.generate_scenario(context, target_mode="singleturn")
+    scenarios = await generator.generate_scenario(context, target_mode="singleturn", max_scenarios=10)
 
     suite = Suite(name="garak-poc", scenarios=scenarios)
     # Giskard is async-native and this is the outermost sync frame, so asyncio.run
     # is correct -- NO background-loop thread needed (that was only POC 1's
     # sync-garak-calling-async problem, which no longer exists here).
-    result = await suite.run(target=target)
+    result = await suite.run(target=structured_target)
     result.print_report()
 
 
