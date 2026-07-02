@@ -945,17 +945,19 @@ class TestComparisonMatchMode:
     """Test collection match modes (any, all, none) on ComparisonCheck."""
 
     @staticmethod
-    async def _tool_calls_trace() -> Trace[Any, Any]:
+    async def _tool_calls_trace(
+        tool_calls: list[dict[str, object]] | None = None,
+    ) -> Trace[Any, Any]:
+        if tool_calls is None:
+            tool_calls = [
+                {"name": "search", "args": {}},
+                {"name": "summarize", "args": {}},
+            ]
         return await Trace.from_interactions(
             Interaction(
                 inputs="test",
                 outputs="result",
-                metadata={
-                    "tool_calls": [
-                        {"name": "search", "args": {}},
-                        {"name": "summarize", "args": {}},
-                    ]
-                },
+                metadata={"tool_calls": tool_calls},
             )
         )
 
@@ -1067,9 +1069,7 @@ class TestComparisonMatchMode:
         assert "Expected a list, set, or tuple" in result.message
 
     async def test_match_any_fails_on_empty_collection(self):
-        trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs="ok", metadata={"tool_calls": []})
-        )
+        trace = await self._tool_calls_trace(tool_calls=[])
         check = Equals(
             expected_value="search",
             key="trace.last.metadata.tool_calls[*].name",
@@ -1083,35 +1083,23 @@ class TestComparisonMatchMode:
         assert isinstance(result.message, str)
         assert "none matched" in result.message
 
-    async def test_match_all_passes_on_empty_collection(self):
-        trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs="ok", metadata={"tool_calls": []})
-        )
+    @pytest.mark.parametrize(
+        ("match", "expect_pass"),
+        [("all", True), ("none", True)],
+        ids=["all", "none"],
+    )
+    async def test_empty_collection_match_modes(self, match, expect_pass):
+        trace = await self._tool_calls_trace(tool_calls=[])
         check = Equals(
             expected_value="search",
             key="trace.last.metadata.tool_calls[*].name",
-            match="all",
+            match=match,
         )
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.PASS
-        assert result.passed
-
-    async def test_match_none_passes_on_empty_collection(self):
-        trace = await Trace.from_interactions(
-            Interaction(inputs="test", outputs="ok", metadata={"tool_calls": []})
-        )
-        check = Equals(
-            expected_value="search",
-            key="trace.last.metadata.tool_calls[*].name",
-            match="none",
-        )
-
-        result = await check.run(trace)
-
-        assert result.status == CheckStatus.PASS
-        assert result.passed
+        assert result.status == CheckStatus.PASS if expect_pass else CheckStatus.FAIL
+        assert result.passed if expect_pass else result.failed
 
     async def test_match_any_works_with_tuple(self):
         trace = await Trace.from_interactions(

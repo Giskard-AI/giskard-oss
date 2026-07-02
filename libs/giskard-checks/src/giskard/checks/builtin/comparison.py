@@ -85,22 +85,57 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
             )
         return self
 
-    @staticmethod
-    def _is_match_collection(value: Any) -> bool:
-        return isinstance(value, list | set | tuple)
+    def _compare_normalized(
+        self, normalized_actual: Any, normalized_expected: ExpectedType
+    ) -> bool | None:
+        try:
+            return self._compare(normalized_actual, normalized_expected)
+        except Exception:
+            return None
 
     def _try_compare(
         self, actual_value: Any, expected_value: ExpectedType
     ) -> bool | None:
-        """Compare two values, returning None when comparison is not supported."""
-        normalized_actual_value = normalize_data(actual_value, self.normalization_form)
-        normalized_expected_value = normalize_data(
-            expected_value, self.normalization_form
+        return self._compare_normalized(
+            normalize_data(actual_value, self.normalization_form),
+            normalize_data(expected_value, self.normalization_form),
         )
-        try:
-            return self._compare(normalized_actual_value, normalized_expected_value)
-        except Exception:
-            return None
+
+    def _try_compare_to_normalized_expected(
+        self, actual_value: Any, normalized_expected: ExpectedType
+    ) -> bool | None:
+        return self._compare_normalized(
+            normalize_data(actual_value, self.normalization_form),
+            normalized_expected,
+        )
+
+    def _collection_match_message(
+        self,
+        passed: bool,
+        actual_value: Any,
+        expected_value: ExpectedType,
+        matched_items: list[Any] | None = None,
+    ) -> str:
+        actual_repr = repr(actual_value)
+        expected_repr = repr(expected_value)
+        comparison = self._comparison_message
+        if self.match == "any":
+            if passed:
+                return f"At least one value in {actual_repr} is {comparison} {expected_repr}."
+            return (
+                f"Expected at least one value {comparison} {expected_repr} "
+                f"but none matched in {actual_repr}."
+            )
+        if self.match == "all":
+            if passed:
+                return f"All values in {actual_repr} are {comparison} {expected_repr}."
+            return f"Expected all values {comparison} {expected_repr} but got {actual_repr}."
+        if passed:
+            return f"No value in {actual_repr} is {comparison} {expected_repr}."
+        return (
+            f"Expected no value {comparison} {expected_repr} "
+            f"but found matches in {repr(matched_items)}."
+        )
 
     def _run_collection_match(
         self,
@@ -108,7 +143,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         expected_value: ExpectedType,
         details: dict[str, Any],
     ) -> CheckResult:
-        if not self._is_match_collection(actual_value):
+        if not isinstance(actual_value, list | set | tuple):
             return CheckResult.failure(
                 message=(
                     f"Expected a list, set, or tuple at key '{self.key}' when match is "
@@ -117,8 +152,10 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
                 details=details,
             )
 
+        normalized_expected = normalize_data(expected_value, self.normalization_form)
         comparison_results = [
-            self._try_compare(item, expected_value) for item in actual_value
+            self._try_compare_to_normalized_expected(item, normalized_expected)
+            for item in actual_value
         ]
 
         if comparison_results and all(result is None for result in comparison_results):
@@ -131,61 +168,32 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
                 details=details,
             )
 
-        matched_items = [
-            item
-            for item, result in zip(actual_value, comparison_results, strict=True)
-            if result is True
-        ]
-
+        truths = [result is True for result in comparison_results]
         if self.match == "any":
-            passed = any(result is True for result in comparison_results)
-            if passed:
-                return CheckResult.success(
-                    message=(
-                        f"At least one value in {repr(actual_value)} is "
-                        f"{self._comparison_message} {repr(expected_value)}."
-                    ),
-                    details=details,
-                )
-            return CheckResult.failure(
-                message=(
-                    f"Expected at least one value {self._comparison_message} "
-                    f"{repr(expected_value)} but none matched in {repr(actual_value)}."
-                ),
-                details=details,
-            )
+            passed = any(truths)
+        elif self.match == "all":
+            passed = all(truths)
+        else:
+            passed = not any(truths)
 
-        if self.match == "all":
-            passed = all(result is True for result in comparison_results)
-            if passed:
-                return CheckResult.success(
-                    message=(
-                        f"All values in {repr(actual_value)} are "
-                        f"{self._comparison_message} {repr(expected_value)}."
-                    ),
-                    details=details,
-                )
-            return CheckResult.failure(
-                message=(
-                    f"Expected all values {self._comparison_message} "
-                    f"{repr(expected_value)} but got {repr(actual_value)}."
-                ),
-                details=details,
-            )
-
-        passed = not any(result is True for result in comparison_results)
         if passed:
             return CheckResult.success(
-                message=(
-                    f"No value in {repr(actual_value)} is "
-                    f"{self._comparison_message} {repr(expected_value)}."
+                message=self._collection_match_message(
+                    True, actual_value, expected_value
                 ),
                 details=details,
             )
+
+        matched_items = None
+        if self.match == "none":
+            matched_items = [
+                item
+                for item, result in zip(actual_value, comparison_results, strict=True)
+                if result is True
+            ]
         return CheckResult.failure(
-            message=(
-                f"Expected no value {self._comparison_message} {repr(expected_value)} "
-                f"but found matches in {repr(matched_items)}."
+            message=self._collection_match_message(
+                False, actual_value, expected_value, matched_items
             ),
             details=details,
         )
@@ -220,19 +228,15 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         if self.match is not MISSING:
             return self._run_collection_match(actual_value, expected_value, details)
 
-        normalized_actual_value = normalize_data(actual_value, self.normalization_form)
-        normalized_expected_value = normalize_data(
-            expected_value, self.normalization_form
-        )
-        try:
-            if self._compare(normalized_actual_value, normalized_expected_value):
-                return CheckResult.success(
-                    message=f"The actual value {repr(actual_value)} is {self._comparison_message} the expected value {repr(expected_value)}.",
-                    details=details,
-                )
-        except Exception:
+        compare_result = self._try_compare(actual_value, expected_value)
+        if compare_result is None:
             return CheckResult.failure(
                 message=f"Comparison not supported: {type(actual_value).__name__} does not support {self._operator_symbol} comparison with {type(expected_value).__name__}",
+                details=details,
+            )
+        if compare_result:
+            return CheckResult.success(
+                message=f"The actual value {repr(actual_value)} is {self._comparison_message} the expected value {repr(expected_value)}.",
                 details=details,
             )
 
