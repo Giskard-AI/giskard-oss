@@ -4,6 +4,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import dataclass
 from importlib.util import find_spec
 from typing import TYPE_CHECKING, Any, cast
 
@@ -15,9 +16,11 @@ from giskard.checks import (
     Target,
     TestCaseResult,
     Trace,
+    get_default_generator,
 )
 
 from ...generators.base import TargetMode
+from ._judge_generator import make_judge_detector
 
 if TYPE_CHECKING:
     from garak.attempt import Attempt
@@ -31,6 +34,12 @@ logger = logging.getLogger(__name__)
 # Strict ``>`` so an exactly-0.5 score is treated as a pass, matching garak's
 # "uncertain, not a confirmed hit" reading of the boundary.
 _HIT_THRESHOLD = 0.5
+
+
+@dataclass(frozen=True)
+class _SkipMarker:
+    name: str
+    reason: str
 
 
 def garak_available() -> bool:
@@ -98,15 +107,72 @@ def _resolve_probes(probes: Iterable[str] | None) -> "list[Probe]":
     return [probe for probe in loaded_probes if probe.active]
 
 
-def _resolve_detectors(probe: "Probe") -> "list[Detector]":
-    from garak._plugins import load_plugin
+def _detector_class(name: str) -> "type[Detector] | None":
+    """Resolve a garak detector name to its class WITHOUT constructing it.
 
-    detectors = [probe.primary_detector or "always.Fail"] + list(
+    ``load_plugin`` instantiates (running the judge's key-requiring ``__init__``), so we
+    import the module and read the attribute directly to classify judge detectors first.
+    Mirrors garak's own name resolution (module.Class, or module + DEFAULT_CLASS).
+    """
+    import importlib
+
+    parts = name.split(".")
+    if len(parts) == 1:
+        module_name, class_name = parts[0], None
+    elif len(parts) == 2:
+        module_name, class_name = parts
+    else:
+        return None
+    try:
+        mod = importlib.import_module(f"garak.detectors.{module_name}")
+    except Exception:  # noqa: BLE001 — unknown module: fall back to instance path
+        return None
+    if class_name is None:
+        class_name = getattr(mod, "DEFAULT_CLASS", None)
+        if class_name is None:
+            return None
+    return getattr(mod, class_name, None)
+
+
+def _resolve_detectors(
+    probe: "Probe", loop: "asyncio.AbstractEventLoop | None"
+) -> "tuple[list[Detector], list[_SkipMarker]]":
+    from garak._plugins import load_plugin
+    from garak.detectors.judge import ModelAsJudge
+    from garak.exception import APIKeyMissingError, GarakException
+
+    detector_names = [probe.primary_detector or "always.Fail"] + list(
         probe.extended_detectors
     )
-    return [
-        cast("Detector", load_plugin(f"detectors.{detector}")) for detector in detectors
-    ]
+
+    detectors: list[Detector] = []
+    skipped: list[_SkipMarker] = []
+    for name in detector_names:
+        full_name = f"detectors.{name}"
+        detector_cls = _detector_class(name)
+
+        # Judge detectors: install the Giskard generator so no judge key is needed.
+        if detector_cls is not None and issubclass(detector_cls, ModelAsJudge):
+            detectors.append(
+                cast(
+                    "Detector",
+                    make_judge_detector(detector_cls, get_default_generator(), loop),
+                )
+            )
+            continue
+
+        try:
+            detectors.append(cast("Detector", load_plugin(full_name)))
+        except GarakException as exc:
+            cause = exc.__cause__
+            if isinstance(cause, APIKeyMissingError):
+                skipped.append(_SkipMarker(name=name, reason=str(cause)))
+            else:
+                logger.warning("Failed to load detector %s: %s", name, exc)
+        except APIKeyMissingError as exc:  # belt-and-suspenders if garak stops wrapping
+            skipped.append(_SkipMarker(name=name, reason=str(exc)))
+
+    return detectors, skipped
 
 
 class GarakScanAdapter:
@@ -192,7 +258,9 @@ class GarakScanAdapter:
         from ._generator import TargetGenerator
 
         generator = TargetGenerator(target=target, loop=loop)
-        detectors = _resolve_detectors(probe)
+        # skipped_detectors is consumed by Task 4's _evaluate_attempt signature change;
+        # computed here so the skip-marker plumbing is already in place.
+        detectors, skipped_detectors = _resolve_detectors(probe, loop)  # noqa: F841
 
         attempts = probe.probe(generator)
         scenario_results = []

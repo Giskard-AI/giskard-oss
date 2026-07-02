@@ -72,3 +72,21 @@ class GiskardJudgeGenerator(OpenAICompatible):
         response = _await_on_loop(self._giskard.complete(messages), self._loop)
         text = response.choices[0].message.text if response.choices else None
         return [Message(text=text) if text is not None else None]
+
+
+def make_judge_detector(detector_cls, generator: BaseGenerator, loop):
+    """Build a judge detector that scores with *generator* instead of its own LLM.
+
+    ``judge.ModelAsJudge.__init__`` calls ``_load_generator`` (which loads an OpenAI
+    generator by name and needs an API key). We subclass and override
+    ``_load_generator`` to install a ``GiskardJudgeGenerator`` and set the token
+    limit garak's ``judge_score`` reads.
+    """
+    from garak.resources.red_team.evaluation import get_token_limit
+
+    class _GiskardJudge(detector_cls):  # type: ignore[valid-type, misc]
+        def _load_generator(self) -> None:
+            self.evaluation_generator = GiskardJudgeGenerator(generator, loop)
+            self.evaluator_token_limit = get_token_limit(self.evaluation_generator.name)
+
+    return _GiskardJudge()

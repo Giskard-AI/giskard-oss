@@ -22,7 +22,9 @@ def _patch_resolvers(monkeypatch: pytest.MonkeyPatch, probes, detectors):
     from giskard.scan.integrations.garak import _adapter
 
     monkeypatch.setattr(_adapter, "_resolve_probes", lambda probes_arg: probes)
-    monkeypatch.setattr(_adapter, "_resolve_detectors", lambda probe: detectors)
+    monkeypatch.setattr(
+        _adapter, "_resolve_detectors", lambda probe, loop: (detectors, [])
+    )
     return _adapter.GarakScanAdapter
 
 
