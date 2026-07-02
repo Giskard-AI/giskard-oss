@@ -29,13 +29,6 @@ def _default_generator(monkeypatch):
     monkeypatch.setattr(_adapter, "get_default_generator", lambda: _StubGenerator())
 
 
-def _load_probe(name: str):
-    _adapter._configure_garak()
-    from garak._plugins import load_plugin
-
-    return load_plugin(name)
-
-
 def test_judge_detector_gets_giskard_generator(monkeypatch):
     from garak.probes.base import Probe
 
@@ -64,3 +57,50 @@ def test_env_var_detector_without_key_is_skipped(monkeypatch):
     assert len(skipped) == 1
     assert isinstance(skipped[0], _SkipMarker)
     assert "PERSPECTIVE_API_KEY" in skipped[0].reason
+
+
+
+def test_skipped_detectors_emit_skip_results(monkeypatch):
+    """Test that skip markers from _resolve_detectors are emitted as CheckResult.skip() per conversation."""
+    from garak.attempt import Attempt
+    from garak.probes.base import Probe
+    from giskard.scan.integrations.garak._adapter import GarakScanAdapter
+    from giskard.checks.core.result import CheckStatus
+
+    # Create a minimal probe with only a skipped detector
+    monkeypatch.delenv("PERSPECTIVE_API_KEY", raising=False)
+    
+    class _SkipProbe(Probe):
+        primary_detector = "perspective.Toxicity"
+        extended_detectors = []
+
+    detectors, skipped = _resolve_detectors(
+        _SkipProbe.__new__(_SkipProbe), None
+    )
+    
+    # Perspective detector should be skipped due to missing key
+    assert len(detectors) == 0
+    assert len(skipped) == 1
+    assert isinstance(skipped[0], _SkipMarker)
+    assert "PERSPECTIVE_API_KEY" in skipped[0].reason
+
+    # Create a minimal attempt with 2 conversations
+    attempt = Attempt()
+    attempt.conversations = ["conv1", "conv2"]
+
+    # Call _evaluate_attempt with the skip markers and no working detectors
+    adapter = GarakScanAdapter()
+    test_case_results = adapter._evaluate_attempt(attempt, detectors, skipped)
+
+    # Should get 2 TestCaseResult objects (one per conversation)
+    assert len(test_case_results) == 2
+
+    for test_case_result in test_case_results:
+        # Each should have exactly 1 CheckResult: the skip marker
+        assert len(test_case_result.results) == 1
+
+        # Result should be a skip result
+        skip_result = test_case_result.results[0]
+        assert skip_result.skipped, f"Expected skip status, got {skip_result.status}"
+        assert "PERSPECTIVE_API_KEY" in str(skip_result.message)
+        assert skip_result.details["detector"] == "perspective.Toxicity"

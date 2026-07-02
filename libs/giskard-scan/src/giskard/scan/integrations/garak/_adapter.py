@@ -179,9 +179,19 @@ class GarakScanAdapter:
     """Build and run a Giskard suite from garak probes."""
 
     def _evaluate_attempt(
-        self, attempt: "Attempt", detectors: "list[Detector]"
+        self, attempt: "Attempt", detectors: "list[Detector]", skipped: "list[_SkipMarker]" = ()
     ) -> list[TestCaseResult]:
         check_results = defaultdict(list)
+
+        # Emit one skip result per skipped detector per conversation
+        for conversation_idx in range(len(attempt.conversations)):
+            for marker in skipped:
+                check_results[conversation_idx].append(
+                    CheckResult.skip(
+                        message=f"detector skipped: {marker.reason}",
+                        details={"detector": marker.name},
+                    )
+                )
 
         for detector in detectors:
             try:
@@ -258,14 +268,12 @@ class GarakScanAdapter:
         from ._generator import TargetGenerator
 
         generator = TargetGenerator(target=target, loop=loop)
-        # skipped_detectors is consumed by Task 4's _evaluate_attempt signature change;
-        # computed here so the skip-marker plumbing is already in place.
-        detectors, skipped_detectors = _resolve_detectors(probe, loop)  # noqa: F841
+        detectors, skipped_detectors = _resolve_detectors(probe, loop)
 
         attempts = probe.probe(generator)
         scenario_results = []
         for attempt_idx, attempt in enumerate(attempts):
-            test_case_results = self._evaluate_attempt(attempt, detectors)
+            test_case_results = self._evaluate_attempt(attempt, detectors, skipped_detectors)
             for conversation_idx, test_case_result in enumerate(test_case_results):
                 scenario_results.append(
                     ScenarioResult(
