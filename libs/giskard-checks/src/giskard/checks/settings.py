@@ -1,11 +1,14 @@
 """Runtime and environment configuration for giskard-checks."""
 
-from giskard.agents import BaseGenerator, EmbeddingModel, Generator
+from functools import lru_cache
+
+from giskard.agents import BaseEmbeddingModel, BaseGenerator, EmbeddingModel, Generator
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Runtime override (takes precedence over environment settings)
+# Runtime overrides (take precedence over environment settings)
 _default_generator: BaseGenerator | None = None
+_default_embedding_model: BaseEmbeddingModel | None = None
 
 DEFAULT_MODEL = "openai/gpt-4o-mini"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
@@ -57,9 +60,15 @@ class GiskardChecksSettings(BaseSettings):
         return parsed if parsed >= 0 else None
 
 
+@lru_cache
 def get_settings() -> GiskardChecksSettings:
-    """Return settings loaded from the environment."""
+    """Return cached settings loaded from the environment."""
     return GiskardChecksSettings()
+
+
+def clear_settings_cache() -> None:
+    """Clear the cached settings instance (for tests and env reloads)."""
+    get_settings.cache_clear()
 
 
 def set_default_generator(generator: BaseGenerator | str) -> None:
@@ -106,13 +115,27 @@ def get_default_generator() -> BaseGenerator:
     return Generator(model=get_settings().default_model)
 
 
-def get_default_embedding_model() -> EmbeddingModel:
+def set_default_embedding_model(embedding_model: BaseEmbeddingModel) -> None:
+    """Set the default embedding model for all checks.
+
+    Parameters
+    ----------
+    embedding_model : BaseEmbeddingModel
+        The embedding model to use as default for all embedding checks.
+    """
+    global _default_embedding_model
+    _default_embedding_model = embedding_model
+
+
+def get_default_embedding_model() -> BaseEmbeddingModel:
     """Get the current default embedding model.
 
     Returns
     -------
-    EmbeddingModel
-        A model built from :envvar:`GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL`,
-        or text-embedding-3-small by default.
+    BaseEmbeddingModel
+        The runtime override if set, otherwise a model built from
+        :envvar:`GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL`, or text-embedding-3-small.
     """
+    if _default_embedding_model is not None:
+        return _default_embedding_model
     return EmbeddingModel(model=get_settings().default_embedding_model)
