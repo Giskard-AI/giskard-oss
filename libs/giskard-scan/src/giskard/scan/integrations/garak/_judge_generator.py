@@ -1,6 +1,7 @@
 """Adapt a Giskard BaseGenerator so garak's LLM-judge detectors can use it."""
 
 import asyncio
+import random
 from typing import cast, override
 
 from garak.attempt import Conversation, Message
@@ -57,6 +58,11 @@ class GiskardJudgeGenerator(OpenAICompatible):
         self._loop = loop
         self.client = None  # never used; _load_unsafe is a no-op
         self.generations = 1
+        # garak Generator.generate() reads these on every call; we skip
+        # Generator.__init__/_load_config to avoid the OpenAI client build and
+        # API-key validation, so set the two attributes it actually needs here.
+        self.seed = None
+        self._rng = random.Random()
 
     @override
     def _load_unsafe(self) -> None:  # override: never build an OpenAI client
