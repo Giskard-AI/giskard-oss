@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Self, override
+from typing import Any, Literal, Self, override
 
 from pydantic import Field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
@@ -9,6 +9,8 @@ from ..core.check import Check
 from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve, resolve
 from ..core.result import CheckResult
 from ..utils.normalization import NormalizationForm, normalize_data
+
+MatchMode = Literal["any", "all", "none"]
 
 
 class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
@@ -47,6 +49,15 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         default="NFKC",
         description="Unicode normalization form to apply before comparison. Defaults to NFKC.",
     )
+    match: MatchMode | MISSING = Field(
+        default=MISSING,
+        description=(
+            "How to apply the comparison when the resolved actual value is a collection. "
+            "When omitted, the resolved value is compared directly. "
+            "'any' passes if at least one item matches, 'all' if every item matches, "
+            "'none' if no item matches. Requires a list, set, or tuple."
+        ),
+    )
 
     @abstractmethod
     def _compare(self, actual_value: Any, expected_value: ExpectedType) -> bool:
@@ -74,6 +85,109 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
             )
         return self
 
+    @staticmethod
+    def _is_match_collection(value: Any) -> bool:
+        return isinstance(value, list | set | tuple)
+
+    def _try_compare(self, actual_value: Any, expected_value: ExpectedType) -> bool | None:
+        """Compare two values, returning None when comparison is not supported."""
+        normalized_actual_value = normalize_data(actual_value, self.normalization_form)
+        normalized_expected_value = normalize_data(
+            expected_value, self.normalization_form
+        )
+        try:
+            return self._compare(normalized_actual_value, normalized_expected_value)
+        except Exception:
+            return None
+
+    def _run_collection_match(
+        self,
+        actual_value: Any,
+        expected_value: ExpectedType,
+        details: dict[str, Any],
+    ) -> CheckResult:
+        if not self._is_match_collection(actual_value):
+            return CheckResult.failure(
+                message=(
+                    f"Expected a list, set, or tuple at key '{self.key}' when match is "
+                    f"{self.match!r}, but got {type(actual_value).__name__}."
+                ),
+                details=details,
+            )
+
+        comparison_results = [
+            self._try_compare(item, expected_value) for item in actual_value
+        ]
+
+        if comparison_results and all(result is None for result in comparison_results):
+            return CheckResult.failure(
+                message=(
+                    f"Comparison not supported: items in {type(actual_value).__name__} "
+                    f"do not support {self._operator_symbol} comparison with "
+                    f"{type(expected_value).__name__}"
+                ),
+                details=details,
+            )
+
+        matched_items = [
+            item
+            for item, result in zip(actual_value, comparison_results, strict=True)
+            if result is True
+        ]
+
+        if self.match == "any":
+            passed = any(result is True for result in comparison_results)
+            if passed:
+                return CheckResult.success(
+                    message=(
+                        f"At least one value in {repr(actual_value)} is "
+                        f"{self._comparison_message} {repr(expected_value)}."
+                    ),
+                    details=details,
+                )
+            return CheckResult.failure(
+                message=(
+                    f"Expected at least one value {self._comparison_message} "
+                    f"{repr(expected_value)} but none matched in {repr(actual_value)}."
+                ),
+                details=details,
+            )
+
+        if self.match == "all":
+            passed = all(result is True for result in comparison_results)
+            if passed:
+                return CheckResult.success(
+                    message=(
+                        f"All values in {repr(actual_value)} are "
+                        f"{self._comparison_message} {repr(expected_value)}."
+                    ),
+                    details=details,
+                )
+            return CheckResult.failure(
+                message=(
+                    f"Expected all values {self._comparison_message} "
+                    f"{repr(expected_value)} but got {repr(actual_value)}."
+                ),
+                details=details,
+            )
+
+        passed = not any(result is True for result in comparison_results)
+        if passed:
+            return CheckResult.success(
+                message=(
+                    f"No value in {repr(actual_value)} is "
+                    f"{self._comparison_message} {repr(expected_value)}."
+                ),
+                details=details,
+            )
+        return CheckResult.failure(
+            message=(
+                f"Expected no value {self._comparison_message} {repr(expected_value)} "
+                f"but found matches in {repr(matched_items)}."
+            ),
+            details=details,
+        )
+
     @override
     async def run(self, trace: TraceType) -> CheckResult:
         """Execute the check against the provided trace."""
@@ -100,6 +214,9 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
                 message=f"No value found for key '{self.key}', expected a value {self._comparison_message} {repr(self.expected_value)}.",
                 details=details,
             )
+
+        if self.match is not MISSING:
+            return self._run_collection_match(actual_value, expected_value, details)
 
         normalized_actual_value = normalize_data(actual_value, self.normalization_form)
         normalized_expected_value = normalize_data(
