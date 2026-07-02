@@ -178,14 +178,13 @@ class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyri
         compatibility with serialized checks using ``kind="lesser_than"``.
     """
 
-    @model_validator(mode="after")
-    def _deprecation_warning(self) -> Self:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         warnings.warn(
             "LesserThan is deprecated; use LessThan instead.",
             DeprecationWarning,
             stacklevel=2,
         )
-        return self
+        super().__init__(*args, **kwargs)
 
 
 @Check.register("greater_than")
@@ -285,14 +284,13 @@ class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  
         compatibility with serialized checks using ``kind="lesser_than_equals"``.
     """
 
-    @model_validator(mode="after")
-    def _deprecation_warning(self) -> Self:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         warnings.warn(
             "LesserThanEquals is deprecated; use LessThanEquals instead.",
             DeprecationWarning,
             stacklevel=2,
         )
-        return self
+        super().__init__(*args, **kwargs)
 
 
 @Check.register("greater_than_equals")
