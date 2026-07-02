@@ -1116,6 +1116,55 @@ class TestComparisonMatchMode:
         assert result.status == CheckStatus.PASS
         assert result.passed
 
+    async def test_match_any_works_with_set(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs={1, 2, 3}),
+        )
+        check = GreaterThan(
+            expected_value=2,
+            key="trace.last.outputs",
+            match="any",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+
+    @pytest.mark.parametrize("match", ["any", "all", "none"])
+    async def test_partial_unsupported_comparison_fails(self, match):
+        """Unsupported comparisons on any item fail instead of being ignored."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs=[5, "abc"]),
+        )
+        check = GreaterThan(
+            expected_value=3,
+            key="trace.last.outputs",
+            match=match,
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert isinstance(result.message, str)
+        assert "Comparison not supported" in result.message
+
+    async def test_match_any_passes_when_supported_items_match(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs=[5, 1]),
+        )
+        check = GreaterThan(
+            expected_value=3,
+            key="trace.last.outputs",
+            match="any",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+
     async def test_default_match_preserves_scalar_comparison(self):
         """Without match mode, wildcard paths still compare the full list."""
         trace = await Trace.from_interactions(

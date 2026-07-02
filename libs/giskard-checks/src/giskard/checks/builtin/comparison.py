@@ -109,6 +109,15 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
             normalized_expected,
         )
 
+    def _unsupported_comparison_message(
+        self, actual_value: Any, expected_value: ExpectedType
+    ) -> str:
+        return (
+            f"Comparison not supported: items in {type(actual_value).__name__} "
+            f"do not support {self._operator_symbol} comparison with "
+            f"{type(expected_value).__name__}"
+        )
+
     def _collection_match_message(
         self,
         passed: bool,
@@ -153,17 +162,21 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
             )
 
         normalized_expected = normalize_data(expected_value, self.normalization_form)
-        comparison_results = [
-            self._try_compare_to_normalized_expected(item, normalized_expected)
-            for item in actual_value
-        ]
+        comparison_results: list[bool | None] = []
+        matched_items: list[Any] = []
+        for item in actual_value:
+            result = self._try_compare_to_normalized_expected(item, normalized_expected)
+            comparison_results.append(result)
+            if result is True:
+                matched_items.append(item)
 
-        if comparison_results and all(result is None for result in comparison_results):
+        if comparison_results and (
+            all(result is None for result in comparison_results)
+            or any(result is None for result in comparison_results)
+        ):
             return CheckResult.failure(
-                message=(
-                    f"Comparison not supported: items in {type(actual_value).__name__} "
-                    f"do not support {self._operator_symbol} comparison with "
-                    f"{type(expected_value).__name__}"
+                message=self._unsupported_comparison_message(
+                    actual_value, expected_value
                 ),
                 details=details,
             )
@@ -184,16 +197,12 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
                 details=details,
             )
 
-        matched_items = None
-        if self.match == "none":
-            matched_items = [
-                item
-                for item, result in zip(actual_value, comparison_results, strict=True)
-                if result is True
-            ]
         return CheckResult.failure(
             message=self._collection_match_message(
-                False, actual_value, expected_value, matched_items
+                False,
+                actual_value,
+                expected_value,
+                matched_items if self.match == "none" else None,
             ),
             details=details,
         )
