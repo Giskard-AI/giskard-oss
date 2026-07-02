@@ -6,6 +6,8 @@ Tests cover different types (numbers, strings) and various comparison scenarios:
 - TypeError handling (missing methods and incompatible types)
 """
 
+from typing import Any
+
 import pytest
 from giskard.checks import (
     CheckStatus,
@@ -943,7 +945,7 @@ class TestComparisonMatchMode:
     """Test collection match modes (any, all, none) on ComparisonCheck."""
 
     @staticmethod
-    async def _tool_calls_trace() -> Trace:
+    async def _tool_calls_trace() -> Trace[Any, Any]:
         return await Trace.from_interactions(
             Interaction(
                 inputs="test",
@@ -984,6 +986,7 @@ class TestComparisonMatchMode:
 
         assert result.status == CheckStatus.FAIL
         assert result.failed
+        assert isinstance(result.message, str)
         assert "none matched" in result.message
 
     async def test_equals_match_all_passes_when_all_match(self):
@@ -1017,6 +1020,7 @@ class TestComparisonMatchMode:
 
         assert result.status == CheckStatus.FAIL
         assert result.failed
+        assert isinstance(result.message, str)
         assert "Expected all values equal to 'ok'" in result.message
 
     async def test_equals_match_none_passes_when_no_item_matches(self):
@@ -1044,6 +1048,7 @@ class TestComparisonMatchMode:
 
         assert result.status == CheckStatus.FAIL
         assert result.failed
+        assert isinstance(result.message, str)
         assert "found matches" in result.message
 
     async def test_match_any_fails_on_scalar_value(self):
@@ -1058,6 +1063,7 @@ class TestComparisonMatchMode:
 
         assert result.status == CheckStatus.FAIL
         assert result.failed
+        assert isinstance(result.message, str)
         assert "Expected a list, set, or tuple" in result.message
 
     async def test_match_any_fails_on_empty_collection(self):
@@ -1074,6 +1080,7 @@ class TestComparisonMatchMode:
 
         assert result.status == CheckStatus.FAIL
         assert result.failed
+        assert isinstance(result.message, str)
         assert "none matched" in result.message
 
     async def test_match_all_passes_on_empty_collection(self):
@@ -1135,7 +1142,11 @@ class TestComparisonMatchMode:
 
         assert result.status == CheckStatus.FAIL
         assert result.failed
-        assert "Expected value equal to 'message 1' but got ['message 1']" in result.message
+        assert isinstance(result.message, str)
+        assert (
+            "Expected value equal to 'message 1' but got ['message 1']"
+            in result.message
+        )
 
     async def test_default_match_fixes_wildcard_with_match_any(self):
         trace = await Trace.from_interactions(

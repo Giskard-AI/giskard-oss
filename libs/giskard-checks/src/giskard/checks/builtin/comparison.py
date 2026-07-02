@@ -89,7 +89,9 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     def _is_match_collection(value: Any) -> bool:
         return isinstance(value, list | set | tuple)
 
-    def _try_compare(self, actual_value: Any, expected_value: ExpectedType) -> bool | None:
+    def _try_compare(
+        self, actual_value: Any, expected_value: ExpectedType
+    ) -> bool | None:
         """Compare two values, returning None when comparison is not supported."""
         normalized_actual_value = normalize_data(actual_value, self.normalization_form)
         normalized_expected_value = normalize_data(
