@@ -1,0 +1,74 @@
+"""Adapt a Giskard BaseGenerator so garak's LLM-judge detectors can use it."""
+
+import asyncio
+from typing import cast, override
+
+from garak.attempt import Conversation, Message
+from garak.generators.openai import OpenAICompatible
+from giskard.agents.generators.base import BaseGenerator
+from giskard.llm.types import ChatMessageParam
+
+from ._bridge import _await_on_loop
+
+
+def _conversation_to_messages(
+    conversation: Conversation | list[dict],  # pyright: ignore[reportMissingTypeArgument]
+) -> list[ChatMessageParam]:
+    """Convert a garak Conversation into Giskard chat-message dicts.
+
+    Giskard's ``complete`` accepts ``ChatMessageParam`` dicts and validates them,
+    so plain ``{\"role\", \"content\"}`` dicts are sufficient. Turns whose text is None
+    (multimodal/file turns) are rendered as empty strings; the judge only sends
+    system/user text turns in practice.
+    """
+    if isinstance(conversation, list):
+        return cast(list[ChatMessageParam], conversation)
+
+    return cast(
+        list[ChatMessageParam],
+        [
+            {"role": turn.role, "content": turn.content.text or ""}
+            for turn in conversation.turns
+        ],
+    )
+
+
+class GiskardJudgeGenerator(OpenAICompatible):
+    """Bridges garak judge detectors to a Giskard ``BaseGenerator``.
+
+    Subclasses ``OpenAICompatible`` ONLY to satisfy ``judge.ModelAsJudge``'s
+    ``isinstance`` gate. It deliberately skips ``OpenAICompatible.__init__`` (which
+    builds a real ``openai.OpenAI`` client and requires an API key + model name) and
+    makes ``_load_unsafe`` a no-op. ``generate()`` is inherited from garak's
+    ``Generator`` and routes through the overridden ``_call_model`` below.
+    """
+
+    generator_family_name = "giskard"
+
+    def __init__(  # pyright: ignore[reportMissingSuperCall] — no super().__init__() that constructs an OpenAI client.
+        self,
+        generator: BaseGenerator,
+        loop: asyncio.AbstractEventLoop | None = None,
+        name: str = "giskard-judge",
+    ) -> None:
+        self.name = name
+        self.fullname = f"{self.generator_family_name} {name}"
+        self._giskard = generator
+        self._loop = loop
+        self.client = None  # never used; _load_unsafe is a no-op
+        self.generations = 1
+
+    @override
+    def _load_unsafe(self) -> None:  # override: never build an OpenAI client
+        pass
+
+    @override
+    def _call_model(
+        self,
+        prompt: Conversation | list[dict],  # pyright: ignore[reportMissingTypeArgument]
+        generations_this_call: int = 1,
+    ) -> "list[Message | None]":
+        messages = _conversation_to_messages(prompt)
+        response = _await_on_loop(self._giskard.complete(messages), self._loop)
+        text = response.choices[0].message.text if response.choices else None
+        return [Message(text=text) if text is not None else None]
