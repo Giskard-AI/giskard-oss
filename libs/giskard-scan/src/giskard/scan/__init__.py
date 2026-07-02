@@ -20,6 +20,7 @@ from .generators.knowledge_base import (
     SycophancyScenarioGenerator,
 )
 from .generators.prompt_injection import PromptInjectionScenarioGenerator
+from .integrations import third_party_scan
 from .quality import quality_scan, quality_suite_generator_registry
 from .registry import SuiteGeneratorRegistry
 from .types import ScanOptions
@@ -51,6 +52,7 @@ __all__ = [
     "SuiteGeneratorRegistry",
     "quality_suite_generator_registry",
     "quality_scan",
+    "third_party_scan",
     "vulnerability_suite_generator_registry",
     "vulnerability_scan",
 ]

@@ -238,11 +238,11 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2026.6.0
+### fsspec-2025.3.0
 
 - HomePage:
 - Author:
-- License: BSD-3-Clause
+- License: BSD License
 - Compatible: True
 
 ### google-auth-2.55.0
@@ -560,7 +560,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### tokenizers-0.23.1
+### tokenizers-0.22.2
 
 - HomePage:
 - Author: Nicolas Patry

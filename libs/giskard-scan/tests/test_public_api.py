@@ -15,6 +15,7 @@ from giskard.scan import (
     generate_suite,
     quality_scan,
     quality_suite_generator_registry,
+    third_party_scan,
     vulnerability_scan,
     vulnerability_suite_generator_registry,
 )
@@ -28,6 +29,7 @@ def test_all_public_symbols_importable():
     assert isinstance(quality_suite_generator_registry, SuiteGeneratorRegistry)
     assert callable(vulnerability_scan)
     assert isinstance(vulnerability_suite_generator_registry, SuiteGeneratorRegistry)
+    assert callable(third_party_scan)
 
 
 def test_vulnerability_suite_generator_registry_contains_builtin_generators():

@@ -33,6 +33,7 @@ from .core import (
     GroupedSuiteResult,
     GroupStats,
     InputGenerationException,
+    InputGenerator,
     Interact,
     Interaction,
     InteractionSpec,
@@ -107,6 +108,7 @@ __all__ = [
     "Interact",
     "Interaction",
     "InteractionSpec",
+    "InputGenerator",
     "WithGeneratorMixin",
     "WithEmbeddingMixin",
     # Builtin and LLM-based checks

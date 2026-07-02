@@ -13,6 +13,10 @@ dependencies = [
     "huggingface-hub>=1.11.0,<2",
 ]
 
+[project.optional-dependencies]
+garak = ["garak>=0.15,<1"]
+
+
 [build-system]
 requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
@@ -34,6 +38,7 @@ asyncio_mode = "auto"
 pythonpath = ["src"]
 markers = [
     "integration: integration tests that are skipped unless --run-integration is provided",
+    "functional: functional tests that exercise a real external tool (skipped when it is not installed)",
 ]
 
 [tool.ruff.lint]

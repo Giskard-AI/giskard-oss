@@ -1,10 +1,11 @@
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from pydantic import BaseModel, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.rule import Rule
 
 from ..protocols import InteractionGenerator
+from ..types import Target
 from .interaction import Interaction
 
 
@@ -135,3 +136,17 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
         for idx, interaction in enumerate(self.interactions):
             yield Rule(f"Interaction {idx + 1}", style="bold")
             yield from interaction.__rich_console__(console, options)
+
+    @classmethod
+    def for_target[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+        cls, target: Target[InputType, OutputType, TraceType]
+    ) -> TraceType:
+        # Local import: utils.inference imports Trace, so a module-level import
+        # here would create a circular import at load time.
+        from ...utils.inference import _infer_trace_type
+
+        target_type = _infer_trace_type(target)
+        if target_type is None:
+            return cast(TraceType, cls())
+
+        return target_type()
