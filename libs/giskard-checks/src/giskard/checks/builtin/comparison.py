@@ -170,10 +170,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
             if result is True:
                 matched_items.append(item)
 
-        if comparison_results and (
-            all(result is None for result in comparison_results)
-            or any(result is None for result in comparison_results)
-        ):
+        if any(result is None for result in comparison_results):
             return CheckResult.failure(
                 message=self._unsupported_comparison_message(
                     actual_value, expected_value
@@ -181,13 +178,12 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
                 details=details,
             )
 
-        truths = [result is True for result in comparison_results]
         if self.match == "any":
-            passed = any(truths)
+            passed = any(comparison_results)
         elif self.match == "all":
-            passed = all(truths)
+            passed = all(comparison_results)
         else:
-            passed = not any(truths)
+            passed = not any(comparison_results)
 
         if passed:
             return CheckResult.success(
