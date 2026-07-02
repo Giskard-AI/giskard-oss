@@ -1,4 +1,3 @@
-import os
 from collections import defaultdict
 from collections.abc import Mapping
 from enum import Enum
@@ -16,6 +15,7 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
+from ..settings import get_settings
 from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
 
@@ -84,20 +84,8 @@ def _pluralize(count: int, word: str, plural: str | None = None) -> str:
 
 
 def _max_reported_failures_from_env() -> int | None:
-    """Return failure cap from env, or ``None`` for unlimited reporting."""
-    raw_value = os.getenv(MAX_REPORTED_FAILURES_ENV_VAR)
-    if raw_value is None:
-        return None
-
-    try:
-        value = int(raw_value)
-    except ValueError:
-        return None
-
-    if value < 0:
-        return None
-
-    return value
+    """Return failure cap from settings, or ``None`` for unlimited reporting."""
+    return get_settings().max_reported_failures
 
 
 class CheckStatus(str, Enum):

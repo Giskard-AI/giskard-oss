@@ -183,6 +183,6 @@ jobs:
       - name: Run functional tests
         env:
           GOOGLE_API_KEY: ${{ matrix.provider == 'google' && secrets.GEMINI_API_KEY || '' }}
-          TEST_MODEL: "google/gemini-3.5-flash"
-          TEST_EMBEDDING_MODEL: "google/gemini-embedding-001"
+          GISKARD_CHECKS_DEFAULT_MODEL: "google/gemini-3.5-flash"
+          GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL: "google/gemini-embedding-001"
         run: make test-functional PACKAGE=giskard-checks PROVIDER=$PROVIDER

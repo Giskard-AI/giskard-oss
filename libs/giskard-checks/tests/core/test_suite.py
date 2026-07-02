@@ -19,6 +19,7 @@ from giskard.checks.core.result import (
     TestCaseResult as CheckTestCaseResult,
 )
 from giskard.checks.scenarios.suite import _OverallOnly, _SuiteProgress
+from giskard.checks.settings import clear_settings_cache
 from rich.console import Console
 from rich.progress import MofNCompleteColumn, Progress
 from rich.text import Text
@@ -222,6 +223,7 @@ def test_suite_result_rich_console_respects_max_reported_failures_env(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "2")
+    clear_settings_cache()
     result = SuiteResult(
         results=[failed_scenario("s1"), failed_scenario("s2"), failed_scenario("s3")],
         duration_ms=3,
@@ -241,6 +243,7 @@ def test_suite_result_rich_console_reports_all_failures_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.delenv(MAX_REPORTED_FAILURES_ENV_VAR, raising=False)
+    clear_settings_cache()
     result = SuiteResult(
         results=[failed_scenario(f"s{i}") for i in range(1, 22)],
         duration_ms=3,
@@ -260,6 +263,7 @@ def test_suite_result_rich_console_can_hide_all_failure_details(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "0")
+    clear_settings_cache()
     result = SuiteResult(
         results=[failed_scenario("s1"), failed_scenario("s2"), failed_scenario("s3")],
         duration_ms=3,
@@ -279,6 +283,7 @@ def test_suite_result_rich_console_ignores_invalid_failure_limit_env(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "invalid")
+    clear_settings_cache()
     result = SuiteResult(
         results=[failed_scenario(f"s{i}") for i in range(1, 22)],
         duration_ms=3,

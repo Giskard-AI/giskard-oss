@@ -69,6 +69,7 @@ Find a list of packages below
 |✔|pycparser|
 |✔|pydantic|
 |✔|pydantic-core|
+|✔|pydantic-settings|
 |✔|pygments|
 |✔|python-dotenv|
 |✔|pyyaml|
@@ -472,6 +473,13 @@ Find a list of packages below
 ### pydantic-core-2.46.4
 
 - HomePage: https://github.com/pydantic/pydantic
+- Author: Samuel Colvin
+- License: MIT
+- Compatible: True
+
+### pydantic-settings-2.14.2
+
+- HomePage:
 - Author: Samuel Colvin
 - License: MIT
 - Compatible: True
