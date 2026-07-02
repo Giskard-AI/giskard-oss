@@ -6,7 +6,7 @@ from typing import cast, override
 
 from garak.attempt import Conversation, Message
 from garak.generators.openai import OpenAICompatible
-from giskard.agents.generators.base import BaseGenerator
+from giskard.agents import BaseGenerator
 from giskard.llm.types import ChatMessageParam
 
 from ._bridge import _await_on_loop

@@ -38,3 +38,17 @@ print(result)
 Probes run in parallel; the target is invoked concurrently, so it must be safe to
 call from multiple threads (per-conversation state is tracked in the `Trace`, not on
 the target).
+
+### API keys and LLM-judge detectors
+
+Some garak detectors need an LLM or a third-party API to score a probe:
+
+- **LLM-judge detectors** (garak's `judge.*`, e.g. refusal detection) normally require
+  their own OpenAI key. Instead, they are automatically backed by Giskard's default
+  generator (`giskard.checks.get_default_generator()`), so they run with the same
+  credentials as the rest of Giskard — no separate OpenAI key needed.
+- **Detectors that need a third-party API key** you have not set (for example
+  `perspective.*`, which needs `PERSPECTIVE_API_KEY`) are **skipped** rather than
+  silently dropping the whole probe. Each skipped detector surfaces as a skip result
+  (`CheckResult.skip`) in the returned `SuiteResult`, with the missing key named in the
+  message, so the rest of the probe's detectors still run.
