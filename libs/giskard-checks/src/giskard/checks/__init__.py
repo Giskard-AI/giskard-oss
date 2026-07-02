@@ -70,7 +70,8 @@ from .testing.runner import TestCaseRunner
 
 __version__ = get_lib_version("giskard-checks")
 
-# Install rich.pretty for better REPL output unless disabled in settings.
+# Install rich.pretty for better REPL output (including Pydantic models)
+# Can be disabled by setting GISKARD_CHECKS_DISABLE_RICH_PRETTY=1
 if not get_settings().disable_rich_pretty:
     from rich.pretty import install
 
