@@ -1,7 +1,5 @@
 """Runtime and environment configuration for giskard-checks."""
 
-from functools import lru_cache
-
 from giskard.agents import BaseEmbeddingModel, BaseGenerator, EmbeddingModel, Generator
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -50,29 +48,26 @@ class GiskardChecksSettings(BaseSettings):
     def _normalize_max_reported_failures(cls, value: object) -> int | None:
         if value is None or value == "":
             return None
+        if isinstance(value, bool):
+            return None
         if isinstance(value, int):
-            parsed = value
-        elif isinstance(value, str):
+            return value if value >= 0 else None
+        if isinstance(value, str):
             try:
                 parsed = int(value)
             except ValueError:
                 return None
-        else:
-            return None
-        if parsed < 0:
-            return None
-        return parsed
+            return parsed if parsed >= 0 else None
+        return None
 
 
-@lru_cache
 def get_settings() -> GiskardChecksSettings:
-    """Return cached settings loaded from the environment."""
+    """Return settings loaded from the environment."""
     return GiskardChecksSettings()
 
 
 def clear_settings_cache() -> None:
-    """Clear the cached settings instance (for tests and env reloads)."""
-    get_settings.cache_clear()
+    """No-op retained for test compatibility."""
 
 
 

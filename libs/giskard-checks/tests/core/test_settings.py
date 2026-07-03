@@ -90,6 +90,10 @@ def test_settings_max_reported_failures_validation(monkeypatch: pytest.MonkeyPat
     clear_settings_cache()
     assert get_settings().max_reported_failures is None
 
+    monkeypatch.setenv("GISKARD_CHECKS_MAX_REPORTED_FAILURES", "true")
+    clear_settings_cache()
+    assert get_settings().max_reported_failures is None
+
 
 def test_settings_disable_rich_pretty(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("GISKARD_CHECKS_DISABLE_RICH_PRETTY", "true")
