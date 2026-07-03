@@ -39,13 +39,9 @@ endif
 
 test-unit: ## Run unit tests only (excludes functional), optional PACKAGE=<name>
 ifdef PACKAGE
-ifneq ($(PACKAGE),giskard-checks)
-	uv run pytest libs/$(PACKAGE)/tests -m "not functional"
+	uv run --directory libs/$(PACKAGE) pytest tests src -m "not functional"
 else
-	uv run pytest libs/$(PACKAGE) -m "not functional"
-endif
-else
-	$(foreach lib,$(LIBS),uv run pytest libs/$(lib)$(if $(filter giskard-checks,$(lib)),,/tests) -m "not functional" &&) true
+	$(foreach lib,$(LIBS),uv run --directory libs/$(lib) pytest tests src -m "not functional" &&) true
 endif
 
 test-functional: ## Run functional tests only (requires API keys), optional PACKAGE=<name> PROVIDER=<name>
