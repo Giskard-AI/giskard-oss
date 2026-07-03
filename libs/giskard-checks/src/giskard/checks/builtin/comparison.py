@@ -1,3 +1,4 @@
+import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Self, override
 
@@ -123,8 +124,8 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         )
 
 
-@Check.register("lesser_than")
-class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+@Check.register("less_than")
+class LessThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values are less than an expected value.
@@ -164,6 +165,26 @@ class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyri
     def _operator_symbol(self) -> str:
         """Get the operator symbol for error messages."""
         return "<"
+
+
+@Check.register("lesser_than")
+class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+    LessThan[InputType, OutputType, TraceType, ExpectedType]
+):
+    """Deprecated alias for :class:`LessThan`.
+
+    .. deprecated::
+        Use :class:`LessThan` instead. This alias remains for backward
+        compatibility with serialized checks using ``kind="lesser_than"``.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        warnings.warn(
+            "LesserThan is deprecated; use LessThan instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)
 
 
 @Check.register("greater_than")
@@ -209,8 +230,8 @@ class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyr
         return ">"
 
 
-@Check.register("lesser_than_equals")
-class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+@Check.register("less_than_equals")
+class LessThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values are less than or equal to an expected value.
@@ -250,6 +271,26 @@ class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  
     def _operator_symbol(self) -> str:
         """Get the operator symbol for error messages."""
         return "<="
+
+
+@Check.register("lesser_than_equals")
+class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+    LessThanEquals[InputType, OutputType, TraceType, ExpectedType]
+):
+    """Deprecated alias for :class:`LessThanEquals`.
+
+    .. deprecated::
+        Use :class:`LessThanEquals` instead. This alias remains for backward
+        compatibility with serialized checks using ``kind="lesser_than_equals"``.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        warnings.warn(
+            "LesserThanEquals is deprecated; use LessThanEquals instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)
 
 
 @Check.register("greater_than_equals")

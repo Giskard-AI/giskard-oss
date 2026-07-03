@@ -8,6 +8,7 @@ Tests cover:
 - Serialisation round-trip via model_dump / model_validate
 """
 
+import warnings
 from typing import Any
 
 from giskard.checks import (
@@ -16,6 +17,7 @@ from giskard.checks import (
     Equals,
     Interaction,
     LesserThan,
+    LessThan,
     Not,
     Trace,
 )
@@ -137,7 +139,7 @@ class TestAllOf:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AllOf(
             checks=[
-                LesserThan(expected_value=10, key="trace.last.outputs"),
+                LessThan(expected_value=10, key="trace.last.outputs"),
                 Equals(expected_value=5, key="trace.last.outputs"),
             ]
         )
@@ -150,7 +152,7 @@ class TestAllOf:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AllOf(
             checks=[
-                LesserThan(expected_value=10, key="trace.last.outputs"),
+                LessThan(expected_value=10, key="trace.last.outputs"),
                 Equals(expected_value=99, key="trace.last.outputs"),  # will fail
             ]
         )
@@ -361,10 +363,24 @@ class TestSerialization:
     async def test_all_of_serialises(self):
         """AllOf round-trips through model_dump."""
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=3))
-        check = AllOf(checks=[LesserThan(expected_value=10, key="trace.last.outputs")])
+        check = AllOf(checks=[LessThan(expected_value=10, key="trace.last.outputs")])
         data = check.model_dump()
 
         assert data["kind"] == "all_of"
+        assert data["checks"][0]["kind"] == "less_than"
+
+        restored = AllOf.model_validate(data)
+        result = await restored.run(trace)
+        assert result.passed
+
+    async def test_all_of_deserialises_legacy_lesser_than_kind(self):
+        """Serialized checks using the legacy lesser_than kind still load."""
+        trace = await Trace.from_interactions(Interaction(inputs="q", outputs=3))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            legacy_check = LesserThan(expected_value=10, key="trace.last.outputs")
+        data = AllOf(checks=[legacy_check]).model_dump()
+
         assert data["checks"][0]["kind"] == "lesser_than"
 
         restored = AllOf.model_validate(data)
@@ -407,7 +423,7 @@ class TestSerialization:
         check = AllOf(
             checks=[
                 Not(check=Equals(expected_value=99, key="trace.last.outputs")),
-                LesserThan(expected_value=10, key="trace.last.outputs"),
+                LessThan(expected_value=10, key="trace.last.outputs"),
             ]
         )
         data = check.model_dump()
