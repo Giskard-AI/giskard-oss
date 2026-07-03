@@ -65,11 +65,11 @@ class GiskardJudgeGenerator(OpenAICompatible):
         self._rng = random.Random()
 
     @override
-    def _load_unsafe(self) -> None:  # override: never build an OpenAI client
+    def _load_unsafe(self) -> None:  # pyright: ignore[reportGeneralTypeIssues]
         pass
 
     @override
-    def _call_model(
+    def _call_model(  # pyright: ignore[reportGeneralTypeIssues]
         self,
         prompt: Conversation | list[dict],  # pyright: ignore[reportMissingTypeArgument]
         generations_this_call: int = 1,

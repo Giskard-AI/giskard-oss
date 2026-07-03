@@ -43,7 +43,7 @@ class TargetGenerator[InputType, OutputType, TraceType: Trace](  # pyright: igno
         return self.internal_cache.pop(conv_uuid, self._empty_trace)
 
     @override
-    def _call_model(
+    def _call_model(  # pyright: ignore[reportGeneralTypeIssues]
         self, prompt: Conversation, generations_this_call: int = 1
     ) -> list[Message | None]:
         conv_uuid = _conv_uuid(prompt) or str(uuid.uuid4())

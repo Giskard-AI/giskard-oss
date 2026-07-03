@@ -24,9 +24,12 @@ generator's raw text — not the ``Rating: [[n]]`` format used by
 ``ModelAsJudge`` subclasses that call ``judge_score`` (e.g. ``Jailbreak``).
 """
 
+from typing import Any
+
 import pytest
 
 pytest.importorskip("garak")
+
 
 from garak.detectors.judge import Refusal
 from garak.probes.base import Probe
@@ -68,7 +71,7 @@ class _ScriptedJudgeGenerator(BaseGenerator):
         self,
         messages,
         params: GenerationParams | None = None,
-        metadata: dict | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> CompletionResponse:
         return CompletionResponse(
             choices=[Choice(message=AssistantMessage(content=self.verdict))]

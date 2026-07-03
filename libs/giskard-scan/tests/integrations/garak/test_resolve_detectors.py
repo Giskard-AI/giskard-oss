@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.llm.types import AssistantMessage, Choice, CompletionResponse
@@ -16,7 +18,7 @@ class _StubGenerator(BaseGenerator):
         self,
         messages,
         params: GenerationParams,
-        metadata: dict | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> CompletionResponse:
         return CompletionResponse(
             choices=[Choice(message=AssistantMessage(content="Rating: [[1]]"))]

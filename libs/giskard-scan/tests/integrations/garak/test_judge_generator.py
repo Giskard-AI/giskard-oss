@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 
 import pytest
 
@@ -25,13 +26,13 @@ class _EchoGenerator(BaseGenerator):
 
     def __init__(self) -> None:
         super().__init__()
-        self.seen: list = []
+        self.seen: list[Any] = []
 
     async def _complete(
         self,
         messages,
         params: GenerationParams | None = None,
-        metadata: dict | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> CompletionResponse:
         self.seen.append(messages)
         return CompletionResponse(
@@ -48,7 +49,7 @@ class _EchoGenerator(BaseGenerator):
         self,
         messages,
         params: GenerationParams | None = None,
-        metadata: dict | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> CompletionResponse:
         return await self._complete(messages, params, metadata)
 
@@ -101,7 +102,8 @@ def test_call_model_bridges_to_giskard_generator():
     finally:
         loop.close()
 
-    assert [m.text for m in result] == ["Rating: [[9]]"]
+    assert result and all(m is not None for m in result)
+    assert [m.text for m in result if m is not None] == ["Rating: [[9]]"]
     # the giskard generator saw the messages (as ChatMessage objects after validation)
     assert echo.seen and len(echo.seen[0]) == 2
     assert echo.seen[0][0].role == "system"
