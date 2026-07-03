@@ -82,11 +82,6 @@ def _pluralize(count: int, word: str, plural: str | None = None) -> str:
     return f"{count} {plural}"
 
 
-def _max_reported_failures_from_env() -> int | None:
-    """Return failure cap from settings, or ``None`` for unlimited reporting."""
-    return get_settings().max_reported_failures
-
-
 class CheckStatus(str, Enum):
     """Outcome categories for a check execution."""
 

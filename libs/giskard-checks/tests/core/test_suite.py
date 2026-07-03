@@ -18,6 +18,7 @@ from giskard.checks.core.result import (
     TestCaseResult as CheckTestCaseResult,
 )
 from giskard.checks.scenarios.suite import _OverallOnly, _SuiteProgress
+from giskard.checks.settings import MAX_REPORTED_FAILURES_ENV_VAR
 from rich.console import Console
 from rich.progress import MofNCompleteColumn, Progress
 from rich.text import Text
