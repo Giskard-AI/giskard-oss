@@ -292,7 +292,7 @@ class GarakScanAdapter:
                             attempt.conversations[conversation_idx]
                         ),
                         duration_ms=0,
-                        tags=list(getattr(probe, "tags", None) or []),
+                        tags=list(probe.tags),
                     )
                 )
 

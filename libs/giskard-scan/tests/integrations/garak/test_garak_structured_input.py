@@ -150,6 +150,7 @@ class _StructuredInputProbe:
     """Fake probe that drives TargetGenerator._call_model (structured path)."""
 
     probename = "fake.StructuredProbe"
+    tags: list[str] = []
 
     def __init__(self, probe_id: str) -> None:
         self.probe_id = probe_id

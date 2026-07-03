@@ -77,6 +77,7 @@ class _FakeProbe:
 
 class _FailingProbe:
     probename = "fake.FailingProbe"
+    tags: list[str] = []
 
     def probe(self, generator: object) -> list[Attempt]:
         raise RuntimeError("probe blew up")
@@ -84,6 +85,7 @@ class _FailingProbe:
 
 class _CacheCheckingProbe:
     probename = "fake.CacheProbe"
+    tags: list[str] = []
 
     def __init__(self, probe_id: str) -> None:
         self.probe_id = probe_id

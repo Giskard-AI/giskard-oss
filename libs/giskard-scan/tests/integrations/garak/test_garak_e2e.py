@@ -17,8 +17,19 @@ Marked ``functional``: it runs whenever garak is installed and is skipped otherw
 """
 
 import pytest
+
+pytest.importorskip("garak")
+
+from typing import cast
+
+from garak._plugins import load_plugin
+from garak.probes.base import Probe
 from giskard.checks import SuiteResult
-from giskard.scan.integrations.garak._adapter import GarakScanAdapter, garak_available
+from giskard.scan.integrations.garak._adapter import (
+    GarakScanAdapter,
+    _resolve_probes,
+    garak_available,
+)
 
 pytestmark = pytest.mark.functional
 
@@ -27,8 +38,6 @@ _PROBE = "probes.goodside.ThreatenJSON"
 
 @pytest.mark.skipif(not garak_available(), reason="garak is not installed")
 def test_resolve_probes_empty_list_returns_no_probes() -> None:
-    from giskard.scan.integrations.garak._adapter import _resolve_probes
-
     assert _resolve_probes([]) == []
 
 
@@ -64,11 +73,6 @@ async def test_run_actual_garak_probe() -> None:
     # A detector actually scored the attempt, producing one check result.
     assert len(scenario.steps) == 1
     assert len(scenario.steps[0].results) >= 1
-
-    from typing import cast
-
-    from garak._plugins import load_plugin
-    from garak.probes.base import Probe
 
     probe = cast("Probe", load_plugin(_PROBE))
     assert scenario.tags == list(probe.tags)
