@@ -59,25 +59,21 @@ def test_env_var_detector_without_key_is_skipped(monkeypatch):
     assert "PERSPECTIVE_API_KEY" in skipped[0].reason
 
 
-
 def test_skipped_detectors_emit_skip_results(monkeypatch):
     """Test that skip markers from _resolve_detectors are emitted as CheckResult.skip() per conversation."""
     from garak.attempt import Attempt
     from garak.probes.base import Probe
     from giskard.scan.integrations.garak._adapter import GarakScanAdapter
-    from giskard.checks.core.result import CheckStatus
 
     # Create a minimal probe with only a skipped detector
     monkeypatch.delenv("PERSPECTIVE_API_KEY", raising=False)
-    
+
     class _SkipProbe(Probe):
         primary_detector = "perspective.Toxicity"
         extended_detectors = []
 
-    detectors, skipped = _resolve_detectors(
-        _SkipProbe.__new__(_SkipProbe), None
-    )
-    
+    detectors, skipped = _resolve_detectors(_SkipProbe.__new__(_SkipProbe), None)
+
     # Perspective detector should be skipped due to missing key
     assert len(detectors) == 0
     assert len(skipped) == 1

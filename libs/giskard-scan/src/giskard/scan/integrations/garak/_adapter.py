@@ -180,7 +180,10 @@ class GarakScanAdapter:
     """Build and run a Giskard suite from garak probes."""
 
     def _evaluate_attempt(
-        self, attempt: "Attempt", detectors: "list[Detector]", skipped: "list[_SkipMarker]" = ()
+        self,
+        attempt: "Attempt",
+        detectors: "list[Detector]",
+        skipped: "list[_SkipMarker]" = (),
     ) -> list[TestCaseResult]:
         check_results = defaultdict(list)
 
@@ -274,7 +277,9 @@ class GarakScanAdapter:
         attempts = probe.probe(generator)
         scenario_results = []
         for attempt_idx, attempt in enumerate(attempts):
-            test_case_results = self._evaluate_attempt(attempt, detectors, skipped_detectors)
+            test_case_results = self._evaluate_attempt(
+                attempt, detectors, skipped_detectors
+            )
             for conversation_idx, test_case_result in enumerate(test_case_results):
                 scenario_results.append(
                     ScenarioResult(
