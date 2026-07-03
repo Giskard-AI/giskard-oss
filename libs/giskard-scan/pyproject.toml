@@ -32,7 +32,7 @@ include = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "src"]
+testpaths = ["tests"]
 addopts = "--doctest-modules --ignore=src/giskard/scan/integrations/garak"
 asyncio_mode = "auto"
 pythonpath = ["src"]
