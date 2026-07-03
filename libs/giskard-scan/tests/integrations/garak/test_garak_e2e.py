@@ -65,7 +65,10 @@ async def test_run_actual_garak_probe() -> None:
     assert len(scenario.steps) == 1
     assert len(scenario.steps[0].results) >= 1
 
-    from garak._plugins import load_plugin
+    from typing import cast
 
-    probe = load_plugin(_PROBE)
+    from garak._plugins import load_plugin
+    from garak.probes.base import Probe
+
+    probe = cast("Probe", load_plugin(_PROBE))
     assert scenario.tags == list(probe.tags)
