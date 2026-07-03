@@ -1,8 +1,16 @@
+from typing import Any
+
 import pytest
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.llm.types import AssistantMessage, Choice, CompletionResponse
 from giskard.scan.integrations.garak import _adapter
-from giskard.scan.integrations.garak._adapter import _resolve_detectors, _SkipMarker
+from giskard.scan.integrations.garak._adapter import (
+    _resolve_detectors,
+    _SkipMarker,
+    garak_available,
+)
+
+pytestmark = pytest.mark.skipif(not garak_available(), reason="garak is not installed")
 
 
 class _StubGenerator(BaseGenerator):
@@ -10,7 +18,7 @@ class _StubGenerator(BaseGenerator):
         self,
         messages,
         params: GenerationParams,
-        metadata: dict | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> CompletionResponse:
         return CompletionResponse(
             choices=[Choice(message=AssistantMessage(content="Rating: [[1]]"))]

@@ -1175,6 +1175,13 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
 ]
+garak-test = [
+    { name = "giskard-scan", extra = ["garak"] },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-timeout" },
+]
 test = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1205,6 +1212,13 @@ dev = [
     { name = "ipykernel", specifier = "==7.3.0" },
     { name = "pip-audit", specifier = "==2.10.1" },
     { name = "pylint-pydantic", specifier = "==0.4.1" },
+    { name = "pytest", specifier = "==9.1.1" },
+    { name = "pytest-asyncio", specifier = "==1.4.0" },
+    { name = "pytest-cov", specifier = "==7.1.0" },
+    { name = "pytest-timeout", specifier = "==2.4.0" },
+]
+garak-test = [
+    { name = "giskard-scan", extras = ["garak"], editable = "libs/giskard-scan" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-asyncio", specifier = "==1.4.0" },
     { name = "pytest-cov", specifier = "==7.1.0" },

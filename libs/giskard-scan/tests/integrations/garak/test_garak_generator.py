@@ -12,6 +12,10 @@ named anything else (e.g. ``prompt``) is rejected by Interact validation.
 
 from uuid import uuid4
 
+import pytest
+
+pytest.importorskip("garak")
+
 from garak.attempt import Conversation, Message, Turn
 from giskard.checks import Interaction, Trace
 from giskard.scan.integrations.garak._generator import TargetGenerator, _conv_uuid

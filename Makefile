@@ -39,9 +39,9 @@ endif
 
 test-unit: ## Run unit tests only (excludes functional), optional PACKAGE=<name>
 ifdef PACKAGE
-	uv run pytest libs/$(PACKAGE) -m "not functional"
+	uv run --directory libs/$(PACKAGE) pytest tests src -m "not functional"
 else
-	$(foreach lib,$(LIBS),uv run pytest libs/$(lib) -m "not functional" &&) true
+	$(foreach lib,$(LIBS),uv run --directory libs/$(lib) pytest tests src -m "not functional" &&) true
 endif
 
 test-functional: ## Run functional tests only (requires API keys), optional PACKAGE=<name> PROVIDER=<name>
@@ -61,6 +61,9 @@ install-no-providers: ## Install giskard-llm without provider SDKs (for no_provi
 install-minimal: ## Install with test group only (no provider SDKs, all packages)
 	uv sync --only-group test
 
+install-garak-test: ## Install garak optional extra for scan integration tests
+	uv sync --group garak-test
+
 test-unit-minimal: ## Run unit tests on minimal deps (no provider SDKs), optional PACKAGE=<name>
 ifdef PACKAGE
 	uv run pytest libs/$(PACKAGE) -m "not functional"
@@ -70,6 +73,9 @@ endif
 
 test-no-providers: ## Run tests that verify behavior when provider SDKs are missing
 	uv run pytest libs/giskard-llm -m "no_providers"
+
+test-garak: ## Run garak integration tests (requires: make install-garak-test)
+	uv run pytest libs/giskard-scan/tests/integrations/garak
 
 test-package-conflict: ## Test package conflict with giskard legacy package installed
 	@echo "Testing package conflict..."

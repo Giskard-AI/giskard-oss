@@ -138,15 +138,15 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
             yield from interaction.__rich_console__(console, options)
 
     @classmethod
-    def for_target[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-        cls, target: Target[InputType, OutputType, TraceType]
-    ) -> TraceType:
+    def for_target[In, Out, Tr: Trace](  # pyright: ignore[reportMissingTypeArgument]
+        cls, target: Target[In, Out, Tr]
+    ) -> Tr:
         # Local import: utils.inference imports Trace, so a module-level import
         # here would create a circular import at load time.
         from ...utils.inference import _infer_trace_type
 
         target_type = _infer_trace_type(target)
         if target_type is None:
-            return cast(TraceType, cls())
+            return cast(Tr, cls())
 
         return target_type()
