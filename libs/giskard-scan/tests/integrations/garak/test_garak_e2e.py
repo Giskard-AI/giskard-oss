@@ -64,3 +64,8 @@ async def test_run_actual_garak_probe() -> None:
     # A detector actually scored the attempt, producing one check result.
     assert len(scenario.steps) == 1
     assert len(scenario.steps[0].results) >= 1
+
+    from garak._plugins import load_plugin
+
+    probe = load_plugin(_PROBE)
+    assert scenario.tags == list(probe.tags)

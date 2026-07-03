@@ -66,6 +66,7 @@ class _OverProducingDetector:
 
 class _FakeProbe:
     probename = "fake.Probe"
+    tags = ["owasp:llm01", "quality:Security:PromptStability"]
 
     def __init__(self, attempts: list[Attempt]) -> None:
         self._attempts = attempts
@@ -134,6 +135,7 @@ async def test_run_produces_suite_result_from_fake_probe(
     assert result.duration_ms >= 0
     for scenario in result.results:
         assert scenario.scenario_name.startswith("Garak fake.Probe")
+        assert scenario.tags == probe.tags
 
 
 async def test_run_failure_score_marks_check_failed(
