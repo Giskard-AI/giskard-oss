@@ -11,16 +11,6 @@ from giskard.checks.settings import (
 )
 
 
-@pytest.fixture(autouse=True)
-def reset_checks_settings():
-    """Restore runtime overrides after each test."""
-    original_generator = settings_module._default_generator
-    original_embedding = settings_module._default_embedding_model
-    yield
-    settings_module._default_generator = original_generator
-    settings_module._default_embedding_model = original_embedding
-
-
 def test_default_generator_uses_settings_model(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "google/gemini-3.5-flash")
 
@@ -60,8 +50,6 @@ def test_default_embedding_model_uses_settings(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_default_embedding_model_falls_back_to_builtin_default():
-    settings_module._default_embedding_model = None
-
     embedding_model = get_default_embedding_model()
 
     assert isinstance(embedding_model, EmbeddingModel)

@@ -46,7 +46,6 @@ STATUS_MAPPING = {
     },
 }
 
-MAX_REPORTED_FAILURES_ENV_VAR = "GISKARD_CHECKS_MAX_REPORTED_FAILURES"
 STATUS_SUMMARY_ORDER: tuple[tuple[str, str], ...] = (
     ("error", "errored"),
     ("fail", "failed"),
@@ -81,11 +80,6 @@ def _pluralize(count: int, word: str, plural: str | None = None) -> str:
     if plural is None:
         plural = word + "s"
     return f"{count} {plural}"
-
-
-def _max_reported_failures_from_env() -> int | None:
-    """Return failure cap from settings, or ``None`` for unlimited reporting."""
-    return get_settings().max_reported_failures
 
 
 class CheckStatus(str, Enum):
@@ -698,7 +692,7 @@ def _suite_report_renderables(
     failures_and_errors = result.failures_and_errors
 
     if failures_and_errors:
-        max_reported_failures = _max_reported_failures_from_env()
+        max_reported_failures = get_settings().max_reported_failures
         reported_failures = failures_and_errors[:max_reported_failures]
         n_hidden = len(failures_and_errors) - len(reported_failures)
 
