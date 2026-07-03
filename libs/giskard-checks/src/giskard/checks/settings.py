@@ -66,11 +66,6 @@ def get_settings() -> GiskardChecksSettings:
     return GiskardChecksSettings()
 
 
-def clear_settings_cache() -> None:
-    """No-op retained for test compatibility."""
-
-
-
 def set_default_generator(generator: BaseGenerator) -> None:
     """Set the default LLM generator for all checks.
 
