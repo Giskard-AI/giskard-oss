@@ -17,6 +17,9 @@ from collections.abc import Sequence
 from typing import Any, override
 
 import pytest
+
+pytest.importorskip("garak")
+
 from garak.attempt import Conversation, Message, Turn
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import settings as checks_settings

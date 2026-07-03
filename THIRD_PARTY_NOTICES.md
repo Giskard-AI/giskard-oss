@@ -602,11 +602,11 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### websockets-16.0
+### websockets-15.0.1
 
 - HomePage:
 - Author: Aymeric Augustin
-- License: BSD-3-Clause
+- License: BSD License
 - Compatible: True
 
 ### yarl-1.24.2

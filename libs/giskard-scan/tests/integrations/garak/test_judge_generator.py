@@ -1,5 +1,9 @@
 import asyncio
 
+import pytest
+
+pytest.importorskip("garak")
+
 from garak.attempt import Conversation, Message, Turn
 from garak.generators.openai import OpenAICompatible
 from giskard.agents.generators.base import BaseGenerator, GenerationParams

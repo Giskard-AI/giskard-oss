@@ -1,11 +1,16 @@
 {
     "include": ["libs"],
+    "exclude": ["libs/giskard-scan/tests/integrations/garak"],
     "executionEnvironments": [
       { "root": "libs/giskard-core/src" },
       { "root": "libs/giskard-llm/src" },
       { "root": "libs/giskard-agents/src" },
       { "root": "libs/giskard-checks/src" },
-      { "root": "libs/giskard-scan/src" }
+      { "root": "libs/giskard-scan/src" },
+      {
+        "root": "libs/giskard-scan/src/giskard/scan/integrations/garak",
+        "reportMissingImports": "none"
+      }
     ],
     "failOnWarnings": false,
     "typeCheckingMode": "recommended",

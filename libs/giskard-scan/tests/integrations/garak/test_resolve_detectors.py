@@ -2,7 +2,13 @@ import pytest
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.llm.types import AssistantMessage, Choice, CompletionResponse
 from giskard.scan.integrations.garak import _adapter
-from giskard.scan.integrations.garak._adapter import _resolve_detectors, _SkipMarker
+from giskard.scan.integrations.garak._adapter import (
+    _resolve_detectors,
+    _SkipMarker,
+    garak_available,
+)
+
+pytestmark = pytest.mark.skipif(not garak_available(), reason="garak is not installed")
 
 
 class _StubGenerator(BaseGenerator):

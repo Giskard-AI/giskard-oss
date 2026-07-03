@@ -25,6 +25,9 @@ generator's raw text — not the ``Rating: [[n]]`` format used by
 """
 
 import pytest
+
+pytest.importorskip("garak")
+
 from garak.detectors.judge import Refusal
 from garak.probes.base import Probe
 from giskard.agents.generators.base import BaseGenerator, GenerationParams

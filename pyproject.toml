@@ -105,3 +105,7 @@ dev = [
     "pip-audit==2.10.1",
     "pylint-pydantic==0.4.1",
 ]
+garak-test = [
+    { include-group = "test" },
+    "giskard-scan[garak]",
+]

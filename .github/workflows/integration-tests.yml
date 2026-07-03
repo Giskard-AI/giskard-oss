@@ -186,3 +186,26 @@ jobs:
           TEST_MODEL: "google/gemini-3.5-flash"
           TEST_EMBEDDING_MODEL: "google/gemini-embedding-001"
         run: make test-functional PACKAGE=giskard-checks PROVIDER=$PROVIDER
+
+  test-scan-garak:
+    needs: authorize
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout repository
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+    name: scan / garak / ${{ matrix.python-version }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+      - run: make install-garak-test
+      - run: make test-garak

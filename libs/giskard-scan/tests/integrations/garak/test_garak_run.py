@@ -7,6 +7,9 @@ gathering after the group exits, and the SuiteResult assembly.
 """
 
 import pytest
+
+pytest.importorskip("garak")
+
 from garak.attempt import Attempt, Conversation, Message, Turn
 from giskard.checks import SuiteResult
 
