@@ -71,4 +71,6 @@ class TargetGenerator[InputType, OutputType, TraceType: Trace](  # pyright: igno
         self.internal_cache[conv_uuid] = trace
 
         assert trace.last is not None, "Trace last is None"
-        return [Message(text=str(trace.last.outputs), notes={"uuid": conv_uuid})]
+        outputs = trace.last.outputs
+        text = str(outputs) if outputs is not None else None
+        return [Message(text=text, notes={"uuid": conv_uuid})]

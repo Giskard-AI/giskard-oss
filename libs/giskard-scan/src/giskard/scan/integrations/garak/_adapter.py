@@ -21,7 +21,6 @@ from giskard.checks import (
 )
 
 from ...generators.base import TargetMode
-from ._judge_generator import make_judge_detector
 
 if TYPE_CHECKING:
     from garak.attempt import Attempt
@@ -74,8 +73,8 @@ def _configure_garak() -> None:
     import garak._config as garak_config
 
     garak_config.load_base_config()
-    setattr(garak_config.run, "generations", 1)
-    setattr(garak_config.transient, "reportfile", io.StringIO())
+    garak_config.run.generations = 1
+    garak_config.transient.reportfile = io.StringIO()
 
 
 def _resolve_probes(probes: Iterable[str] | None) -> "list[Probe]":
@@ -142,6 +141,8 @@ def _resolve_detectors(
     from garak.detectors.judge import ModelAsJudge
     from garak.exception import APIKeyMissingError, GarakException
 
+    from ._judge_generator import make_judge_detector
+
     detector_names = [probe.primary_detector or "always.Fail"] + list(
         probe.extended_detectors
     )
@@ -172,6 +173,8 @@ def _resolve_detectors(
                 logger.warning("Failed to load detector %s: %s", name, exc)
         except APIKeyMissingError as exc:  # belt-and-suspenders if garak stops wrapping
             skipped.append(_SkipMarker(name=name, reason=str(exc)))
+        except Exception as exc:  # noqa: BLE001 — one bad detector must not abort the scan
+            logger.warning("Failed to load detector %s: %s", name, exc)
 
     return detectors, skipped
 
@@ -183,7 +186,7 @@ class GarakScanAdapter:
         self,
         attempt: "Attempt",
         detectors: "list[Detector]",
-        skipped: "list[_SkipMarker]" = (),
+        skipped: "Iterable[_SkipMarker]" = (),
     ) -> list[TestCaseResult]:
         check_results = defaultdict(list)
 

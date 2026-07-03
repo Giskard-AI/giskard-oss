@@ -3,7 +3,6 @@ from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.llm.types import AssistantMessage, Choice, CompletionResponse
 from giskard.scan.integrations.garak import _adapter
 from giskard.scan.integrations.garak._adapter import _resolve_detectors, _SkipMarker
-from giskard.scan.integrations.garak._judge_generator import GiskardJudgeGenerator
 
 
 class _StubGenerator(BaseGenerator):
@@ -39,6 +38,8 @@ def test_judge_detector_gets_giskard_generator(monkeypatch):
     detectors, skipped = _resolve_detectors(_JudgeProbe.__new__(_JudgeProbe), None)
     assert skipped == []
     assert len(detectors) == 1
+    from giskard.scan.integrations.garak._judge_generator import GiskardJudgeGenerator
+
     assert isinstance(detectors[0].evaluation_generator, GiskardJudgeGenerator)
 
 

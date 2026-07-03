@@ -125,6 +125,19 @@ def test_play_conversation_handles_structured_outputs() -> None:
     play_conversation(["hello"] * 10)
 
 
+def test_call_model_returns_none_text_when_target_returns_none() -> None:
+    def target(inputs: str) -> None:
+        return None
+
+    generator = TargetGenerator(target=target)
+    messages = generator._call_model(_conversation("hello", uuid="u1"))
+
+    assert len(messages) == 1
+    assert messages[0] is not None
+    assert messages[0].text is None
+    assert messages[0].notes == {"uuid": "u1"}
+
+
 def test_call_model_invokes_target_and_tags_uuid() -> None:
     def target(inputs: str) -> str:
         return "ECHO:" + inputs

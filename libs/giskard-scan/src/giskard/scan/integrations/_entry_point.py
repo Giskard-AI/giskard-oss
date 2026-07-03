@@ -4,12 +4,6 @@ from typing import Any, Literal
 
 from giskard.checks import SuiteResult, Target, Trace
 
-from .garak import GarakScanAdapter
-
-SCAN_ADAPTERS = {
-    "garak": GarakScanAdapter(),
-}
-
 
 async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     target: Target[InputType, OutputType, TraceType],
@@ -30,7 +24,10 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
     Returns:
         The completed suite result.
     """
-    adapter = SCAN_ADAPTERS.get(tool)
-    if adapter is None:
-        raise ValueError(f"Unknown tool {tool!r}. Available: {list(SCAN_ADAPTERS)}")
+    if tool == "garak":
+        from .garak import GarakScanAdapter
+
+        adapter = GarakScanAdapter()
+    else:
+        raise ValueError(f"Unknown tool {tool!r}. Available: ['garak']")
     return await adapter.run(target, **kwargs)

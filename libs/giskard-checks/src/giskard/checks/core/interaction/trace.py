@@ -138,7 +138,7 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
             yield from interaction.__rich_console__(console, options)
 
     @classmethod
-    def for_target[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    def for_target[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
         cls, target: Target[InputType, OutputType, TraceType]
     ) -> TraceType:
         # Local import: utils.inference imports Trace, so a module-level import
