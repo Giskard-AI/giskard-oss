@@ -2,7 +2,7 @@ from giskard.core.utils import get_lib_version
 
 from .chat import Chat
 from .context import RunContext
-from .embeddings import BaseEmbeddingModel, EmbeddingModel
+from .embeddings import BaseEmbeddingModel, EmbeddingModel, SentenceTransformerEmbedding
 from .errors import Error, ModelRefusalError, WorkflowError
 from .generators import BaseGenerator, Generator
 from .templates import (
@@ -40,5 +40,6 @@ __all__ = [
     "Error",
     "BaseEmbeddingModel",
     "EmbeddingModel",
+    "SentenceTransformerEmbedding",
     "StepType",
 ]

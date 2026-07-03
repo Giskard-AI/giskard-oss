@@ -36,6 +36,19 @@ def set_default_embedding_model(embedding_model: "BaseEmbeddingModel") -> None:
     ----------
     embedding_model : BaseEmbeddingModel
         The embedding model to use as default for all embedding checks.
+
+    Examples
+    --------
+    Use a local SentenceTransformers model for checks such as
+    :class:`~giskard.checks.SemanticSimilarity`::
+
+        from giskard.checks import set_default_embedding_model
+        from giskard.checks.utils.embeddings import SentenceTransformerEmbedding
+
+        set_default_embedding_model(SentenceTransformerEmbedding("all-MiniLM-L6-v2"))
+
+    Custom providers can subclass :class:`giskard.agents.BaseEmbeddingModel` and
+    implement ``_embed``.
     """
     global _default_embedding_model
     _default_embedding_model = embedding_model

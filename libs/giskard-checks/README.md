@@ -27,6 +27,21 @@ Requires Python >= 3.12.
 - `giskard-agents>=1.0.0a1` - LLM integration, workflows, and bundled prompt templates
 - `jsonpath-ng>=1.7.0` - JSONPath expressions for data extraction
 
+Optional local embeddings for semantic checks:
+
+```bash
+pip install "giskard-checks[local-embeddings]"
+```
+
+```python
+from giskard.checks import SemanticSimilarity, set_default_embedding_model
+from giskard.checks.utils.embeddings import SentenceTransformerEmbedding
+
+set_default_embedding_model(SentenceTransformerEmbedding("all-MiniLM-L6-v2"))
+
+check = SemanticSimilarity(reference_text="Hello world", threshold=0.8)
+```
+
 Quickstart
 ----------
 

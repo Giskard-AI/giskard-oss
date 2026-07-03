@@ -23,6 +23,7 @@ openai = ["giskard-llm[openai]>=1.0.0a1,<2"]
 google = ["giskard-llm[google]>=1.0.0a1,<2"]
 anthropic = ["giskard-llm[anthropic]>=1.0.0a1,<2"]
 litellm = ["litellm>=1.83.0,<2"]
+local-embeddings = ["sentence-transformers>=3.0,<4"]
 all = ["giskard-llm[all]>=1.0.0a1,<2"]
 
 [build-system]

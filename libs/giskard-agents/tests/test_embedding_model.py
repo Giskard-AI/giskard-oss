@@ -1,9 +1,14 @@
+import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
 import pytest
 from giskard.agents.embeddings.base import BaseEmbeddingModel, EmbeddingParams
 from giskard.agents.embeddings.litellm_embedding_model import LitellmEmbeddingModel
+from giskard.agents.embeddings.sentence_transformer_embedding import (
+    SentenceTransformerEmbedding,
+)
 from giskard.llm import EmbeddingData, EmbeddingResponse
 
 
@@ -43,6 +48,96 @@ async def test_litellm_embedding_model_embed_with_mock(
         assert len(embeddings[1]) == 3
         assert np.isclose(embeddings[0], np.array([0.1, 0.2, 0.3])).all()
         assert np.isclose(embeddings[1], np.array([0.4, 0.5, 0.6])).all()
+
+
+async def test_sentence_transformer_embedding_model_embed_with_mock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test local SentenceTransformers embedding without downloading a model."""
+
+    class FakeSentenceTransformer:
+        instances: list["FakeSentenceTransformer"] = []
+
+        def __init__(
+            self,
+            model_name_or_path: str,
+            *,
+            device: str | None = None,
+            trust_remote_code: bool = False,
+            **kwargs: object,
+        ) -> None:
+            self.model_name_or_path = model_name_or_path
+            self.device = device
+            self.trust_remote_code = trust_remote_code
+            self.kwargs = kwargs
+            self.encode_calls: list[tuple[list[str], dict[str, object]]] = []
+            self.instances.append(self)
+
+        def encode(self, texts: list[str], **kwargs: object) -> np.ndarray:
+            self.encode_calls.append((texts, kwargs))
+            return np.array(
+                [[float(len(text)), float(index)] for index, text in enumerate(texts)]
+            )
+
+    monkeypatch.setitem(
+        sys.modules,
+        "sentence_transformers",
+        SimpleNamespace(SentenceTransformer=FakeSentenceTransformer),
+    )
+
+    model = SentenceTransformerEmbedding(
+        "all-MiniLM-L6-v2",
+        device="cpu",
+        model_kwargs={"cache_folder": "/tmp/models"},
+        encode_kwargs={"normalize_embeddings": True},
+    )
+    embeddings = await model.embed(["hello", "world"])
+
+    assert len(embeddings) == 2
+    assert np.array_equal(embeddings[0], np.array([5.0, 0.0]))
+    assert np.array_equal(embeddings[1], np.array([5.0, 1.0]))
+
+    fake_client = FakeSentenceTransformer.instances[0]
+    assert fake_client.model_name_or_path == "all-MiniLM-L6-v2"
+    assert fake_client.device == "cpu"
+    assert fake_client.trust_remote_code is False
+    assert fake_client.kwargs == {"cache_folder": "/tmp/models"}
+    assert fake_client.encode_calls == [
+        (
+            ["hello", "world"],
+            {"convert_to_numpy": True, "normalize_embeddings": True},
+        )
+    ]
+
+
+def test_sentence_transformer_embedding_model_serialization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SentenceTransformerEmbedding survives discriminated serialization."""
+
+    class FakeSentenceTransformer:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+    monkeypatch.setitem(
+        sys.modules,
+        "sentence_transformers",
+        SimpleNamespace(SentenceTransformer=FakeSentenceTransformer),
+    )
+
+    model = SentenceTransformerEmbedding(
+        model="all-MiniLM-L6-v2",
+        device="cpu",
+        params=EmbeddingParams(dimensions=384),
+    )
+    json_str = model.model_dump_json()
+
+    deserialized_model = BaseEmbeddingModel.model_validate_json(json_str)
+
+    assert isinstance(deserialized_model, SentenceTransformerEmbedding)
+    assert deserialized_model.model == "all-MiniLM-L6-v2"
+    assert deserialized_model.device == "cpu"
+    assert deserialized_model.params.dimensions == 384
 
 
 @pytest.mark.google

@@ -35,6 +35,7 @@ litellm = ["giskard-agents[litellm]>=1.0.2b4,<2"]
 
 # Optional checks dependencies
 regorus = ["giskard-checks[regorus]>=1.0.2b4,<2"]
+local-embeddings = ["giskard-checks[local-embeddings]>=1.0.2b4,<2"]
 
 # Optional giskard libs
 scan = ["giskard-scan>=1.0.0b2,<2"]
@@ -43,6 +44,38 @@ scan = ["giskard-scan>=1.0.0b2,<2"]
 all-llms = ["giskard-llm[all]>=1.0.0b4,<2"] # Install all native LLM providers
 all-checks = ["giskard-checks[all]>=1.0.2b4,<2"] # Install all optional checks dependencies
 full = ["giskard[all-llms,all-checks,scan,litellm]"]
+
+[tool.uv]
+conflicts = [
+    [
+        { extra = "local-embeddings" },
+        { extra = "scan" },
+    ],
+    [
+        { extra = "local-embeddings" },
+        { extra = "full" },
+    ],
+    [
+        { extra = "local-embeddings" },
+        { group = "dev" },
+    ],
+    [
+        { package = "giskard-agents", extra = "local-embeddings" },
+        { extra = "scan" },
+    ],
+    [
+        { package = "giskard-agents", extra = "local-embeddings" },
+        { extra = "full" },
+    ],
+    [
+        { package = "giskard-agents", extra = "local-embeddings" },
+        { group = "dev" },
+    ],
+    [
+        { package = "giskard-agents", extra = "local-embeddings" },
+        { package = "giskard-scan" },
+    ],
+]
 
 [project.urls]
 "Homepage" = "https://giskard.ai"

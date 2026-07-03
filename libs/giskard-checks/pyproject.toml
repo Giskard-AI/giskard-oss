@@ -21,6 +21,9 @@ dependencies = [
 readability = [
     "textstat>=0.7.0",
 ]
+local-embeddings = [
+    "giskard-agents[local-embeddings]>=1.0.2b2",
+]
 regorus = ["celine-regorus>=0.9.1"]
 all = ["giskard-checks[regorus]"] # Install all optional dependencies
 
