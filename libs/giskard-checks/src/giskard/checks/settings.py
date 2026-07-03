@@ -1,7 +1,5 @@
 """Runtime and environment configuration for giskard-checks."""
 
-from functools import lru_cache
-
 from giskard.agents import BaseEmbeddingModel, BaseGenerator, EmbeddingModel, Generator
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -60,15 +58,13 @@ class GiskardChecksSettings(BaseSettings):
         return parsed if parsed >= 0 else None
 
 
-@lru_cache
 def get_settings() -> GiskardChecksSettings:
-    """Return cached settings loaded from the environment."""
+    """Return settings loaded from the environment."""
     return GiskardChecksSettings()
 
 
 def clear_settings_cache() -> None:
-    """Clear the cached settings instance (for tests and env reloads)."""
-    get_settings.cache_clear()
+    """No-op retained for test compatibility."""
 
 
 def set_default_generator(generator: BaseGenerator | str) -> None:
