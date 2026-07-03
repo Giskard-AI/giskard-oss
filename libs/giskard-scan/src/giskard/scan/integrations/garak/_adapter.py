@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -321,6 +322,7 @@ class GarakScanAdapter:
             ]
 
         loop = asyncio.get_running_loop()
+        start_time = time.perf_counter()
         async with asyncio.TaskGroup() as task_group:
             tasks = [
                 task_group.create_task(
@@ -333,5 +335,6 @@ class GarakScanAdapter:
         # task has completed; reading task.result() inside the block would hit
         # InvalidStateError because the tasks have not run yet.
         scenario_results = [scenario for task in tasks for scenario in task.result()]
+        duration_ms = int((time.perf_counter() - start_time) * 1000)
 
-        return SuiteResult(results=scenario_results, duration_ms=0)
+        return SuiteResult(results=scenario_results, duration_ms=duration_ms)

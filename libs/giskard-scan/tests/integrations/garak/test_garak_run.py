@@ -128,6 +128,7 @@ async def test_run_produces_suite_result_from_fake_probe(
     assert isinstance(result, SuiteResult)
     # Two attempts, each with one conversation -> two scenarios.
     assert len(result.results) == 2
+    assert result.duration_ms >= 0
     for scenario in result.results:
         assert scenario.scenario_name.startswith("Garak fake.Probe")
 
