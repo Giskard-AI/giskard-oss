@@ -66,6 +66,7 @@ class _OverProducingDetector:
 
 class _FakeProbe:
     probename = "fake.Probe"
+    tags = ["owasp:llm01", "quality:Security:PromptStability"]
 
     def __init__(self, attempts: list[Attempt]) -> None:
         self._attempts = attempts
@@ -76,6 +77,7 @@ class _FakeProbe:
 
 class _FailingProbe:
     probename = "fake.FailingProbe"
+    tags: list[str] = []
 
     def probe(self, generator: object) -> list[Attempt]:
         raise RuntimeError("probe blew up")
@@ -83,6 +85,7 @@ class _FailingProbe:
 
 class _CacheCheckingProbe:
     probename = "fake.CacheProbe"
+    tags: list[str] = []
 
     def __init__(self, probe_id: str) -> None:
         self.probe_id = probe_id
@@ -134,6 +137,7 @@ async def test_run_produces_suite_result_from_fake_probe(
     assert result.duration_ms >= 0
     for scenario in result.results:
         assert scenario.scenario_name.startswith("Garak fake.Probe")
+        assert scenario.tags == probe.tags
 
 
 async def test_run_failure_score_marks_check_failed(
