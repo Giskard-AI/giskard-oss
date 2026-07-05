@@ -20,6 +20,13 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
             means all active loadable probes, while an empty list runs none.
             ``target_mode: str`` (default ``"multiturn"``) skips garak
             iterative probes when set to ``"singleturn"``.
+          For lidar:
+            ``probes: list[str] | None`` restricts which probes run by id
+            (e.g. ``"deepset-injection:1.0"``); ``None`` runs all.
+            ``tags: list[str] | None`` restricts probes by tag; ``None`` runs
+            all. ``target_mode`` is ignored. Note: lidar probes generally need
+            a discovered target profile, which this integration does not enable,
+            so many probes report SKIP.
 
     Returns:
         The completed suite result.
