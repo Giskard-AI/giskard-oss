@@ -1,0 +1,82 @@
+"""Bridge a giskard.scan Target into a lidar Target (a giskard.agents BaseGenerator).
+
+IMPORTANT: this module imports lidar's pinned ``giskard.agents`` (``BaseGenerator``,
+``Response``). Those symbols are NOT the giskard-oss workspace ``giskard.agents`` —
+they resolve to whatever lidar installed on sys.path. This module is therefore
+imported LAZILY (inside LidarScanAdapter.run), never at package import time, so
+`import giskard.scan.integrations.lidar` does not require lidar to be present.
+"""
+
+import uuid
+from typing import Any
+
+# Resolves to LIDAR's giskard.agents at runtime (lidar is on sys.path when this runs).
+# BaseGenerator is the workspace giskard.agents type — always importable, no lidar needed.
+from giskard.agents import BaseGenerator
+
+# Message/Response/make_response come from lidar's compat layer — import LAZILY inside
+# _call_model (below), NOT here, so this module imports without lidar installed.
+# These ARE the workspace giskard.checks (the scan side of the bridge).
+from giskard.checks import DatasetInputGenerator, Interact, Target, Trace
+from pydantic import PrivateAttr
+
+
+class ScanTargetGenerator(BaseGenerator):
+    """Presents a scan Target to lidar as a lidar Target.
+
+    Subclasses lidar's BaseGenerator (Pydantic) so it satisfies lidar's
+    runtime_checkable Target protocol, which the scanner probes with isinstance
+    and calls model_copy(update={"middlewares": ...}) / model_dump on. A plain
+    wrapper cannot satisfy that; a BaseGenerator subclass gets those for free.
+
+    Statefulness via thread_id round-trip (mirrors the app's HubTarget):
+    multiturn probes negotiate session state through Response.metadata["thread_id"].
+    We keep one accumulating scan Trace per thread_id in ``_threads`` and always
+    return the thread_id, so the probe can send only the latest turn next time and
+    still have the Target driven with full accumulated context. This mirrors garak's
+    TargetGenerator.internal_cache, keyed on metadata["thread_id"] instead of
+    Message.notes["uuid"].
+    """
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    scan_target: Target
+
+    # Private (leading underscore) pydantic attr for the per-thread trace cache.
+    # default_factory ensures each instance gets its own dict (not a shared mutable
+    # class-level default).
+    _threads: dict[str, Trace] = PrivateAttr(default_factory=dict)
+
+    def __init__(self, target: Target, **data: Any):
+        super().__init__(scan_target=target, **data)
+
+    async def _call_model(
+        self,
+        messages: Any,
+        params: Any = None,
+        metadata: "dict[str, Any] | None" = None,
+    ) -> Any:  # -> lidar.giskard_compat.Response
+        # Lazy: lidar's compat layer, only importable when lidar is installed.
+        from lidar.giskard_compat import make_response
+
+        thread_id = (metadata or {}).get("thread_id") or str(uuid.uuid4())
+        # Accumulated trace for this thread (empty on first turn). Trace is frozen,
+        # so with_interaction returns a NEW trace we write back under the same key.
+        trace = self._threads.get(thread_id) or Trace.for_target(self.scan_target)
+
+        text = messages[-1].content if messages else ""
+        interaction = Interact(
+            inputs=DatasetInputGenerator(prompt=text),
+            outputs=self.scan_target,
+        )
+        trace = await trace.with_interaction(interaction)
+        self._threads[thread_id] = trace
+
+        outputs = trace.last.outputs if trace.last is not None else None
+        reply = str(outputs) if outputs is not None else ""
+        # Round-trip the thread_id so the probe threads subsequent turns.
+        # make_response builds a lidar.giskard_compat.Response (subclass of
+        # giskard's CompletionResponse) that carries a settable .metadata dict.
+        return make_response(
+            role="assistant", content=reply, metadata={"thread_id": thread_id}
+        )

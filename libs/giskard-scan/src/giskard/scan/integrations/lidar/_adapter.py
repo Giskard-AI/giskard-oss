@@ -1,6 +1,7 @@
 """Adapter that runs the private lidar scanner through Giskard scan."""
 
 import logging
+import time
 from importlib.util import find_spec
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,7 @@ from giskard.checks import (
     SuiteResult,
     TestCaseResult,
     Trace,
+    get_default_generator,
 )
 
 if TYPE_CHECKING:
@@ -79,7 +81,43 @@ def _severity_label(severity: object) -> "str | None":
 
 
 class LidarScanAdapter:
-    """Build and run a Giskard suite from a lidar scan. Filled in by later tasks."""
+    """Build and run a Giskard suite from a lidar scan."""
+
+    async def run(self, target, **kwargs) -> SuiteResult:
+        _require_lidar()
+        from lidar import run_scan
+
+        from ._target import ScanTargetGenerator
+
+        probes = kwargs.pop("probes", None)
+        tags = kwargs.pop("tags", None)
+        if kwargs.pop("target_mode", None) is not None:
+            logger.debug("target_mode is ignored for lidar; lidar owns turn logic.")
+
+        bridged = ScanTargetGenerator(target=target)
+        start = time.perf_counter()
+        try:
+            # run_scan returns a ScanRun immediately (the scan runs in the background);
+            # await wait_for_completion() to block, then read .scan_result off it.
+            scan_run = await run_scan(
+                target=bridged,
+                probe_ids=probes,
+                tags_filter=tags,
+                generator=get_default_generator(),
+                discover_target_info=False,
+                base_seed=None,
+            )
+            await scan_run.wait_for_completion()
+            scan_result = scan_run.scan_result
+        except Exception as exc:  # noqa: BLE001 — total failure -> empty suite, not abort
+            logger.warning("lidar run_scan raised: %s", exc)
+            elapsed_ms = int((time.perf_counter() - start) * 1000)
+            return SuiteResult(results=[], duration_ms=elapsed_ms)
+
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        if scan_result is None:  # completed but produced nothing -> empty suite
+            return SuiteResult(results=[], duration_ms=duration_ms)
+        return await self._to_suite_result(scan_result, duration_ms)
 
     async def _to_suite_result(self, scan_result, duration_ms: int) -> SuiteResult:
         scenario_results: list[ScenarioResult] = []

@@ -7,14 +7,14 @@ from giskard.checks import SuiteResult, Target, Trace
 
 async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     target: Target[InputType, OutputType, TraceType],
-    tool: Literal["garak"] = "garak",
+    tool: Literal["garak", "lidar"] = "garak",
     **kwargs: Any,
 ) -> SuiteResult:
     """Run an external security scanner against a Giskard target.
 
     Args:
         target: Agent or provider target to evaluate.
-        tool: Scanner to use. Only ``"garak"`` is supported today.
+        tool: Scanner to use. ``"garak"`` or ``"lidar"``.
         **kwargs: Tool-specific options. For garak:
             ``probes: list[str] | None`` restricts which probes run; omitted
             means all active loadable probes, while an empty list runs none.
@@ -28,6 +28,10 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
         from .garak import GarakScanAdapter
 
         adapter = GarakScanAdapter()
+    elif tool == "lidar":
+        from .lidar import LidarScanAdapter
+
+        adapter = LidarScanAdapter()
     else:
-        raise ValueError(f"Unknown tool {tool!r}. Available: ['garak']")
+        raise ValueError(f"Unknown tool {tool!r}. Available: ['garak', 'lidar']")
     return await adapter.run(target, **kwargs)
