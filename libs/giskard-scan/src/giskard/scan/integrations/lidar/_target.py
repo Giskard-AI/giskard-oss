@@ -1,16 +1,15 @@
 """Bridge a giskard.scan Target into a lidar Target (a giskard.agents BaseGenerator).
 
-IMPORTANT: this module imports lidar's pinned ``giskard.agents`` (``BaseGenerator``,
-``Response``). Those symbols are NOT the giskard-oss workspace ``giskard.agents`` —
-they resolve to whatever lidar installed on sys.path. This module is therefore
-imported LAZILY (inside LidarScanAdapter.run), never at package import time, so
-`import giskard.scan.integrations.lidar` does not require lidar to be present.
+``BaseGenerator`` is the workspace ``giskard.agents`` type and is imported eagerly
+(no lidar needed). lidar's compat types (``make_response``) are imported LAZILY
+inside ``_call_model`` so ``import giskard.scan.integrations.lidar`` works without
+lidar installed. lidar adapts the workspace ``giskard.agents`` via its own
+``giskard_compat`` layer — there is no second copy of ``giskard.agents``.
 """
 
 import uuid
 from typing import Any
 
-# Resolves to LIDAR's giskard.agents at runtime (lidar is on sys.path when this runs).
 # BaseGenerator is the workspace giskard.agents type — always importable, no lidar needed.
 from giskard.agents import BaseGenerator
 
@@ -40,15 +39,20 @@ class ScanTargetGenerator(BaseGenerator):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    scan_target: Target
+    # The scan Target is a PRIVATE attr, not a pydantic field: lidar's scanner
+    # serializes the generator via model_dump(mode="json") for run metadata, and a
+    # scan Target (often a plain function) is not JSON-serializable. A PrivateAttr is
+    # excluded from model_dump, so the scan runs; model_copy(update={"middlewares":
+    # ...}) still preserves it because model_copy carries private attrs over.
+    _scan_target: Target = PrivateAttr()
 
-    # Private (leading underscore) pydantic attr for the per-thread trace cache.
-    # default_factory ensures each instance gets its own dict (not a shared mutable
-    # class-level default).
+    # Per-thread trace cache. default_factory gives each instance its own dict
+    # (not a shared mutable class-level default).
     _threads: dict[str, Trace] = PrivateAttr(default_factory=dict)
 
     def __init__(self, target: Target, **data: Any):
-        super().__init__(scan_target=target, **data)
+        super().__init__(**data)
+        self._scan_target = target
 
     async def _call_model(
         self,
@@ -62,12 +66,12 @@ class ScanTargetGenerator(BaseGenerator):
         thread_id = (metadata or {}).get("thread_id") or str(uuid.uuid4())
         # Accumulated trace for this thread (empty on first turn). Trace is frozen,
         # so with_interaction returns a NEW trace we write back under the same key.
-        trace = self._threads.get(thread_id) or Trace.for_target(self.scan_target)
+        trace = self._threads.get(thread_id) or Trace.for_target(self._scan_target)
 
         text = messages[-1].content if messages else ""
         interaction = Interact(
             inputs=DatasetInputGenerator(prompt=text),
-            outputs=self.scan_target,
+            outputs=self._scan_target,
         )
         trace = await trace.with_interaction(interaction)
         self._threads[thread_id] = trace

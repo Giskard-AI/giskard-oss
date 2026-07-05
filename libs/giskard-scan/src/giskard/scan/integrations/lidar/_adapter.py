@@ -84,6 +84,14 @@ class LidarScanAdapter:
     """Build and run a Giskard suite from a lidar scan."""
 
     async def run(self, target, **kwargs) -> SuiteResult:
+        """Run a lidar scan against ``target`` and return a scan SuiteResult.
+
+        Note: ``discover_target_info`` is hardcoded to False. Most lidar probes
+        depend on a discovered ``TargetInfo`` and will be reported as SKIP when it
+        is absent; those that do not need it run normally. Target discovery is left
+        off to keep runs deterministic and offline-friendly (it would otherwise
+        drive an LLM to profile the target before scanning).
+        """
         _require_lidar()
         from lidar import run_scan
 
