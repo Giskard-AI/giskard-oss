@@ -1,50 +1,14 @@
-import json
-from typing import Any, override
-
-from giskard.agents.chat import Message
-from giskard.agents.generators._types import Response
-from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import CheckStatus, Correctness, Interaction, Trace
-from pydantic import Field
 
-
-class LLMTrace(Trace[str, str], frozen=True):
-    def _repr_prompt_(self) -> str:
-        return "\n".join(
-            [
-                f"[user]: {interaction.inputs}\n[assistant]: {interaction.outputs}"
-                for interaction in self.interactions
-            ]
-        )
-
-
-class MockGenerator(BaseGenerator):
-    passed: bool
-    reason: str | None
-    calls: list[list[Message]] = Field(default_factory=list)
-
-    @override
-    async def _call_model(
-        self,
-        messages: list[Message],
-        params: GenerationParams,
-        metadata: dict[str, Any] | None = None,
-    ) -> Response:
-        self.calls.append(messages)
-        return Response(
-            message=Message(
-                role="assistant",
-                content=json.dumps({"passed": self.passed, "reason": self.reason}),
-            ),
-            finish_reason="stop",
-        )
+from ..testing_utils import LLMTrace
+from ..testing_utils import MockJudgeGenerator as MockGenerator
 
 
 async def test_run_returns_success() -> None:
     generator = MockGenerator(passed=True, reason="Matches reference")
     correctness = Correctness(
         generator=generator,
-        description="Q&A bot",
+        agent_description="Q&A bot",
         answer="Paris.",
         reference_answer="The capital of France is Paris.",
     )
@@ -60,7 +24,7 @@ async def test_run_returns_failure() -> None:
     generator = MockGenerator(passed=False, reason="Contradicts reference")
     correctness = Correctness(
         generator=generator,
-        description="Q&A bot",
+        agent_description="Q&A bot",
         answer="Lyon.",
         reference_answer="The capital of France is Paris.",
     )
@@ -91,17 +55,11 @@ async def test_inputs_from_trace() -> None:
     assert result.details["reason"] is None
 
     assert len(generator.calls) == 1
-    message = generator.calls[0][0]
-    assert isinstance(message.content, str)
-    assert (
-        "<AGENT DESCRIPTION>\nFactual assistant\n</AGENT DESCRIPTION>"
-        in message.content
-    )
-    assert (
-        f"<CONVERSATION>\n{trace._repr_prompt_()}\n</CONVERSATION>" in message.content
-    )
-    assert "<AGENT ANSWER>\nParis.\n</AGENT ANSWER>" in message.content
+    prompt = generator.calls[0][0].transcript
+    assert "<AGENT DESCRIPTION>\nFactual assistant\n</AGENT DESCRIPTION>" in prompt
+    assert f"<CONVERSATION>\n{trace._repr_prompt_()}\n</CONVERSATION>" in prompt
+    assert "<AGENT ANSWER>\nParis.\n</AGENT ANSWER>" in prompt
     assert (
         "<REFERENCE ANSWER>\nParis is the capital of France.\n</REFERENCE ANSWER>"
-        in message.content
+        in prompt
     )
