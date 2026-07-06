@@ -207,7 +207,7 @@ async def test_parallel_probes_with_structured_target_use_main_loop(
     adapter_cls = _patch_resolvers(
         monkeypatch,
         probes=[_StructuredInputProbe("p1"), _StructuredInputProbe("p2")],
-        detectors=[_FakeDetector()],
+        detectors=[("fake.Detector", _FakeDetector())],
     )
 
     result = await adapter_cls().run(target=target)

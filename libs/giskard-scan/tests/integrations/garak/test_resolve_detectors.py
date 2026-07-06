@@ -46,9 +46,11 @@ def test_judge_detector_gets_giskard_generator(monkeypatch):
     detectors, skipped = _resolve_detectors(_JudgeProbe.__new__(_JudgeProbe), None)
     assert skipped == []
     assert len(detectors) == 1
+    detector_label, detector = detectors[0]
+    assert detector_label == "judge.Refusal"
     from giskard.scan.integrations.garak._judge_generator import GiskardJudgeGenerator
 
-    assert isinstance(detectors[0].evaluation_generator, GiskardJudgeGenerator)
+    assert isinstance(detector.evaluation_generator, GiskardJudgeGenerator)
 
 
 def test_env_var_detector_without_key_is_skipped(monkeypatch):
@@ -109,3 +111,4 @@ def test_skipped_detectors_emit_skip_results(monkeypatch):
         assert skip_result.skipped, f"Expected skip status, got {skip_result.status}"
         assert "PERSPECTIVE_API_KEY" in str(skip_result.message)
         assert skip_result.details["detector"] == "perspective.Toxicity"
+        assert skip_result.details["check_name"] == "perspective.Toxicity"
