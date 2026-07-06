@@ -22,6 +22,37 @@ from .._shared import reject_unexpected_kwargs
 
 logger = logging.getLogger(__name__)
 
+# Lidar tags its multiturn probes (crescendo, goat, ...) with this. It is the
+# ONLY uniform signal lidar exposes for "this probe drives a multi-turn
+# conversation" — there is no shared base class or attribute to isinstance on
+# (unlike garak's IterativeProbe). We use it to drop those probes when the
+# caller declares a single-turn target. A guard test pins this string so a lidar
+# rename fails loudly instead of silently leaking multiturn probes into
+# singleturn mode. See test_lidar_singleturn.py.
+_MULTITURN_TAG = "gsk:probe-type='multi-turn'"
+
+
+def _singleturn_probe_ids(
+    probes: "list[str] | None", tags: "list[str] | None"
+) -> list[str]:
+    """Resolve the probe ids to run in single-turn mode.
+
+    Lidar's ``tags_filter`` is inclusion-only (a probe is kept if it matches
+    ANY tag), so it cannot express "exclude multiturn". Instead we resolve the
+    exact class set lidar would run for the caller's ``probes``/``tags`` filters,
+    then drop every probe carrying ``_MULTITURN_TAG``. The surviving ids are
+    passed to ``run_scan`` with ``tags_filter=None`` (the tag filter has already
+    been applied here).
+    """
+    from lidar.utils.probe_registry import ProbeRegistry
+
+    candidates = ProbeRegistry().get_probes(tags, probe_ids=probes)
+    return [
+        info.id
+        for probe_cls in candidates
+        if _MULTITURN_TAG not in (info := probe_cls.info()).tags
+    ]
+
 
 def lidar_available() -> bool:
     """Return True if the private lidar dependency is importable."""
@@ -107,10 +138,25 @@ class LidarScanAdapter:
 
         probes = kwargs.pop("probes", None)
         tags = kwargs.pop("tags", None)
-        if kwargs.pop("target_mode", None) is not None:
-            # TODO: filter out multiturn probes if target_mode is singleturn
-            logger.debug("target_mode is ignored for lidar; lidar owns turn logic.")
+        # target_mode is a scan-wide hint about the target's conversational
+        # ability. Lidar owns its own turn logic, so the only thing "singleturn"
+        # can mean here is: don't run probes that require a multi-turn exchange
+        # (crescendo, goat, ...). Those probes have no single-turn form — a
+        # 1-turn crescendo is not a valid attack — so we SKIP them, mirroring
+        # garak's IterativeProbe skip. "multiturn" (the default) runs everything.
+        target_mode = kwargs.pop("target_mode", None)
         reject_unexpected_kwargs("lidar", kwargs)
+
+        # tags_filter is applied by run_scan for the default path; in singleturn
+        # mode we resolve+filter the probe ids ourselves and pass tags_filter=None
+        # so lidar doesn't intersect the tag filter a second time.
+        tags_filter: list[str] | None = tags
+        if target_mode == "singleturn":
+            probes = _singleturn_probe_ids(probes, tags)
+            tags_filter = None
+            if not probes:
+                logger.debug("target_mode='singleturn' left no lidar probes to run.")
+                return SuiteResult(results=[], duration_ms=0)
 
         target_info = TargetInfo(
             agent_description=description,
@@ -126,7 +172,7 @@ class LidarScanAdapter:
             target=bridged,  # pyright: ignore[reportArgumentType]
             target_info=target_info,
             probe_ids=probes,
-            tags_filter=tags,
+            tags_filter=tags_filter,
             generator=get_default_generator(),
             discover_target_info=False,
             base_seed=None,

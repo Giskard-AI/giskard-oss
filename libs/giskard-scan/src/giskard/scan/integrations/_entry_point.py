@@ -33,7 +33,9 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
             ``probes: list[str] | None`` restricts which probes run by id
             (e.g. ``"deepset-injection:1.0"``); ``None`` runs all.
             ``tags: list[str] | None`` restricts probes by tag; ``None`` runs
-            all. ``target_mode`` is ignored.
+            all. ``target_mode: str`` (default ``"multiturn"``) skips lidar's
+            multi-turn probes (crescendo, goat, ...) when set to
+            ``"singleturn"``.
 
     Returns:
         The completed suite result.
