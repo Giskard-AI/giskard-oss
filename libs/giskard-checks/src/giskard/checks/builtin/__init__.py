@@ -19,12 +19,17 @@ from .comparison import (
     GreaterThan,
     LesserThan,
     LesserThanEquals,
+    LessThan,
+    LessThanEquals,
     NotEquals,
 )
 
 # Import other builtin checks (staying in builtin)
 from .composition import AllOf, AnyOf, Not
 from .fn import FnCheck, from_fn
+from .json_valid import JsonValid
+from .nlp_metrics import Readability
+from .rego_policy import RegoPolicy
 from .semantic_similarity import SemanticSimilarity
 from .text_matching import RegexMatching, StringMatching
 
@@ -34,10 +39,15 @@ __all__ = [
     "Not",
     "from_fn",
     "FnCheck",
+    "JsonValid",
+    "Readability",
+    "RegoPolicy",
     "StringMatching",
     "RegexMatching",
     "Equals",
     "NotEquals",
+    "LessThan",
+    "LessThanEquals",
     "LesserThan",
     "GreaterThan",
     "LesserThanEquals",

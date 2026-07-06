@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field, ValidationError
 from .chat import Chat
 from .context import RunContext
 from .errors.serializable import Error
-from .errors.workflow_errors import WorkflowError
+from .errors.workflow_errors import ModelRefusalError, WorkflowError
 from .generators import BaseGenerator, GenerationParams
 from .templates import MessageTemplate, PromptsManager, get_prompts_manager
 from .tools.tool import Tool
@@ -173,10 +173,16 @@ class _StepRunner:
             return
 
         for tool_call in chat.last.tool_calls:
-            if tool_call.function.name not in self._workflow.tools:
-                continue  # TODO: raise an error?
+            tool_name = tool_call.function.name or "<missing>"
+            if tool_name not in self._workflow.tools:
+                registered_tools = ", ".join(sorted(self._workflow.tools)) or "<none>"
+                raise ValueError(
+                    f"Unknown tool call '{tool_name}' "
+                    f"(tool_call_id='{tool_call.id}'). "
+                    f"Registered tools: {registered_tools}."
+                )
 
-            tool = self._workflow.tools[tool_call.function.name]
+            tool = self._workflow.tools[tool_name]
             tool_content = await tool.run(
                 deserialize_arguments(tool_call.function.arguments),
                 ctx=chat.context,
@@ -222,10 +228,15 @@ class _StepRunner:
         if response.choices[0].message.tool_calls:
             return response.choices[0].message
 
-        # Attempt the parsing to raise ValidationError if output is not compatible
-        output_model.model_validate_json(response.choices[0].message.text or "")
+        # If the model refused to generate content, raise a ModelRefusalError
+        choice = response.choices[0]
+        if choice.finish_reason == "refusal" or choice.message.is_refusal:
+            raise ModelRefusalError(refusal=choice.message.text)
 
-        return response.choices[0].message
+        # Attempt the parsing to raise ValidationError if output is not compatible
+        output_model.model_validate_json(choice.message.text or "")
+
+        return choice.message
 
 
 class ChatWorkflow(BaseModel, Generic[OutputType]):

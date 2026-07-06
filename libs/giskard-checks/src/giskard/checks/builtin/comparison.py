@@ -1,8 +1,9 @@
+import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Self, override
 
-from giskard.core import NOT_PROVIDED, NotProvided, provide_not_none
 from pydantic import Field, model_validator
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
 from ..core.check import Check
@@ -35,13 +36,13 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     key: JSONPathStr = Field(
         ..., description="The key to extract the actual value from the trace"
     )
-    expected_value: ExpectedType | None = Field(
-        default=None,
-        description="The expected value to compare against. If None, the expected value is extracted from the trace using the expected_value_key.",
+    expected_value: ExpectedType | MISSING = Field(
+        default=MISSING,
+        description="The expected value to compare against. If omitted, the expected value is extracted from the trace using expected_value_key. Explicit None is valid and compares against None.",
     )
-    expected_value_key: JSONPathStr | NotProvided = Field(
-        default=NOT_PROVIDED,
-        description="The key to extract the expected value from the trace. If None, the expected value is used as is. If provided, the expected value is extracted from the trace using the expected_value_key.",
+    expected_value_key: JSONPathStr | MISSING = Field(
+        default=MISSING,
+        description="The key to extract the expected value from the trace. If omitted, use expected_value directly. If provided, the expected value is extracted from the trace using this key.",
     )
     normalization_form: NormalizationForm | None = Field(
         default="NFKC",
@@ -68,11 +69,9 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     @model_validator(mode="after")
     def validate_expected_value_or_expected_value_key(self) -> Self:
         """Validate that exactly one of expected_value or expected_value_key is provided."""
-        if isinstance(self.expected_value, NotProvided) and isinstance(
-            self.expected_value_key, NotProvided
-        ):
+        if (self.expected_value is MISSING) == (self.expected_value_key is MISSING):
             raise ValueError(
-                "Either 'expected_value' or 'expected_value_key' must be provided"
+                "Exactly one of 'expected_value' or 'expected_value_key' must be provided"
             )
         return self
 
@@ -82,7 +81,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         actual_value = resolve(trace, self.key)
         expected_value = provided_or_resolve(
             trace,
-            key=provide_not_none(self.expected_value_key),
+            key=self.expected_value_key,
             value=self.expected_value,
         )
 
@@ -125,8 +124,8 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         )
 
 
-@Check.register("lesser_than")
-class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+@Check.register("less_than")
+class LessThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values are less than an expected value.
@@ -166,6 +165,26 @@ class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyri
     def _operator_symbol(self) -> str:
         """Get the operator symbol for error messages."""
         return "<"
+
+
+@Check.register("lesser_than")
+class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+    LessThan[InputType, OutputType, TraceType, ExpectedType]
+):
+    """Deprecated alias for :class:`LessThan`.
+
+    .. deprecated::
+        Use :class:`LessThan` instead. This alias remains for backward
+        compatibility with serialized checks using ``kind="lesser_than"``.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        warnings.warn(
+            "LesserThan is deprecated; use LessThan instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)
 
 
 @Check.register("greater_than")
@@ -211,8 +230,8 @@ class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyr
         return ">"
 
 
-@Check.register("lesser_than_equals")
-class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+@Check.register("less_than_equals")
+class LessThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values are less than or equal to an expected value.
@@ -252,6 +271,26 @@ class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  
     def _operator_symbol(self) -> str:
         """Get the operator symbol for error messages."""
         return "<="
+
+
+@Check.register("lesser_than_equals")
+class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+    LessThanEquals[InputType, OutputType, TraceType, ExpectedType]
+):
+    """Deprecated alias for :class:`LessThanEquals`.
+
+    .. deprecated::
+        Use :class:`LessThanEquals` instead. This alias remains for backward
+        compatibility with serialized checks using ``kind="lesser_than_equals"``.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        warnings.warn(
+            "LesserThanEquals is deprecated; use LessThanEquals instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)
 
 
 @Check.register("greater_than_equals")

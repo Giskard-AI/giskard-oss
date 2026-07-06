@@ -34,13 +34,21 @@ Supported features:
 Provider-specific kwargs:
     - ``base_url``: custom API endpoint
     - ``timeout``: request timeout in seconds
+    - ``http_client``: caller-owned async HTTP client passed to the SDK; not closed by giskard-llm
+    - ``default_headers``: extra headers merged into every SDK request
+
+Azure Foundry OpenAI v1:
+    Azure Foundry OpenAI v1 endpoints are OpenAI-compatible and should use
+    this provider with ``base_url`` set to the Azure ``/openai/v1/`` endpoint.
+    The ``model`` argument remains the Azure deployment name for completions,
+    Responses API calls, and embeddings.
 """
 
 # pyright: reportAttributeAccessIssue=false
 
 import logging
-from collections.abc import Sequence
-from typing import Any, NoReturn
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -69,6 +77,9 @@ from ..types import (
     ToolDefParam,
 )
 from ..utils import compact
+
+if TYPE_CHECKING:
+    from httpx import AsyncClient
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +110,8 @@ class OpenAIProvider:
         api_key: str | None = None,
         base_url: str | None = None,
         timeout: float | None = None,
+        http_client: "AsyncClient | None" = None,
+        default_headers: Mapping[str, str] | None = None,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:
@@ -107,7 +120,13 @@ class OpenAIProvider:
             )
         openai = _import_openai()
         self._client = openai.AsyncOpenAI(
-            **compact(api_key=api_key, base_url=base_url, timeout=timeout)
+            **compact(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=timeout,
+                http_client=http_client,
+                default_headers=default_headers,
+            )
         )
 
     def _map_error(self, e: Exception) -> NoReturn:

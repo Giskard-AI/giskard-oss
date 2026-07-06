@@ -178,7 +178,7 @@ API Overview
 
 **Built-in and LLM-based checks**
 - `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
-- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LesserThan`, `LesserThanEquals`.
+- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LessThan`, `LessThanEquals` (`LesserThan` and `LesserThanEquals` are deprecated aliases).
 - `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
 - JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks via `key` or check-specific fields like `answer_key`.
 
@@ -427,13 +427,13 @@ User simulation
 Use `UserSimulator` for LLM-powered user personas in multi-turn scenarios. Supports predefined personas (e.g., ``frustrated_customer``, ``helpful_user``) or custom descriptions.
 
 ```python
-from giskard.checks import scenario, UserSimulator, set_default_generator
+from giskard.checks import Scenario, UserSimulator, set_default_generator
 from giskard.agents.generators import Generator
 
 set_default_generator(Generator(model="openai/gpt-4o-mini"))
 
 result = await (
-    scenario("user-simulation")
+    Scenario("user-simulation")
     .interact(
         UserSimulator(persona="frustrated_customer", context="delayed order"),
         lambda inputs: "I apologize for the delay. Let me look into that.",

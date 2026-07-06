@@ -1,6 +1,5 @@
 from typing import Annotated, Any, override
 
-from giskard.core import NOT_PROVIDED, NotProvided
 from jsonpath_ng import (
     Child,
     DatumInContext,
@@ -15,6 +14,7 @@ from jsonpath_ng import (
 )
 from jsonpath_ng.exceptions import JsonPathLexerError, JsonPathParserError
 from pydantic import AfterValidator, BaseModel, Field
+from pydantic.experimental.missing_sentinel import MISSING
 
 from .interaction import Trace
 
@@ -90,10 +90,10 @@ def resolve[TraceType: Trace](trace: TraceType, key: str) -> Any:  # pyright: ig
 
 def provided_or_resolve[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     trace: TraceType,
-    key: str | NotProvided = NOT_PROVIDED,
-    value: Any = NOT_PROVIDED,
+    key: str | MISSING = MISSING,
+    value: Any = MISSING,
 ) -> Any:
-    if isinstance(key, NotProvided) or not isinstance(value, NotProvided):
+    if key is MISSING or value is not MISSING:
         return value
 
     return resolve(trace, key)

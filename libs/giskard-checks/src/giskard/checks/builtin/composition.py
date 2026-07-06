@@ -24,9 +24,9 @@ class AllOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
 
     Examples
     --------
-    >>> from giskard.checks import AllOf, LesserThan, Equals
+    >>> from giskard.checks import AllOf, LessThan, Equals
     >>> check = AllOf(checks=[
-    ...     LesserThan(expected_value=10, key="trace.last.outputs"),
+    ...     LessThan(expected_value=10, key="trace.last.outputs"),
     ...     Equals(expected_value=5, key="trace.last.outputs"),
     ... ])
     """
