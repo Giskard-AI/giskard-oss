@@ -42,7 +42,7 @@ class LiteLLMEmbeddingModel(BaseEmbeddingModel):
         self, texts: list[str], params: EmbeddingParams | None = None
     ) -> list[np.ndarray]:
         litellm = _import_litellm()
-        params_ = self.params.model_dump()
+        params_ = self.params.model_dump() if self.params is not None else {}
 
         if params is not None:
             params_.update(params.model_dump(exclude_unset=True))
