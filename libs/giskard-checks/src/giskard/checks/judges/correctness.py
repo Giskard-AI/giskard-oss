@@ -1,8 +1,8 @@
 from typing import Any, override
 
-from giskard.agents.workflow import TemplateReference
-from giskard.core import provide_not_none
+from giskard.agents import TemplateReference
 from pydantic import Field
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
 from ..core.check import Check
@@ -31,19 +31,17 @@ class Correctness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
 
     Attributes
     ----------
-    description : str | None
+    agent_description : str
         Description of the agent under test.
-    description_key : str
-        JSONPath expression to extract the description from the trace
+    agent_description_key : str
+        JSONPath expression to extract the agent description from the trace
         (default: ``trace.annotations.description``).
-
-        Can use ``trace.last`` (preferred) or ``trace.interactions[-1]`` for JSONPath expressions.
-    answer : str | None
+    answer : str
         The agent's answer to evaluate (typically the response to the final user message).
     answer_key : str
         JSONPath expression to extract the answer from the trace
         (default: ``trace.last.outputs``).
-    reference_answer : str | None
+    reference_answer : str
         Reference answer representing the correct response.
     reference_answer_key : str
         JSONPath expression to extract the reference answer from the trace
@@ -69,22 +67,22 @@ class Correctness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
     >>> # await check.run(trace)
     """
 
-    description: str | None = Field(
-        default=None, description="Description of the agent under test"
+    agent_description: str | MISSING = Field(
+        default=MISSING, description="Description of the agent under test"
     )
-    description_key: JSONPathStr = Field(
+    agent_description_key: JSONPathStr = Field(
         default="trace.annotations.description",
         description="Key to extract the agent description from the trace",
     )
-    answer: str | None = Field(
-        default=None, description="Agent answer to evaluate for correctness"
+    answer: str | MISSING = Field(
+        default=MISSING, description="Agent answer to evaluate for correctness"
     )
     answer_key: JSONPathStr = Field(
         default="trace.last.outputs",
         description="Key to extract the answer from the trace",
     )
-    reference_answer: str | None = Field(
-        default=None, description="Reference (ground-truth) answer"
+    reference_answer: str | MISSING = Field(
+        default=MISSING, description="Reference (ground-truth) answer"
     )
     reference_answer_key: JSONPathStr = Field(
         default="trace.last.metadata.reference_answer",
@@ -110,15 +108,15 @@ class Correctness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
         Returns
         -------
         dict[str, Any]
-            Template variables: ``description`` and ``answer`` and ``reference_answer``
-            as strings; ``conversation`` as the trace instance.
+            Template variables: ``agent_description`` and ``answer`` and
+            ``reference_answer`` as strings; ``conversation`` as the trace instance.
         """
         return {
-            "description": str(
+            "agent_description": str(
                 provided_or_resolve(
                     trace,
-                    key=self.description_key,
-                    value=provide_not_none(self.description),
+                    key=self.agent_description_key,
+                    value=self.agent_description,
                 )
             ),
             "conversation": trace,
@@ -126,14 +124,14 @@ class Correctness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
                 provided_or_resolve(
                     trace,
                     key=self.answer_key,
-                    value=provide_not_none(self.answer),
+                    value=self.answer,
                 )
             ),
             "reference_answer": str(
                 provided_or_resolve(
                     trace,
                     key=self.reference_answer_key,
-                    value=provide_not_none(self.reference_answer),
+                    value=self.reference_answer,
                 )
             ),
         }
