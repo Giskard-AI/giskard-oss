@@ -44,13 +44,13 @@ class ScanTargetGenerator(BaseGenerator):
     # scan Target (often a plain function) is not JSON-serializable. A PrivateAttr is
     # excluded from model_dump, so the scan runs; model_copy(update={"middlewares":
     # ...}) still preserves it because model_copy carries private attrs over.
-    _scan_target: Target = PrivateAttr()
+    _scan_target: Target = PrivateAttr()  # pyright: ignore[reportMissingTypeArgument]
 
     # Per-thread trace cache. default_factory gives each instance its own dict
     # (not a shared mutable class-level default).
-    _threads: dict[str, Trace] = PrivateAttr(default_factory=dict)
+    _threads: dict[str, Trace] = PrivateAttr(default_factory=dict)  # pyright: ignore[reportMissingTypeArgument]
 
-    def __init__(self, target: Target, **data: Any):
+    def __init__(self, target: Target, **data: Any):  # pyright: ignore[reportMissingTypeArgument]
         super().__init__(**data)
         self._scan_target = target
 

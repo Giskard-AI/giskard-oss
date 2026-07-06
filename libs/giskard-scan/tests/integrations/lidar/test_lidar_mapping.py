@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 import pytest
 
@@ -33,16 +34,16 @@ class FakeProbeInfo:
 @dataclass
 class FakeAttempt:
     successful: bool
-    messages: list = field(default_factory=list)
+    messages: list[Any] = field(default_factory=list)
     severity: object = None
     reason: str = ""
     error: object = None
-    metadata: dict = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class FakeResult:
-    attempts: list
+    attempts: list[Any]
 
 
 @dataclass
@@ -55,7 +56,7 @@ class FakeProbeExecution:
 
 @dataclass
 class FakeScanResult:
-    results: list
+    results: list[Any]
 
 
 def _msgs():

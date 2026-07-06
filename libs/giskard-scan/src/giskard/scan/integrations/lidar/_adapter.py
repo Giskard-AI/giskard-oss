@@ -38,7 +38,7 @@ def _require_lidar() -> None:
         )
 
 
-async def _trace_from_messages(messages: "list[Message]") -> Trace:
+async def _trace_from_messages(messages: "list[Message]") -> Trace:  # pyright: ignore[reportMissingTypeArgument]
     """Rebuild a scan Trace from a lidar attempt's flat message list.
 
     Lidar owns its own executor and hands back finished conversations, so we
@@ -46,13 +46,13 @@ async def _trace_from_messages(messages: "list[Message]") -> Trace:
     reply that follows it. System/tool messages carry no input/output pair and
     are skipped. A trailing user message with no reply yields outputs=None.
     """
-    interactions: list[Interaction] = []
+    interactions: list[Interaction] = []  # pyright: ignore[reportMissingTypeArgument]
     pending_input: str | None = None
     for message in messages:
         if message.role == "user":
             if pending_input is not None:
                 interactions.append(Interaction(inputs=pending_input, outputs=None))
-            pending_input = message.content
+            pending_input = message.content  # pyright: ignore[reportAssignmentType]
         elif message.role == "assistant":
             if pending_input is not None:
                 interactions.append(
@@ -117,7 +117,7 @@ class LidarScanAdapter:
             # run_scan returns a ScanRun immediately (the scan runs in the background);
             # await wait_for_completion() to block, then read .scan_result off it.
             scan_run = await run_scan(
-                target=bridged,
+                target=bridged,  # pyright: ignore[reportArgumentType]
                 target_info=target_info,
                 probe_ids=probes,
                 tags_filter=tags,
@@ -138,7 +138,7 @@ class LidarScanAdapter:
         return await self._to_suite_result(scan_result, duration_ms)
 
     async def _to_suite_result(self, scan_result, duration_ms: int) -> SuiteResult:
-        scenario_results: list[ScenarioResult] = []
+        scenario_results: list[ScenarioResult] = []  # pyright: ignore[reportMissingTypeArgument]
         for execution in scan_result.results:
             probe_info = execution.probe_info
             result = execution.result

@@ -222,8 +222,8 @@ async def test_third_party_scan_rejects_unknown_tool(target) -> None:
     with pytest.raises(ValueError, match="Unknown tool"):
         await third_party_scan(
             target,
-            tool="nope",
-            description="A test agent",  # pyright: ignore[reportArgumentType]
+            tool="nope",  # pyright: ignore[reportArgumentType]
+            description="A test agent",
         )
 
 
