@@ -3,11 +3,13 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from giskard.llm.errors import ProviderNotAvailableError
 from giskard.llm.routing import (
     LLMClient,
     _create_provider,
     _parse_model_string,
     _resolve_value,
+    supports_native,
 )
 
 # -- _parse_model_string -------------------------------------------------------
@@ -298,4 +300,46 @@ async def test_client_routes_azure_foundry_v1_through_openai_provider(
     mock_provider.embed.assert_called_once_with("text-embedding-3-small", ["hello"])
     mock_provider.respond.assert_called_once_with(
         "gpt-4.1-mini", "Hello", instructions=None, previous_id=None, tools=None
+    )
+
+
+# -- supports_native -----------------------------------------------------------
+
+
+def test_supports_native_completion_for_openai():
+    assert supports_native("openai/gpt-4o-mini", "completion") is True
+
+
+def test_supports_native_false_for_unknown_provider():
+    assert supports_native("deepseek/deepseek-chat", "completion") is False
+
+
+@patch(
+    "giskard.llm.providers.openai._import_openai",
+    side_effect=ProviderNotAvailableError("openai", "openai"),
+)
+def test_supports_native_false_when_sdk_missing(_mock_import):
+    assert supports_native("openai/gpt-4o-mini", "completion") is False
+
+
+def test_supports_native_false_for_unsupported_embedding_operation():
+    assert supports_native("anthropic/claude-opus-4-6", "embedding") is False
+
+
+def test_supports_native_embedding_for_openai():
+    assert supports_native("text-embedding-3-small", "embedding") is True
+
+
+def test_supports_native_false_for_invalid_model_string():
+    assert supports_native("", "completion") is False
+
+
+def test_supports_native_uses_configured_alias():
+    client = LLMClient()
+    client.configure(
+        "foundry-v1", provider="openai", api_key="sk-test"
+    )  # pragma: allowlist secret
+
+    assert (
+        supports_native("foundry-v1/gpt-4.1-mini", "completion", client=client) is True
     )
