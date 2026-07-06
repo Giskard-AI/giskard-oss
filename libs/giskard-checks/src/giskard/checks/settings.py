@@ -1,6 +1,11 @@
 """Runtime and environment configuration for giskard-checks."""
 
-from giskard.agents import BaseGenerator, EmbeddingModel, Generator
+from giskard.agents import (
+    BaseEmbeddingModel,
+    BaseGenerator,
+    resolve_embedding_model,
+    resolve_generator,
+)
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -85,16 +90,16 @@ def get_default_generator() -> BaseGenerator:
     """
     if _default_generator is not None:
         return _default_generator
-    return Generator(model=get_settings().default_model)
+    return resolve_generator(get_settings().default_model)
 
 
-def get_default_embedding_model() -> EmbeddingModel:
+def get_default_embedding_model() -> BaseEmbeddingModel:
     """Get the current default embedding model.
 
     Returns
     -------
-    EmbeddingModel
+    BaseEmbeddingModel
         A model built from :envvar:`GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL`,
         or text-embedding-3-small by default.
     """
-    return EmbeddingModel(model=get_settings().default_embedding_model)
+    return resolve_embedding_model(get_settings().default_embedding_model)

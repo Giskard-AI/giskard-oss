@@ -3,9 +3,9 @@
 import importlib
 import os
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
-from .errors import UnsupportedOperationError
+from .errors import ProviderNotAvailableError, UnsupportedOperationError
 from .providers.base import CompletionProvider, EmbeddingProvider, ResponseProvider
 from .types import (
     ChatMessage,
@@ -184,6 +184,91 @@ class LLMClient:
 
 
 _default_client = LLMClient()
+
+
+def _resolve_provider_type(alias: str, client: LLMClient) -> str:
+    """Return the registry provider type for *alias*."""
+    if alias in client._configs:
+        return client._configs[alias]["provider"]
+    if alias in _PROVIDER_REGISTRY:
+        return alias
+    raise ValueError(
+        f"Provider '{alias}' is not configured and not in the registry. "
+        f"Call client.configure('{alias}', ...) first."
+    )
+
+
+_SDK_PROBE: dict[str, tuple[str, str]] = {
+    "openai": ("giskard.llm.providers.openai", "_import_openai"),
+    "google": ("giskard.llm.providers.google", "_import_genai"),
+    "gemini": ("giskard.llm.providers.google", "_import_genai"),
+    "anthropic": ("giskard.llm.providers.anthropic", "_import_anthropic"),
+    "azure": ("giskard.llm.providers.openai", "_import_openai"),
+    "azure_ai": ("giskard.llm.providers.openai", "_import_openai"),
+}
+
+_OPERATION_METHOD: dict[str, str] = {
+    "completion": "complete",
+    "embedding": "embed",
+}
+
+
+def supports_native(
+    model: str,
+    operation: Literal["completion", "embedding"],
+    *,
+    client: LLMClient | None = None,
+) -> bool:
+    """Return whether giskard-llm can handle *model* for *operation* natively.
+
+    Checks registry membership (or ``configure()`` aliases), SDK availability,
+    and provider protocol support. Does not perform network I/O.
+
+    Parameters
+    ----------
+    model
+        Model string in ``provider/model-name`` format. Bare names default to
+        ``openai``.
+    operation
+        ``"completion"`` or ``"embedding"``.
+    client
+        Optional client used for configured provider aliases. Defaults to the
+        module-level default client.
+
+    Returns
+    -------
+    bool
+        ``True`` when a native provider can handle the requested operation.
+    """
+    method_name = _OPERATION_METHOD[operation]
+    try:
+        alias, _ = _parse_model_string(model)
+        probe_client = client or _default_client
+        provider_type = _resolve_provider_type(alias, probe_client)
+    except ValueError:
+        return False
+
+    if provider_type not in _PROVIDER_REGISTRY:
+        return False
+
+    module_path, class_name = _PROVIDER_REGISTRY[provider_type]
+    try:
+        module = importlib.import_module(module_path)
+        provider_cls = getattr(module, class_name)
+    except ImportError:
+        return False
+
+    if not callable(getattr(provider_cls, method_name, None)):
+        return False
+
+    sdk_module_path, sdk_import_name = _SDK_PROBE[provider_type]
+    try:
+        sdk_module = importlib.import_module(sdk_module_path)
+        getattr(sdk_module, sdk_import_name)()
+    except (ImportError, ProviderNotAvailableError):
+        return False
+
+    return True
 
 
 def configure(name: str, provider: str | None = None, **kwargs: Any) -> None:

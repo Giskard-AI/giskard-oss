@@ -1,6 +1,12 @@
 import giskard.checks.settings as settings_module
 import pytest
-from giskard.agents import EmbeddingModel, Generator
+from giskard.agents import Generator
+from giskard.agents.embeddings.litellm_embedding_model import LitellmEmbeddingModel
+from giskard.agents.embeddings.litellm_package_embedding_model import (
+    LiteLLMEmbeddingModel,
+)
+from giskard.agents.generators.giskard_llm_generator import GiskardLLMGenerator
+from giskard.agents.generators.litellm_generator import LiteLLMGenerator
 from giskard.checks.settings import (
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_MODEL,
@@ -16,7 +22,7 @@ def test_default_generator_uses_settings_model(monkeypatch: pytest.MonkeyPatch):
 
     generator = get_default_generator()
 
-    assert isinstance(generator, Generator)
+    assert isinstance(generator, GiskardLLMGenerator)
     assert generator.model == "google/gemini-3.5-flash"
 
 
@@ -25,7 +31,7 @@ def test_default_generator_falls_back_to_builtin_default():
 
     generator = get_default_generator()
 
-    assert isinstance(generator, Generator)
+    assert isinstance(generator, GiskardLLMGenerator)
     assert generator.model == DEFAULT_MODEL
 
 
@@ -45,15 +51,42 @@ def test_default_embedding_model_uses_settings(monkeypatch: pytest.MonkeyPatch):
 
     embedding_model = get_default_embedding_model()
 
-    assert isinstance(embedding_model, EmbeddingModel)
+    assert isinstance(embedding_model, LitellmEmbeddingModel)
     assert embedding_model.model == "google/gemini-embedding-001"
 
 
 def test_default_embedding_model_falls_back_to_builtin_default():
     embedding_model = get_default_embedding_model()
 
-    assert isinstance(embedding_model, EmbeddingModel)
+    assert isinstance(embedding_model, LitellmEmbeddingModel)
     assert embedding_model.model == DEFAULT_EMBEDDING_MODEL
+
+
+def test_default_generator_uses_litellm_for_unsupported_provider(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    pytest.importorskip("litellm")
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "deepseek/deepseek-chat")
+    settings_module._default_generator = None
+
+    generator = get_default_generator()
+
+    assert isinstance(generator, LiteLLMGenerator)
+    assert generator.model == "deepseek/deepseek-chat"
+
+
+def test_default_embedding_model_uses_litellm_for_unsupported_provider(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    pytest.importorskip("litellm")
+    monkeypatch.setenv(
+        "GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL", "deepseek/deepseek-embed"
+    )
+
+    embedding_model = get_default_embedding_model()
+
+    assert isinstance(embedding_model, LiteLLMEmbeddingModel)
+    assert embedding_model.model == "deepseek/deepseek-embed"
 
 
 def test_settings_max_reported_failures_validation(monkeypatch: pytest.MonkeyPatch):
