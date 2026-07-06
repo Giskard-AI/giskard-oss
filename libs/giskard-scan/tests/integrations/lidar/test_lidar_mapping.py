@@ -283,6 +283,42 @@ async def test_multiple_attempts_yield_numbered_scenarios():
     assert names == ["Lidar X #1", "Lidar X #2"]
 
 
+async def test_run_builds_target_info_from_description(monkeypatch):
+    from giskard.scan.integrations.lidar import LidarScanAdapter
+
+    captured = {}
+
+    class _FakeScanRun:
+        scan_result = None
+
+        async def wait_for_completion(self):
+            return None
+
+    async def fake_run_scan(**kwargs):
+        captured.update(kwargs)
+        return _FakeScanRun()
+
+    # run_scan is imported inside run() via `from lidar import run_scan`,
+    # so patch it on the lidar module.
+    import lidar
+
+    monkeypatch.setattr(lidar, "run_scan", fake_run_scan)
+
+    def _target(inputs: str) -> str:
+        return "ok"
+
+    await LidarScanAdapter().run(
+        _target, description="A customer-support bot for ACME", languages=["en"]
+    )
+
+    target_info = captured["target_info"]
+    assert target_info is not None
+    assert target_info.agent_description == "A customer-support bot for ACME"
+    assert target_info.languages == ["en"]
+    # discovery stays off; context comes from the caller
+    assert captured["discover_target_info"] is False
+
+
 async def test_errored_probe_with_no_result_maps_to_error_scenario():
     # ProbeExecution with result=None (probe errored) -> one visible error
     # scenario, no crash on the missing .attempts.

@@ -83,17 +83,21 @@ def _severity_label(severity: object) -> "str | None":
 class LidarScanAdapter:
     """Build and run a Giskard suite from a lidar scan."""
 
-    async def run(self, target, **kwargs) -> SuiteResult:
+    async def run(
+        self, target, *, description, languages=None, **kwargs
+    ) -> SuiteResult:
         """Run a lidar scan against ``target`` and return a scan SuiteResult.
 
-        Note: ``discover_target_info`` is hardcoded to False. Most lidar probes
-        depend on a discovered ``TargetInfo`` and will be reported as SKIP when it
-        is absent; those that do not need it run normally. Target discovery is left
-        off to keep runs deterministic and offline-friendly (it would otherwise
-        drive an LLM to profile the target before scanning).
+        ``description`` and ``languages`` build the ``TargetInfo`` that lidar
+        probes read to construct their attacks. ``discover_target_info`` stays
+        False: the target profile now comes from the caller, so lidar never
+        needs to run its own discovery pass. ``agent_name`` / ``company_name`` /
+        ``competitors`` are left at their None/[] defaults; probes that read them
+        only use them as prompt-template values and degrade gracefully.
         """
         _require_lidar()
         from lidar import run_scan
+        from lidar.resources.target_info import TargetInfo
 
         from ._target import ScanTargetGenerator
 
@@ -102,6 +106,11 @@ class LidarScanAdapter:
         if kwargs.pop("target_mode", None) is not None:
             logger.debug("target_mode is ignored for lidar; lidar owns turn logic.")
 
+        target_info = TargetInfo(
+            agent_description=description,
+            languages=languages or [],
+        )
+
         bridged = ScanTargetGenerator(target=target)
         start = time.perf_counter()
         try:
@@ -109,6 +118,7 @@ class LidarScanAdapter:
             # await wait_for_completion() to block, then read .scan_result off it.
             scan_run = await run_scan(
                 target=bridged,
+                target_info=target_info,
                 probe_ids=probes,
                 tags_filter=tags,
                 generator=get_default_generator(),

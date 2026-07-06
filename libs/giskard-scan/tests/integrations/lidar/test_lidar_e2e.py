@@ -33,7 +33,12 @@ def _refusing_target(inputs: str) -> str:
 async def test_lidar_scan_runs_end_to_end_and_returns_suite_result():
     # Runs offline. With discovery off the probe SKIPs, but the bridge, the
     # scanner round-trip, and the result mapping all execute for real.
-    suite = await LidarScanAdapter().run(_refusing_target, probes=[_PROBE], tags=None)
+    suite = await LidarScanAdapter().run(
+        _refusing_target,
+        description="A customer-support bot",
+        probes=[_PROBE],
+        tags=None,
+    )
     assert isinstance(suite, SuiteResult)
     assert suite.results, "expected at least one scenario for the requested probe"
     for scenario in suite.results:
@@ -54,7 +59,12 @@ async def test_lidar_scan_with_discovery_produces_a_verdict():
     # With a key present, target discovery succeeds and the probe actually runs,
     # yielding a real PASS/FAIL/ERROR verdict rather than a SKIP.
     adapter = LidarScanAdapter()
-    suite = await adapter.run(_refusing_target, probes=[_PROBE], tags=None)
+    suite = await adapter.run(
+        _refusing_target,
+        description="A customer-support bot",
+        probes=[_PROBE],
+        tags=None,
+    )
     assert isinstance(suite, SuiteResult)
     assert suite.results
     statuses = [s.steps[0].results[0] for s in suite.results]
