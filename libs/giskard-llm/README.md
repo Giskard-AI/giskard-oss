@@ -97,6 +97,50 @@ Use `azure_ai/` for the existing Azure AI Foundry compatibility path. Do not
 use `azure_ai/` for new OpenAI v1 endpoints unless you intentionally need that
 legacy endpoint behavior.
 
+## Eden AI (OpenAI-compatible)
+
+[Eden AI](https://www.edenai.co/) exposes an OpenAI-compatible endpoint that
+routes to models from many providers (OpenAI, Anthropic, Mistral, Google, and
+more) behind a single EU-based, GDPR-compliant API key. Configure it with the
+`openai` provider and Eden AI's `base_url` (use `https://api.eu.edenai.run/v3`
+instead if you need strict EU data residency). The model name after the config
+alias is Eden AI's own `provider/model` identifier (for example
+`openai/gpt-4o-mini`), so the full model string is
+`<alias>/<eden-provider>/<eden-model>`.
+
+The `base_url` ends in `/v3` because that is Eden AI's API version (the path is
+`/v3/chat/completions`, not `/v1/...`). The key is read from the environment and
+never hard-coded:
+
+```bash
+export EDENAI_API_KEY="your-eden-ai-key"
+```
+
+```python
+from giskard.llm import LLMClient
+
+client = LLMClient()
+client.configure(
+    "edenai",
+    provider="openai",
+    api_key="os.environ/EDENAI_API_KEY", # pragma: allowlist secret
+    base_url="https://api.edenai.run/v3",
+)
+
+chat = await client.acompletion(
+    "edenai/openai/gpt-4o-mini",
+    [{"role": "user", "content": "Write one sentence."}],
+)
+embedding = await client.aembedding(
+    "edenai/openai/text-embedding-3-small",
+    ["Text to embed."],
+)
+```
+
+The same `edenai/<eden-provider>/<eden-model>` alias works for both `acompletion`
+and `aembedding`, so a single configured client covers chat and embedding models.
+Browse the available models in the [Eden AI models catalog](https://www.edenai.co/models).
+
 ## Custom transport and headers
 
 Use `http_client` to provide a caller-owned async HTTP client, for example
