@@ -3,7 +3,7 @@
 import logging
 import time
 from importlib.util import find_spec
-from typing import TYPE_CHECKING
+from typing import Any
 
 from giskard.checks import (
     CheckResult,
@@ -11,17 +11,14 @@ from giskard.checks import (
     Metric,
     ScenarioResult,
     SuiteResult,
+    Target,
     TestCaseResult,
     Trace,
     get_default_generator,
 )
+from giskard.llm.types import ChatMessage
 
 from .._shared import reject_unexpected_kwargs
-
-if TYPE_CHECKING:
-    # Type-only: lidar's compat Message union. Never imported at runtime — the
-    # function only reads .role/.content, so no lidar dependency is introduced.
-    from lidar.giskard_compat import Message
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +37,7 @@ def _require_lidar() -> None:
         )
 
 
-async def _trace_from_messages(messages: "list[Message]") -> Trace:  # pyright: ignore[reportMissingTypeArgument]
+async def _trace_from_messages(messages: list[ChatMessage]) -> Trace:  # pyright: ignore[reportMissingTypeArgument]
     """Rebuild a scan Trace from a lidar attempt's flat message list.
 
     Lidar owns its own executor and hands back finished conversations, so we
@@ -85,8 +82,13 @@ def _severity_label(severity: object) -> "str | None":
 class LidarScanAdapter:
     """Build and run a Giskard suite from a lidar scan."""
 
-    async def run(
-        self, target, *, description, languages=None, **kwargs
+    async def run[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+        self,
+        target: Target[InputType, OutputType, TraceType],
+        *,
+        description: str,
+        languages: list[str] | None = None,
+        **kwargs: Any,
     ) -> SuiteResult:
         """Run a lidar scan against ``target`` and return a scan SuiteResult.
 
@@ -106,6 +108,7 @@ class LidarScanAdapter:
         probes = kwargs.pop("probes", None)
         tags = kwargs.pop("tags", None)
         if kwargs.pop("target_mode", None) is not None:
+            # TODO: filter out multiturn probes if target_mode is singleturn
             logger.debug("target_mode is ignored for lidar; lidar owns turn logic.")
         reject_unexpected_kwargs("lidar", kwargs)
 
