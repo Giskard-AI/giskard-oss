@@ -65,8 +65,6 @@ def test_resolve_embedding_model_uses_litellm_package_when_native_unsupported(
 
 
 async def test_litellm_package_embedding_model_embed_with_mock(monkeypatch):
-    model = LiteLLMEmbeddingModel(model="test-embedding")
-
     embedding = MagicMock()
     embedding.embedding = [0.1, 0.2, 0.3]
     response = MagicMock()
@@ -78,6 +76,8 @@ async def test_litellm_package_embedding_model_embed_with_mock(monkeypatch):
         "giskard.agents.embeddings.litellm_package_embedding_model._import_litellm",
         lambda: mock_litellm,
     )
+
+    model = LiteLLMEmbeddingModel(model="test-embedding")
 
     vectors = await model.embed(["hello"])
 

@@ -204,7 +204,7 @@ _SDK_PROBE: dict[str, tuple[str, str]] = {
     "gemini": ("giskard.llm.providers.google", "_import_genai"),
     "anthropic": ("giskard.llm.providers.anthropic", "_import_anthropic"),
     "azure": ("giskard.llm.providers.openai", "_import_openai"),
-    "azure_ai": ("giskard.llm.providers.openai", "_import_openai"),
+    "azure_ai": ("giskard.llm.providers.azure_ai", "_import_openai"),
 }
 
 _OPERATION_METHOD: dict[str, str] = {
@@ -259,6 +259,9 @@ def supports_native(
         return False
 
     if not callable(getattr(provider_cls, method_name, None)):
+        return False
+
+    if provider_type not in _SDK_PROBE:
         return False
 
     sdk_module_path, sdk_import_name = _SDK_PROBE[provider_type]
