@@ -13,7 +13,7 @@ from threading import ExceptHookArgs, Lock
 from traceback import TracebackException
 
 import requests
-from mixpanel import Mixpanel
+from mixpanel import Mixpanel, Consumer
 
 from giskard.client.dtos import ServerInfo
 from giskard.settings import settings
@@ -142,7 +142,8 @@ class GiskardAnalyticsCollector:
         return Mixpanel(
             GiskardAnalyticsCollector.dev_mp_project_key
             if is_dev_mode
-            else GiskardAnalyticsCollector.prod_mp_project_key
+            else GiskardAnalyticsCollector.prod_mp_project_key,
+            consumer=Consumer(api_host="api-eu.mixpanel.com"),
         )
 
     @analytics_method
