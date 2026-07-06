@@ -95,7 +95,13 @@ def _probe_provider_sdk(provider_type: str) -> bool:
             return True
         except (ImportError, ProviderNotAvailableError):
             return False
-    return False
+
+    try:
+        openai_module = importlib.import_module("giskard.llm.providers.openai")
+        openai_module._import_openai()
+    except (ImportError, ProviderNotAvailableError, AttributeError):
+        return False
+    return True
 
 
 class LLMClient:
