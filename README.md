@@ -1,18 +1,19 @@
 <p align="center">
   <img alt="giskardlogo" src="https://raw.githubusercontent.com/giskard-ai/giskard/main/readme/giskard_logo.png#gh-light-mode-only">
   <img alt="giskardlogo" src="https://raw.githubusercontent.com/giskard-ai/giskard/main/readme/giskard_logo_green.png#gh-dark-mode-only">
+
 </p>
 <h1 align="center" weight='300' >The Evaluation & Testing framework for AI systems</h1>
 <h3 align="center" weight='300' >Control risks of performance, bias and security issues in AI systems</h3>
 <div align="center">
 
-  [![GitHub release](https://img.shields.io/github/v/release/Giskard-AI/giskard)](https://github.com/Giskard-AI/giskard/releases)
-  [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/Giskard-AI/giskard/blob/main/LICENSE)
-  [![Downloads](https://static.pepy.tech/badge/giskard/month)](https://pepy.tech/project/giskard)
-  [![CI](https://github.com/Giskard-AI/giskard/actions/workflows/build-python.yml/badge.svg?branch=main)](https://github.com/Giskard-AI/giskard/actions/workflows/build-python.yml?query=branch%3Amain)
-  [![Giskard on Discord](https://img.shields.io/discord/939190303397666868?label=Discord)](https://gisk.ar/discord)
+[![GitHub release](https://img.shields.io/github/v/release/Giskard-AI/giskard)](https://github.com/Giskard-AI/giskard/releases)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/Giskard-AI/giskard/blob/main/LICENSE)
+[![Downloads](https://static.pepy.tech/badge/giskard/month)](https://pepy.tech/project/giskard)
+[![CI](https://github.com/Giskard-AI/giskard/actions/workflows/build-python.yml/badge.svg?branch=main)](https://github.com/Giskard-AI/giskard/actions/workflows/build-python.yml?query=branch%3Amain)
+[![Giskard on Discord](https://img.shields.io/discord/939190303397666868?label=Discord)](https://gisk.ar/discord)
 
-  <a rel="me" href="https://fosstodon.org/@Giskard"></a>
+<a rel="me" href="https://fosstodon.org/@Giskard"></a>
 
 </div>
 <h3 align="center">
@@ -23,21 +24,27 @@
 <br />
 
 ## Install Giskard 🐢
+
 Install the latest version of Giskard from PyPi using pip:
+
 ```sh
 pip install "giskard[llm]" -U
 ```
+
 We officially support Python 3.9, 3.10 and 3.11.
+
 ## Try in Colab 📙
+
 [Open Colab notebook](https://colab.research.google.com/github/giskard-ai/giskard/blob/main/docs/getting_started/quickstart/quickstart_llm.ipynb)
 
-______________________________________________________________________
+---
 
 Giskard is an open-source Python library that **automatically detects performance, bias & security issues in AI applications**. The library covers LLM-based applications such as RAG agents, all the way to traditional ML models for tabular data.
 
 ## Scan: Automatically assess your LLM-based agents for performance, bias & security issues ⤵️
 
 Issues detected include:
+
 - Hallucinations
 - Harmful content generation
 - Prompt injection
@@ -55,8 +62,7 @@ Issues detected include:
 If you're testing a RAG application, you can get an even more in-depth assessment using **RAGET**, Giskard's RAG Evaluation Toolkit.
 
 - **RAGET** can generate automatically a list of `question`, `reference_answer` and `reference_context` from the knowledge base of the RAG. You can then use this generated test set to evaluate your RAG agent.
-- **RAGET** computes scores *for each component of the RAG agent*. The scores are computed by aggregating the correctness of the agent’s answers on different question types.
-
+- **RAGET** computes scores _for each component of the RAG agent_. The scores are computed by aggregating the correctness of the agent’s answers on different question types.
   - Here is the list of components evaluated with **RAGET**:
     - `Generator`: the LLM used inside the RAG to generate the answers
     - `Retriever`: fetch relevant documents from the knowledge base according to a user query
@@ -67,7 +73,6 @@ If you're testing a RAG application, you can get an even more in-depth assessmen
 <p align="center">
   <img src="https://raw.githubusercontent.com/giskard-ai/giskard/main/readme/RAGET_updated.gif" alt="Test Suite Example" width="800">
 </p>
-
 
 Giskard works with any model, in any environment and integrates seamlessly with your favorite tools ⤵️ <br/>
 
@@ -81,9 +86,9 @@ Looking for solutions to evaluate computer vision models? Check out [giskard-vis
 # Contents
 
 - 🤸‍♀️ **[Quickstart](#quickstart)**
-    - **1**. 🏗️ [Build a LLM agent](#build-a-llm-agent)
-    - **2**. 🔎 [Scan your model for issues](#scan-your-model-for-issues)
-    - **3**. 🪄 [Automatically generate an evaluation dataset for your RAG applications](#automatically-generate-an-evaluation-dataset-for-your-rag-applications)
+  - **1**. 🏗️ [Build a LLM agent](#build-a-llm-agent)
+  - **2**. 🔎 [Scan your model for issues](#scan-your-model-for-issues)
+  - **3**. 🪄 [Automatically generate an evaluation dataset for your RAG applications](#automatically-generate-an-evaluation-dataset-for-your-rag-applications)
 - 👋 **[Community](#community)**
 
 <h1 id="quickstart">🤸‍♀️ Quickstart</h1>
@@ -93,10 +98,10 @@ Looking for solutions to evaluate computer vision models? Check out [giskard-vis
 Let's build an agent that answers questions about climate change, based on the 2023 Climate Change Synthesis Report by the IPCC.
 
 Before starting let's install the required libraries:
+
 ```sh
 pip install langchain langchain-community langchain-openai tiktoken "pypdf<=3.17.0"
 ```
-
 
 ```python
 from langchain import FAISS, PromptTemplate
@@ -158,9 +163,11 @@ giskard_model = giskard.Model(
 ```
 
 ✨✨✨Then run Giskard's magical scan✨✨✨
+
 ```python
 scan_results = giskard.scan(giskard_model)
 ```
+
 Once the scan completes, you can display the results directly in your notebook:
 
 ```python
@@ -170,7 +177,7 @@ display(scan_results)
 scan_results.to_html("scan_results.html")
 ```
 
-*If you're facing issues, check out our [docs](https://docs.giskard.ai/en/stable/open_source/scan/scan_llm/index.html) for more information.*
+_If you're facing issues, check out our [docs](https://docs.giskard.ai/en/stable/open_source/scan/scan_llm/index.html) for more information._
 
 <h2 id="automatically-generate-an-evaluation-dataset-for-your-rag-applications">3. 🪄 Automatically generate an evaluation dataset for your RAG applications</h2>
 
@@ -206,6 +213,7 @@ Depending on how many questions you generate, this can take a while. Once you’
 # Save the generated testset
 testset.save("my_testset.jsonl")
 ```
+
 You can easily load it back
 
 ```python
@@ -219,8 +227,8 @@ df = loaded_testset.to_pandas()
 
 Here’s an example of a generated question:
 
-| question                               | reference_context                                                                                                                                                     | reference_answer                                             | metadata                                               |
-|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|-------------------------------------------------------|
+| question                                     | reference_context                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | reference_answer                                                                                              | metadata                                                                         |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | For which countries can I track my shipping? | Document 1: We offer free shipping on all orders over $50. For orders below $50, we charge a flat rate of $5.99. We offer shipping services to customers residing in all 50 states of the US, in addition to providing delivery options to Canada and Mexico. Document 2: Once your purchase has been successfully confirmed and shipped, you will receive a confirmation email containing your tracking number. You can simply click on the link provided in the email or visit our website’s order tracking page. | We ship to all 50 states in the US, as well as to Canada and Mexico. We offer tracking for all our shippings. | `{"question_type": "simple", "seed_document_id": 1, "topic": "Shipping policy"}` |
 
 Each row of the test set contains 5 columns:
@@ -250,6 +258,3 @@ We thank the following companies which are sponsoring our project with monthly d
 **[Biolevate](https://www.biolevate.com/)**
 
 <img src="https://awsmp-logos.s3.amazonaws.com/seller-wgamx5z6umune/2d10badd2ccac49699096ea7fb986b98.png" alt="Biolevate logo" width="400"/>
-
-
-
