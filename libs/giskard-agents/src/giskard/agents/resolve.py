@@ -3,7 +3,8 @@
 from giskard.llm import supports_native
 
 from .embeddings.base import BaseEmbeddingModel
-from .embeddings.litellm_embedding_model import LitellmEmbeddingModel
+from .embeddings.giskard_llm_embedding_model import GiskardLLMEmbeddingModel
+from .embeddings.litellm_embedding_model import LiteLLMEmbeddingModel
 from .generators.base import BaseGenerator
 from .generators.giskard_llm_generator import GiskardLLMGenerator
 
@@ -20,7 +21,5 @@ def resolve_generator(model: str) -> BaseGenerator:
 def resolve_embedding_model(model: str) -> BaseEmbeddingModel:
     """Return the best embedding backend for *model*."""
     if supports_native(model, "embedding"):
-        return LitellmEmbeddingModel(model=model)
-    from .embeddings.litellm_package_embedding_model import LiteLLMEmbeddingModel
-
+        return GiskardLLMEmbeddingModel(model=model)
     return LiteLLMEmbeddingModel(model=model)
