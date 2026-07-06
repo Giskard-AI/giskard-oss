@@ -209,7 +209,7 @@ async def test_third_party_scan_routes_to_garak_adapter(
         detectors=[_FakeDetector(score=0.9)],
     )
 
-    result = await third_party_scan(target, tool="garak")
+    result = await third_party_scan(target, tool="garak", description="A test agent")
 
     assert isinstance(result, SuiteResult)
     assert len(result.results) == 1
@@ -220,7 +220,18 @@ async def test_third_party_scan_rejects_unknown_tool(target) -> None:
     from giskard.scan.integrations import third_party_scan
 
     with pytest.raises(ValueError, match="Unknown tool"):
-        await third_party_scan(target, tool="nope")  # pyright: ignore[reportArgumentType]
+        await third_party_scan(
+            target,
+            tool="nope",
+            description="A test agent",  # pyright: ignore[reportArgumentType]
+        )
+
+
+async def test_third_party_scan_requires_description(target) -> None:
+    from giskard.scan.integrations import third_party_scan
+
+    with pytest.raises(TypeError):
+        await third_party_scan(target, tool="garak")  # pyright: ignore[reportCallIssue]
 
 
 async def test_run_marks_missing_detector_scores_as_skip(
