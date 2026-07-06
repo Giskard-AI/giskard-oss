@@ -126,28 +126,25 @@ emb = await aembedding("edenai/openai/text-embedding-3-small", ["Text to embed."
 
 ### EU data residency (GDPR)
 
-Roughly 270 of Eden AI's models are EU-hosted. `GET https://api.edenai.run/v3/models`
-returns a `regions` list per model; choose an id whose regions include `eu` to keep
-inference within the European Union. Some providers also publish explicit regional
-variants whose id ends in `@eu` / `@us`:
-
-```python
-# Plain id that happens to be EU-hosted, or an explicit @eu variant:
-chat = await acompletion(
-    "edenai/amazon/amazon.nova-2-lite-v1:0@eu",
-    [{"role": "user", "content": "Bonjour !"}],
-)
-```
-
-Use `LLMClient.configure` to pin a custom base URL or per-alias key:
+For strict data residency, use Eden AI's **dedicated EU endpoint**
+(`https://api.eu.edenai.run/v3`) via `eu=True`. It serves only EU-hosted models
+(~270) and **rejects any non-EU model with HTTP 451**, guaranteeing inference
+stays within the European Union.
 
 ```python
 from giskard.llm import LLMClient
 
 client = LLMClient()
-client.configure("eden", provider="edenai", api_key="os.environ/EDENAI_API_KEY")  # pragma: allowlist secret
-chat = await client.acompletion("eden/mistral/mistral-large-latest", messages)
+client.configure("eden-eu", provider="edenai", eu=True, api_key="os.environ/EDENAI_API_KEY")  # pragma: allowlist secret
+
+# EU-hosted model → OK; a non-EU model would raise a 451 error.
+chat = await client.acompletion("eden-eu/amazon/amazon.nova-lite-v1:0", messages)
 ```
+
+Alternatively, keep the default endpoint and select EU-hosted model ids
+yourself: `GET https://api.edenai.run/v3/models` returns a `regions` list per
+model, and some providers publish explicit `@eu` variants (e.g.
+`edenai/amazon/amazon.nova-2-lite-v1:0@eu`).
 
 ## Custom transport and headers
 

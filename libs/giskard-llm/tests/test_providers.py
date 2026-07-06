@@ -298,6 +298,19 @@ def test_edenai_provider_defaults_base_url_and_env_key(monkeypatch):
     assert kwargs["base_url"] == "https://api.edenai.run/v3"
 
 
+def test_edenai_provider_eu_endpoint(monkeypatch):
+    monkeypatch.setenv("EDENAI_API_KEY", "eden-key")  # pragma: allowlist secret
+
+    with patch("giskard.llm.providers.openai._import_openai") as mock_import:
+        sdk = MagicMock()
+        mock_import.return_value = sdk
+
+        EdenAIProvider(eu=True)
+
+    kwargs = sdk.AsyncOpenAI.call_args.kwargs
+    assert kwargs["base_url"] == "https://api.eu.edenai.run/v3"
+
+
 def test_edenai_provider_respects_explicit_kwargs(monkeypatch):
     monkeypatch.setenv("EDENAI_API_KEY", "eden-key")  # pragma: allowlist secret
 

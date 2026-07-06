@@ -15,15 +15,17 @@ strings look like ``edenai/openai/gpt-4o`` or
 ``/`` only, leaving ``provider/model`` as the model name).
 
 EU data residency (GDPR):
-    ~270 of Eden AI's models are EU-hosted. ``GET /v3/models`` exposes a
-    ``regions`` list per model; pick an id whose regions include ``eu`` (some
-    providers also publish explicit ``@eu`` variants, e.g.
-    ``edenai/amazon/amazon.nova-2-lite-v1:0@eu``) to keep inference within the
-    European Union.
+    Pass ``eu=True`` (or set ``base_url`` to ``https://api.eu.edenai.run/v3``)
+    to route through Eden AI's dedicated EU endpoint, which serves only
+    EU-hosted models (~270) and rejects any non-EU model with HTTP 451,
+    guaranteeing inference stays within the European Union. ``GET /v3/models``
+    also exposes a ``regions`` list per model if you prefer to pick EU-hosted
+    ids against the default endpoint.
 
 Authentication:
     - Env: ``EDENAI_API_KEY``
-    - Kwargs: ``api_key``, ``base_url`` (defaults to ``https://api.edenai.run/v3``)
+    - Kwargs: ``api_key``, ``eu`` (use the EU endpoint), ``base_url``
+      (defaults to ``https://api.edenai.run/v3``)
 
 Supported features:
     - Completion: yes
@@ -45,6 +47,9 @@ if TYPE_CHECKING:
 
 PROVIDER = "edenai"
 DEFAULT_BASE_URL = "https://api.edenai.run/v3"
+# Dedicated EU endpoint: serves only EU-hosted models and rejects any non-EU
+# model with HTTP 451, guaranteeing inference stays within the European Union.
+EU_BASE_URL = "https://api.eu.edenai.run/v3"
 
 
 class EdenAIProvider(OpenAIProvider):
@@ -54,14 +59,17 @@ class EdenAIProvider(OpenAIProvider):
         self,
         api_key: str | None = None,
         base_url: str | None = None,
+        eu: bool = False,
         timeout: float | None = None,
         http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
         **kwargs: Any,
     ) -> None:
+        # Precedence: explicit base_url > eu=True (EU endpoint) > default endpoint.
+        resolved_base_url = base_url or (EU_BASE_URL if eu else DEFAULT_BASE_URL)
         super().__init__(
             api_key=api_key or os.environ.get("EDENAI_API_KEY"),
-            base_url=base_url or DEFAULT_BASE_URL,
+            base_url=resolved_base_url,
             timeout=timeout,
             http_client=http_client,
             default_headers=default_headers,
