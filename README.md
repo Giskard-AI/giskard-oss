@@ -1,6 +1,6 @@
 <p align="center">
   <img alt="giskardlogo" src="https://raw.githubusercontent.com/giskard-ai/giskard/main/readme/giskard_logo.png#gh-light-mode-only">
-  <img alt="giskardlogo" src="https://raw.githubusercontent.com/giskard-ai/giskard/main/readme/giskard_logo_green.png#gh-dark-mode-only">
+
 </p>
 <h1 align="center" weight='300' >The Evaluation & Testing framework for AI systems</h1>
 <h3 align="center" weight='300' >Control risks of performance, bias and security issues in AI systems</h3>
