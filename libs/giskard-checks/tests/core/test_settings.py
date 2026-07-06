@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 import giskard.checks.settings as settings_module
 import pytest
 from giskard.agents import Generator
@@ -16,17 +18,129 @@ from giskard.checks.settings import (
     set_default_generator,
 )
 
+# --- Mocked resolution (always run, SDK-agnostic) ---
 
-def test_default_generator_uses_settings_model(monkeypatch: pytest.MonkeyPatch):
+
+@patch("giskard.agents.resolve.supports_native", return_value=True)
+def test_get_default_generator_uses_native_when_supported(mock_supports):
+    settings_module._default_generator = None
+
+    generator = get_default_generator()
+
+    assert isinstance(generator, GiskardLLMGenerator)
+    assert generator.model == DEFAULT_MODEL
+    mock_supports.assert_called_once_with(DEFAULT_MODEL, "completion")
+
+
+@patch("giskard.agents.resolve.supports_native", return_value=True)
+def test_get_default_embedding_model_uses_native_when_supported(mock_supports):
+    embedding_model = get_default_embedding_model()
+
+    assert isinstance(embedding_model, GiskardLLMEmbeddingModel)
+    assert embedding_model.model == DEFAULT_EMBEDDING_MODEL
+    mock_supports.assert_called_once_with(DEFAULT_EMBEDDING_MODEL, "embedding")
+
+
+@patch("giskard.agents.resolve.supports_native", return_value=True)
+def test_get_default_generator_honors_settings_model_when_native(
+    mock_supports, monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "google/gemini-3.5-flash")
+    settings_module._default_generator = None
 
     generator = get_default_generator()
 
     assert isinstance(generator, GiskardLLMGenerator)
     assert generator.model == "google/gemini-3.5-flash"
+    mock_supports.assert_called_once_with("google/gemini-3.5-flash", "completion")
 
 
-def test_default_generator_falls_back_to_builtin_default():
+@patch("giskard.agents.resolve.supports_native", return_value=True)
+def test_get_default_embedding_model_honors_settings_when_native(
+    mock_supports, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv(
+        "GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL", "google/gemini-embedding-001"
+    )
+
+    embedding_model = get_default_embedding_model()
+
+    assert isinstance(embedding_model, GiskardLLMEmbeddingModel)
+    assert embedding_model.model == "google/gemini-embedding-001"
+    mock_supports.assert_called_once_with("google/gemini-embedding-001", "embedding")
+
+
+@patch("giskard.agents.generators.litellm_generator.LiteLLMGenerator")
+@patch("giskard.agents.resolve.supports_native", return_value=False)
+def test_get_default_generator_falls_back_to_litellm_when_unsupported(
+    mock_supports, mock_generator_cls
+):
+    expected = MagicMock(spec=LiteLLMGenerator)
+    mock_generator_cls.return_value = expected
+    settings_module._default_generator = None
+
+    generator = get_default_generator()
+
+    assert generator is expected
+    mock_supports.assert_called_once_with(DEFAULT_MODEL, "completion")
+    mock_generator_cls.assert_called_once_with(model=DEFAULT_MODEL)
+
+
+@patch("giskard.agents.resolve.LiteLLMEmbeddingModel")
+@patch("giskard.agents.resolve.supports_native", return_value=False)
+def test_get_default_embedding_model_falls_back_to_litellm_when_unsupported(
+    mock_supports, mock_embedding_cls
+):
+    expected = MagicMock(spec=LiteLLMEmbeddingModel)
+    mock_embedding_cls.return_value = expected
+
+    embedding_model = get_default_embedding_model()
+
+    assert embedding_model is expected
+    mock_supports.assert_called_once_with(DEFAULT_EMBEDDING_MODEL, "embedding")
+    mock_embedding_cls.assert_called_once_with(model=DEFAULT_EMBEDDING_MODEL)
+
+
+@patch("giskard.agents.generators.litellm_generator.LiteLLMGenerator")
+@patch("giskard.agents.resolve.supports_native", return_value=False)
+def test_get_default_generator_settings_model_falls_back_to_litellm(
+    mock_supports, mock_generator_cls, monkeypatch: pytest.MonkeyPatch
+):
+    expected = MagicMock(spec=LiteLLMGenerator)
+    mock_generator_cls.return_value = expected
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "deepseek/deepseek-chat")
+    settings_module._default_generator = None
+
+    generator = get_default_generator()
+
+    assert generator is expected
+    mock_supports.assert_called_once_with("deepseek/deepseek-chat", "completion")
+    mock_generator_cls.assert_called_once_with(model="deepseek/deepseek-chat")
+
+
+@patch("giskard.agents.resolve.LiteLLMEmbeddingModel")
+@patch("giskard.agents.resolve.supports_native", return_value=False)
+def test_get_default_embedding_model_settings_falls_back_to_litellm(
+    mock_supports, mock_embedding_cls, monkeypatch: pytest.MonkeyPatch
+):
+    expected = MagicMock(spec=LiteLLMEmbeddingModel)
+    mock_embedding_cls.return_value = expected
+    monkeypatch.setenv(
+        "GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL", "deepseek/deepseek-embed"
+    )
+
+    embedding_model = get_default_embedding_model()
+
+    assert embedding_model is expected
+    mock_supports.assert_called_once_with("deepseek/deepseek-embed", "embedding")
+    mock_embedding_cls.assert_called_once_with(model="deepseek/deepseek-embed")
+
+
+# --- Real native resolution when provider SDK is installed ---
+
+
+@pytest.mark.openai
+def test_default_generator_builtin_uses_native_with_openai_sdk():
     settings_module._default_generator = None
 
     generator = get_default_generator()
@@ -35,16 +149,31 @@ def test_default_generator_falls_back_to_builtin_default():
     assert generator.model == DEFAULT_MODEL
 
 
-def test_set_default_generator_overrides_settings(monkeypatch: pytest.MonkeyPatch):
+@pytest.mark.openai
+def test_default_embedding_model_builtin_uses_native_with_openai_sdk():
+    embedding_model = get_default_embedding_model()
+
+    assert isinstance(embedding_model, GiskardLLMEmbeddingModel)
+    assert embedding_model.model == DEFAULT_EMBEDDING_MODEL
+
+
+@pytest.mark.google
+def test_default_generator_settings_google_uses_native_with_google_sdk(
+    monkeypatch: pytest.MonkeyPatch,
+):
     monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "google/gemini-3.5-flash")
-    explicit = Generator(model="anthropic/claude-haiku-4-5-20251001")
+    settings_module._default_generator = None
 
-    set_default_generator(explicit)
+    generator = get_default_generator()
 
-    assert get_default_generator() is explicit
+    assert isinstance(generator, GiskardLLMGenerator)
+    assert generator.model == "google/gemini-3.5-flash"
 
 
-def test_default_embedding_model_uses_settings(monkeypatch: pytest.MonkeyPatch):
+@pytest.mark.google
+def test_default_embedding_model_settings_google_uses_native_with_google_sdk(
+    monkeypatch: pytest.MonkeyPatch,
+):
     monkeypatch.setenv(
         "GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL", "google/gemini-embedding-001"
     )
@@ -55,17 +184,109 @@ def test_default_embedding_model_uses_settings(monkeypatch: pytest.MonkeyPatch):
     assert embedding_model.model == "google/gemini-embedding-001"
 
 
-def test_default_embedding_model_falls_back_to_builtin_default():
+@pytest.mark.anthropic
+def test_default_generator_settings_anthropic_uses_native_with_anthropic_sdk(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(
+        "GISKARD_CHECKS_DEFAULT_MODEL", "anthropic/claude-haiku-4-5-20251001"
+    )
+    settings_module._default_generator = None
+
+    generator = get_default_generator()
+
+    assert isinstance(generator, GiskardLLMGenerator)
+    assert generator.model == "anthropic/claude-haiku-4-5-20251001"
+
+
+# --- Real LiteLLM fallback when no provider SDK is installed ---
+
+
+@pytest.mark.no_providers
+@patch("giskard.agents.generators.litellm_generator.LiteLLMGenerator")
+def test_default_generator_falls_back_without_provider_sdk(mock_generator_cls):
+    expected = MagicMock(spec=LiteLLMGenerator)
+    mock_generator_cls.return_value = expected
+    settings_module._default_generator = None
+
+    generator = get_default_generator()
+
+    assert generator is expected
+    mock_generator_cls.assert_called_once_with(model=DEFAULT_MODEL)
+
+
+@pytest.mark.no_providers
+@patch("giskard.agents.resolve.LiteLLMEmbeddingModel")
+def test_default_embedding_model_falls_back_without_provider_sdk(mock_embedding_cls):
+    expected = MagicMock(spec=LiteLLMEmbeddingModel)
+    mock_embedding_cls.return_value = expected
+
     embedding_model = get_default_embedding_model()
 
-    assert isinstance(embedding_model, GiskardLLMEmbeddingModel)
-    assert embedding_model.model == DEFAULT_EMBEDDING_MODEL
+    assert embedding_model is expected
+    mock_embedding_cls.assert_called_once_with(model=DEFAULT_EMBEDDING_MODEL)
 
 
+@pytest.mark.no_providers
+@patch("giskard.agents.generators.litellm_generator.LiteLLMGenerator")
+def test_default_generator_google_model_falls_back_without_google_sdk(
+    mock_generator_cls, monkeypatch: pytest.MonkeyPatch
+):
+    expected = MagicMock(spec=LiteLLMGenerator)
+    mock_generator_cls.return_value = expected
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "google/gemini-3.5-flash")
+    settings_module._default_generator = None
+
+    generator = get_default_generator()
+
+    assert generator is expected
+    mock_generator_cls.assert_called_once_with(model="google/gemini-3.5-flash")
+
+
+@pytest.mark.no_providers
+@patch("giskard.agents.resolve.LiteLLMEmbeddingModel")
+def test_default_embedding_model_google_falls_back_without_google_sdk(
+    mock_embedding_cls, monkeypatch: pytest.MonkeyPatch
+):
+    expected = MagicMock(spec=LiteLLMEmbeddingModel)
+    mock_embedding_cls.return_value = expected
+    monkeypatch.setenv(
+        "GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL", "google/gemini-embedding-001"
+    )
+
+    embedding_model = get_default_embedding_model()
+
+    assert embedding_model is expected
+    mock_embedding_cls.assert_called_once_with(model="google/gemini-embedding-001")
+
+
+@pytest.mark.no_providers
+@patch("giskard.agents.generators.litellm_generator.LiteLLMGenerator")
+def test_default_generator_anthropic_model_falls_back_without_anthropic_sdk(
+    mock_generator_cls, monkeypatch: pytest.MonkeyPatch
+):
+    expected = MagicMock(spec=LiteLLMGenerator)
+    mock_generator_cls.return_value = expected
+    monkeypatch.setenv(
+        "GISKARD_CHECKS_DEFAULT_MODEL", "anthropic/claude-haiku-4-5-20251001"
+    )
+    settings_module._default_generator = None
+
+    generator = get_default_generator()
+
+    assert generator is expected
+    mock_generator_cls.assert_called_once_with(
+        model="anthropic/claude-haiku-4-5-20251001"
+    )
+
+
+# --- Real LiteLLM fallback for unsupported providers when litellm is installed ---
+
+
+@pytest.mark.litellm
 def test_default_generator_uses_litellm_for_unsupported_provider(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    pytest.importorskip("litellm")
     monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "deepseek/deepseek-chat")
     settings_module._default_generator = None
 
@@ -75,10 +296,10 @@ def test_default_generator_uses_litellm_for_unsupported_provider(
     assert generator.model == "deepseek/deepseek-chat"
 
 
+@pytest.mark.litellm
 def test_default_embedding_model_uses_litellm_for_unsupported_provider(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    pytest.importorskip("litellm")
     monkeypatch.setenv(
         "GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL", "deepseek/deepseek-embed"
     )
@@ -87,6 +308,15 @@ def test_default_embedding_model_uses_litellm_for_unsupported_provider(
 
     assert isinstance(embedding_model, LiteLLMEmbeddingModel)
     assert embedding_model.model == "deepseek/deepseek-embed"
+
+
+def test_set_default_generator_overrides_settings(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "google/gemini-3.5-flash")
+    explicit = Generator(model="anthropic/claude-haiku-4-5-20251001")
+
+    set_default_generator(explicit)
+
+    assert get_default_generator() is explicit
 
 
 def test_settings_max_reported_failures_validation(monkeypatch: pytest.MonkeyPatch):

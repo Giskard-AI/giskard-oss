@@ -1,6 +1,25 @@
+import importlib
+
 import giskard.checks.settings as settings_module
 import pytest
 from giskard.core import disable_telemetry
+
+_PROVIDER_PACKAGES = {
+    "openai": "openai",
+    "google": "google.genai",
+    "anthropic": "anthropic",
+    "litellm": "litellm",
+}
+
+_ANY_PROVIDER_PACKAGES = ["openai", "google.genai", "anthropic"]
+
+
+def _is_installed(module_path: str) -> bool:
+    try:
+        importlib.import_module(module_path)
+        return True
+    except ImportError:
+        return False
 
 
 @pytest.fixture(autouse=True)
@@ -30,15 +49,39 @@ def pytest_collection_modifyitems(
     config: pytest.Config, items: list[pytest.Item]
 ) -> None:
     """Skip integration tests unless explicitly requested."""
-    if config.getoption("--run-integration"):
+    if not config.getoption("--run-integration"):
+        skip_integration = pytest.mark.skip(
+            reason="Pass --run-integration to include integration tests."
+        )
+        for item in items:
+            if "integration" in item.keywords:
+                item.add_marker(skip_integration)
+
+    installed_cache: dict[str, bool] = {}
+    for item in items:
+        for mark_name, package in _PROVIDER_PACKAGES.items():
+            if mark_name in item.keywords:
+                if package not in installed_cache:
+                    installed_cache[package] = _is_installed(package)
+                if not installed_cache[package]:
+                    item.add_marker(
+                        pytest.mark.skip(
+                            reason=f"Provider SDK '{package}' not installed"
+                        )
+                    )
+
+    if not any("no_providers" in item.keywords for item in items):
         return
 
-    skip_integration = pytest.mark.skip(
-        reason="Pass --run-integration to include integration tests."
-    )
-    for item in items:
-        if "integration" in item.keywords:
-            item.add_marker(skip_integration)
+    any_installed = any(_is_installed(p) for p in _ANY_PROVIDER_PACKAGES)
+    if any_installed:
+        for item in items:
+            if "no_providers" in item.keywords:
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason="no_providers tests require no provider SDKs installed"
+                    )
+                )
 
 
 def pytest_sessionfinish(session, exitstatus):
