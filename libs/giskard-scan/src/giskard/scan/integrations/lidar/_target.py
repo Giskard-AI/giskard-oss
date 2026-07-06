@@ -16,7 +16,7 @@ from giskard.agents import BaseGenerator
 # Message/Response/make_response come from lidar's compat layer — import LAZILY inside
 # _call_model (below), NOT here, so this module imports without lidar installed.
 # These ARE the workspace giskard.checks (the scan side of the bridge).
-from giskard.checks import DatasetInputGenerator, Interact, Target, Trace
+from giskard.checks import DatasetInputGenerator, Interact, Interaction, Target, Trace
 from pydantic import PrivateAttr
 
 
@@ -50,6 +50,12 @@ class ScanTargetGenerator(BaseGenerator):
     # (not a shared mutable class-level default).
     _threads: dict[str, Trace] = PrivateAttr(default_factory=dict)  # pyright: ignore[reportMissingTypeArgument]
 
+    # Structured interactions this bridge built, keyed by lidar's per-call
+    # call_id (from get_current_target_call_id()). The adapter joins
+    # attempt.target_calls back to these to rebuild a lossless display Trace,
+    # instead of reconstructing it from flattened attempt.messages.
+    _by_call_id: dict[str, Interaction] = PrivateAttr(default_factory=dict)  # pyright: ignore[reportMissingTypeArgument]
+
     def __init__(self, target: Target, **data: Any):  # pyright: ignore[reportMissingTypeArgument]
         super().__init__(**data)
         self._scan_target = target
@@ -60,7 +66,10 @@ class ScanTargetGenerator(BaseGenerator):
         params: Any = None,
         metadata: "dict[str, Any] | None" = None,
     ) -> Any:  # -> lidar.giskard_compat.Response
-        # Lazy: lidar's compat layer, only importable when lidar is installed.
+        # Lazy: lidar's compat layer + call-id side channel, only importable when
+        # lidar is installed. get_current_target_call_id() returns the in-flight
+        # call id set by lidar's TargetCallTrackingMiddleware for THIS complete().
+        from lidar.core.models.target import get_current_target_call_id
         from lidar.giskard_compat import make_response
 
         thread_id = (metadata or {}).get("thread_id") or str(uuid.uuid4())
@@ -75,6 +84,14 @@ class ScanTargetGenerator(BaseGenerator):
         )
         trace = await trace.with_interaction(interaction)
         self._threads[thread_id] = trace
+
+        # Keep the typed Interaction we just built, keyed by lidar's call_id, so
+        # the adapter can join attempt.target_calls back to it at result time and
+        # avoid reconstructing a lossy trace from flattened messages. call_id is
+        # None only outside a tracked complete() (e.g. discovery) — skip then.
+        call_id = get_current_target_call_id()
+        if call_id is not None and trace.last is not None:
+            self._by_call_id[call_id] = trace.last
 
         outputs = trace.last.outputs if trace.last is not None else None
         reply = str(outputs) if outputs is not None else ""
