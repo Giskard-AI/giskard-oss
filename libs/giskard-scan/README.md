@@ -27,6 +27,7 @@ result = asyncio.run(
     third_party_scan(
         target,
         tool="garak",
+        description="A helpful assistant",  # required; lidar builds its target profile from this, garak ignores it
         probes=["probes.goodside.ThreatenJSON"],  # omit to run all active probes
         target_mode="multiturn",  # "singleturn" skips garak's iterative probes
     )
