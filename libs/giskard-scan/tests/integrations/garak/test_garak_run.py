@@ -21,6 +21,9 @@ def _patch_resolvers(monkeypatch: pytest.MonkeyPatch, probes, detectors):
     globals, so we patch — and return the adapter from — the exact live module.
     See conftest.py ``block_garak_import`` for why a top-level import could bind a
     stale module and silently run the real garak catalog.
+
+    ``detectors`` is a list of ``(label, detector)`` pairs, matching
+    ``_resolve_detectors`` output.
     """
     from giskard.scan.integrations.garak import _adapter
 
@@ -32,7 +35,7 @@ def _patch_resolvers(monkeypatch: pytest.MonkeyPatch, probes, detectors):
 
 
 class _FakeDetector:
-    name = "fake.Detector"
+    detectorname = "garak.detectors.fake.Detector"
     hit_desc = "hit"
     pass_desc = "pass"
 
@@ -45,7 +48,7 @@ class _FakeDetector:
 
 
 class _TruncatedDetector:
-    name = "fake.TruncatedDetector"
+    detectorname = "garak.detectors.fake.TruncatedDetector"
     hit_desc = "hit"
     pass_desc = "pass"
 
@@ -56,7 +59,7 @@ class _TruncatedDetector:
 class _OverProducingDetector:
     """Returns more scores than the attempt has conversations."""
 
-    name = "fake.OverProducingDetector"
+    detectorname = "garak.detectors.fake.OverProducingDetector"
     hit_desc = "hit"
     pass_desc = "pass"
 
@@ -126,7 +129,9 @@ async def test_run_produces_suite_result_from_fake_probe(
 ) -> None:
     probe = _FakeProbe([_attempt("a1"), _attempt("a2")])
     adapter_cls = _patch_resolvers(
-        monkeypatch, probes=[probe], detectors=[_FakeDetector(score=0.9)]
+        monkeypatch,
+        probes=[probe],
+        detectors=[("fake.Detector", _FakeDetector(score=0.9))],
     )
 
     result = await adapter_cls().run(target=target)
@@ -146,7 +151,7 @@ async def test_run_failure_score_marks_check_failed(
     adapter_cls = _patch_resolvers(
         monkeypatch,
         probes=[_FakeProbe([_attempt("a1")])],
-        detectors=[_FakeDetector(score=0.9)],  # > 0.5 -> failure
+        detectors=[("fake.Detector", _FakeDetector(score=0.9))],  # > 0.5 -> failure
     )
 
     result = await adapter_cls().run(target=target)
@@ -154,6 +159,7 @@ async def test_run_failure_score_marks_check_failed(
     check_results = result.results[0].steps[0].results
     assert len(check_results) == 1
     assert check_results[0].failed
+    assert check_results[0].details["check_name"] == "fake.Detector"
 
 
 async def test_run_ignores_probe_exception(
@@ -162,7 +168,7 @@ async def test_run_ignores_probe_exception(
     adapter_cls = _patch_resolvers(
         monkeypatch,
         probes=[_FakeProbe([_attempt("a1")]), _FailingProbe()],
-        detectors=[_FakeDetector(score=0.1)],
+        detectors=[("fake.Detector", _FakeDetector(score=0.1))],
     )
 
     result = await adapter_cls().run(target=target)
@@ -177,7 +183,7 @@ async def test_run_uses_separate_generator_per_probe(
     adapter_cls = _patch_resolvers(
         monkeypatch,
         probes=[_CacheCheckingProbe("p1"), _CacheCheckingProbe("p2")],
-        detectors=[_FakeDetector(score=0.1)],
+        detectors=[("fake.Detector", _FakeDetector(score=0.1))],
     )
 
     result = await adapter_cls().run(target=target)
@@ -189,7 +195,7 @@ async def test_run_with_no_probes_returns_empty_suite(
     monkeypatch: pytest.MonkeyPatch, target
 ) -> None:
     adapter_cls = _patch_resolvers(
-        monkeypatch, probes=[], detectors=[_FakeDetector(score=0.1)]
+        monkeypatch, probes=[], detectors=[("fake.Detector", _FakeDetector(score=0.1))]
     )
 
     result = await adapter_cls().run(target=target)
@@ -218,7 +224,7 @@ async def test_third_party_scan_routes_to_garak_adapter(
     _patch_resolvers(
         monkeypatch,
         probes=[_FakeProbe([_attempt("a1")])],
-        detectors=[_FakeDetector(score=0.9)],
+        detectors=[("fake.Detector", _FakeDetector(score=0.9))],
     )
 
     result = await third_party_scan(target, tool="garak", description="A test agent")
@@ -261,7 +267,7 @@ async def test_run_marks_missing_detector_scores_as_skip(
     adapter_cls = _patch_resolvers(
         monkeypatch,
         probes=[probe],
-        detectors=[_TruncatedDetector()],
+        detectors=[("fake.TruncatedDetector", _TruncatedDetector())],
     )
 
     result = await adapter_cls().run(target=target)
@@ -287,7 +293,7 @@ async def test_run_warns_and_drops_extra_detector_scores(
     adapter_cls = _patch_resolvers(
         monkeypatch,
         probes=[probe],
-        detectors=[_OverProducingDetector()],
+        detectors=[("fake.OverProducingDetector", _OverProducingDetector())],
     )
 
     with caplog.at_level("WARNING"):

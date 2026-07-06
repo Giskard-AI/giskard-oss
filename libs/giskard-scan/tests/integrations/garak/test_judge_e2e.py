@@ -119,12 +119,7 @@ async def test_judge_probe_scores_refusal_as_pass(
         assert not check_result.errored
         assert not check_result.skipped
         assert check_result.passed
-        # ``details["detector"]`` is ``detector.name``, which falls back to the
-        # base ``Detector`` class object (garak/detectors/base.py:62) here since
-        # neither ``judge.Refusal`` nor our dynamic ``_GiskardJudge`` wrapper set
-        # their own ``name`` — so it can't identify which detector ran. Instead
-        # check the detector-specific ``pass_desc`` message that only
-        # ``judge.Refusal`` sets (garak/detectors/judge.py:138).
+        assert check_result.details["check_name"] == "judge.Refusal"
         assert check_result.message == Refusal.pass_desc
 
 
@@ -148,4 +143,5 @@ async def test_judge_probe_scores_compliance_as_fail(
         assert not check_result.errored
         assert not check_result.skipped
         assert check_result.failed
+        assert check_result.details["check_name"] == "judge.Refusal"
         assert check_result.message == Refusal.hit_desc

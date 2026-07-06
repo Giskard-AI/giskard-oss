@@ -137,7 +137,7 @@ def _detector_class(name: str) -> "type[Detector] | None":
 
 def _resolve_detectors(
     probe: "Probe", loop: "asyncio.AbstractEventLoop | None"
-) -> "tuple[list[Detector], list[_SkipMarker]]":
+) -> "tuple[list[tuple[str, Detector]], list[_SkipMarker]]":
     from garak._plugins import load_plugin
     from garak.detectors.judge import ModelAsJudge
     from garak.exception import APIKeyMissingError, GarakException
@@ -148,7 +148,7 @@ def _resolve_detectors(
         probe.extended_detectors
     )
 
-    detectors: list[Detector] = []
+    detectors: list[tuple[str, Detector]] = []
     skipped: list[_SkipMarker] = []
     for name in detector_names:
         full_name = f"detectors.{name}"
@@ -157,15 +157,20 @@ def _resolve_detectors(
         # Judge detectors: install the Giskard generator so no judge key is needed.
         if detector_cls is not None and issubclass(detector_cls, ModelAsJudge):
             detectors.append(
-                cast(
-                    "Detector",
-                    make_judge_detector(detector_cls, get_default_generator(), loop),
+                (
+                    name,
+                    cast(
+                        "Detector",
+                        make_judge_detector(
+                            detector_cls, get_default_generator(), loop
+                        ),
+                    ),
                 )
             )
             continue
 
         try:
-            detectors.append(cast("Detector", load_plugin(full_name)))
+            detectors.append((name, cast("Detector", load_plugin(full_name))))
         except GarakException as exc:
             cause = exc.__cause__
             if isinstance(cause, APIKeyMissingError):
@@ -186,7 +191,7 @@ class GarakScanAdapter:
     def _evaluate_attempt(
         self,
         attempt: "Attempt",
-        detectors: "list[Detector]",
+        detectors: "list[tuple[str, Detector]]",
         skipped: "Iterable[_SkipMarker]" = (),
     ) -> list[TestCaseResult]:
         check_results = defaultdict(list)
@@ -197,11 +202,14 @@ class GarakScanAdapter:
                 check_results[conversation_idx].append(
                     CheckResult.skip(
                         message=f"detector skipped: {marker.reason}",
-                        details={"detector": marker.name},
+                        details={
+                            "check_name": marker.name,
+                            "detector": marker.name,
+                        },
                     )
                 )
 
-        for detector in detectors:
+        for detector_label, detector in detectors:
             try:
                 # detect() is typed as Iterable; materialize so we can measure it
                 # and index safely (a one-shot generator would be exhausted below).
@@ -216,7 +224,7 @@ class GarakScanAdapter:
                     logger.warning(
                         "Detector %s returned %d scores for %d conversations; "
                         "extra scores are ignored",
-                        detector.name,
+                        detector_label,
                         len(scores),
                         conversation_count,
                     )
@@ -226,23 +234,32 @@ class GarakScanAdapter:
                         check_results[conversation_idx].append(
                             CheckResult.skip(
                                 message="detector returned no score",
-                                details={"detector": detector.name},
+                                details={
+                                    "check_name": detector_label,
+                                    "detector": detector_label,
+                                },
                             )
                         )
                     elif score > _HIT_THRESHOLD:
                         check_results[conversation_idx].append(
                             CheckResult.failure(
                                 message=detector.hit_desc,
-                                details={"detector": detector.name},
-                                metrics=[Metric(name=str(detector.name), value=score)],
+                                details={
+                                    "check_name": detector_label,
+                                    "detector": detector_label,
+                                },
+                                metrics=[Metric(name=detector_label, value=score)],
                             )
                         )
                     else:
                         check_results[conversation_idx].append(
                             CheckResult.success(
                                 message=detector.pass_desc,
-                                details={"detector": detector.name},
-                                metrics=[Metric(name=str(detector.name), value=score)],
+                                details={
+                                    "check_name": detector_label,
+                                    "detector": detector_label,
+                                },
+                                metrics=[Metric(name=detector_label, value=score)],
                             )
                         )
             except Exception as exc:  # noqa: BLE001 — a broken detector skips, not aborts
@@ -250,7 +267,11 @@ class GarakScanAdapter:
                     check_results[conversation_idx].append(
                         CheckResult.error(
                             message="detector raised",
-                            details={"detector": detector.name, "error": repr(exc)},
+                            details={
+                                "check_name": detector_label,
+                                "detector": detector_label,
+                                "error": repr(exc),
+                            },
                         )
                     )
 
