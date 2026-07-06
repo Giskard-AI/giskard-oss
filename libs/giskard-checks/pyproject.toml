@@ -33,6 +33,11 @@ pythonpath = ["src"]
 markers = [
     "integration: integration tests that are skipped unless --run-integration is provided",
     "uses_ambient_env: opt out of the GISKARD_* environment isolation fixture",
+    "openai: tests requiring the openai provider SDK",
+    "google: tests requiring the google-genai provider SDK",
+    "anthropic: tests requiring the anthropic provider SDK",
+    "litellm: tests requiring the optional litellm SDK",
+    "no_providers: tests that run without any provider SDK installed",
 ]
 
 [tool.ruff.lint]
