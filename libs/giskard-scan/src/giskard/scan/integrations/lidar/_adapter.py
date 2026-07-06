@@ -16,6 +16,8 @@ from giskard.checks import (
     get_default_generator,
 )
 
+from .._shared import reject_unexpected_kwargs
+
 if TYPE_CHECKING:
     # Type-only: lidar's compat Message union. Never imported at runtime — the
     # function only reads .role/.content, so no lidar dependency is introduced.
@@ -105,6 +107,7 @@ class LidarScanAdapter:
         tags = kwargs.pop("tags", None)
         if kwargs.pop("target_mode", None) is not None:
             logger.debug("target_mode is ignored for lidar; lidar owns turn logic.")
+        reject_unexpected_kwargs("lidar", kwargs)
 
         target_info = TargetInfo(
             agent_description=description,
@@ -113,24 +116,20 @@ class LidarScanAdapter:
 
         bridged = ScanTargetGenerator(target=target)
         start = time.perf_counter()
-        try:
-            # run_scan returns a ScanRun immediately (the scan runs in the background);
-            # await wait_for_completion() to block, then read .scan_result off it.
-            scan_run = await run_scan(
-                target=bridged,  # pyright: ignore[reportArgumentType]
-                target_info=target_info,
-                probe_ids=probes,
-                tags_filter=tags,
-                generator=get_default_generator(),
-                discover_target_info=False,
-                base_seed=None,
-            )
-            await scan_run.wait_for_completion()
-            scan_result = scan_run.scan_result
-        except Exception as exc:  # noqa: BLE001 — total failure -> empty suite, not abort
-            logger.warning("lidar run_scan raised: %s", exc)
-            elapsed_ms = int((time.perf_counter() - start) * 1000)
-            return SuiteResult(results=[], duration_ms=elapsed_ms)
+        # run_scan returns a ScanRun immediately (scan runs in the background); await
+        # wait_for_completion() to block, then read .scan_result off it. Failures
+        # propagate: an empty suite would read as "scan succeeded, no vulnerabilities".
+        scan_run = await run_scan(
+            target=bridged,  # pyright: ignore[reportArgumentType]
+            target_info=target_info,
+            probe_ids=probes,
+            tags_filter=tags,
+            generator=get_default_generator(),
+            discover_target_info=False,
+            base_seed=None,
+        )
+        await scan_run.wait_for_completion()
+        scan_result = scan_run.scan_result
 
         duration_ms = int((time.perf_counter() - start) * 1000)
         if scan_result is None:  # completed but produced nothing -> empty suite

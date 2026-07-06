@@ -284,7 +284,23 @@ async def test_multiple_attempts_yield_numbered_scenarios():
     assert names == ["Lidar X #1", "Lidar X #2"]
 
 
-async def test_run_builds_target_info_from_description(monkeypatch):
+@pytest.fixture
+def target():
+    def _target(inputs: str) -> str:
+        return "ok"
+
+    return _target
+
+
+def _patch_run_scan(monkeypatch, fake):
+    # run_scan is imported inside run() via `from lidar import run_scan`,
+    # so patch it on the lidar module.
+    import lidar
+
+    monkeypatch.setattr(lidar, "run_scan", fake)
+
+
+async def test_run_builds_target_info_from_description(monkeypatch, target):
     from giskard.scan.integrations.lidar import LidarScanAdapter
 
     captured = {}
@@ -299,17 +315,10 @@ async def test_run_builds_target_info_from_description(monkeypatch):
         captured.update(kwargs)
         return _FakeScanRun()
 
-    # run_scan is imported inside run() via `from lidar import run_scan`,
-    # so patch it on the lidar module.
-    import lidar
-
-    monkeypatch.setattr(lidar, "run_scan", fake_run_scan)
-
-    def _target(inputs: str) -> str:
-        return "ok"
+    _patch_run_scan(monkeypatch, fake_run_scan)
 
     await LidarScanAdapter().run(
-        _target, description="A customer-support bot for ACME", languages=["en"]
+        target, description="A customer-support bot for ACME", languages=["en"]
     )
 
     target_info = captured["target_info"]
@@ -318,6 +327,29 @@ async def test_run_builds_target_info_from_description(monkeypatch):
     assert target_info.languages == ["en"]
     # discovery stays off; context comes from the caller
     assert captured["discover_target_info"] is False
+
+
+async def test_run_propagates_run_scan_failure(monkeypatch, target):
+    # A total run_scan failure must surface, not be swallowed into an empty
+    # (falsely-passing) suite.
+    from giskard.scan.integrations.lidar import LidarScanAdapter
+
+    async def boom_run_scan(**kwargs):
+        raise RuntimeError("missing API key")
+
+    _patch_run_scan(monkeypatch, boom_run_scan)
+
+    with pytest.raises(RuntimeError, match="missing API key"):
+        await LidarScanAdapter().run(target, description="A bot")
+
+
+async def test_run_rejects_unexpected_kwargs(target):
+    # A typo'd option (e.g. probe vs probes) must raise, not be silently dropped.
+    # Raises before reaching run_scan, so no patch needed.
+    from giskard.scan.integrations.lidar import LidarScanAdapter
+
+    with pytest.raises(TypeError, match="probe"):
+        await LidarScanAdapter().run(target, description="A bot", probe=["x:1.0"])
 
 
 async def test_errored_probe_with_no_result_maps_to_error_scenario():

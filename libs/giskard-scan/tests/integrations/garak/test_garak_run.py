@@ -197,6 +197,18 @@ async def test_run_with_no_probes_returns_empty_suite(
     assert result.results == []
 
 
+async def test_run_rejects_unexpected_kwargs(
+    monkeypatch: pytest.MonkeyPatch, target
+) -> None:
+    # A typo'd option (e.g. probe vs probes) must raise, not be silently dropped.
+    adapter_cls = _patch_resolvers(
+        monkeypatch, probes=[], detectors=[_FakeDetector(score=0.1)]
+    )
+
+    with pytest.raises(TypeError, match="probe"):
+        await adapter_cls().run(target=target, probe=["x"])
+
+
 async def test_third_party_scan_routes_to_garak_adapter(
     monkeypatch: pytest.MonkeyPatch, target
 ) -> None:
