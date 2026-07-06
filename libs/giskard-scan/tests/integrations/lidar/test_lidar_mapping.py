@@ -16,7 +16,7 @@ from lidar.giskard_compat import make_message  # noqa: E402
 
 
 class _EmptyBridge:
-    _by_call_id: dict = {}
+    _by_call_id: dict[str, object] = {}
 
 
 # ProbeExecution / ProbeInfo / Attempt are still faked (hard to construct, like

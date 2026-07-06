@@ -41,7 +41,9 @@ async def test_bridge_captures_interaction_by_call_id():
     # The tracking middleware attaches the TargetCall (with its call_id) to the
     # returned response; the bridge must have stored the built Interaction under
     # that same call_id.
-    call_id = response._target_call.call_id
+    # response is lidar's Response subclass at runtime (it carries the sidecar);
+    # statically it's typed as the base CompletionResponse, hence the ignore.
+    call_id = response._target_call.call_id  # pyright: ignore[reportAttributeAccessIssue]
     assert call_id in bridge._by_call_id
     interaction = bridge._by_call_id[call_id]
     assert isinstance(interaction, Interaction)
@@ -57,8 +59,8 @@ async def test_bridge_captures_each_turn_of_a_multiturn_call():
     for i in range(3):
         history.append(make_message(role="user", content=f"turn {i}"))
         response = await bridge.complete(history)
-        history.append(response.message)
-        call_ids.append(response._target_call.call_id)
+        history.append(response.message)  # pyright: ignore[reportAttributeAccessIssue]
+        call_ids.append(response._target_call.call_id)  # pyright: ignore[reportAttributeAccessIssue]
 
     assert len(set(call_ids)) == 3  # distinct call per turn
     for i, call_id in enumerate(call_ids):
@@ -87,8 +89,8 @@ async def test_structured_round_trip_through_model_copy():
     for i in range(2):
         history.append(make_message(role="user", content=f"input {i}"))
         response = await tracked.complete(history)
-        history.append(response.message)
-        call_ids.append(response._target_call.call_id)
+        history.append(response.message)  # pyright: ignore[reportAttributeAccessIssue]
+        call_ids.append(response._target_call.call_id)  # pyright: ignore[reportAttributeAccessIssue]
 
     # Verify the shared-dict invariant: original and copy share _by_call_id.
     assert bridge._by_call_id is tracked._by_call_id, (
