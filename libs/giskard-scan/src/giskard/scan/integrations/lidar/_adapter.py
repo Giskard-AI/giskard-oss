@@ -137,9 +137,33 @@ class LidarScanAdapter:
         duration_ms = int((time.perf_counter() - start) * 1000)
         if scan_result is None:  # completed but produced nothing -> empty suite
             return SuiteResult(results=[], duration_ms=duration_ms)
-        return await self._to_suite_result(scan_result, duration_ms)
+        return await self._to_suite_result(scan_result, duration_ms, bridged)
 
-    async def _to_suite_result(self, scan_result, duration_ms: int) -> SuiteResult:
+    async def _trace_from_target_calls(self, attempt, bridged) -> Trace:  # pyright: ignore[reportMissingTypeArgument]
+        """Rebuild a scan Trace by joining lidar's per-call records to the typed
+        interactions the bridge captured.
+
+        ``attempt.target_calls`` is lidar's authoritative, ordered list of
+        ``target.complete`` calls for this attempt; each carries the ``call_id``
+        the bridge keyed its structured ``Interaction`` on. Joining on that id
+        preserves the real typed inputs/outputs instead of re-pairing flattened
+        ``attempt.messages`` strings. When the attempt made no target calls
+        (e.g. the probe errored before reaching the target), fall back to the
+        message reconstruction so a partial transcript still displays.
+        """
+        target_calls = getattr(attempt, "target_calls", None) or []
+        if not target_calls:
+            return await _trace_from_messages(attempt.messages)
+        interactions: list[Interaction] = []  # pyright: ignore[reportMissingTypeArgument]
+        for target_call in target_calls:
+            interaction = bridged._by_call_id.get(target_call.call_id)
+            if interaction is not None:
+                interactions.append(interaction)
+        return await Trace.from_interactions(*interactions)
+
+    async def _to_suite_result(
+        self, scan_result, duration_ms: int, bridged
+    ) -> SuiteResult:
         scenario_results: list[ScenarioResult] = []  # pyright: ignore[reportMissingTypeArgument]
         for execution in scan_result.results:
             probe_info = execution.probe_info
@@ -167,7 +191,9 @@ class LidarScanAdapter:
                     ScenarioResult(
                         scenario_name=f"Lidar {probe_info.name} #{attempt_idx + 1}",
                         steps=[TestCaseResult(results=[check], duration_ms=0)],
-                        final_trace=await _trace_from_messages(attempt.messages),
+                        final_trace=await self._trace_from_target_calls(
+                            attempt, bridged
+                        ),
                         tags=list(probe_info.tags),
                         duration_ms=0,
                     )

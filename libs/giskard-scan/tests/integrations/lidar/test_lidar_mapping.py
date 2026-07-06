@@ -15,6 +15,10 @@ from giskard.scan.integrations.lidar._adapter import (  # noqa: E402
 from lidar.giskard_compat import make_message  # noqa: E402
 
 
+class _EmptyBridge:
+    _by_call_id: dict = {}
+
+
 # ProbeExecution / ProbeInfo / Attempt are still faked (hard to construct, like
 # garak's _FakeProbe) — only the messages use the real lidar type via make_message.
 class Severity(str, Enum):
@@ -86,7 +90,9 @@ async def test_successful_attempt_maps_to_failure():
             )
         ]
     )
-    suite = await LidarScanAdapter()._to_suite_result(scan_result, duration_ms=42)
+    suite = await LidarScanAdapter()._to_suite_result(
+        scan_result, duration_ms=42, bridged=_EmptyBridge()
+    )
 
     assert isinstance(suite, SuiteResult)
     assert suite.duration_ms == 42
@@ -123,7 +129,9 @@ async def test_unsuccessful_attempt_maps_to_success():
             )
         ]
     )
-    suite = await LidarScanAdapter()._to_suite_result(scan_result, duration_ms=1)
+    suite = await LidarScanAdapter()._to_suite_result(
+        scan_result, duration_ms=1, bridged=_EmptyBridge()
+    )
     check = suite.results[0].steps[0].results[0]
     assert check.passed
 
@@ -147,7 +155,9 @@ async def test_errored_attempt_maps_to_error():
             )
         ]
     )
-    suite = await LidarScanAdapter()._to_suite_result(scan_result, duration_ms=1)
+    suite = await LidarScanAdapter()._to_suite_result(
+        scan_result, duration_ms=1, bridged=_EmptyBridge()
+    )
     check = suite.results[0].steps[0].results[0]
     assert check.errored
 
@@ -167,7 +177,9 @@ async def test_none_severity_omits_metric_and_label():
             )
         ]
     )
-    suite = await LidarScanAdapter()._to_suite_result(scan_result, duration_ms=1)
+    suite = await LidarScanAdapter()._to_suite_result(
+        scan_result, duration_ms=1, bridged=_EmptyBridge()
+    )
     check = suite.results[0].steps[0].results[0]
     assert check.metrics == []
     assert "severity" not in check.details
@@ -196,7 +208,9 @@ async def test_unknown_severity_degrades_without_crashing():
             )
         ]
     )
-    suite = await LidarScanAdapter()._to_suite_result(scan_result, duration_ms=1)
+    suite = await LidarScanAdapter()._to_suite_result(
+        scan_result, duration_ms=1, bridged=_EmptyBridge()
+    )
     check = suite.results[0].steps[0].results[0]
     assert check.metrics == []
     assert check.details["severity"] == "blocker"
@@ -224,7 +238,9 @@ async def test_attempt_metadata_carried_into_details():
             )
         ]
     )
-    suite = await LidarScanAdapter()._to_suite_result(scan_result, duration_ms=1)
+    suite = await LidarScanAdapter()._to_suite_result(
+        scan_result, duration_ms=1, bridged=_EmptyBridge()
+    )
     check = suite.results[0].steps[0].results[0]
     assert check.details["metadata"] == {
         "objective": "exfiltrate",
@@ -250,7 +266,9 @@ async def test_empty_metadata_omits_key():
             )
         ]
     )
-    suite = await LidarScanAdapter()._to_suite_result(scan_result, duration_ms=1)
+    suite = await LidarScanAdapter()._to_suite_result(
+        scan_result, duration_ms=1, bridged=_EmptyBridge()
+    )
     check = suite.results[0].steps[0].results[0]
     assert "metadata" not in check.details
 
@@ -279,7 +297,9 @@ async def test_multiple_attempts_yield_numbered_scenarios():
             )
         ]
     )
-    suite = await LidarScanAdapter()._to_suite_result(scan_result, duration_ms=1)
+    suite = await LidarScanAdapter()._to_suite_result(
+        scan_result, duration_ms=1, bridged=_EmptyBridge()
+    )
     names = [s.scenario_name for s in suite.results]
     assert names == ["Lidar X #1", "Lidar X #2"]
 
@@ -365,7 +385,9 @@ async def test_errored_probe_with_no_result_maps_to_error_scenario():
             )
         ]
     )
-    suite = await LidarScanAdapter()._to_suite_result(scan_result, duration_ms=1)
+    suite = await LidarScanAdapter()._to_suite_result(
+        scan_result, duration_ms=1, bridged=_EmptyBridge()
+    )
     assert len(suite.results) == 1
     scenario = suite.results[0]
     assert scenario.scenario_name == "Lidar Boom"
