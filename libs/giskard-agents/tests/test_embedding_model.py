@@ -3,7 +3,10 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 from giskard.agents.embeddings.base import BaseEmbeddingModel, EmbeddingParams
-from giskard.agents.embeddings.litellm_embedding_model import LitellmEmbeddingModel
+from giskard.agents.embeddings.giskard_llm_embedding_model import (
+    GiskardLLMEmbeddingModel,
+    LitellmEmbeddingModel,
+)
 from giskard.llm import EmbeddingData, EmbeddingResponse
 
 
@@ -23,14 +26,14 @@ def mock_embedding_response():
     )
 
 
-async def test_litellm_embedding_model_embed_with_mock(
+async def test_giskard_llm_embedding_model_embed_with_mock(
     mock_embedding_response: EmbeddingResponse,
 ) -> None:
     """Test embedding with a mock response."""
-    model = LitellmEmbeddingModel(model="test-model")
+    model = GiskardLLMEmbeddingModel(model="test-model")
 
     with patch(
-        "giskard.agents.embeddings.litellm_embedding_model.aembedding",
+        "giskard.agents.embeddings.giskard_llm_embedding_model.aembedding",
         return_value=mock_embedding_response,
     ):
         texts = ["Hello, world!", "This is a test."]
@@ -48,7 +51,7 @@ async def test_litellm_embedding_model_embed_with_mock(
 @pytest.mark.google
 @pytest.mark.functional
 async def test_embedding_model_real_embedding(
-    embedding_model: LitellmEmbeddingModel,
+    embedding_model: GiskardLLMEmbeddingModel,
 ) -> None:
     """Test real embedding generation (requires API key)."""
     texts = ["Hello, world!", "This is a test."]
@@ -64,7 +67,7 @@ async def test_embedding_model_real_embedding(
 
 def test_batched_embeddings_simple() -> None:
     """Test basic batching behavior."""
-    model = LitellmEmbeddingModel()
+    model = GiskardLLMEmbeddingModel()
     texts = ["text1", "text2", "text3", "text4"]
 
     batches = list(
@@ -79,7 +82,7 @@ def test_batched_embeddings_simple() -> None:
 
 def test_batched_embeddings_with_char_limit() -> None:
     """Test batching with character limit."""
-    model = LitellmEmbeddingModel()
+    model = GiskardLLMEmbeddingModel()
     texts = ["short", "a bit longer text", "tiny"]
 
     batches = list(
@@ -98,7 +101,7 @@ def test_batched_embeddings_with_char_limit() -> None:
 
 def test_batched_embeddings_truncate_long_text() -> None:
     """Test that overly long texts are truncated."""
-    model = LitellmEmbeddingModel()
+    model = GiskardLLMEmbeddingModel()
     long_text = "a" * 50  # 50 characters, well over the limit
     texts = [long_text, "short"]
 
@@ -114,7 +117,7 @@ def test_batched_embeddings_truncate_long_text() -> None:
 
 def test_batched_embeddings_custom_limits() -> None:
     """Test batching with custom limits passed to method."""
-    model = LitellmEmbeddingModel()
+    model = GiskardLLMEmbeddingModel()
     texts = ["text1", "text2", "text3"]
 
     # Override with smaller limits
@@ -129,7 +132,7 @@ def test_batched_embeddings_custom_limits() -> None:
 
 async def test_embed_with_multiple_batches() -> None:
     """Test that embed() correctly handles multiple batches."""
-    model = LitellmEmbeddingModel(model="test-model")
+    model = GiskardLLMEmbeddingModel(model="test-model")
 
     call_count = 0
 
@@ -145,7 +148,7 @@ async def test_embed_with_multiple_batches() -> None:
         )
 
     with patch(
-        "giskard.agents.embeddings.litellm_embedding_model.aembedding",
+        "giskard.agents.embeddings.giskard_llm_embedding_model.aembedding",
         side_effect=mock_aembedding_side_effect,
     ) as mock_aembedding:
         texts = ["text1", "text2", "text3", "text4", "text5"]
@@ -159,20 +162,34 @@ async def test_embed_with_multiple_batches() -> None:
 
 def test_embedding_model_serialization() -> None:
     """Test that embedding model can be serialized and deserialized."""
+    model = GiskardLLMEmbeddingModel(
+        model="test-model",
+        params=EmbeddingParams(dimensions=768),
+    )
+
+    json_str = model.model_dump_json()
+    deserialized_model = BaseEmbeddingModel.model_validate_json(json_str)
+
+    assert isinstance(deserialized_model, GiskardLLMEmbeddingModel)
+    assert deserialized_model.model == "test-model"
+    assert deserialized_model.params.dimensions == 768
+    assert deserialized_model.kind == "giskard_llm"
+
+
+def test_legacy_litellm_kind_deserializes_to_giskard_llm_model() -> None:
+    """Legacy serialized models with kind ``litellm`` still deserialize."""
     model = LitellmEmbeddingModel(
         model="test-model",
         params=EmbeddingParams(dimensions=768),
     )
 
-    # Serialize
     json_str = model.model_dump_json()
-
-    # Deserialize
     deserialized_model = BaseEmbeddingModel.model_validate_json(json_str)
 
     assert isinstance(deserialized_model, LitellmEmbeddingModel)
     assert deserialized_model.model == "test-model"
     assert deserialized_model.params.dimensions == 768
+    assert deserialized_model.kind == "litellm"
 
 
 def test_embedding_params_defaults() -> None:
@@ -191,9 +208,9 @@ def test_embedding_params_custom_values() -> None:
     assert params.dimensions == 512
 
 
-async def test_litellm_embedding_model_passes_params() -> None:
-    """Test that custom params are passed to litellm aembedding."""
-    model = LitellmEmbeddingModel(
+async def test_giskard_llm_embedding_model_passes_params() -> None:
+    """Test that custom params are passed to giskard-llm aembedding."""
+    model = GiskardLLMEmbeddingModel(
         model="test-model",
         params=EmbeddingParams(dimensions=768),
     )
@@ -201,15 +218,13 @@ async def test_litellm_embedding_model_passes_params() -> None:
     mock_response = _make_embedding_response([[0.1, 0.2, 0.3]])
 
     with patch(
-        "giskard.agents.embeddings.litellm_embedding_model.aembedding",
+        "giskard.agents.embeddings.giskard_llm_embedding_model.aembedding",
         return_value=mock_response,
     ) as mock_aembedding:
         texts = ["test"]
-        # Pass custom params via the params argument
         custom_params = EmbeddingParams(dimensions=512)
         _ = await model.embed(texts, params=custom_params)
 
-        # Verify that aembedding was called with correct parameters
         mock_aembedding.assert_called_once()
         call_kwargs = mock_aembedding.call_args.kwargs
         assert call_kwargs["model"] == "test-model"
@@ -219,7 +234,7 @@ async def test_litellm_embedding_model_passes_params() -> None:
 
 def test_batched_embeddings_empty_list() -> None:
     """Test batching with empty list."""
-    model = LitellmEmbeddingModel()
+    model = GiskardLLMEmbeddingModel()
     texts: list[str] = []
 
     batches = list(model.batched_embeddings(texts))
@@ -229,7 +244,7 @@ def test_batched_embeddings_empty_list() -> None:
 
 def test_batched_embeddings_single_text() -> None:
     """Test batching with single text."""
-    model = LitellmEmbeddingModel()
+    model = GiskardLLMEmbeddingModel()
     texts = ["single text"]
 
     batches = list(model.batched_embeddings(texts))

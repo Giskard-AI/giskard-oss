@@ -1,10 +1,10 @@
 import giskard.checks.settings as settings_module
 import pytest
 from giskard.agents import Generator
-from giskard.agents.embeddings.litellm_embedding_model import LitellmEmbeddingModel
-from giskard.agents.embeddings.litellm_package_embedding_model import (
-    LiteLLMEmbeddingModel,
+from giskard.agents.embeddings.giskard_llm_embedding_model import (
+    GiskardLLMEmbeddingModel,
 )
+from giskard.agents.embeddings.litellm_embedding_model import LiteLLMEmbeddingModel
 from giskard.agents.generators.giskard_llm_generator import GiskardLLMGenerator
 from giskard.agents.generators.litellm_generator import LiteLLMGenerator
 from giskard.checks.settings import (
@@ -51,14 +51,14 @@ def test_default_embedding_model_uses_settings(monkeypatch: pytest.MonkeyPatch):
 
     embedding_model = get_default_embedding_model()
 
-    assert isinstance(embedding_model, LitellmEmbeddingModel)
+    assert isinstance(embedding_model, GiskardLLMEmbeddingModel)
     assert embedding_model.model == "google/gemini-embedding-001"
 
 
 def test_default_embedding_model_falls_back_to_builtin_default():
     embedding_model = get_default_embedding_model()
 
-    assert isinstance(embedding_model, LitellmEmbeddingModel)
+    assert isinstance(embedding_model, GiskardLLMEmbeddingModel)
     assert embedding_model.model == DEFAULT_EMBEDDING_MODEL
 
 

@@ -2,10 +2,10 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from giskard.agents.embeddings.litellm_embedding_model import LitellmEmbeddingModel
-from giskard.agents.embeddings.litellm_package_embedding_model import (
-    LiteLLMEmbeddingModel,
+from giskard.agents.embeddings.giskard_llm_embedding_model import (
+    GiskardLLMEmbeddingModel,
 )
+from giskard.agents.embeddings.litellm_embedding_model import LiteLLMEmbeddingModel
 from giskard.agents.generators.giskard_llm_generator import GiskardLLMGenerator
 from giskard.agents.generators.litellm_generator import LiteLLMGenerator
 from giskard.agents.resolve import resolve_embedding_model, resolve_generator
@@ -41,14 +41,12 @@ def test_resolve_embedding_model_uses_giskard_llm_when_native_supported(
 ):
     model = resolve_embedding_model("text-embedding-3-small")
 
-    assert isinstance(model, LitellmEmbeddingModel)
+    assert isinstance(model, GiskardLLMEmbeddingModel)
     assert model.model == "text-embedding-3-small"
     mock_supports.assert_called_once_with("text-embedding-3-small", "embedding")
 
 
-@patch(
-    "giskard.agents.embeddings.litellm_package_embedding_model.LiteLLMEmbeddingModel"
-)
+@patch("giskard.agents.resolve.LiteLLMEmbeddingModel")
 @patch("giskard.agents.resolve.supports_native", return_value=False)
 def test_resolve_embedding_model_uses_litellm_package_when_native_unsupported(
     mock_supports, mock_embedding_cls
@@ -72,7 +70,7 @@ async def test_litellm_package_embedding_model_embed_with_mock(monkeypatch):
     mock_litellm = MagicMock()
     mock_litellm.aembedding = AsyncMock(return_value=response)
     monkeypatch.setattr(
-        "giskard.agents.embeddings.litellm_package_embedding_model._import_litellm",
+        "giskard.agents.embeddings.litellm_embedding_model._import_litellm",
         lambda: mock_litellm,
     )
 
