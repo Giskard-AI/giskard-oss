@@ -50,9 +50,7 @@ from urllib.parse import urlparse, urlunparse
 
 from ..errors import ProviderNotAvailableError
 from ..utils import compact
-from .openai import OpenAIProvider, _import_openai
-
-__all__ = ["AzureAIProvider", "_import_openai"]
+from .openai import OpenAIProvider
 
 if TYPE_CHECKING:
     from httpx import AsyncClient

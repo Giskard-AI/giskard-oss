@@ -9,7 +9,6 @@ from .middleware import (
     RetryMiddleware,
     RetryPolicy,
 )
-from .resolve import resolve_generator
 
 Generator = GiskardLLMGenerator
 
@@ -24,7 +23,6 @@ __all__ = [
     "BaseGenerator",
     "GiskardLLMGenerator",
     "GiskardLLMRetryMiddleware",
-    "resolve_generator",
     "LiteLLMGenerator",
     "LiteLLMRetryMiddleware",
     "CompletionMiddleware",

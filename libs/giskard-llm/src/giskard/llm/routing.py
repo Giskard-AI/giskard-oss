@@ -76,6 +76,28 @@ def _create_provider(provider_type: str, **kwargs: Any) -> Provider:
     return cls(**kwargs)
 
 
+def _probe_provider_sdk(provider_type: str) -> bool:
+    """Return whether the provider module's SDK import helpers succeed."""
+    module_path, _ = _PROVIDER_REGISTRY[provider_type]
+    try:
+        module = importlib.import_module(module_path)
+    except ImportError:
+        return False
+
+    for name in sorted(dir(module)):
+        if not name.startswith("_import_") or name.endswith(("_errors", "_types")):
+            continue
+        importer = getattr(module, name, None)
+        if not callable(importer):
+            continue
+        try:
+            importer()
+            return True
+        except (ImportError, ProviderNotAvailableError):
+            return False
+    return False
+
+
 class LLMClient:
     """Entry point for configuring and calling LLM providers.
 
@@ -107,27 +129,57 @@ class LLMClient:
         for name, kwargs in config.items():
             self.configure(name, **kwargs)
 
+    def _resolve_provider_type(self, alias: str) -> str:
+        """Return the registry provider type for *alias*."""
+        if alias in self._configs:
+            return self._configs[alias]["provider"]
+        if alias in _PROVIDER_REGISTRY:
+            return alias
+        raise ValueError(
+            f"Provider '{alias}' is not configured and not in the registry. "
+            f"Call client.configure('{alias}', ...) first."
+        )
+
     def _get_provider(self, name: str) -> Provider:
         if name in self._providers:
             return self._providers[name]
 
+        provider_type = self._resolve_provider_type(name)
         if name in self._configs:
             cfg = dict(self._configs[name])
-            provider_type = cfg.pop("provider")
+            cfg.pop("provider")
             resolved = {k: _resolve_value(v) for k, v in cfg.items()}
             provider = _create_provider(provider_type, **resolved)
-            self._providers[name] = provider
-            return provider
+        else:
+            provider = _create_provider(provider_type)
+        self._providers[name] = provider
+        return provider
 
-        if name in _PROVIDER_REGISTRY:
-            provider = _create_provider(name)
-            self._providers[name] = provider
-            return provider
+    def supports_native(
+        self, model: str, operation: Literal["completion", "embedding"]
+    ) -> bool:
+        """Return whether this client can handle *model* for *operation* natively."""
+        method_name = "complete" if operation == "completion" else "embed"
+        try:
+            alias, _ = _parse_model_string(model)
+            provider_type = self._resolve_provider_type(alias)
+        except ValueError:
+            return False
 
-        raise ValueError(
-            f"Provider '{name}' is not configured and not in the registry. "
-            f"Call client.configure('{name}', ...) first."
-        )
+        if provider_type not in _PROVIDER_REGISTRY:
+            return False
+
+        module_path, class_name = _PROVIDER_REGISTRY[provider_type]
+        try:
+            module = importlib.import_module(module_path)
+            provider_cls = getattr(module, class_name)
+        except ImportError:
+            return False
+
+        if not callable(getattr(provider_cls, method_name, None)):
+            return False
+
+        return _probe_provider_sdk(provider_type)
 
     def _resolve(self, model: str, protocol: type, operation: str) -> tuple[Any, str]:
         """Parse model string, look up the provider, and check capability."""
@@ -186,33 +238,6 @@ class LLMClient:
 _default_client = LLMClient()
 
 
-def _resolve_provider_type(alias: str, client: LLMClient) -> str:
-    """Return the registry provider type for *alias*."""
-    if alias in client._configs:
-        return client._configs[alias]["provider"]
-    if alias in _PROVIDER_REGISTRY:
-        return alias
-    raise ValueError(
-        f"Provider '{alias}' is not configured and not in the registry. "
-        f"Call client.configure('{alias}', ...) first."
-    )
-
-
-_SDK_PROBE: dict[str, tuple[str, str]] = {
-    "openai": ("giskard.llm.providers.openai", "_import_openai"),
-    "google": ("giskard.llm.providers.google", "_import_genai"),
-    "gemini": ("giskard.llm.providers.google", "_import_genai"),
-    "anthropic": ("giskard.llm.providers.anthropic", "_import_anthropic"),
-    "azure": ("giskard.llm.providers.openai", "_import_openai"),
-    "azure_ai": ("giskard.llm.providers.azure_ai", "_import_openai"),
-}
-
-_OPERATION_METHOD: dict[str, str] = {
-    "completion": "complete",
-    "embedding": "embed",
-}
-
-
 def supports_native(
     model: str,
     operation: Literal["completion", "embedding"],
@@ -223,55 +248,8 @@ def supports_native(
 
     Checks registry membership (or ``configure()`` aliases), SDK availability,
     and provider protocol support. Does not perform network I/O.
-
-    Parameters
-    ----------
-    model
-        Model string in ``provider/model-name`` format. Bare names default to
-        ``openai``.
-    operation
-        ``"completion"`` or ``"embedding"``.
-    client
-        Optional client used for configured provider aliases. Defaults to the
-        module-level default client.
-
-    Returns
-    -------
-    bool
-        ``True`` when a native provider can handle the requested operation.
     """
-    method_name = _OPERATION_METHOD[operation]
-    try:
-        alias, _ = _parse_model_string(model)
-        probe_client = client or _default_client
-        provider_type = _resolve_provider_type(alias, probe_client)
-    except ValueError:
-        return False
-
-    if provider_type not in _PROVIDER_REGISTRY:
-        return False
-
-    module_path, class_name = _PROVIDER_REGISTRY[provider_type]
-    try:
-        module = importlib.import_module(module_path)
-        provider_cls = getattr(module, class_name)
-    except ImportError:
-        return False
-
-    if not callable(getattr(provider_cls, method_name, None)):
-        return False
-
-    if provider_type not in _SDK_PROBE:
-        return False
-
-    sdk_module_path, sdk_import_name = _SDK_PROBE[provider_type]
-    try:
-        sdk_module = importlib.import_module(sdk_module_path)
-        getattr(sdk_module, sdk_import_name)()
-    except (ImportError, ProviderNotAvailableError):
-        return False
-
-    return True
+    return (client or _default_client).supports_native(model, operation)
 
 
 def configure(name: str, provider: str | None = None, **kwargs: Any) -> None:
