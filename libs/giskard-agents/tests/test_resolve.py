@@ -6,13 +6,12 @@ from giskard.agents.embeddings.litellm_embedding_model import LitellmEmbeddingMo
 from giskard.agents.embeddings.litellm_package_embedding_model import (
     LiteLLMEmbeddingModel,
 )
-from giskard.agents.embeddings.resolve import resolve_embedding_model
 from giskard.agents.generators.giskard_llm_generator import GiskardLLMGenerator
 from giskard.agents.generators.litellm_generator import LiteLLMGenerator
-from giskard.agents.generators.resolve import resolve_generator
+from giskard.agents.resolve import resolve_embedding_model, resolve_generator
 
 
-@patch("giskard.agents.generators.resolve.supports_native", return_value=True)
+@patch("giskard.agents.resolve.supports_native", return_value=True)
 def test_resolve_generator_uses_giskard_llm_when_native_supported(mock_supports):
     generator = resolve_generator("openai/gpt-4o-mini")
 
@@ -22,7 +21,7 @@ def test_resolve_generator_uses_giskard_llm_when_native_supported(mock_supports)
 
 
 @patch("giskard.agents.generators.litellm_generator.LiteLLMGenerator")
-@patch("giskard.agents.generators.resolve.supports_native", return_value=False)
+@patch("giskard.agents.resolve.supports_native", return_value=False)
 def test_resolve_generator_uses_litellm_when_native_unsupported(
     mock_supports, mock_generator_cls
 ):
@@ -36,7 +35,7 @@ def test_resolve_generator_uses_litellm_when_native_unsupported(
     mock_generator_cls.assert_called_once_with(model="deepseek/deepseek-chat")
 
 
-@patch("giskard.agents.embeddings.resolve.supports_native", return_value=True)
+@patch("giskard.agents.resolve.supports_native", return_value=True)
 def test_resolve_embedding_model_uses_giskard_llm_when_native_supported(
     mock_supports,
 ):
@@ -50,7 +49,7 @@ def test_resolve_embedding_model_uses_giskard_llm_when_native_supported(
 @patch(
     "giskard.agents.embeddings.litellm_package_embedding_model.LiteLLMEmbeddingModel"
 )
-@patch("giskard.agents.embeddings.resolve.supports_native", return_value=False)
+@patch("giskard.agents.resolve.supports_native", return_value=False)
 def test_resolve_embedding_model_uses_litellm_package_when_native_unsupported(
     mock_supports, mock_embedding_cls
 ):
