@@ -44,7 +44,7 @@ Giskard is an open-source Python library for **testing and evaluating agentic sy
 | Status         | Package          | Description                                                                                                                                                              |
 | -------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | ✅ Beta        | `giskard-checks` | Testing & evaluation — scenario API, built-in checks, LLM-as-judge                                                                                                       |
-| 🚧 In progress | `giskard-scan`   | Agent vulnerability scanner — red teaming, prompt injection, data leakage (successor of [v2 Scan](https://legacy-docs.giskard.ai/en/stable/open_source/scan/index.html)) |
+| ✅ Beta        | `giskard-scan`   | Agent vulnerability scanner — red teaming, prompt injection, data leakage (successor of [v2 Scan](https://legacy-docs.giskard.ai/en/stable/open_source/scan/index.html)) |
 | 📋 Planned     | `giskard-rag`    | RAG evaluation & synthetic data generation (successor of [v2 RAGET](https://legacy-docs.giskard.ai/en/stable/open_source/testset_generation/index.html))                 |
 
 ## Giskard Checks — create and apply evals for testing agents
