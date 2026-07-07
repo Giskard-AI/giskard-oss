@@ -7,7 +7,7 @@ from giskard.checks import SuiteResult, Target, Trace
 
 async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     target: Target[InputType, OutputType, TraceType],
-    tool: Literal["garak", "lidar"] = "garak",
+    tool: Literal["garak", "lidar"],
     *,
     description: str,
     languages: list[str] | None = None,
