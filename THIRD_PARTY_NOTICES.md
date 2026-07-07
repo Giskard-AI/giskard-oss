@@ -396,7 +396,7 @@ Find a list of packages below
 - License: Apache License 2.0
 - Compatible: True
 
-### numpy-2.5.0
+### numpy-2.4.6
 
 - HomePage:
 - Author: Travis E. Oliphant et al.

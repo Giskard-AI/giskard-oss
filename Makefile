@@ -64,6 +64,12 @@ install-minimal: ## Install with test group only (no provider SDKs, all packages
 install-garak-test: ## Install garak optional extra for scan integration tests
 	uv sync --group garak-test
 
+install-lidar-test: ## Install lidar private dependency for scan integration tests
+	uv sync --group lidar-test
+
+test-lidar: install-lidar-test ## Run lidar integration tests
+	uv run pytest libs/giskard-scan/tests/integrations/lidar -v
+
 test-unit-minimal: ## Run unit tests on minimal deps (no provider SDKs), optional PACKAGE=<name>
 ifdef PACKAGE
 	uv run pytest libs/$(PACKAGE) -m "not functional"

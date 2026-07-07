@@ -33,7 +33,7 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--doctest-modules --ignore=src/giskard/scan/integrations/garak"
+addopts = "--doctest-modules --ignore=src/giskard/scan/integrations/garak --ignore=src/giskard/scan/integrations/lidar"
 asyncio_mode = "auto"
 pythonpath = ["src"]
 markers = [

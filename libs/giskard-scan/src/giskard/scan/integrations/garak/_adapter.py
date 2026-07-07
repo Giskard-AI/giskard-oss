@@ -21,6 +21,7 @@ from giskard.checks import (
 )
 
 from ...generators.base import TargetMode
+from .._shared import reject_unexpected_kwargs
 
 if TYPE_CHECKING:
     from garak.attempt import Attempt
@@ -345,6 +346,7 @@ class GarakScanAdapter:
 
         probes = _resolve_probes(kwargs.pop("probes", None))
         target_mode: TargetMode = kwargs.pop("target_mode", "multiturn")
+        reject_unexpected_kwargs("garak", kwargs)
 
         if target_mode == "singleturn":
             probes = [

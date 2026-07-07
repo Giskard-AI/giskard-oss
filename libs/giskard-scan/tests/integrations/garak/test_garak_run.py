@@ -203,6 +203,18 @@ async def test_run_with_no_probes_returns_empty_suite(
     assert result.results == []
 
 
+async def test_run_rejects_unexpected_kwargs(
+    monkeypatch: pytest.MonkeyPatch, target
+) -> None:
+    # A typo'd option (e.g. probe vs probes) must raise, not be silently dropped.
+    adapter_cls = _patch_resolvers(
+        monkeypatch, probes=[], detectors=[_FakeDetector(score=0.1)]
+    )
+
+    with pytest.raises(TypeError, match="probe"):
+        await adapter_cls().run(target=target, probe=["x"])
+
+
 async def test_third_party_scan_routes_to_garak_adapter(
     monkeypatch: pytest.MonkeyPatch, target
 ) -> None:
@@ -215,7 +227,7 @@ async def test_third_party_scan_routes_to_garak_adapter(
         detectors=[("fake.Detector", _FakeDetector(score=0.9))],
     )
 
-    result = await third_party_scan(target, tool="garak")
+    result = await third_party_scan(target, tool="garak", description="A test agent")
 
     assert isinstance(result, SuiteResult)
     assert len(result.results) == 1
@@ -226,7 +238,18 @@ async def test_third_party_scan_rejects_unknown_tool(target) -> None:
     from giskard.scan.integrations import third_party_scan
 
     with pytest.raises(ValueError, match="Unknown tool"):
-        await third_party_scan(target, tool="nope")  # pyright: ignore[reportArgumentType]
+        await third_party_scan(
+            target,
+            tool="nope",  # pyright: ignore[reportArgumentType]
+            description="A test agent",
+        )
+
+
+async def test_third_party_scan_requires_description(target) -> None:
+    from giskard.scan.integrations import third_party_scan
+
+    with pytest.raises(TypeError):
+        await third_party_scan(target, tool="garak")  # pyright: ignore[reportCallIssue]
 
 
 async def test_run_marks_missing_detector_scores_as_skip(
