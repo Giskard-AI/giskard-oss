@@ -1,6 +1,7 @@
 """Adapter that runs garak through Giskard scan scenarios."""
 
 import asyncio
+import concurrent.futures
 import logging
 import time
 from collections import defaultdict
@@ -140,16 +141,7 @@ def _resolve_detectors(
     loop: "asyncio.AbstractEventLoop | None",
     cache: "dict[str, Detector] | None" = None,
 ) -> "tuple[list[tuple[str, Detector]], list[_SkipMarker]]":
-    """Resolve a probe's detectors, reusing any already in ``cache``.
-
-    Detectors download at construction time — ``HFDetector.__init__`` pulls model
-    weights from the Hub — so building the same detector once per probe both
-    re-downloads and, when probes run in parallel, races on the HF cache. A shared
-    ``cache`` keyed by detector name builds each distinct detector exactly once and
-    lets every probe reuse the instance. Both plain and judge detectors go through
-    the cache (garak's own ``PluginProvider`` dedups plain detectors by class but
-    not judge detectors, which we build out-of-band).
-    """
+    """Resolve a probe's detectors, reusing any already in ``cache``."""
     from garak._plugins import load_plugin
     from garak.detectors.judge import ModelAsJudge
     from garak.exception import APIKeyMissingError, GarakException
@@ -391,20 +383,35 @@ class GarakScanAdapter:
                 continue
             resolved.append((probe, detectors, skipped))
 
-        async with asyncio.TaskGroup() as task_group:
-            tasks = [
-                task_group.create_task(
-                    asyncio.to_thread(
-                        self._run_probe_isolated,
-                        probe,
-                        target,
-                        loop,
-                        detectors,
-                        skipped,
+        async def _run_on_executor(
+            executor: concurrent.futures.ThreadPoolExecutor,
+            probe: "Probe",
+            detectors: "list[tuple[str, Detector]]",
+            skipped: "list[_SkipMarker]",
+        ) -> list[ScenarioResult[TraceType]]:
+            return await loop.run_in_executor(
+                executor,
+                self._run_probe_isolated,
+                probe,
+                target,
+                loop,
+                detectors,
+                skipped,
+            )
+
+        probe_executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=max(len(resolved), 1)
+        )
+        try:
+            async with asyncio.TaskGroup() as task_group:
+                tasks = [
+                    task_group.create_task(
+                        _run_on_executor(probe_executor, probe, detectors, skipped)
                     )
-                )
-                for probe, detectors, skipped in resolved
-            ]
+                    for probe, detectors, skipped in resolved
+                ]
+        finally:
+            probe_executor.shutdown(wait=False)
 
         # Results are only available once the TaskGroup has exited and every
         # task has completed; reading task.result() inside the block would hit
