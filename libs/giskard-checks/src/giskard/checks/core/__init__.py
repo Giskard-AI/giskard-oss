@@ -14,10 +14,12 @@ from .result import (
 )
 from .scenario import Scenario, Step
 from .testcase import TestCase
+from .types import Target
 
 __all__ = [
     "Scenario",
     "Step",
+    "Target",
     "Trace",
     "InteractionSpec",
     "Interact",

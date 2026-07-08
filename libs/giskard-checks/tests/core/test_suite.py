@@ -1,11 +1,25 @@
 import asyncio
 import time
 from contextlib import nullcontext
+from typing import Any
 
 import pytest
 from giskard.checks import Equals, Scenario, Suite
-from giskard.checks.core.result import GroupedSuiteResult, GroupStats, ScenarioStatus
+from giskard.checks.core.interaction import Trace
+from giskard.checks.core.result import (
+    CheckResult,
+    GroupedSuiteResult,
+    GroupStats,
+    ScenarioResult,
+    ScenarioStatus,
+    SuiteResult,
+)
+from giskard.checks.core.result import (
+    TestCaseResult as CheckTestCaseResult,
+)
 from giskard.checks.scenarios.suite import _OverallOnly, _SuiteProgress
+from giskard.checks.settings import MAX_REPORTED_FAILURES_ENV_VAR
+from rich.console import Console
 from rich.progress import MofNCompleteColumn, Progress
 from rich.text import Text
 
@@ -28,6 +42,25 @@ def sut3():
 @pytest.fixture
 def identity_sut():
     return lambda inputs: inputs
+
+
+def failed_scenario(name: str) -> ScenarioResult[Trace[Any, Any]]:
+    return ScenarioResult(
+        scenario_name=name,
+        steps=[
+            CheckTestCaseResult(
+                results=[
+                    CheckResult.failure(
+                        message=f"{name} failed",
+                        details={"check_name": "ExampleCheck"},
+                    )
+                ],
+                duration_ms=1,
+            )
+        ],
+        duration_ms=1,
+        final_trace=Trace(interactions=[]),
+    )
 
 
 @pytest.mark.asyncio
@@ -119,6 +152,31 @@ async def test_suite_result_aggregation():
 
 
 @pytest.mark.asyncio
+async def test_suite_result_exposes_originating_suite():
+    """The suite that produced a result is recoverable from the result."""
+    suite = Suite(name="recover_suite", target=lambda inputs: inputs)
+    suite.append(Scenario("s1").interact("a", "a"))
+
+    result = await suite.run()
+
+    # In-memory: the originating suite is recoverable from the result. Pydantic
+    # revalidates the submodel, so this is an equal copy rather than the same
+    # object, but the suite-level target callable is carried through by identity.
+    assert result.suite is not None
+    assert result.suite.name == suite.name
+    assert result.suite.target is suite.target
+
+    # Serialization: `suite` is excluded (it holds non-serializable callables),
+    # so dumping never raises and the field is absent from the output.
+    dumped = result.model_dump()
+    assert "suite" not in dumped
+    assert "suite" not in result.model_dump_json()
+
+    # Round-trip: deserializing has no suite to restore, so it comes back None.
+    assert result.__class__.model_validate_json(result.model_dump_json()).suite is None
+
+
+@pytest.mark.asyncio
 async def test_suite_callable_target():
     """Verify that suite target can be a callable."""
     scenario = Scenario("s1").interact("hello")
@@ -160,6 +218,81 @@ async def test_suite_append_chaining():
     assert result.results[1].scenario_name == "b"
 
 
+def test_suite_result_rich_console_respects_max_reported_failures_env(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "2")
+    result = SuiteResult(
+        results=[failed_scenario("s1"), failed_scenario("s2"), failed_scenario("s3")],
+        duration_ms=3,
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "s1" in output
+    assert "s2" in output
+    assert "s3" not in output
+    assert "... and 1 more" in output
+
+
+def test_suite_result_rich_console_reports_all_failures_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.delenv(MAX_REPORTED_FAILURES_ENV_VAR, raising=False)
+    result = SuiteResult(
+        results=[failed_scenario(f"s{i}") for i in range(1, 22)],
+        duration_ms=3,
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "s1" in output
+    assert "s20" in output
+    assert "s21" in output
+    assert "... and" not in output
+
+
+def test_suite_result_rich_console_can_hide_all_failure_details(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "0")
+    result = SuiteResult(
+        results=[failed_scenario("s1"), failed_scenario("s2"), failed_scenario("s3")],
+        duration_ms=3,
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "s1" not in output
+    assert "s2" not in output
+    assert "s3" not in output
+    assert "... and 3 more" in output
+
+
+def test_suite_result_rich_console_ignores_invalid_failure_limit_env(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(MAX_REPORTED_FAILURES_ENV_VAR, "invalid")
+    result = SuiteResult(
+        results=[failed_scenario(f"s{i}") for i in range(1, 22)],
+        duration_ms=3,
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "s20" in output
+    assert "s21" in output
+    assert "... and" not in output
+
+
 @pytest.mark.asyncio
 async def test_suite_parallel_preserves_result_order():
     delays = {"first": 0.09, "second": 0.01, "third": 0.05}
@@ -186,7 +319,6 @@ async def test_suite_parallel_preserves_result_order():
 @pytest.mark.asyncio
 async def test_suite_parallel_runs_concurrently():
     sleep_s = 0.06
-    n = 3
 
     async def delayed_identity(inputs):
         await asyncio.sleep(sleep_s)
@@ -197,12 +329,15 @@ async def test_suite_parallel_runs_concurrently():
     suite.append(Scenario("b").interact("b"))
     suite.append(Scenario("c").interact("c"))
 
-    start = time.perf_counter()
-    await suite.run(parallel=True)
-    parallel_duration = time.perf_counter() - start
+    serial_start = time.perf_counter()
+    await suite.run()
+    serial_duration = time.perf_counter() - serial_start
 
-    # Must complete faster than running all scenarios serially
-    assert parallel_duration < sleep_s * n
+    parallel_start = time.perf_counter()
+    await suite.run(parallel=True)
+    parallel_duration = time.perf_counter() - parallel_start
+
+    assert parallel_duration < serial_duration
 
 
 @pytest.mark.asyncio
@@ -289,13 +424,31 @@ async def test_suite_parallel_respects_max_concurrency():
     assert peak_runs == 2
 
 
-@pytest.mark.asyncio
-async def test_suite_parallel_rejects_invalid_max_concurrency():
-    suite = Suite(name="invalid_parallel_limit_suite", target=lambda inputs: inputs)
+@pytest.fixture
+def simple_suite():
+    suite = Suite(name="invalid_limit_suite", target=lambda inputs: inputs)
     suite.append(Scenario("a").interact("a"))
+    return suite
 
-    with pytest.raises(ValueError, match="max_concurrency must be greater than 0"):
-        await suite.run(parallel=True, max_concurrency=0)
+
+@pytest.mark.parametrize("parallel", [True, False])
+@pytest.mark.parametrize(
+    ("max_concurrency", "error_type", "message"),
+    [
+        (0, ValueError, "max_concurrency must be greater than 0"),
+        (-1, ValueError, "max_concurrency must be greater than 0"),
+        (True, TypeError, "max_concurrency must be None or a positive integer"),
+        (False, TypeError, "max_concurrency must be None or a positive integer"),
+        (1.5, TypeError, "max_concurrency must be None or a positive integer"),
+        ("2", TypeError, "max_concurrency must be None or a positive integer"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_suite_rejects_invalid_max_concurrency(
+    simple_suite, parallel, max_concurrency, error_type, message
+):
+    with pytest.raises(error_type, match=message):
+        await simple_suite.run(parallel=parallel, max_concurrency=max_concurrency)
 
 
 def test_progress_counter_appears_only_on_the_overall_row():
@@ -456,6 +609,7 @@ def test_suite_group_by_skipped_scenario_counted_separately():
         SuiteResult,
         TestCaseResult,
     )
+    from giskard.checks.scenarios.suite import Suite
 
     empty_trace = Trace(interactions=[])
 
@@ -482,7 +636,9 @@ def test_suite_group_by_skipped_scenario_counted_separately():
         tags=["Category:Hallucination"],
     )
     suite_result = SuiteResult(
-        results=[skipped_scenario, passing_scenario], duration_ms=0
+        results=[skipped_scenario, passing_scenario],
+        duration_ms=0,
+        suite=Suite(name="test"),
     )
     grouped = suite_result.group_by("Category")
 

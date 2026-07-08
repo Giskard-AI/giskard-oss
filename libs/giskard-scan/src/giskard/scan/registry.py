@@ -1,8 +1,4 @@
-from .generators.adversarial import AdversarialScenarioGenerator
 from .generators.base import ScenarioGenerator
-from .generators.crescendo import CrescendoAttackScenarioGenerator
-from .generators.goat import GOATAttackScenarioGenerator
-from .generators.prompt_injection import PromptInjectionScenarioGenerator
 
 
 def _normalize_generator(
@@ -14,7 +10,7 @@ def _normalize_generator(
 
 
 class SuiteGeneratorRegistry:
-    """Global registry of ScenarioGenerator instances."""
+    """Mutable registry of scenario generator instances."""
 
     def __init__(self) -> None:
         self._generators: list[ScenarioGenerator] = []
@@ -45,12 +41,9 @@ class SuiteGeneratorRegistry:
     def clear(self) -> None:
         self._generators.clear()
 
-    def generators(self) -> list[ScenarioGenerator]:
-        return list(self._generators)
-
-
-suite_generator_registry = SuiteGeneratorRegistry()
-suite_generator_registry.register(AdversarialScenarioGenerator)
-suite_generator_registry.register(CrescendoAttackScenarioGenerator)
-suite_generator_registry.register(GOATAttackScenarioGenerator)
-suite_generator_registry.register(PromptInjectionScenarioGenerator)
+    def generators(self, commercial_use: bool = False) -> list[ScenarioGenerator]:
+        return [
+            generator
+            for generator in self._generators
+            if not commercial_use or generator.allow_commercial_use
+        ]

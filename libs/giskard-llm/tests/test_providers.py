@@ -482,20 +482,32 @@ def _all_subclasses(cls: type) -> list[type]:
 
 
 def _make_httpx_sdk_exc(cls: type) -> Exception:
-    """Construct a minimal httpx-based SDK exception (openai / anthropic / google._interactions)."""
-    import httpx  # pyright: ignore[reportMissingImports]
+    """Construct a minimal httpx-based SDK exception (openai / anthropic / google._interactions).
 
-    name = cls.__name__
-    if name == "APITimeoutError":
-        return cls(request=httpx.Request("GET", "https://test"))  # type: ignore[call-arg]
-    if name == "APIConnectionError":
-        return cls(request=httpx.Request("GET", "https://test"), message="conn err")  # type: ignore[call-arg]
-    if name == "APIResponseValidationError":
-        resp = httpx.Response(200, request=httpx.Request("GET", "https://test"))
-        return cls(response=resp, body=None)  # type: ignore[call-arg]
-    # APIStatusError and all its subclasses
-    resp = httpx.Response(400, request=httpx.Request("GET", "https://test"))
-    return cls(message="test", response=resp, body=None)  # type: ignore[call-arg]
+    SDK error classes have inconsistent constructor signatures (some take
+    ``message``, some ``response``, some ``request``, some only keyword args).
+    Rather than special-casing each class name, introspect the constructor and
+    pass only the arguments it accepts.
+    """
+    import inspect
+
+    import httpx
+
+    request = httpx.Request("GET", "https://test")
+    response = httpx.Response(400, request=request)
+
+    available = {
+        "message": "test",
+        "request": request,
+        "response": response,
+        "body": None,
+    }
+
+    params = inspect.signature(cls.__init__).parameters
+    kwargs: dict[str, object] = {
+        name: value for name, value in available.items() if name in params
+    }
+    return cls(**kwargs)
 
 
 @pytest.mark.openai

@@ -1,15 +1,12 @@
 """Scenario generator for Crescendo-style multi-turn attacks."""
 
-from typing import Any, ClassVar, override
+from typing import Any, override
 
 import numpy as np
-from giskard.checks.core.interaction import Trace
-from giskard.checks.core.scenario import Scenario
-from giskard.checks.generators import LLMGenerator
-from giskard.checks.judges import LLMJudge
+from giskard.checks import LLMGenerator, LLMJudge, Scenario, Trace
 from pydantic import Field
 
-from .base import ScenarioGenerator
+from .base import ScenarioContext, ScenarioGenerator, TargetMode
 
 DEFAULT_CRESCENDO_MAX_TURNS = 10
 """Default number of attacker turns."""
@@ -40,45 +37,43 @@ class CrescendoAttackScenarioGenerator(ScenarioGenerator):
         Maximum number of attacker turns per scenario.
     """
 
-    tags: ClassVar[list[str]] = [
-        "gsk:threat-type='harmful-content-generation'",
-    ]
-
     max_turns: int = Field(default=DEFAULT_CRESCENDO_MAX_TURNS, ge=1)
 
     @override
     async def generate_scenario(
         self,
-        description: str,
-        languages: list[str],
+        context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
+        target_mode: TargetMode = "multiturn",
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Generate Crescendo attack scenarios for the described agent.
 
         Parameters
         ----------
-        description : str
-            Natural-language description of the agent under test.
-        languages : list[str]
-            BCP-47 language codes the attacker may use.
+        context : ScenarioContext
+            Run-wide context providing description and languages.
         max_scenarios : int, optional
             Maximum number of Crescendo objectives to include. ``None``
             includes all built-in objectives.
         rng : numpy.random.Generator, optional
             Random generator used for reproducible objective sampling.
+        target_mode : Literal["singleturn", "multiturn"]
+            Mode of interaction with the target. Crescendo only supports multiturn.
 
         Returns
         -------
         list[Scenario]
             One multi-turn Crescendo scenario per selected objective.
         """
-        assignments = self._select_objectives(max_scenarios, languages, rng)
+        if self._skip_for_singleturn(target_mode):
+            return []
+        assignments = self._select_objectives(max_scenarios, context.languages, rng)
         return [
             self._build_scenario(
                 objective_name=objective_name,
                 goal=goal,
-                description=description,
+                description=context.description,
                 language=language,
             )
             for objective_name, goal, language in assignments
@@ -132,5 +127,11 @@ class CrescendoAttackScenarioGenerator(ScenarioGenerator):
                     "language": language,
                     "max_turns": self.max_turns,
                 }
+            )
+            .with_tags(
+                [
+                    "threat-type:harmful-content-generation",
+                    "probe-type:multi-turn",
+                ]
             )
         )

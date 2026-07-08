@@ -44,7 +44,7 @@ Giskard is an open-source Python library for **testing and evaluating agentic sy
 | Status         | Package          | Description                                                                                                                                                              |
 | -------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | ✅ Beta        | `giskard-checks` | Testing & evaluation — scenario API, built-in checks, LLM-as-judge                                                                                                       |
-| 🚧 In progress | `giskard-scan`   | Agent vulnerability scanner — red teaming, prompt injection, data leakage (successor of [v2 Scan](https://legacy-docs.giskard.ai/en/stable/open_source/scan/index.html)) |
+| ✅ Beta        | `giskard-scan`   | Agent vulnerability scanner — red teaming, prompt injection, data leakage (successor of [v2 Scan](https://legacy-docs.giskard.ai/en/stable/open_source/scan/index.html)) |
 | 📋 Planned     | `giskard-rag`    | RAG evaluation & synthetic data generation (successor of [v2 RAGET](https://legacy-docs.giskard.ai/en/stable/open_source/testset_generation/index.html))                 |
 
 ## Giskard Checks — create and apply evals for testing agents
@@ -113,21 +113,20 @@ Use Giskard Scan to:
 
 - **Red-team your agent** — automatically generate adversarial inputs across OWASP LLM Top-10 threat categories
 - **Run prompt-injection probes** — built-in dataset of injection payloads ready to use
-- **Extend with custom generators** — register your own `ScenarioGenerator` via `suite_generator_registry`
+- **Extend with custom generators** — pass your own `ScenarioGenerator` instances to `generate_suite`, or register them on `vulnerability_suite_generator_registry`
 
 ### Quickstart
 
 ```python
 import asyncio
-from giskard.scan import generate_suite
+from giskard.scan import vulnerability_scan
 
 async def main():
-    suite = await generate_suite(
+    await vulnerability_scan(
+        target=my_agent,
         description="A customer support chatbot for an e-commerce platform.",
         languages=["en"],
     )
-    results = await suite.run(my_agent)
-    results.print_report()
 
 asyncio.run(main())
 ```

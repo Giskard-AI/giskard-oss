@@ -1,6 +1,5 @@
 """Public package exports for giskard.checks."""
 
-import os
 from pathlib import Path
 
 from giskard.agents import add_prompts_path
@@ -18,12 +17,15 @@ from .builtin import (
     GreaterThan,
     HitRateAtK,
     JsonValid,
+    LessThan,
+    LessThanEquals,
     LesserThan,
     LesserThanEquals,
     NDCGAtK,
     Not,
     NotEquals,
     PrecisionAtK,
+    Readability,
     RecallAtK,
     RegexMatching,
     RegoPolicy,
@@ -46,17 +48,21 @@ from .core import (
     ScenarioResult,
     Step,
     SuiteResult,
+    Target,
     TestCase,
     TestCaseResult,
     Trace,
     resolve,
 )
+from .core.mixin import WithEmbeddingMixin, WithGeneratorMixin
 from .generators.base import BaseLLMGenerator, LLMGenerator
+from .generators.dataset import DatasetInputGenerator
 from .generators.user import UserSimulator
 from .judges import (
     AnswerRelevance,
     BaseLLMCheck,
     Conformity,
+    Contradiction,
     Groundedness,
     LLMCheckResult,
     LLMJudge,
@@ -64,19 +70,14 @@ from .judges import (
 )
 from .scenarios.runner import ScenarioRunner
 from .scenarios.suite import Suite
-from .settings import get_default_generator, set_default_generator
+from .settings import get_default_generator, get_settings, set_default_generator
 from .testing import WithSpy
 from .testing.runner import TestCaseRunner
 
 __version__ = get_lib_version("giskard-checks")
 
-# Install rich.pretty for better REPL output (including Pydantic models)
-# Can be disabled by setting GISKARD_CHECKS_DISABLE_RICH_PRETTY=1
-if os.getenv("GISKARD_CHECKS_DISABLE_RICH_PRETTY", "").lower() not in (
-    "1",
-    "true",
-    "yes",
-):
+# Install rich.pretty for better REPL output unless disabled in settings.
+if not get_settings().disable_rich_pretty:
     from rich.pretty import install
 
     install()
@@ -100,6 +101,7 @@ __all__ = [
     "ScenarioResult",
     "Step",
     "SuiteResult",
+    "Target",
     "TestCase",
     "TestCaseResult",
     "Trace",
@@ -107,6 +109,8 @@ __all__ = [
     "Interact",
     "Interaction",
     "InteractionSpec",
+    "WithGeneratorMixin",
+    "WithEmbeddingMixin",
     # Builtin and LLM-based checks
     "AnswerRelevance",
     "AllOf",
@@ -115,8 +119,11 @@ __all__ = [
     "BaseLLMCheck",
     "LLMCheckResult",
     "Conformity",
+    "Contradiction",
     "Equals",
     "NotEquals",
+    "LessThan",
+    "LessThanEquals",
     "LesserThan",
     "GreaterThan",
     "LesserThanEquals",
@@ -133,6 +140,7 @@ __all__ = [
     "from_fn",
     "Groundedness",
     "LLMJudge",
+    "Readability",
     "SemanticSimilarity",
     "Toxicity",
     "StringMatching",
@@ -143,6 +151,7 @@ __all__ = [
     "BaseLLMGenerator",
     "LLMGenerator",
     # Generators
+    "DatasetInputGenerator",
     "UserSimulator",
     # Testing
     "WithSpy",

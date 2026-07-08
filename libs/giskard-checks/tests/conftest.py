@@ -1,5 +1,14 @@
+import giskard.checks.settings as settings_module
 import pytest
 from giskard.core import disable_telemetry
+
+
+@pytest.fixture(autouse=True)
+def reset_default_generator():
+    """Restore the global default generator after each test."""
+    original = settings_module._default_generator
+    yield
+    settings_module._default_generator = original
 
 
 def pytest_configure(config: pytest.Config) -> None:

@@ -18,6 +18,8 @@ from .comparison import (
     GreaterThan,
     LesserThan,
     LesserThanEquals,
+    LessThan,
+    LessThanEquals,
     NotEquals,
 )
 
@@ -25,6 +27,7 @@ from .comparison import (
 from .composition import AllOf, AnyOf, Not
 from .fn import FnCheck, from_fn
 from .json_valid import JsonValid
+from .nlp_metrics import Readability
 from .rego_policy import RegoPolicy
 from .retrieval import (
     MRR,
@@ -50,11 +53,14 @@ __all__ = [
     "NDCGAtK",
     "AveragePrecision",
     "JsonValid",
+    "Readability",
     "RegoPolicy",
     "StringMatching",
     "RegexMatching",
     "Equals",
     "NotEquals",
+    "LessThan",
+    "LessThanEquals",
     "LesserThan",
     "GreaterThan",
     "LesserThanEquals",
