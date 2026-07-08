@@ -1,13 +1,16 @@
-"""Unit tests for comparison checks (LesserThan, GreaterThan, LesserThanEquals, GreaterEquals).
+"""Unit tests for comparison checks (LessThan, GreaterThan, LessThanEquals, GreaterEquals).
 
 Tests cover different types (numbers, strings) and various comparison scenarios:
-- Success cases (e.g., 5 < 10 should pass for LesserThan)
-- Failure cases (e.g., 10 < 5 should fail for LesserThan)
+- Success cases (e.g., 5 < 10 should pass for LessThan)
+- Failure cases (e.g., 10 < 5 should fail for LessThan)
 - TypeError handling (missing methods and incompatible types)
 """
 
+import warnings
+
 import pytest
 from giskard.checks import (
+    Check,
     CheckStatus,
     Equals,
     GreaterEquals,
@@ -15,19 +18,21 @@ from giskard.checks import (
     Interaction,
     LesserThan,
     LesserThanEquals,
+    LessThan,
+    LessThanEquals,
     NotEquals,
     Trace,
 )
 from giskard.checks.core.extraction import NoMatch
 
 
-class TestLesserThan:
-    """Test LesserThan check."""
+class TestLessThan:
+    """Test LessThan check."""
 
     async def test_number_lesser_than_success(self):
         """Test that 5 < 10 passes."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
-        check = LesserThan(
+        check = LessThan(
             expected_value=10,
             key="trace.interactions[-1].outputs",
         )
@@ -42,7 +47,7 @@ class TestLesserThan:
     async def test_number_lesser_than_failure(self):
         """Test that 10 < 5 fails."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
-        check = LesserThan(
+        check = LessThan(
             expected_value=5,
             key="trace.interactions[-1].outputs",
         )
@@ -59,7 +64,7 @@ class TestLesserThan:
     async def test_number_lesser_than_equal_fails(self):
         """Test that 5 < 5 fails (equal values)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
-        check = LesserThan(
+        check = LessThan(
             expected_value=5,
             key="trace.interactions[-1].outputs",
         )
@@ -74,7 +79,7 @@ class TestLesserThan:
     async def test_float_lesser_than_success(self):
         """Test that 3.14 < 5.0 passes."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
-        check = LesserThan(
+        check = LessThan(
             expected_value=5.0,
             key="trace.interactions[-1].outputs",
         )
@@ -89,7 +94,7 @@ class TestLesserThan:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="apple")
         )
-        check = LesserThan(
+        check = LessThan(
             expected_value="banana",
             key="trace.interactions[-1].outputs",
         )
@@ -104,7 +109,7 @@ class TestLesserThan:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="banana")
         )
-        check = LesserThan(
+        check = LessThan(
             expected_value="apple",
             key="trace.interactions[-1].outputs",
         )
@@ -115,11 +120,11 @@ class TestLesserThan:
         assert result.failed
 
     async def test_missing_key(self):
-        """Test LesserThan check when the key is missing from trace."""
+        """Test LessThan check when the key is missing from trace."""
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs={"other": "value"})
         )
-        check = LesserThan(
+        check = LessThan(
             expected_value=10,
             key="trace.interactions[-1].outputs.missing",
         )
@@ -132,11 +137,11 @@ class TestLesserThan:
         assert result.message is not None
 
     async def test_nested_outputs(self):
-        """Test LesserThan check with nested outputs."""
+        """Test LessThan check with nested outputs."""
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs={"value": 5})
         )
-        check = LesserThan(
+        check = LessThan(
             expected_value=10,
             key="trace.interactions[-1].outputs.value",
         )
@@ -148,9 +153,9 @@ class TestLesserThan:
         assert result.details["actual_value"] == 5
 
     async def test_typeerror_incompatible_types(self):
-        """Test LesserThan with incompatible types (string vs int)."""
+        """Test LessThan with incompatible types (string vs int)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="5"))
-        check = LesserThan(
+        check = LessThan(
             expected_value=10,
             key="trace.interactions[-1].outputs",
         )
@@ -164,11 +169,11 @@ class TestLesserThan:
         assert result.message is not None
 
     async def test_typeerror_missing_method(self):
-        """Test LesserThan with object that doesn't implement __lt__."""
+        """Test LessThan with object that doesn't implement __lt__."""
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs=object())
         )
-        check = LesserThan(
+        check = LessThan(
             expected_value=10,
             key="trace.interactions[-1].outputs",
         )
@@ -282,13 +287,13 @@ class TestGreaterThan:
         assert "> comparison" in result.message
 
 
-class TestLesserThanEquals:
-    """Test LesserThanEquals check."""
+class TestLessThanEquals:
+    """Test LessThanEquals check."""
 
     async def test_number_lesser_than_equals_success_less(self):
         """Test that 5 <= 10 passes (less than case)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
-        check = LesserThanEquals(
+        check = LessThanEquals(
             expected_value=10,
             key="trace.interactions[-1].outputs",
         )
@@ -303,7 +308,7 @@ class TestLesserThanEquals:
     async def test_number_lesser_than_equals_success_equal(self):
         """Test that 5 <= 5 passes (equal case)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
-        check = LesserThanEquals(
+        check = LessThanEquals(
             expected_value=5,
             key="trace.interactions[-1].outputs",
         )
@@ -318,7 +323,7 @@ class TestLesserThanEquals:
     async def test_number_lesser_than_equals_failure(self):
         """Test that 10 <= 5 fails."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
-        check = LesserThanEquals(
+        check = LessThanEquals(
             expected_value=5,
             key="trace.interactions[-1].outputs",
         )
@@ -337,7 +342,7 @@ class TestLesserThanEquals:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="apple")
         )
-        check = LesserThanEquals(
+        check = LessThanEquals(
             expected_value="banana",
             key="trace.interactions[-1].outputs",
         )
@@ -352,7 +357,7 @@ class TestLesserThanEquals:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="apple")
         )
-        check = LesserThanEquals(
+        check = LessThanEquals(
             expected_value="apple",
             key="trace.interactions[-1].outputs",
         )
@@ -363,9 +368,9 @@ class TestLesserThanEquals:
         assert result.passed
 
     async def test_typeerror_incompatible_types(self):
-        """Test LesserThanEquals with incompatible types (string vs int)."""
+        """Test LessThanEquals with incompatible types (string vs int)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="5"))
-        check = LesserThanEquals(
+        check = LessThanEquals(
             expected_value=10,
             key="trace.interactions[-1].outputs",
         )
@@ -381,11 +386,11 @@ class TestLesserThanEquals:
         assert "<= comparison" in result.message
 
     async def test_typeerror_missing_method(self):
-        """Test LesserThanEquals with object that doesn't implement __le__."""
+        """Test LessThanEquals with object that doesn't implement __le__."""
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs=object())
         )
-        check = LesserThanEquals(
+        check = LessThanEquals(
             expected_value=10,
             key="trace.interactions[-1].outputs",
         )
@@ -520,9 +525,9 @@ class TestComparisonEdgeCases:
     """Test edge cases for comparison checks."""
 
     async def test_none_value_lesser_than(self):
-        """Test LesserThan with None values."""
+        """Test LessThan with None values."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
-        check = LesserThan(
+        check = LessThan(
             expected_value=10,
             key="trace.interactions[-1].outputs",
         )
@@ -555,7 +560,7 @@ class TestComparisonEdgeCases:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs=[1, 2, 3])
         )
-        check = LesserThan(
+        check = LessThan(
             expected_value="abc",
             key="trace.interactions[-1].outputs",
         )
@@ -591,7 +596,7 @@ class TestComparisonEdgeCases:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs=ComparableValue(5))
         )
-        check = LesserThan(
+        check = LessThan(
             expected_value=ComparableValue(10),
             key="trace.interactions[-1].outputs",
         )
@@ -614,7 +619,7 @@ class TestComparisonEdgeCases:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs=ComparableValue(5))
         )
-        check = LesserThan(
+        check = LessThan(
             expected_value=10,  # int, not ComparableValue
             key="trace.interactions[-1].outputs",
         )
@@ -627,12 +632,12 @@ class TestComparisonEdgeCases:
         assert "Comparison not supported" in result.message
 
     async def test_wildcard_expression_with_list(self):
-        """Test LesserThan with wildcard expression returning a list."""
+        """Test LessThan with wildcard expression returning a list."""
         trace = await Trace.from_interactions(
             Interaction(inputs="test1", outputs=5),
             Interaction(inputs="test2", outputs=3),
         )
-        check = LesserThan(
+        check = LessThan(
             expected_value=[10, 10],  # Expected list
             key="trace.interactions[*].outputs",
         )
@@ -645,12 +650,12 @@ class TestComparisonEdgeCases:
         assert isinstance(result.details["actual_value"], list)
 
     async def test_single_index_expression(self):
-        """Test LesserThan with single index expression."""
+        """Test LessThan with single index expression."""
         trace = await Trace.from_interactions(
             Interaction(inputs="test1", outputs=5),
             Interaction(inputs="test2", outputs=15),
         )
-        check = LesserThan(
+        check = LessThan(
             expected_value=10,
             key="trace.interactions[-1].outputs",
         )
@@ -909,7 +914,7 @@ class TestComparisonSentinelDefault:
 
     @pytest.mark.parametrize(
         "check_cls",
-        [Equals, GreaterThan, LesserThan, GreaterEquals, LesserThanEquals, NotEquals],
+        [Equals, GreaterThan, LessThan, GreaterEquals, LessThanEquals, NotEquals],
     )
     def test_omitting_both_raises(self, check_cls):
         """Omitting both expected_value and expected_value_key must raise ValueError."""
@@ -937,3 +942,39 @@ class TestComparisonSentinelDefault:
                 expected_value=42,
                 expected_value_key="trace.last.metadata.expected",
             )
+
+
+class TestLessThanBackwardCompat:
+    """Backward compatibility for deprecated LesserThan names and kind strings."""
+
+    def test_less_than_serialises_with_new_kind(self):
+        check = LessThan(expected_value=10, key="trace.last.outputs")
+        assert check.model_dump()["kind"] == "less_than"
+
+    def test_lesser_than_serialises_with_legacy_kind(self):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", DeprecationWarning)
+            check = LesserThan(expected_value=10, key="trace.last.outputs")
+        assert len(caught) == 1
+        assert "LesserThan is deprecated" in str(caught[0].message)
+        assert check.model_dump()["kind"] == "lesser_than"
+
+    def test_lesser_than_kind_deserialises(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            original = LesserThan(expected_value=10, key="trace.last.outputs")
+        restored = Check.model_validate(original.model_dump())
+        assert isinstance(restored, LesserThan)
+        assert restored.kind == "lesser_than"
+
+    def test_less_than_equals_serialises_with_new_kind(self):
+        check = LessThanEquals(expected_value=10, key="trace.last.outputs")
+        assert check.model_dump()["kind"] == "less_than_equals"
+
+    def test_lesser_than_equals_kind_deserialises(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            original = LesserThanEquals(expected_value=10, key="trace.last.outputs")
+        restored = Check.model_validate(original.model_dump())
+        assert isinstance(restored, LesserThanEquals)
+        assert restored.kind == "lesser_than_equals"
