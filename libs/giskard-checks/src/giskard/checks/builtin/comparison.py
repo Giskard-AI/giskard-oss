@@ -12,6 +12,7 @@ from ..core.result import CheckResult
 from ..utils.normalization import NormalizationForm, normalize_data
 
 MatchMode = Literal["any", "all", "none"]
+type MatchCollection[T] = list[T] | set[T] | tuple[T, ...]
 
 
 class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
@@ -153,7 +154,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         expected_value: ExpectedType,
         details: dict[str, Any],
     ) -> CheckResult:
-        if not isinstance(actual_value, list | set | tuple):
+        if not isinstance(actual_value, (list, set, tuple)):
             return CheckResult.failure(
                 message=(
                     f"Expected a list, set, or tuple at key '{self.key}' when match is "
@@ -162,13 +163,14 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
                 details=details,
             )
 
+        collection: MatchCollection[Any] = actual_value
         normalized_expected = normalize_data(expected_value, self.normalization_form)
         comparison_results: list[bool | None] = []
         matched_items: list[Any] = []
-        for item in actual_value:
+        for item in collection:
             result = self._try_compare_to_normalized_expected(item, normalized_expected)
             comparison_results.append(result)
-            if result is True:
+            if result:
                 matched_items.append(item)
 
         if any(result is None for result in comparison_results):
@@ -189,14 +191,14 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         if passed:
             return CheckResult.success(
                 message=self._collection_match_message(
-                    True, actual_value, expected_value
+                    passed, actual_value, expected_value
                 ),
                 details=details,
             )
 
         return CheckResult.failure(
             message=self._collection_match_message(
-                False,
+                passed,
                 actual_value,
                 expected_value,
                 matched_items if self.match == "none" else None,
