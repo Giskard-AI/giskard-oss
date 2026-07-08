@@ -1,11 +1,68 @@
-from giskard.agents import BaseEmbeddingModel, BaseGenerator, EmbeddingModel, Generator
+"""Runtime and environment configuration for giskard-checks."""
 
-# Global default generator
+from giskard.agents import BaseGenerator, EmbeddingModel, Generator
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Runtime override (takes precedence over environment settings)
 _default_generator: BaseGenerator | None = None
-_default_embedding_model: BaseEmbeddingModel | None = None
+
+DEFAULT_MODEL = "openai/gpt-4o-mini"
+DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
+MAX_REPORTED_FAILURES_ENV_VAR = "GISKARD_CHECKS_MAX_REPORTED_FAILURES"
 
 
-def set_default_generator(generator: "BaseGenerator") -> None:
+class GiskardChecksSettings(BaseSettings):
+    """Environment-backed settings for giskard-checks.
+
+    Values can be set via environment variables prefixed with ``GISKARD_CHECKS_``
+    or in a ``.env`` file at the project root.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="GISKARD_CHECKS_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    default_model: str = Field(
+        default=DEFAULT_MODEL,
+        description="Default LLM model identifier for checks without an explicit generator.",
+    )
+    default_embedding_model: str = Field(
+        default=DEFAULT_EMBEDDING_MODEL,
+        description="Default embedding model identifier for checks without an explicit model.",
+    )
+    disable_rich_pretty: bool = Field(
+        default=False,
+        description="Disable rich.pretty installation for REPL output.",
+    )
+    max_reported_failures: int | None = Field(
+        default=None,
+        description="Maximum number of failures to include in suite reports. None means unlimited.",
+    )
+
+    @field_validator("max_reported_failures", mode="before")
+    @classmethod
+    def _normalize_max_reported_failures(cls, value: object) -> int | None:
+        if value is None or value == "" or isinstance(value, bool):
+            return None
+        if not isinstance(value, (int, str)):
+            return None
+        try:
+            parsed = int(value)
+        except ValueError:
+            return None
+        return parsed if parsed >= 0 else None
+
+
+def get_settings() -> GiskardChecksSettings:
+    """Return settings loaded from the environment."""
+    return GiskardChecksSettings()
+
+
+def set_default_generator(generator: BaseGenerator) -> None:
     """Set the default LLM generator for all checks.
 
     Parameters
@@ -23,31 +80,21 @@ def get_default_generator() -> BaseGenerator:
     Returns
     -------
     BaseGenerator
-        The current default generator, or a default GPT-4o-mini generator
-        if none has been set.
+        The runtime override if set, otherwise a generator built from
+        :envvar:`GISKARD_CHECKS_DEFAULT_MODEL`, or a default GPT-4o-mini generator.
     """
-    return _default_generator or Generator(model="openai/gpt-4o-mini")
+    if _default_generator is not None:
+        return _default_generator
+    return Generator(model=get_settings().default_model)
 
 
-def set_default_embedding_model(embedding_model: "BaseEmbeddingModel") -> None:
-    """Set the default embedding model for all checks.
-
-    Parameters
-    ----------
-    embedding_model : BaseEmbeddingModel
-        The embedding model to use as default for all embedding checks.
-    """
-    global _default_embedding_model
-    _default_embedding_model = embedding_model
-
-
-def get_default_embedding_model() -> BaseEmbeddingModel:
+def get_default_embedding_model() -> EmbeddingModel:
     """Get the current default embedding model.
 
     Returns
     -------
-    BaseEmbeddingModel
-        The current default embedding model, or a default text-embedding-3-small model
-        if none has been set.
+    EmbeddingModel
+        A model built from :envvar:`GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL`,
+        or text-embedding-3-small by default.
     """
-    return _default_embedding_model or EmbeddingModel(model="text-embedding-3-small")
+    return EmbeddingModel(model=get_settings().default_embedding_model)
