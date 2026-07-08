@@ -1,6 +1,7 @@
 """Adapter that runs garak through Giskard scan scenarios."""
 
 import asyncio
+import concurrent.futures
 import logging
 import time
 from collections import defaultdict
@@ -355,13 +356,25 @@ class GarakScanAdapter:
 
         loop = asyncio.get_running_loop()
         start_time = time.perf_counter()
-        async with asyncio.TaskGroup() as task_group:
-            tasks = [
-                task_group.create_task(
-                    asyncio.to_thread(self._run_probe_isolated, probe, target, loop)
-                )
-                for probe in probes
-            ]
+
+        async def _run_on_executor(
+            executor: concurrent.futures.ThreadPoolExecutor, probe: "Probe"
+        ) -> list[ScenarioResult[TraceType]]:
+            return await loop.run_in_executor(
+                executor, self._run_probe_isolated, probe, target, loop
+            )
+
+        probe_executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=max(len(probes), 1)
+        )
+        try:
+            async with asyncio.TaskGroup() as task_group:
+                tasks = [
+                    task_group.create_task(_run_on_executor(probe_executor, probe))
+                    for probe in probes
+                ]
+        finally:
+            probe_executor.shutdown(wait=False)
 
         # Results are only available once the TaskGroup has exited and every
         # task has completed; reading task.result() inside the block would hit
