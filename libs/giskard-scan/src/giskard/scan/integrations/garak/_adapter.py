@@ -364,17 +364,21 @@ class GarakScanAdapter:
                 executor, self._run_probe_isolated, probe, target, loop
             )
 
-        probe_executor = concurrent.futures.ThreadPoolExecutor(
+        # A dedicated pool with one thread per probe: each probe worker blocks on
+        # the scan loop via run_coroutine_threadsafe (see _generator._call_model),
+        # and for a structured target that loop-bound coroutine issues an LLM call
+        # whose own work needs a pool thread. Sharing asyncio.to_thread's default
+        # executor (min(32, cpu+4) threads) lets probe workers fill it and deadlock
+        # — all blocked on the loop while the loop waits for a free thread. The
+        # TaskGroup joins every probe before the executor's __exit__ shuts it down.
+        with concurrent.futures.ThreadPoolExecutor(
             max_workers=max(len(probes), 1)
-        )
-        try:
+        ) as probe_executor:
             async with asyncio.TaskGroup() as task_group:
                 tasks = [
                     task_group.create_task(_run_on_executor(probe_executor, probe))
                     for probe in probes
                 ]
-        finally:
-            probe_executor.shutdown(wait=False)
 
         # Results are only available once the TaskGroup has exited and every
         # task has completed; reading task.result() inside the block would hit
