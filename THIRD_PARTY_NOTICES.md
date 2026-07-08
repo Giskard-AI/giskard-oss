@@ -17,7 +17,6 @@ Find a list of packages below
 |✔|aiohappyeyeballs|
 |✔|aiohttp|
 |✔|aiosignal|
-|✔|annotated-doc|
 |✔|annotated-types|
 |✔|anthropic|
 |✔|anyio|
@@ -78,13 +77,11 @@ Find a list of packages below
 |✔|requests|
 |✔|rich|
 |✔|rpds-py|
-|✔|shellingham|
 |✔|sniffio|
 |✔|tenacity|
 |✔|tiktoken|
 |✔|tokenizers|
 |✔|tqdm|
-|✔|typer|
 |✔|typing-extensions|
 |✔|typing-inspection|
 |✔|urllib3|
@@ -111,13 +108,6 @@ Find a list of packages below
 - HomePage: https://github.com/aio-libs/aiosignal
 - Author:
 - License: Apache Software License
-- Compatible: True
-
-### annotated-doc-0.0.4
-
-- HomePage:
-- Author: =?utf-8?q?Sebasti=C3=A1n_Ram=C3=ADrez?=
-- License: MIT
 - Compatible: True
 
 ### annotated-types-0.7.0
@@ -540,13 +530,6 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### shellingham-1.5.4
-
-- HomePage: https://github.com/sarugaku/shellingham
-- Author: Tzu-ping Chung
-- License: ISC License _ISCL_
-- Compatible: True
-
 ### sniffio-1.3.1
 
 - HomePage:
@@ -580,13 +563,6 @@ Find a list of packages below
 - HomePage:
 - Author:
 - License: MIT;; MPL-2.0
-- Compatible: True
-
-### typer-0.25.1
-
-- HomePage:
-- Author: Sebastián Ramírez
-- License: MIT
 - Compatible: True
 
 ### typing-extensions-4.15.0

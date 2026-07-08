@@ -197,3 +197,65 @@ def test_from_google_empty_candidates():
     out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
     assert out.choices == []
     assert out.model == _MODEL
+
+
+def test_from_google_max_tokens_maps_to_length():
+    """A ``MAX_TOKENS`` finish reason maps to ``length``.
+
+    Regression: ``candidate.finish_reason`` round-trips through
+    ``model_validate`` as a ``FinishReason`` enum whose ``str()`` is
+    ``"FinishReason.MAX_TOKENS"``. Keying the map on ``str(enum)`` silently
+    missed and collapsed every non-STOP reason to ``"stop"``.
+    """
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "truncated"}]},
+                    "finish_reason": "MAX_TOKENS",
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].finish_reason == "length"
+
+
+def test_from_google_safety_maps_to_refusal():
+    """A ``SAFETY`` finish reason maps to ``refusal`` (not the default ``stop``)."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "blocked"}]},
+                    "finish_reason": "SAFETY",
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].finish_reason == "refusal"
+    # The refusal text must be a clean reason string, never "FinishReason.SAFETY".
+    assert out.choices[0].message.refusal == "SAFETY"
+
+
+def test_from_google_refusal_uses_finish_message_when_present():
+    """When Gemini supplies a ``finish_message``, it becomes the refusal text.
+
+    The reason code (``SAFETY``) is only the fallback; the human-readable
+    ``finish_message`` takes precedence so callers surface Gemini's explanation.
+    """
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "blocked"}]},
+                    "finish_reason": "SAFETY",
+                    "finish_message": "Blocked for safety.",
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].finish_reason == "refusal"
+    assert out.choices[0].message.refusal == "Blocked for safety."

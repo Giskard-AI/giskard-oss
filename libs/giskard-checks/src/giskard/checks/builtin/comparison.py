@@ -1,6 +1,6 @@
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Self, override
+from typing import Any, Literal, Self, override
 
 from pydantic import Field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
@@ -10,6 +10,9 @@ from ..core.check import Check
 from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve, resolve
 from ..core.result import CheckResult
 from ..utils.normalization import NormalizationForm, normalize_data
+
+MatchMode = Literal["any", "all", "none"]
+type MatchCollection[T] = list[T] | set[T] | tuple[T, ...]
 
 
 class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
@@ -48,6 +51,15 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         default="NFKC",
         description="Unicode normalization form to apply before comparison. Defaults to NFKC.",
     )
+    match: MatchMode | MISSING = Field(
+        default=MISSING,
+        description=(
+            "How to apply the comparison when the resolved actual value is a collection. "
+            "When omitted, the resolved value is compared directly. "
+            "'any' passes if at least one item matches, 'all' if every item matches, "
+            "'none' if no item matches. Requires a list, set, or tuple."
+        ),
+    )
 
     @abstractmethod
     def _compare(self, actual_value: Any, expected_value: ExpectedType) -> bool:
@@ -74,6 +86,125 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
                 "Exactly one of 'expected_value' or 'expected_value_key' must be provided"
             )
         return self
+
+    def _compare_normalized(
+        self, normalized_actual: Any, normalized_expected: ExpectedType
+    ) -> bool | None:
+        try:
+            return self._compare(normalized_actual, normalized_expected)
+        except Exception:
+            return None
+
+    def _try_compare(
+        self, actual_value: Any, expected_value: ExpectedType
+    ) -> bool | None:
+        return self._compare_normalized(
+            normalize_data(actual_value, self.normalization_form),
+            normalize_data(expected_value, self.normalization_form),
+        )
+
+    def _try_compare_to_normalized_expected(
+        self, actual_value: Any, normalized_expected: ExpectedType
+    ) -> bool | None:
+        return self._compare_normalized(
+            normalize_data(actual_value, self.normalization_form),
+            normalized_expected,
+        )
+
+    def _unsupported_comparison_message(
+        self, actual_value: Any, expected_value: ExpectedType
+    ) -> str:
+        return (
+            f"Comparison not supported: items in {type(actual_value).__name__} "
+            f"do not support {self._operator_symbol} comparison with "
+            f"{type(expected_value).__name__}"
+        )
+
+    def _collection_match_message(
+        self,
+        passed: bool,
+        actual_value: Any,
+        expected_value: ExpectedType,
+        matched_items: list[Any] | None = None,
+    ) -> str:
+        actual_repr = repr(actual_value)
+        expected_repr = repr(expected_value)
+        comparison = self._comparison_message
+        if self.match == "any":
+            if passed:
+                return f"At least one value in {actual_repr} is {comparison} {expected_repr}."
+            return (
+                f"Expected at least one value {comparison} {expected_repr} "
+                f"but none matched in {actual_repr}."
+            )
+        if self.match == "all":
+            if passed:
+                return f"All values in {actual_repr} are {comparison} {expected_repr}."
+            return f"Expected all values {comparison} {expected_repr} but got {actual_repr}."
+        if passed:
+            return f"No value in {actual_repr} is {comparison} {expected_repr}."
+        return (
+            f"Expected no value {comparison} {expected_repr} "
+            f"but found matches in {repr(matched_items)}."
+        )
+
+    def _run_collection_match(
+        self,
+        actual_value: Any,
+        expected_value: ExpectedType,
+        details: dict[str, Any],
+    ) -> CheckResult:
+        if not isinstance(actual_value, (list, set, tuple)):
+            return CheckResult.failure(
+                message=(
+                    f"Expected a list, set, or tuple at key '{self.key}' when match is "
+                    f"{self.match!r}, but got {type(actual_value).__name__}."
+                ),
+                details=details,
+            )
+
+        collection: MatchCollection[Any] = actual_value
+        normalized_expected = normalize_data(expected_value, self.normalization_form)
+        comparison_results: list[bool | None] = []
+        matched_items: list[Any] = []
+        for item in collection:
+            result = self._try_compare_to_normalized_expected(item, normalized_expected)
+            comparison_results.append(result)
+            if result:
+                matched_items.append(item)
+
+        if any(result is None for result in comparison_results):
+            return CheckResult.failure(
+                message=self._unsupported_comparison_message(
+                    actual_value, expected_value
+                ),
+                details=details,
+            )
+
+        if self.match == "any":
+            passed = any(comparison_results)
+        elif self.match == "all":
+            passed = all(comparison_results)
+        else:
+            passed = not any(comparison_results)
+
+        if passed:
+            return CheckResult.success(
+                message=self._collection_match_message(
+                    passed, actual_value, expected_value
+                ),
+                details=details,
+            )
+
+        return CheckResult.failure(
+            message=self._collection_match_message(
+                passed,
+                actual_value,
+                expected_value,
+                matched_items if self.match == "none" else None,
+            ),
+            details=details,
+        )
 
     @override
     async def run(self, trace: TraceType) -> CheckResult:
@@ -102,19 +233,18 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
                 details=details,
             )
 
-        normalized_actual_value = normalize_data(actual_value, self.normalization_form)
-        normalized_expected_value = normalize_data(
-            expected_value, self.normalization_form
-        )
-        try:
-            if self._compare(normalized_actual_value, normalized_expected_value):
-                return CheckResult.success(
-                    message=f"The actual value {repr(actual_value)} is {self._comparison_message} the expected value {repr(expected_value)}.",
-                    details=details,
-                )
-        except Exception:
+        if self.match is not MISSING:
+            return self._run_collection_match(actual_value, expected_value, details)
+
+        compare_result = self._try_compare(actual_value, expected_value)
+        if compare_result is None:
             return CheckResult.failure(
                 message=f"Comparison not supported: {type(actual_value).__name__} does not support {self._operator_symbol} comparison with {type(expected_value).__name__}",
+                details=details,
+            )
+        if compare_result:
+            return CheckResult.success(
+                message=f"The actual value {repr(actual_value)} is {self._comparison_message} the expected value {repr(expected_value)}.",
                 details=details,
             )
 
