@@ -136,8 +136,20 @@ def _detector_class(name: str) -> "type[Detector] | None":
 
 
 def _resolve_detectors(
-    probe: "Probe", loop: "asyncio.AbstractEventLoop | None"
+    probe: "Probe",
+    loop: "asyncio.AbstractEventLoop | None",
+    cache: "dict[str, Detector] | None" = None,
 ) -> "tuple[list[tuple[str, Detector]], list[_SkipMarker]]":
+    """Resolve a probe's detectors, reusing any already in ``cache``.
+
+    Detectors download at construction time — ``HFDetector.__init__`` pulls model
+    weights from the Hub — so building the same detector once per probe both
+    re-downloads and, when probes run in parallel, races on the HF cache. A shared
+    ``cache`` keyed by detector name builds each distinct detector exactly once and
+    lets every probe reuse the instance. Both plain and judge detectors go through
+    the cache (garak's own ``PluginProvider`` dedups plain detectors by class but
+    not judge detectors, which we build out-of-band).
+    """
     from garak._plugins import load_plugin
     from garak.detectors.judge import ModelAsJudge
     from garak.exception import APIKeyMissingError, GarakException
@@ -151,26 +163,29 @@ def _resolve_detectors(
     detectors: list[tuple[str, Detector]] = []
     skipped: list[_SkipMarker] = []
     for name in detector_names:
+        if cache is not None and name in cache:
+            detectors.append((name, cache[name]))
+            continue
+
         full_name = f"detectors.{name}"
         detector_cls = _detector_class(name)
 
         # Judge detectors: install the Giskard generator so no judge key is needed.
         if detector_cls is not None and issubclass(detector_cls, ModelAsJudge):
-            detectors.append(
-                (
-                    name,
-                    cast(
-                        "Detector",
-                        make_judge_detector(
-                            detector_cls, get_default_generator(), loop
-                        ),
-                    ),
-                )
+            judge = cast(
+                "Detector",
+                make_judge_detector(detector_cls, get_default_generator(), loop),
             )
+            if cache is not None:
+                cache[name] = judge
+            detectors.append((name, judge))
             continue
 
         try:
-            detectors.append((name, cast("Detector", load_plugin(full_name))))
+            detector = cast("Detector", load_plugin(full_name))
+            if cache is not None:
+                cache[name] = detector
+            detectors.append((name, detector))
         except GarakException as exc:
             cause = exc.__cause__
             if isinstance(cause, APIKeyMissingError):
@@ -293,11 +308,12 @@ class GarakScanAdapter:
         probe: "Probe",
         target: Target[InputType, OutputType, TraceType],
         loop: asyncio.AbstractEventLoop,
+        detectors: "list[tuple[str, Detector]]",
+        skipped_detectors: "list[_SkipMarker]",
     ) -> list[ScenarioResult[TraceType]]:
         from ._generator import TargetGenerator
 
         generator = TargetGenerator(target=target, loop=loop)
-        detectors, skipped_detectors = _resolve_detectors(probe, loop)
 
         attempts = probe.probe(generator)
         scenario_results = []
@@ -325,9 +341,11 @@ class GarakScanAdapter:
         probe: "Probe",
         target: Target[InputType, OutputType, TraceType],
         loop: asyncio.AbstractEventLoop,
+        detectors: "list[tuple[str, Detector]]",
+        skipped_detectors: "list[_SkipMarker]",
     ) -> list[ScenarioResult[TraceType]]:
         try:
-            return self._run_probe(probe, target, loop)
+            return self._run_probe(probe, target, loop, detectors, skipped_detectors)
         except Exception as exc:  # noqa: BLE001 — probe errors are ignored per spec
             logger.warning("Probe %s raised: %s", probe.probename, exc)
             return []
@@ -355,12 +373,37 @@ class GarakScanAdapter:
 
         loop = asyncio.get_running_loop()
         start_time = time.perf_counter()
+
+        # Resolve every probe's detectors sequentially, before the parallel run.
+        # Detectors download at construction (HFDetector.__init__ pulls model
+        # weights); building them from the parallel probe threads races on the HF
+        # cache and can hang. The shared cache also builds each distinct detector
+        # once and reuses the instance across probes.
+        detector_cache: dict[str, Detector] = {}
+        resolved: list[tuple[Probe, list[tuple[str, Detector]], list[_SkipMarker]]] = []
+        for probe in probes:
+            try:
+                detectors, skipped = _resolve_detectors(probe, loop, detector_cache)
+            except Exception as exc:  # noqa: BLE001 — one bad probe must not abort the scan
+                logger.warning(
+                    "Resolving detectors for probe %s raised: %s", probe.probename, exc
+                )
+                continue
+            resolved.append((probe, detectors, skipped))
+
         async with asyncio.TaskGroup() as task_group:
             tasks = [
                 task_group.create_task(
-                    asyncio.to_thread(self._run_probe_isolated, probe, target, loop)
+                    asyncio.to_thread(
+                        self._run_probe_isolated,
+                        probe,
+                        target,
+                        loop,
+                        detectors,
+                        skipped,
+                    )
                 )
-                for probe in probes
+                for probe, detectors, skipped in resolved
             ]
 
         # Results are only available once the TaskGroup has exited and every

@@ -29,7 +29,7 @@ def _patch_resolvers(monkeypatch: pytest.MonkeyPatch, probes, detectors):
 
     monkeypatch.setattr(_adapter, "_resolve_probes", lambda probes_arg: probes)
     monkeypatch.setattr(
-        _adapter, "_resolve_detectors", lambda probe, loop: (detectors, [])
+        _adapter, "_resolve_detectors", lambda probe, loop, cache=None: (detectors, [])
     )
     return _adapter.GarakScanAdapter
 
@@ -279,6 +279,91 @@ async def test_run_marks_missing_detector_scores_as_skip(
         result.results[1].steps[0].results[0].message
         == "no detector score for this conversation"
     )
+
+
+class _RecordingProbe:
+    """Probe that logs a (phase, name) event when its .probe() runs."""
+
+    tags: list[str] = []
+
+    def __init__(self, name: str, log: list[tuple[str, str]]) -> None:
+        self.probename = name
+        self._log = log
+
+    def probe(self, generator: object) -> list[Attempt]:
+        self._log.append(("probe", self.probename))
+        return [_attempt(self.probename)]
+
+
+async def test_run_resolves_all_detectors_before_running_any_probe(
+    monkeypatch: pytest.MonkeyPatch, target
+) -> None:
+    """Detector construction is serialized before the parallel probe run.
+
+    HF-backed detectors download at construction time; doing that from the
+    parallel probe threads races on the HF cache. So every probe's detectors
+    must be resolved before the first probe's .probe() executes.
+    """
+    from giskard.scan.integrations.garak import _adapter
+
+    log: list[tuple[str, str]] = []
+
+    def fake_resolve(probe, loop, cache=None):
+        log.append(("resolve", probe.probename))
+        return ([("fake.Detector", _FakeDetector(score=0.1))], [])
+
+    monkeypatch.setattr(
+        _adapter, "_resolve_probes", lambda probes_arg: probes_arg or []
+    )
+    monkeypatch.setattr(_adapter, "_resolve_detectors", fake_resolve)
+
+    probes = [_RecordingProbe(f"p{i}", log) for i in range(3)]
+    await _adapter.GarakScanAdapter().run(target=target, probes=probes)
+
+    resolve_count = sum(1 for phase, _ in log if phase == "resolve")
+    first_probe_at = next(i for i, (phase, _) in enumerate(log) if phase == "probe")
+    resolves_before_first_probe = sum(
+        1 for phase, _ in log[:first_probe_at] if phase == "resolve"
+    )
+    assert resolve_count == 3
+    assert resolves_before_first_probe == 3, (
+        f"expected all 3 detector resolutions before the first probe ran, "
+        f"got {resolves_before_first_probe}; log={log}"
+    )
+
+
+def test_resolve_detectors_reuses_shared_cache() -> None:
+    """A detector name already in the shared cache is not rebuilt.
+
+    Reusing one instance across probes avoids re-downloading the same HF model
+    (HFDetector.__init__ pulls weights from the Hub) per probe.
+    """
+    from giskard.scan.integrations.garak import _adapter
+
+    build_calls: list[str] = []
+
+    def fake_load_plugin(full_name: str):
+        build_calls.append(full_name)
+        return _FakeDetector(score=0.1)
+
+    class _Probe:
+        primary_detector = "shared.Detector"
+        extended_detectors: list[str] = []
+
+    cache: dict[str, object] = {}
+    import garak._plugins as garak_plugins
+
+    original = garak_plugins.load_plugin
+    garak_plugins.load_plugin = fake_load_plugin
+    try:
+        first, _ = _adapter._resolve_detectors(_Probe(), None, cache=cache)
+        second, _ = _adapter._resolve_detectors(_Probe(), None, cache=cache)
+    finally:
+        garak_plugins.load_plugin = original
+
+    # Built once, reused the second time; both probes get the same instance.
+    assert build_calls == ["detectors.shared.Detector"]
+    assert first[0][1] is second[0][1]
 
 
 async def test_run_warns_and_drops_extra_detector_scores(

@@ -179,7 +179,7 @@ def _patch_resolvers(monkeypatch: pytest.MonkeyPatch, probes, detectors):
 
     monkeypatch.setattr(_adapter, "_resolve_probes", lambda probes_arg: probes)
     monkeypatch.setattr(
-        _adapter, "_resolve_detectors", lambda probe, loop: (detectors, [])
+        _adapter, "_resolve_detectors", lambda probe, loop, cache=None: (detectors, [])
     )
     return _adapter.GarakScanAdapter
 
