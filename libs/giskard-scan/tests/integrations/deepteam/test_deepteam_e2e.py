@@ -36,19 +36,36 @@ class _FakeRiskAssessment:
 
 
 async def test_third_party_scan_deepteam_end_to_end(monkeypatch):
+    import asyncio
+
     import deepteam
 
     def fake_red_team(**kwargs):
-        # Drive the callback once so the uuid cache is populated like a real run.
-        return _FakeRiskAssessment()
+        # Drive the real bridge callback once so the uuid cache is populated the
+        # way a real run would, then hand back a test case whose turns carry the
+        # stamped assistant RTTurn. This exercises the true
+        # entry-point -> adapter -> callback -> Trace -> _trace_for path, not just
+        # a static fixture.
+        callback = kwargs["model_callback"]
+        # fake_red_team runs inside asyncio.to_thread (a worker thread with no
+        # running loop), so asyncio.run is the right primitive to drive the
+        # async callback here.
+        turn = asyncio.run(callback("attack"))
+        case = _FakeRTTestCase()
+        case.turns = [turn]
+        assessment = _FakeRiskAssessment()
+        assessment.test_cases = [case]
+        return assessment
 
-    monkeypatch.setattr(deepteam, "red_team", fake_red_team)
-    # The adapter imports red_team via `from deepteam import red_team`, so patch
-    # the name it will bind. Patch the module attribute BEFORE the call.
-    monkeypatch.setattr("deepteam.red_team", fake_red_team, raising=False)
+    # The adapter binds red_team via `from deepteam import red_team` inside run(),
+    # so patch the module attribute it will resolve at call time.
+    monkeypatch.setattr(deepteam, "red_team", fake_red_team, raising=False)
+
+    def target(inputs: str) -> str:
+        return "refusal"
 
     result = await third_party_scan(
-        target=lambda x: "refusal",
+        target=target,
         tool="deepteam",
         description="a support agent",
         attacks=["PromptInjection"],

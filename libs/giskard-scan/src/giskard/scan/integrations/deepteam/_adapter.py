@@ -135,9 +135,10 @@ async def _testcase_to_scenario(
         details["tools_called"] = test_case.tools_called
 
     score = getattr(test_case, "score", None)
-    metrics = (
-        [Metric(name=str(vulnerability), value=score)] if score is not None else []
-    )
+    # Name the metric after the vulnerability, falling back to a stable label
+    # when DeepTeam left it unset (avoids a literal "None" metric name).
+    metric_name = str(vulnerability) if vulnerability else "deepteam"
+    metrics = [Metric(name=metric_name, value=score)] if score is not None else []
 
     error = getattr(test_case, "error", None)
     if error is not None:
