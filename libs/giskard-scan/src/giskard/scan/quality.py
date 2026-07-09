@@ -5,6 +5,12 @@ import warnings
 
 from giskard.checks import SuiteResult, Target, Trace
 
+from ._telemetry_props import (
+    generator_type_counts,
+    scan_shape_properties,
+    scan_telemetry_scope,
+    suite_result_properties,
+)
 from .catalog import generate_suite
 from .generators.base import TargetMode
 from .generators.knowledge_base import (
@@ -78,27 +84,51 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         _warn_if_missing_knowledge_base(knowledge_base)
     )
 
+    generators = quality_suite_generator_registry.generators()
     suite = await generate_suite(
         description=description,
         languages=languages,
-        generators=quality_suite_generator_registry.generators(),
+        generators=generators,
         max_scenarios=max_scenarios,
         seed=seed,
         target_mode=target_mode,
         knowledge_base=knowledge_base,
     )
 
-    result: SuiteResult = await suite.run(
-        target,
+    shape_props = scan_shape_properties(
+        scan_type="quality",
+        languages=languages,
+        target_mode=target_mode,
+        max_scenarios=max_scenarios,
+        seed=seed,
+        group_by=group_by,
         parallel=parallel,
         max_concurrency=max_concurrency,
+        generator_count=len(generators),
+        generator_types=generator_type_counts(generators),
+        scenario_count=len(suite.scenarios),
+        knowledge_base_document_count=(
+            len(knowledge_base.documents) if knowledge_base is not None else 0
+        ),
     )
-    try:
-        recommendation = await generate_quality_recommendation(result)
-    except Exception:
-        logger.exception("Quality recommendation generation failed")
-        recommendation = ""
-    quality_result = result.model_copy(update={"recommendation": recommendation})
+
+    with scan_telemetry_scope("quality", shape_props) as finished:
+        result: SuiteResult = await suite.run(
+            target,
+            parallel=parallel,
+            max_concurrency=max_concurrency,
+        )
+
+        try:
+            recommendation = await generate_quality_recommendation(result)
+        except Exception:
+            logger.exception("Quality recommendation generation failed")
+            recommendation = ""
+        quality_result = result.model_copy(update={"recommendation": recommendation})
+
+        finished.update(suite_result_properties(quality_result))
+        finished["has_recommendation"] = bool(recommendation)
+
     quality_result.print_report(group_by=group_by)
     return quality_result
 

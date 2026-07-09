@@ -4,6 +4,13 @@ from typing import Any, Literal
 
 from giskard.checks import SuiteResult, Target, Trace
 
+from .._telemetry_props import (
+    scan_shape_properties,
+    scan_telemetry_scope,
+    suite_result_properties,
+)
+from ..generators.base import TargetMode
+
 
 async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     target: Target[InputType, OutputType, TraceType],
@@ -40,17 +47,32 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
     Returns:
         The completed suite result.
     """
-    if tool == "garak":
-        from .garak import GarakScanAdapter
+    target_mode: TargetMode = kwargs.get("target_mode", "multiturn")
+    probes = kwargs.get("probes")
+    tags = kwargs.get("tags")
+    shape_props = scan_shape_properties(
+        scan_type=tool,
+        languages=languages or [],
+        target_mode=target_mode,
+        third_party_probes=probes,
+        third_party_tags=tags,
+    )
 
-        # Garak has no TargetInfo concept: drop the context args so its
-        # run() signature is unaffected.
-        return await GarakScanAdapter().run(target, **kwargs)
-    elif tool == "lidar":
-        from .lidar import LidarScanAdapter
+    with scan_telemetry_scope(tool, shape_props) as finished:
+        if tool == "garak":
+            from .garak import GarakScanAdapter
 
-        return await LidarScanAdapter().run(
-            target, description=description, languages=languages, **kwargs
-        )
-    else:
-        raise ValueError(f"Unknown tool {tool!r}. Available: ['garak', 'lidar']")
+            # Garak has no TargetInfo concept: drop the context args so its
+            # run() signature is unaffected.
+            result = await GarakScanAdapter().run(target, **kwargs)
+        elif tool == "lidar":
+            from .lidar import LidarScanAdapter
+
+            result = await LidarScanAdapter().run(
+                target, description=description, languages=languages, **kwargs
+            )
+        else:
+            raise ValueError(f"Unknown tool {tool!r}. Available: ['garak', 'lidar']")
+        finished.update(suite_result_properties(result))
+
+    return result
