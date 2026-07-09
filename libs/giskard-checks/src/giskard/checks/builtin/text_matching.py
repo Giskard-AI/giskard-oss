@@ -51,6 +51,41 @@ def _format_str(
     return value
 
 
+def _partition_by_containment(
+    values: list[str],
+    formatted_text: str,
+    normalization_form: NormalizationForm | None,
+    case_sensitive: bool,
+) -> tuple[list[str], list[str]]:
+    """Partition values into matched/missing based on containment in formatted_text.
+
+    Each value is formatted once and classified in a single pass, avoiding the
+    O(N^2) cost of testing list membership per value.
+
+    Parameters
+    ----------
+    values : list[str]
+        The values to check for containment.
+    formatted_text : str
+        The already-formatted text to search within.
+    normalization_form : NormalizationForm | None
+        Unicode normalization form to apply to each value.
+    case_sensitive : bool
+        If False, values are lowercased before comparison.
+
+    Returns
+    -------
+    tuple[list[str], list[str]]
+        The (matched, missing) values, in their original form and order.
+    """
+    matched: list[str] = []
+    missing: list[str] = []
+    for v in values:
+        formatted_v = _format_str(v, normalization_form, case_sensitive)
+        (matched if formatted_v in formatted_text else missing).append(v)
+    return matched, missing
+
+
 class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     Check[InputType, OutputType, TraceType], ABC
 ):
@@ -666,13 +701,9 @@ class ContainsAny[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
         details["case_sensitive"] = self.case_sensitive
 
         formatted_text = _format_str(text, self.normalization_form, self.case_sensitive)
-        matched = [
-            v
-            for v in values
-            if _format_str(v, self.normalization_form, self.case_sensitive)
-            in formatted_text
-        ]
-        missing = [v for v in values if v not in matched]
+        matched, missing = _partition_by_containment(
+            values, formatted_text, self.normalization_form, self.case_sensitive
+        )
 
         details["matched"] = matched
         details["missing"] = missing
@@ -738,13 +769,9 @@ class ContainsAll[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
         details["case_sensitive"] = self.case_sensitive
 
         formatted_text = _format_str(text, self.normalization_form, self.case_sensitive)
-        matched = [
-            v
-            for v in values
-            if _format_str(v, self.normalization_form, self.case_sensitive)
-            in formatted_text
-        ]
-        missing = [v for v in values if v not in matched]
+        matched, missing = _partition_by_containment(
+            values, formatted_text, self.normalization_form, self.case_sensitive
+        )
 
         details["matched"] = matched
         details["missing"] = missing
