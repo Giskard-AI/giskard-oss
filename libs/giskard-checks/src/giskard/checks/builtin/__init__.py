@@ -30,7 +30,7 @@ from .json_valid import JsonValid
 from .nlp_metrics import Readability
 from .rego_policy import RegoPolicy
 from .semantic_similarity import SemanticSimilarity
-from .text_matching import RegexMatching, StringMatching
+from .text_matching import ContainsAll, ContainsAny, RegexMatching, StringMatching
 
 __all__ = [
     "AllOf",
@@ -43,6 +43,8 @@ __all__ = [
     "RegoPolicy",
     "StringMatching",
     "RegexMatching",
+    "ContainsAny",
+    "ContainsAll",
     "Equals",
     "NotEquals",
     "LessThan",
