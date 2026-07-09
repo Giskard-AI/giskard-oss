@@ -9,6 +9,7 @@ from .llm_information_disclosure_detector import LLMInformationDisclosureDetecto
 from .llm_output_formatting_detector import LLMOutputFormattingDetector
 from .llm_prompt_injection_detector import LLMPromptInjectionDetector
 from .llm_stereotypes_detector import LLMStereotypesDetector
+from .llm_numerical_faithfulness_detector import LLMNumericalFaithfulnessDetector
 
 __all__ = [
     "LLMBasicSycophancyDetector",
@@ -19,4 +20,5 @@ __all__ = [
     "LLMOutputFormattingDetector",
     "LLMPromptInjectionDetector",
     "LLMStereotypesDetector",
+    "LLMNumericalFaithfulnessDetector",
 ]
