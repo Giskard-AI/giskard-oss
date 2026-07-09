@@ -187,7 +187,7 @@ def _resolve_detectors(
 
 
 class GarakScanAdapter:
-    """Build and run a Giskard suite from garak probes."""
+    """Build and run a Giskard suite from Garak probes."""
 
     def _evaluate_attempt(
         self,
