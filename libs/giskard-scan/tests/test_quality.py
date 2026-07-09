@@ -227,6 +227,8 @@ async def test_quality_scan_warns_and_skips_empty_raw_knowledge_base(
     captured_knowledge_bases: list[object] = []
 
     class _FakeSuite:
+        scenarios: list[Scenario[Any, Any, Trace[Any, Any]]] = []
+
         async def run(
             self,
             target: object,
@@ -278,6 +280,8 @@ async def test_quality_scan_configures_knowledge_base_generator(
     printed_reports: list[str | None] = []
 
     class _FakeSuite:
+        scenarios: list[Scenario[Any, Any, Trace[Any, Any]]] = []
+
         async def run(
             self,
             target: object,
