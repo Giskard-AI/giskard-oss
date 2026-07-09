@@ -1,13 +1,16 @@
 """Quality scan entry points for giskard.scan."""
 
 import logging
-import time
 import warnings
 
 from giskard.checks import SuiteResult, Target, Trace
-from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
 
-from ._telemetry_props import generator_type_counts, suite_scan_shape_properties
+from ._telemetry_props import (
+    generator_type_counts,
+    scan_shape_properties,
+    scan_telemetry_scope,
+    suite_result_properties,
+)
 from .catalog import generate_suite
 from .generators.base import TargetMode
 from .generators.knowledge_base import (
@@ -82,40 +85,39 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     )
 
     generators = quality_suite_generator_registry.generators()
-    with telemetry_run_context():
-        telemetry_tag("giskard_component", "scan_quality")
-        telemetry_tag("giskard_operation", "quality_scan")
+    suite = await generate_suite(
+        description=description,
+        languages=languages,
+        generators=generators,
+        max_scenarios=max_scenarios,
+        seed=seed,
+        target_mode=target_mode,
+        knowledge_base=knowledge_base,
+    )
 
-        suite = await generate_suite(
-            description=description,
-            languages=languages,
-            generators=generators,
-            max_scenarios=max_scenarios,
-            seed=seed,
-            target_mode=target_mode,
-            knowledge_base=knowledge_base,
-        )
+    shape_props = scan_shape_properties(
+        scan_type="quality",
+        languages=languages,
+        target_mode=target_mode,
+        max_scenarios=max_scenarios,
+        seed=seed,
+        group_by=group_by,
+        parallel=parallel,
+        max_concurrency=max_concurrency,
+        generator_count=len(generators),
+        generator_types=generator_type_counts(generators),
+        scenario_count=len(suite.scenarios),
+        knowledge_base_document_count=(
+            len(knowledge_base.documents) if knowledge_base is not None else 0
+        ),
+    )
 
-        shape_props = suite_scan_shape_properties(
-            scan_kind="quality",
-            language_count=len(languages),
-            target_mode=target_mode,
-            generator_count=len(generators),
-            scenario_count=len(suite.scenarios),
-            generator_types=generator_type_counts(generators),
-            parallel=parallel,
-            max_concurrency=max_concurrency,
-            has_knowledge_base=knowledge_base is not None,
-        )
-        telemetry_capture("scan_quality_run_started", properties=shape_props)
-
-        start_time = time.perf_counter()
+    with scan_telemetry_scope("quality", shape_props) as finished:
         result: SuiteResult = await suite.run(
             target,
             parallel=parallel,
             max_concurrency=max_concurrency,
         )
-        duration_ms = int((time.perf_counter() - start_time) * 1000)
 
         try:
             recommendation = await generate_quality_recommendation(result)
@@ -124,18 +126,8 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
             recommendation = ""
         quality_result = result.model_copy(update={"recommendation": recommendation})
 
-        telemetry_capture(
-            "scan_quality_run_finished",
-            properties={
-                **shape_props,
-                "duration_ms": duration_ms,
-                "passed_count": quality_result.passed_count,
-                "failed_count": quality_result.failed_count,
-                "errored_count": quality_result.errored_count,
-                "skipped_count": quality_result.skipped_count,
-                "has_recommendation": bool(recommendation),
-            },
-        )
+        finished.update(suite_result_properties(quality_result))
+        finished["has_recommendation"] = bool(recommendation)
 
     quality_result.print_report(group_by=group_by)
     return quality_result

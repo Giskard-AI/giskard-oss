@@ -13,11 +13,7 @@ from giskard.scan.vulnerability import (
     vulnerability_suite_generator_registry,
 )
 
-_TELEMETRY_MODULES = (
-    "giskard.scan.quality",
-    "giskard.scan.vulnerability",
-    "giskard.scan.integrations._entry_point",
-)
+_TELEMETRY_MODULES = ("giskard.scan._telemetry_props",)
 
 
 class _DeterministicGenerator(ScenarioGenerator):
@@ -72,17 +68,18 @@ async def test_quality_scan_telemetry(telemetry_capture):
         parallel=False,
     )
 
-    assert telemetry_capture[0][0] == "scan_quality_run_started"
+    assert telemetry_capture[0][0] == "scan_run_started"
     started = telemetry_capture[0][1]
     assert started["integration"] == "giskard-scan"
-    assert started["scan_kind"] == "quality"
-    assert started["language_count"] == 2
+    assert started["scan_type"] == "quality"
+    assert started["languages"] == ["en", "fr"]
     assert started["generator_count"] == 1
     assert started["scenario_count"] == 2
-    assert started["has_knowledge_base"] is True
+    assert started["knowledge_base_document_count"] == 1
     assert started["parallel"] is False
+    assert started["third_party_probes"] is None
 
-    assert telemetry_capture[1][0] == "scan_quality_run_finished"
+    assert telemetry_capture[1][0] == "scan_run_finished"
     finished = telemetry_capture[1][1]
     assert finished["passed_count"] == 1
     assert finished["failed_count"] == 1
@@ -104,13 +101,14 @@ async def test_vulnerability_scan_telemetry(telemetry_capture):
         commercial_use=True,
     )
 
-    assert telemetry_capture[0][0] == "scan_vulnerability_run_started"
+    assert telemetry_capture[0][0] == "scan_run_started"
     started = telemetry_capture[0][1]
-    assert started["scan_kind"] == "vulnerability"
+    assert started["scan_type"] == "vulnerability"
     assert started["commercial_use"] is True
     assert started["parallel"] is True
+    assert started["group_by"] == "threat-type"
 
-    assert telemetry_capture[1][0] == "scan_vulnerability_run_finished"
+    assert telemetry_capture[1][0] == "scan_run_finished"
     finished = telemetry_capture[1][1]
     assert finished["passed_count"] == 1
     assert finished["failed_count"] == 1
@@ -145,14 +143,13 @@ async def test_third_party_scan_telemetry_garak(telemetry_capture, monkeypatch):
         target_mode="singleturn",
     )
 
-    assert telemetry_capture[0][0] == "scan_third_party_run_started"
+    assert telemetry_capture[0][0] == "scan_run_started"
     started = telemetry_capture[0][1]
-    assert started["scan_kind"] == "third_party_garak"
-    assert started["tool"] == "garak"
-    assert started["has_probe_filter"] is True
+    assert started["scan_type"] == "garak"
+    assert started["third_party_probes"] == ["probe.one"]
     assert started["target_mode"] == "singleturn"
 
-    assert telemetry_capture[1][0] == "scan_third_party_run_finished"
+    assert telemetry_capture[1][0] == "scan_run_finished"
     finished = telemetry_capture[1][1]
     assert finished["scenario_count"] == 1
     assert finished["passed_count"] == 1
