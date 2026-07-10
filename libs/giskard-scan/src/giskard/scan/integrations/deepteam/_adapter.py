@@ -7,6 +7,7 @@ with the attack-success -> scan-failure polarity flip.
 
 import logging
 import time
+from enum import Enum
 from importlib.util import find_spec
 from typing import Any
 
@@ -104,22 +105,48 @@ async def _reconstruct_trace(test_case: Any) -> Trace:  # pyright: ignore[report
     return await Trace.from_interactions(*interactions)
 
 
+def _vulnerability_type_label(vulnerability_type: Any) -> str | None:
+    """Return the string label DeepTeam uses for a vulnerability subtype.
+
+    Mirrors ``deepteam.metrics.evaluation_prompt_blocks.format_vulnerability_type_label``:
+    Enums become their ``.value``; plain strings pass through unchanged.
+    """
+    if vulnerability_type is None:
+        return None
+    if isinstance(vulnerability_type, Enum):
+        return str(vulnerability_type.value)
+    return str(vulnerability_type)
+
+
+def _check_name(vulnerability: Any, vulnerability_type: str | None) -> str:
+    """Build the framework check label: ``vulnerability/vulnerability_type``."""
+    vuln_label = str(vulnerability) if vulnerability else None
+    if vuln_label and vulnerability_type:
+        return f"{vuln_label}/{vulnerability_type}"
+    if vuln_label:
+        return vuln_label
+    return "deepteam"
+
+
 async def _testcase_to_scenario(
     test_case: Any, callback: ScanTargetCallback
 ) -> ScenarioResult:  # pyright: ignore[reportMissingTypeArgument]
     """Translate one RTTestCase into a ScenarioResult (one CheckResult)."""
     vulnerability = getattr(test_case, "vulnerability", None)
     vulnerability_type = getattr(test_case, "vulnerability_type", None)
+    vulnerability_type_label = _vulnerability_type_label(vulnerability_type)
     attack_method = getattr(test_case, "attack_method", None)
     risk_category = getattr(test_case, "risk_category", None)
+    check_name = _check_name(vulnerability, vulnerability_type_label)
 
-    name = f"DeepTeam {vulnerability}/{vulnerability_type}"
+    name = f"DeepTeam {check_name}"
     if attack_method:
         name += f" — {attack_method}"
 
     details: dict[str, Any] = {
+        "check_name": check_name,
         "vulnerability": vulnerability,
-        "vulnerability_type": vulnerability_type,
+        "vulnerability_type": vulnerability_type_label,
         "attack_method": attack_method,
         "risk_category": risk_category,
         "input": getattr(test_case, "input", None),
@@ -135,10 +162,7 @@ async def _testcase_to_scenario(
         details["tools_called"] = test_case.tools_called
 
     score = getattr(test_case, "score", None)
-    # Name the metric after the vulnerability, falling back to a stable label
-    # when DeepTeam left it unset (avoids a literal "None" metric name).
-    metric_name = str(vulnerability) if vulnerability else "deepteam"
-    metrics = [Metric(name=metric_name, value=score)] if score is not None else []
+    metrics = [Metric(name=check_name, value=score)] if score is not None else []
 
     error = getattr(test_case, "error", None)
     if error is not None:

@@ -71,3 +71,48 @@ async def test_scenario_name_and_tags():
     scenario = await _adapter._testcase_to_scenario(_TC(), cb)
     assert scenario.scenario_name.startswith("DeepTeam Bias/race")
     assert "Bias" in scenario.tags
+
+
+async def test_check_name_uses_vulnerability_and_type():
+    cb = ScanTargetCallback(target=lambda x: x)
+    scenario = await _adapter._testcase_to_scenario(_TC(), cb)
+    check = _check(scenario)
+    assert check.details["check_name"] == "Bias/race"
+    assert check.metrics[0].name == "Bias/race"
+
+
+async def test_check_name_resolves_enum_vulnerability_type():
+    from enum import Enum
+
+    class _BiasType(Enum):
+        RACE = "race"
+
+    cb = ScanTargetCallback(target=lambda x: x)
+    scenario = await _adapter._testcase_to_scenario(
+        _TC(vulnerability_type=_BiasType.RACE), cb
+    )
+    check = _check(scenario)
+    assert check.details["check_name"] == "Bias/race"
+    assert check.details["vulnerability_type"] == "race"
+    assert scenario.scenario_name.startswith("DeepTeam Bias/race")
+
+
+async def test_scenario_name_resolves_real_deepteam_enum():
+    from deepteam.vulnerabilities.misinformation.types import MisinformationType
+
+    cb = ScanTargetCallback(target=lambda x: x)
+    scenario = await _adapter._testcase_to_scenario(
+        _TC(
+            vulnerability="Misinformation",
+            vulnerability_type=MisinformationType.EXPERTIZE_MISREPRESENTATION,
+            attack_method="Linear Jailbreaking",
+        ),
+        cb,
+    )
+    assert (
+        scenario.scenario_name
+        == "DeepTeam Misinformation/expertize_misrepresentation — Linear Jailbreaking"
+    )
+    assert _check(scenario).details["check_name"] == (
+        "Misinformation/expertize_misrepresentation"
+    )
