@@ -187,6 +187,13 @@ API Overview
 
 **Settings**
 - `giskard.checks.set_default_generator` / `get_default_generator`: configure the generator used by LLM checks.
+- Environment variables (or `.env` at the project root), prefixed with `GISKARD_CHECKS_`:
+  - `GISKARD_CHECKS_DEFAULT_MODEL` — default LLM model (default: `openai/gpt-4o-mini`).
+  - `GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL` — default embedding model (default: `text-embedding-3-small`).
+  - `GISKARD_CHECKS_MAX_REPORTED_FAILURES` — cap on failures shown in suite reports.
+  - `GISKARD_CHECKS_DISABLE_RICH_PRETTY` — disable rich REPL pretty-printing.
+
+Runtime `set_default_generator()` overrides take precedence over environment settings.
 
 Testing
 -------

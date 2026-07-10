@@ -303,3 +303,65 @@ async def test_run_warns_and_drops_extra_detector_scores(
     assert len(result.results) == 1
     assert result.results[0].steps[0].results[0].failed
     assert "returned 3 scores for 1 conversations" in caplog.text
+
+
+class _LoopBlockingProbe:
+    """Probe that mimics the real _call_model: from its worker thread it schedules
+    a coroutine on the scan loop and BLOCKS on the result. That coroutine itself
+    needs a worker thread (asyncio.to_thread), exactly like a structured target's
+    LLM call. If probes shared asyncio.to_thread's default pool, enough of them
+    would fill it, all block on the loop, and starve the threads their own
+    coroutines need -> deadlock. The dedicated per-probe pool prevents this.
+    """
+
+    tags: list[str] = []
+
+    def __init__(self, name: str, loop) -> None:
+        self.probename = name
+        self._loop = loop
+
+    def probe(self, generator: object) -> list[Attempt]:
+        import asyncio
+
+        async def _needs_a_thread() -> str:
+            # This inner work needs a free pool thread to complete.
+            return await asyncio.to_thread(lambda: "ok")
+
+        fut = asyncio.run_coroutine_threadsafe(_needs_a_thread(), self._loop)
+        fut.result()  # block this worker thread on the loop, like _call_model
+        return [_attempt(self.probename)]
+
+
+async def test_run_does_not_deadlock_when_probes_exceed_thread_pool(
+    monkeypatch: pytest.MonkeyPatch, target
+) -> None:
+    """Probe workers block on the loop; their coroutines need pool threads too.
+
+    With N probes > the shared default executor (min(32, cpu+4)), running them on
+    asyncio.to_thread makes every worker block on run_coroutine_threadsafe while
+    the coroutines can't get a thread to finish -> deadlock. A dedicated pool
+    sized to the probe count keeps the run finishing regardless of probe count.
+    """
+    import asyncio
+
+    from giskard.scan.integrations.garak import _adapter
+
+    loop = asyncio.get_running_loop()
+    # Well above the default pool; ~40 mirrors a full probe set.
+    probes = [_LoopBlockingProbe(f"p{i}", loop) for i in range(40)]
+
+    monkeypatch.setattr(
+        _adapter, "_resolve_probes", lambda probes_arg: probes_arg or []
+    )
+    monkeypatch.setattr(
+        _adapter,
+        "_resolve_detectors",
+        lambda probe, loop: ([("fake.Detector", _FakeDetector(score=0.1))], []),
+    )
+
+    result = await asyncio.wait_for(
+        _adapter.GarakScanAdapter().run(target=target, probes=probes),
+        timeout=30,
+    )
+
+    assert len(result.results) == 40

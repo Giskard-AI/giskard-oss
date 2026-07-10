@@ -1,6 +1,7 @@
 """Adapter that runs garak through Giskard scan scenarios."""
 
 import asyncio
+import concurrent.futures
 import logging
 import time
 from collections import defaultdict
@@ -186,7 +187,7 @@ def _resolve_detectors(
 
 
 class GarakScanAdapter:
-    """Build and run a Giskard suite from garak probes."""
+    """Build and run a Giskard suite from Garak probes."""
 
     def _evaluate_attempt(
         self,
@@ -355,13 +356,29 @@ class GarakScanAdapter:
 
         loop = asyncio.get_running_loop()
         start_time = time.perf_counter()
-        async with asyncio.TaskGroup() as task_group:
-            tasks = [
-                task_group.create_task(
-                    asyncio.to_thread(self._run_probe_isolated, probe, target, loop)
-                )
-                for probe in probes
-            ]
+
+        async def _run_on_executor(
+            executor: concurrent.futures.ThreadPoolExecutor, probe: "Probe"
+        ) -> list[ScenarioResult[TraceType]]:
+            return await loop.run_in_executor(
+                executor, self._run_probe_isolated, probe, target, loop
+            )
+
+        # A dedicated pool with one thread per probe: each probe worker blocks on
+        # the scan loop via run_coroutine_threadsafe (see _generator._call_model),
+        # and for a structured target that loop-bound coroutine issues an LLM call
+        # whose own work needs a pool thread. Sharing asyncio.to_thread's default
+        # executor (min(32, cpu+4) threads) lets probe workers fill it and deadlock
+        # — all blocked on the loop while the loop waits for a free thread. The
+        # TaskGroup joins every probe before the executor's __exit__ shuts it down.
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=max(len(probes), 1)
+        ) as probe_executor:
+            async with asyncio.TaskGroup() as task_group:
+                tasks = [
+                    task_group.create_task(_run_on_executor(probe_executor, probe))
+                    for probe in probes
+                ]
 
         # Results are only available once the TaskGroup has exited and every
         # task has completed; reading task.result() inside the block would hit

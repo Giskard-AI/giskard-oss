@@ -1390,6 +1390,7 @@ dependencies = [
     { name = "jsonschema" },
     { name = "numpy" },
     { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "regex" },
     { name = "rich" },
 ]
@@ -1416,6 +1417,7 @@ requires-dist = [
     { name = "jsonschema", specifier = ">=4.23.0,<5" },
     { name = "numpy", specifier = ">=2.4.1,<3" },
     { name = "pydantic", specifier = ">=2.12,<3" },
+    { name = "pydantic-settings", specifier = ">=2.7,<3" },
     { name = "regex", specifier = ">=2026.1.15" },
     { name = "rich", specifier = ">=14.2.0,<16" },
     { name = "textstat", marker = "extra == 'readability'", specifier = ">=0.7.0" },
