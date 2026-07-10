@@ -114,3 +114,7 @@ lidar-test = [
     { include-group = "test" },
     "lidar",
 ]
+deepteam-test = [
+    { include-group = "test" },
+    "giskard-scan[deepteam]",
+]

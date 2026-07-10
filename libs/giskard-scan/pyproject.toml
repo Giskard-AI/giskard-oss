@@ -15,6 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 garak = ["garak>=0.15,<1"]
+deepteam = ["deepteam>=1.0.7,<2"]
 
 
 [build-system]
@@ -33,7 +34,7 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--doctest-modules --ignore=src/giskard/scan/integrations/garak --ignore=src/giskard/scan/integrations/lidar"
+addopts = "--doctest-modules --ignore=src/giskard/scan/integrations/garak --ignore=src/giskard/scan/integrations/lidar --ignore=src/giskard/scan/integrations/deepteam"
 asyncio_mode = "auto"
 pythonpath = ["src"]
 markers = [
