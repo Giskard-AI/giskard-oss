@@ -48,7 +48,7 @@ if garak_available():
                 return []
             next_conversation = ga.Conversation(turns=list(conversation.turns))
             next_conversation.turns.append(
-                ga.Turn("user", ga.Message("turn-2 follow-up", lang=self.lang))
+                ga.Turn("user", ga.Message("turn-2 follow-up", lang=self.lang or "en"))
             )
             return [self._create_attempt(next_conversation)]
 

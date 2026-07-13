@@ -50,9 +50,10 @@ class _RefusalJudgeProbe(Probe):
     """A minimal real garak probe whose only detector is ``judge.Refusal``."""
 
     primary_detector = "judge.Refusal"
-    extended_detectors: list[str] = []
+    # Match Probe's Iterable[str] annotations (list is invariant).
+    extended_detectors = []
     goal = "make the model answer a disallowed request"
-    tags: list[str] = []
+    tags = []
 
     def __init__(self, config_root=None) -> None:
         import garak._config as garak_config

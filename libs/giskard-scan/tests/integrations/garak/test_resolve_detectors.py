@@ -41,7 +41,8 @@ def test_judge_detector_gets_giskard_generator(monkeypatch):
 
     class _JudgeProbe(Probe):
         primary_detector = "judge.Refusal"
-        extended_detectors: list[str] = []
+        # Match Probe's Iterable[str] annotation (list is invariant).
+        extended_detectors = []
 
     detectors, skipped = _resolve_detectors(_JudgeProbe.__new__(_JudgeProbe), None)
     assert skipped == []
@@ -50,7 +51,8 @@ def test_judge_detector_gets_giskard_generator(monkeypatch):
     assert detector_label == "judge.Refusal"
     from giskard.scan.integrations.garak._judge_generator import GiskardJudgeGenerator
 
-    assert isinstance(detector.evaluation_generator, GiskardJudgeGenerator)
+    # Judge detectors install evaluation_generator; base Detector has no such attr.
+    assert isinstance(getattr(detector, "evaluation_generator"), GiskardJudgeGenerator)
 
 
 def test_env_var_detector_without_key_is_skipped(monkeypatch):
@@ -59,7 +61,7 @@ def test_env_var_detector_without_key_is_skipped(monkeypatch):
 
     class _PerspectiveProbe(Probe):
         primary_detector = "perspective.Toxicity"
-        extended_detectors: list[str] = []
+        extended_detectors = []
 
     detectors, skipped = _resolve_detectors(
         _PerspectiveProbe.__new__(_PerspectiveProbe), None
@@ -72,7 +74,7 @@ def test_env_var_detector_without_key_is_skipped(monkeypatch):
 
 def test_skipped_detectors_emit_skip_results(monkeypatch):
     """Test that skip markers from _resolve_detectors are emitted as CheckResult.skip() per conversation."""
-    from garak.attempt import Attempt
+    from garak.attempt import Attempt, Conversation
     from garak.probes.base import Probe
     from giskard.scan.integrations.garak._adapter import GarakScanAdapter
 
@@ -91,9 +93,10 @@ def test_skipped_detectors_emit_skip_results(monkeypatch):
     assert isinstance(skipped[0], _SkipMarker)
     assert "PERSPECTIVE_API_KEY" in skipped[0].reason
 
-    # Create a minimal attempt with 2 conversations
+    # Create a minimal attempt with 2 conversations (_evaluate_attempt only
+    # needs len(conversations); empty Conversation stubs are enough).
     attempt = Attempt()
-    attempt.conversations = ["conv1", "conv2"]
+    attempt.conversations = [Conversation(turns=[]), Conversation(turns=[])]
 
     # Call _evaluate_attempt with the skip markers and no working detectors
     adapter = GarakScanAdapter()

@@ -79,5 +79,8 @@ class TargetGenerator[InputType, OutputType, TraceType: Trace](  # pyright: igno
 
         assert trace.last is not None, "Trace last is None"
         outputs = trace.last.outputs
-        text = str(outputs) if outputs is not None else None
-        return [Message(text=text, notes={"uuid": conv_uuid})]
+        # Message.text is typed as str (default None at runtime). Match the judge
+        # generator: omit text when the target returned nothing.
+        if outputs is None:
+            return [Message(notes={"uuid": conv_uuid})]
+        return [Message(text=str(outputs), notes={"uuid": conv_uuid})]

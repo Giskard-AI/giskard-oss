@@ -15,7 +15,11 @@ dependencies = [
 
 [project.optional-dependencies]
 garak = ["garak>=0.15,<1"]
-deepteam = ["deepteam>=1.0.7,<2"]
+deepteam = [
+    "deepteam>=1.0.7,<2",
+    # deepteam imports stdlib nntplib, removed in 3.13+ (PEP 594)
+    "standard-nntplib>=3.13; python_version >= '3.13'",
+]
 
 
 [build-system]

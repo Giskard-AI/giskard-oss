@@ -80,8 +80,11 @@ def _configure_garak() -> None:
     import garak._config as garak_config
 
     garak_config.load_base_config()
-    garak_config.run.generations = 1
-    garak_config.transient.reportfile = io.StringIO()
+    # GarakSubConfig / TransientConfig are empty dataclasses whose fields are
+    # populated at runtime by load_base_config(); setattr avoids fighting the
+    # static types (unknown attrs / reportfile typed as None).
+    setattr(garak_config.run, "generations", 1)
+    setattr(garak_config.transient, "reportfile", io.StringIO())
 
 
 def _resolve_probes(probes: Iterable[str] | None) -> "list[Probe]":
@@ -215,13 +218,15 @@ class _DetectorCache:
 
         try:
             return cast("Detector", load_plugin(f"detectors.{name}")), None
+        except APIKeyMissingError as exc:
+            # Raised directly (APIKeyMissingError subclasses GarakException).
+            return None, _SkipMarker(name=name, reason=str(exc))
         except GarakException as exc:
+            # Raised wrapped: garak often wraps the missing-key error as cause.
             cause = exc.__cause__
             if isinstance(cause, APIKeyMissingError):
                 return None, _SkipMarker(name=name, reason=str(cause))
             logger.warning("Failed to load detector %s: %s", name, exc)
-        except APIKeyMissingError as exc:  # belt-and-suspenders if garak stops wrapping
-            return None, _SkipMarker(name=name, reason=str(exc))
         except Exception as exc:  # noqa: BLE001 — one bad detector must not abort the scan
             logger.warning("Failed to load detector %s: %s", name, exc)
         return None, None
