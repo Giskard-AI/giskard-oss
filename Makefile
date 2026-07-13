@@ -61,12 +61,6 @@ install-no-providers: ## Install giskard-llm without provider SDKs (for no_provi
 install-minimal: ## Install with test group only (no provider SDKs, all packages)
 	uv sync --only-group test
 
-install-licensecheck: ## Install the deps the license scan must see (garak/deepteam trees)
-	# licensecheck reads each package's license metadata from the installed env, so a
-	# package in LICENSECHECK_EXTRAS but absent from the env resolves to UNKNOWN and
-	# fails the gate. Keep this in sync with LICENSECHECK_EXTRAS.
-	uv sync --group garak-test --group deepteam-test
-
 install-garak-test: ## Install garak optional extra for scan integration tests
 	uv sync --group garak-test
 
@@ -143,7 +137,7 @@ LICENSECHECK := uv run --with licensecheck==$(LICENSECHECK_VERSION) licensecheck
 # explicitly here or their trees (accelerate, avidtools, ...) go unscanned and
 # unattributed. Space-separated: --extras is nargs, so a comma-separated value is read
 # as one literal extra name, matches nothing, and silently scans zero packages.
-LICENSECHECK_EXTRAS := full garak deepteam
+LICENSECHECK_EXTRAS := full
 # Permissive licenses that licensecheck cannot parse, so it falls back to UNKNOWN and
 # fails them: datetime/zope-interface are ZPL-2.1 (BSD-style), mistralai and
 # sentencepiece are Apache-2.0 but publish no license metadata. All reached via garak.

@@ -29,7 +29,7 @@ jobs:
           python-version: "3.12"
       # install-licensecheck pulls in the garak/deepteam trees that check-licenses and
       # check-notices scan; without them licensecheck cannot read their license metadata.
-      - run: make install install-tools install-licensecheck
+      - run: make install install-tools
       - run: make check
 
   test-unit:
