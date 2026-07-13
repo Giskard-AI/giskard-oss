@@ -67,8 +67,11 @@ install-garak-test: ## Install garak optional extra for scan integration tests
 install-deepteam-test: ## Install deepteam optional extra for scan integration tests
 	uv sync --group deepteam-test
 
+# Private package — not in pyproject/uv.lock so public CI/release never fetch it.
+LIDAR_GIT ?= git+https://github.com/Giskard-AI/lidar.git@v0.2.7
+
 install-lidar-test: ## Install lidar private dependency for scan integration tests
-	uv sync --group lidar-test
+	uv pip install "$(LIDAR_GIT)"
 
 test-lidar: install-lidar-test ## Run lidar integration tests
 	uv run pytest libs/giskard-scan/tests/integrations/lidar -v

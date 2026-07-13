@@ -1311,13 +1311,6 @@ garak-test = [
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
 ]
-lidar-test = [
-    { name = "lidar" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-timeout" },
-]
 test = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1363,13 +1356,6 @@ dev = [
 ]
 garak-test = [
     { name = "giskard-scan", extras = ["garak"], editable = "libs/giskard-scan" },
-    { name = "pytest", specifier = "==9.1.1" },
-    { name = "pytest-asyncio", specifier = "==1.4.0" },
-    { name = "pytest-cov", specifier = "==7.1.0" },
-    { name = "pytest-timeout", specifier = "==2.4.0" },
-]
-lidar-test = [
-    { name = "lidar", git = "https://github.com/Giskard-AI/lidar.git?tag=v0.2.7" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-asyncio", specifier = "==1.4.0" },
     { name = "pytest-cov", specifier = "==7.1.0" },
@@ -2042,15 +2028,6 @@ wheels = [
 ]
 
 [[package]]
-name = "iso639-lang"
-version = "2.6.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9b/5a/49bbf16d155192255e7bb37e403b2ac360144992d0d112a865afc62e457f/iso639_lang-2.6.3.tar.gz", hash = "sha256:078ddb7cd0182dcc04367691acc8022ddf7158b6cb09f08f798af823fa864265", size = 319391, upload-time = "2025-07-23T09:04:53.568Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6b/c7/f6fd3db6c33a164631c39dce2ca26a3794e3abf91b875cc99a43a5565d88/iso639_lang-2.6.3-py3-none-any.whl", hash = "sha256:a6c2fb9f739dca180dc7f48b098880f303bcce2cdf93a4ca3152ed8bbbb94fbb", size = 324990, upload-time = "2025-07-23T09:04:52.221Z" },
-]
-
-[[package]]
 name = "isort"
 version = "8.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2418,24 +2395,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/40/71/d89bb0e71b1415453980fd32315f2a037aad9f7f70f695c7cec7035feb13/license_expression-30.4.4.tar.gz", hash = "sha256:73448f0aacd8d0808895bdc4b2c8e01a8d67646e4188f887375398c761f340fd", size = 186402, upload-time = "2025-07-22T11:13:32.17Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/af/40/791891d4c0c4dab4c5e187c17261cedc26285fd41541577f900470a45a4d/license_expression-30.4.4-py3-none-any.whl", hash = "sha256:421788fdcadb41f049d2dc934ce666626265aeccefddd25e162a26f23bcbf8a4", size = 120615, upload-time = "2025-07-22T11:13:31.217Z" },
-]
-
-[[package]]
-name = "lidar"
-version = "0.2.7"
-source = { git = "https://github.com/Giskard-AI/lidar.git?tag=v0.2.7#2f9a14b9f637d298750e0150c557c6714b15e56b" }
-dependencies = [
-    { name = "giskard-agents" },
-    { name = "giskard-core" },
-    { name = "giskard-llm" },
-    { name = "iso639-lang" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "pydantic" },
-    { name = "relais" },
-    { name = "tenacity" },
-    { name = "tiktoken" },
-    { name = "uniseg" },
 ]
 
 [[package]]
@@ -4377,15 +4336,6 @@ wheels = [
 ]
 
 [[package]]
-name = "relais"
-version = "0.2.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/16/2b/d9bb9aa75f8571fd17babd76984a79a86cb4a733e37b57da216ed9d9418c/relais-0.2.1.tar.gz", hash = "sha256:2a25876cc46f282d9df168d52bed5c7e5f61143a4cd797a2eab17aa5fcf24af4", size = 128113, upload-time = "2025-09-03T22:35:25.425Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/65/50/10d14257b10ee34372cdf98e7142a7a2d5477436498c20f4dae64f4a45c4/relais-0.2.1-py3-none-any.whl", hash = "sha256:853b640a7886d44f40f3c4eb29739145d697b77e6a27e56af5151aa6fcfb871b", size = 36135, upload-time = "2025-09-03T22:35:24.001Z" },
-]
-
-[[package]]
 name = "replicate"
 version = "1.0.7"
 source = { registry = "https://pypi.org/simple" }
@@ -5123,15 +5073,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ba/19/1b9b0e29f30c6d35cb345486df41110984ea67ae69dddbc0e8a100999493/tzdata-2026.2.tar.gz", hash = "sha256:9173fde7d80d9018e02a662e168e5a2d04f87c41ea174b139fbef642eda62d10", size = 198254, upload-time = "2026-04-24T15:22:08.651Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ce/e4/dccd7f47c4b64213ac01ef921a1337ee6e30e8c6466046018326977efd95/tzdata-2026.2-py2.py3-none-any.whl", hash = "sha256:bbe9af844f658da81a5f95019480da3a89415801f6cc966806612cc7169bffe7", size = 349321, upload-time = "2026-04-24T15:22:05.876Z" },
-]
-
-[[package]]
-name = "uniseg"
-version = "0.10.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/fc/5e/fc5b1c370dc523a580cb214ee7753c8631a2d4be8fc51283785415b62d92/uniseg-0.10.1.tar.gz", hash = "sha256:5224267916fc01132cb2f7bf60882402dde72ab52c6977184827e4d9d6676de6", size = 8151423, upload-time = "2026-01-09T12:53:03.45Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/80/6c/9eb6d93ad8b9ac96cba13e6d2f419c316d8fdb91013e12dd478a99501699/uniseg-0.10.1-py3-none-any.whl", hash = "sha256:74fe3f7b4ee46bbd703a70ea1e5cd28e04f63eee5af9a10388d93316c554e358", size = 8179942, upload-time = "2026-01-09T12:53:00.64Z" },
 ]
 
 [[package]]

@@ -69,7 +69,6 @@ giskard-llm = { workspace = true }
 giskard-agents = { workspace = true }
 giskard-checks = { workspace = true }
 giskard-scan = { workspace = true }
-lidar = { git = "https://github.com/Giskard-AI/lidar.git", tag = "v0.2.7" }
 
 [build-system]
 requires = ["hatchling>=1.25.0"]
@@ -110,10 +109,6 @@ dev = [
 garak-test = [
     { include-group = "test" },
     "giskard-scan[garak]",
-]
-lidar-test = [
-    { include-group = "test" },
-    "lidar",
 ]
 deepteam-test = [
     { include-group = "test" },
