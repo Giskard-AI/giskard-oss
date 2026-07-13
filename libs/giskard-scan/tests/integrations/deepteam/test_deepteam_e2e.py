@@ -23,7 +23,7 @@ class _FakeRTTestCase:
         self.score = 1.0
         self.reason = "resisted"
         self.error = None
-        self.turns = None
+        self.turns: list[object] | None = None
         self.simulation_cost = None
         self.evaluation_cost = None
         self.token_cost = None

@@ -12,6 +12,7 @@ pytest.importorskip("garak")
 
 from garak.attempt import Attempt, Conversation, Message, Turn
 from giskard.checks import SuiteResult
+from giskard.scan.integrations import third_party_scan
 
 
 def _patch_resolvers(monkeypatch: pytest.MonkeyPatch, probes, detectors):
@@ -219,8 +220,6 @@ async def test_third_party_scan_routes_to_garak_adapter(
     monkeypatch: pytest.MonkeyPatch, target
 ) -> None:
     """The public entry point resolves tool="garak" to GarakScanAdapter.run."""
-    from giskard.scan.integrations import third_party_scan
-
     _patch_resolvers(
         monkeypatch,
         probes=[_FakeProbe([_attempt("a1")])],
@@ -235,10 +234,8 @@ async def test_third_party_scan_routes_to_garak_adapter(
 
 
 async def test_third_party_scan_rejects_unknown_tool(target) -> None:
-    from giskard.scan.integrations import third_party_scan
-
     with pytest.raises(ValueError, match="Unknown tool"):
-        await third_party_scan(
+        await third_party_scan(  # pyright: ignore[reportCallIssue]
             target,
             tool="nope",  # pyright: ignore[reportArgumentType]
             description="A test agent",
@@ -246,8 +243,6 @@ async def test_third_party_scan_rejects_unknown_tool(target) -> None:
 
 
 async def test_third_party_scan_requires_description(target) -> None:
-    from giskard.scan.integrations import third_party_scan
-
     with pytest.raises(TypeError):
         await third_party_scan(target, tool="garak")  # pyright: ignore[reportCallIssue]
 
