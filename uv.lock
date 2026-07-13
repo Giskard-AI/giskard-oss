@@ -1422,7 +1422,7 @@ provides-extras = ["openai", "google", "anthropic", "litellm", "all"]
 
 [[package]]
 name = "giskard-checks"
-version = "1.0.2b4"
+version = "1.0.2b5"
 source = { editable = "libs/giskard-checks" }
 dependencies = [
     { name = "giskard-agents" },
@@ -1523,7 +1523,7 @@ provides-extras = ["openai", "google", "anthropic", "azure", "all"]
 
 [[package]]
 name = "giskard-scan"
-version = "1.0.0b2"
+version = "1.0.0b3"
 source = { editable = "libs/giskard-scan" }
 dependencies = [
     { name = "giskard-agents" },
