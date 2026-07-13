@@ -61,6 +61,12 @@ install-no-providers: ## Install giskard-llm without provider SDKs (for no_provi
 install-minimal: ## Install with test group only (no provider SDKs, all packages)
 	uv sync --only-group test
 
+install-licensecheck: ## Install the deps the license scan must see (garak/deepteam trees)
+	# licensecheck reads each package's license metadata from the installed env, so a
+	# package in LICENSECHECK_EXTRAS but absent from the env resolves to UNKNOWN and
+	# fails the gate. Keep this in sync with LICENSECHECK_EXTRAS.
+	uv sync --group garak-test --group deepteam-test
+
 install-garak-test: ## Install garak optional extra for scan integration tests
 	uv sync --group garak-test
 
@@ -132,9 +138,21 @@ security: ## Check for security vulnerabilities
 # uv.lock instead of whatever PyPI resolves to at runtime. Pinned for reproducibility.
 LICENSECHECK_VERSION := 2026.0.8
 LICENSECHECK := uv run --with licensecheck==$(LICENSECHECK_VERSION) licensecheck --license MIT
-# all-extras pulls in the provider extras' transitive deps; skip the workspace libs
-# themselves (LIBS) so the notices list only third-party packages.
-LICENSECHECK_FLAGS := --extras full --skip-dependencies $(LIBS)
+# Scan scope. `full` deliberately omits garak/deepteam so `pip install giskard[full]`
+# stays light, but license coverage must not follow that packaging choice -- name them
+# explicitly here or their trees (accelerate, avidtools, ...) go unscanned and
+# unattributed. Space-separated: --extras is nargs, so a comma-separated value is read
+# as one literal extra name, matches nothing, and silently scans zero packages.
+LICENSECHECK_EXTRAS := full garak deepteam
+# Permissive licenses that licensecheck cannot parse, so it falls back to UNKNOWN and
+# fails them: datetime/zope-interface are ZPL-2.1 (BSD-style), mistralai and
+# sentencepiece are Apache-2.0 but publish no license metadata. All reached via garak.
+# These are detection gaps, not license conflicts -- do not read this as suppressing a
+# genuine copyleft warning.
+LICENSECHECK_IGNORE := datetime zope-interface mistralai sentencepiece
+# Skip the workspace libs themselves (LIBS) so the notices list only third-party packages.
+LICENSECHECK_FLAGS := --extras $(LICENSECHECK_EXTRAS) --skip-dependencies $(LIBS) \
+	--ignore-packages $(LICENSECHECK_IGNORE)
 # licensecheck markdown output is not byte-stable (trailing whitespace, blank-line
 # runs), so canonicalize it before writing/diffing: strip trailing whitespace and
 # collapse consecutive blank lines.
