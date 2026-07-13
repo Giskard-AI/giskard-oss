@@ -6,7 +6,8 @@ from garak.attempt import Conversation, Message
 from garak.generators.base import Generator
 from giskard.checks import DatasetInputGenerator, Interact, Target, Trace
 
-from ._bridge import _await_on_loop, _conv_uuid
+from .._shared import await_on_loop
+from ._bridge import _conv_uuid
 
 
 class TargetGenerator[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
@@ -70,7 +71,7 @@ class TargetGenerator[InputType, OutputType, TraceType: Trace](  # pyright: igno
             outputs=self.target,
         )
 
-        trace = _await_on_loop(trace.with_interaction(interaction), self._loop)
+        trace = await_on_loop(trace.with_interaction(interaction), self._loop)
 
         # Trace is frozen — with_interaction returns a NEW trace, so write it back
         # under the same uuid for the next turn in this conversation to build on.

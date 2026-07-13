@@ -23,7 +23,6 @@ _INTEGRATION_MODULES = (
     "giskard.scan.integrations.garak",
     "giskard.scan.integrations._entry_point",
     "giskard.scan.integrations",
-    "giskard.scan.third_party",
 )
 
 

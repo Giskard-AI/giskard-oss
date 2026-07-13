@@ -29,9 +29,8 @@ class ScanTargetCallback:
 
     METADATA_UUID_KEY = "giskard_uuid"
 
-    def __init__(self, target: Target, loop: Any = None) -> None:  # pyright: ignore[reportMissingTypeArgument]
+    def __init__(self, target: Target) -> None:  # pyright: ignore[reportMissingTypeArgument]
         self._target = target
-        self._loop = loop
         self.traces: dict[str, Trace] = {}  # pyright: ignore[reportMissingTypeArgument]
 
     def _recover_uuid(self, turns: "list[Any] | None") -> "str | None":
@@ -57,6 +56,18 @@ class ScanTargetCallback:
             if metadata and metadata.get(self.METADATA_UUID_KEY):
                 return metadata[self.METADATA_UUID_KEY]
         return None
+
+    def trace_for(self, turns: "list[Any] | None") -> "Trace | None":  # pyright: ignore[reportMissingTypeArgument]
+        """Return the lossless Trace accumulated for *turns*, or None if we never
+        produced a turn in this conversation (e.g. a seeded opening turn).
+
+        The uuid cache is ours: callers hand us the test case's turns and get a
+        Trace back rather than reaching into ``traces``/``METADATA_UUID_KEY``.
+        """
+        conversation_uuid = self._recover_uuid(turns)
+        if conversation_uuid is None:
+            return None
+        return self.traces.get(conversation_uuid)
 
     async def __call__(self, input: str, turns: "list[Any] | None" = None) -> Any:
         from deepteam.test_case import RTTurn

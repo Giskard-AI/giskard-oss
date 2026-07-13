@@ -28,10 +28,8 @@ def test_garak_adapter_module_import_does_not_raise(
 
 def test_third_party_scan_import_does_not_raise(block_garak_import: None) -> None:
     from giskard.scan.integrations import third_party_scan
-    from giskard.scan.third_party import third_party_scan as compat_third_party_scan
 
     assert callable(third_party_scan)
-    assert compat_third_party_scan is third_party_scan
 
 
 async def test_garak_adapter_run_raises_import_error_when_garak_absent(

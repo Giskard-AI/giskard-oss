@@ -23,7 +23,7 @@ from giskard.checks import (
     get_default_generator,
 )
 
-from .._shared import reject_unexpected_kwargs
+from .._shared import reject_unexpected_kwargs, trace_from_role_content_turns
 from ._bridge import ScanTargetCallback
 
 logger = logging.getLogger(__name__)
@@ -50,59 +50,27 @@ def _require_deepteam() -> None:
         )
 
 
-def _score_check(
-    test_case: Any, details: dict[str, Any], metrics: list[Any]
-) -> CheckResult:
-    """Map a scored (non-errored) RTTestCase to a CheckResult, polarity-flipped."""
-    score = getattr(test_case, "score", None)
-    reason = getattr(test_case, "reason", None) or ""
-    if score is not None and score >= _HIT_THRESHOLD:
-        return CheckResult.success(message=reason, details=details, metrics=metrics)
-    return CheckResult.failure(message=reason, details=details, metrics=metrics)
-
-
 async def _trace_for(test_case: Any, callback: ScanTargetCallback) -> Trace:  # pyright: ignore[reportMissingTypeArgument]
-    """Recover the typed Trace for *test_case* from the callback's uuid cache.
+    """Recover the typed Trace for *test_case*.
 
-    Prefer the lossless cached Trace (keyed on the uuid our callback stamped into
-    an assistant turn's metadata). Fall back to pairing the test case's turns
-    (or its single input/output) into Interactions when no cached trace is found
-    (e.g. a seeded opening turn our callback never produced).
+    Prefer the lossless Trace the callback accumulated for this conversation.
+    Fall back to pairing the test case's turns (or its single input/output) into
+    Interactions when the callback has none -- e.g. a seeded opening turn it
+    never produced.
     """
-    turns = getattr(test_case, "turns", None) or []
-    for turn in reversed(turns):
-        metadata = getattr(turn, "metadata", None)
-        if metadata and metadata.get(callback.METADATA_UUID_KEY):
-            cached = callback.traces.get(metadata[callback.METADATA_UUID_KEY])
-            if cached is not None:
-                return cached
-    return await _reconstruct_trace(test_case)
+    cached = callback.trace_for(getattr(test_case, "turns", None))
+    if cached is not None:
+        return cached
 
-
-async def _reconstruct_trace(test_case: Any) -> Trace:  # pyright: ignore[reportMissingTypeArgument]
-    """Fallback: build a display Trace from turns, or a single input/output pair."""
     turns = getattr(test_case, "turns", None) or []
-    interactions: list[Interaction] = []  # pyright: ignore[reportMissingTypeArgument]
     if turns:
-        pending: str | None = None
-        for turn in turns:
-            if turn.role == "user":
-                if pending is not None:
-                    interactions.append(Interaction(inputs=pending, outputs=None))
-                pending = turn.content
-            elif turn.role == "assistant" and pending is not None:
-                interactions.append(Interaction(inputs=pending, outputs=turn.content))
-                pending = None
-        if pending is not None:
-            interactions.append(Interaction(inputs=pending, outputs=None))
-    else:
-        interactions.append(
-            Interaction(
-                inputs=getattr(test_case, "input", None),
-                outputs=getattr(test_case, "actual_output", None),
-            )
+        return await trace_from_role_content_turns(turns)
+    return await Trace.from_interactions(
+        Interaction(
+            inputs=getattr(test_case, "input", None),
+            outputs=getattr(test_case, "actual_output", None),
         )
-    return await Trace.from_interactions(*interactions)
+    )
 
 
 def _vulnerability_type_label(vulnerability_type: Any) -> str | None:
@@ -165,10 +133,14 @@ async def _testcase_to_scenario(
     metrics = [Metric(name=check_name, value=score)] if score is not None else []
 
     error = getattr(test_case, "error", None)
+    reason = getattr(test_case, "reason", None) or ""
     if error is not None:
         check = CheckResult.error(message=str(error), details=details)
+    elif score is not None and score >= _HIT_THRESHOLD:
+        # Polarity flip: a high score means the model resisted -> scan success.
+        check = CheckResult.success(message=reason, details=details, metrics=metrics)
     else:
-        check = _score_check(test_case, details, metrics)
+        check = CheckResult.failure(message=reason, details=details, metrics=metrics)
 
     tags = [t for t in (vulnerability, attack_method, risk_category) if t]
     return ScenarioResult(
@@ -217,8 +189,11 @@ class DeepTeamScanAdapter:
             logger.debug("deepteam: no attacks/vulnerabilities to run.")
             return SuiteResult(results=[], duration_ms=0)
 
+        # The callback is async and is awaited by deepteam directly, so it needs no
+        # loop; the judge LLM does -- deepeval calls its sync `generate` from a
+        # worker thread and must route the coroutine back onto the scan's loop.
         loop = asyncio.get_running_loop()
-        callback = ScanTargetCallback(target=target, loop=loop)
+        callback = ScanTargetCallback(target=target)
         llm = make_deepeval_llm(get_default_generator(), loop)
 
         start = time.perf_counter()

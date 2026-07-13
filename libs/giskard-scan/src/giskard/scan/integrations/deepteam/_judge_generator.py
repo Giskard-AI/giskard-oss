@@ -15,25 +15,9 @@ a schema we return raw text via ``complete``.
 """
 
 import asyncio
-from collections.abc import Coroutine
 from typing import Any
 
-
-def _await_on_loop[T](
-    coro: Coroutine[Any, Any, T],
-    loop: "asyncio.AbstractEventLoop | None",
-) -> T:
-    """Run *coro* to completion. If *loop* is a running loop on another thread,
-    schedule there via ``run_coroutine_threadsafe``; otherwise ``asyncio.run``.
-
-    DeepTeam may call ``generate`` (sync) from inside its own async machinery on
-    a worker thread; a nested ``asyncio.run`` there would break shared locks in
-    the Giskard generator, so we reuse the scan's loop when one is provided.
-    """
-    if loop is None:
-        return asyncio.run(coro)
-    future = asyncio.run_coroutine_threadsafe(coro, loop)
-    return future.result()
+from .._shared import await_on_loop
 
 
 def make_deepeval_llm(
@@ -71,7 +55,7 @@ def make_deepeval_llm(
         def generate(
             self, prompt: str, schema: Any = None, *args: Any, **kwargs: Any
         ) -> Any:
-            return _await_on_loop(self.a_generate(prompt, schema), self._loop)
+            return await_on_loop(self.a_generate(prompt, schema), self._loop)
 
         def get_model_name(self) -> str:
             return "giskard-deepteam"

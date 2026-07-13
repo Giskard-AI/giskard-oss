@@ -29,7 +29,7 @@ def _patch_resolvers(monkeypatch: pytest.MonkeyPatch, probes, detectors):
 
     monkeypatch.setattr(_adapter, "_resolve_probes", lambda probes_arg: probes)
     monkeypatch.setattr(
-        _adapter, "_resolve_detectors", lambda probe, loop: (detectors, [])
+        _adapter, "_resolve_detectors", lambda probe, loop, *_: (detectors, [])
     )
     return _adapter.GarakScanAdapter
 
@@ -356,7 +356,7 @@ async def test_run_does_not_deadlock_when_probes_exceed_thread_pool(
     monkeypatch.setattr(
         _adapter,
         "_resolve_detectors",
-        lambda probe, loop: ([("fake.Detector", _FakeDetector(score=0.1))], []),
+        lambda probe, loop, *_: ([("fake.Detector", _FakeDetector(score=0.1))], []),
     )
 
     result = await asyncio.wait_for(

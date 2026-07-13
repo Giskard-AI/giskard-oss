@@ -9,7 +9,7 @@ from garak.generators.openai import OpenAICompatible
 from giskard.agents import BaseGenerator
 from giskard.llm.types import ChatMessageParam
 
-from ._bridge import _await_on_loop
+from .._shared import await_on_loop
 
 
 def _conversation_to_messages(
@@ -75,7 +75,7 @@ class GiskardJudgeGenerator(OpenAICompatible):
         generations_this_call: int = 1,
     ) -> "list[Message | None]":
         messages = _conversation_to_messages(prompt)
-        response = _await_on_loop(self._giskard.complete(messages), self._loop)
+        response = await_on_loop(self._giskard.complete(messages), self._loop)
         text = response.choices[0].message.text if response.choices else None
         return [Message(text=text) if text is not None else None]
 

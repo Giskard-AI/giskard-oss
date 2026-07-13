@@ -18,7 +18,7 @@ from giskard.checks import (
 )
 from giskard.llm.types import ChatMessage
 
-from .._shared import reject_unexpected_kwargs
+from .._shared import reject_unexpected_kwargs, trace_from_role_content_turns
 
 logger = logging.getLogger(__name__)
 
@@ -71,28 +71,10 @@ def _require_lidar() -> None:
 async def _trace_from_messages(messages: list[ChatMessage]) -> Trace:  # pyright: ignore[reportMissingTypeArgument]
     """Rebuild a scan Trace from a lidar attempt's flat message list.
 
-    Lidar owns its own executor and hands back finished conversations, so we
-    reconstruct a display trace by pairing each user turn with the assistant
-    reply that follows it. System/tool messages carry no input/output pair and
-    are skipped. A trailing user message with no reply yields outputs=None.
+    Lidar owns its own executor and hands back finished conversations, so there
+    is no typed Trace to recover and we pair the turns instead.
     """
-    interactions: list[Interaction] = []  # pyright: ignore[reportMissingTypeArgument]
-    pending_input: str | None = None
-    for message in messages:
-        if message.role == "user":
-            if pending_input is not None:
-                interactions.append(Interaction(inputs=pending_input, outputs=None))
-            pending_input = message.content  # pyright: ignore[reportAssignmentType]
-        elif message.role == "assistant":
-            if pending_input is not None:
-                interactions.append(
-                    Interaction(inputs=pending_input, outputs=message.content)
-                )
-                pending_input = None
-        # system / tool messages: no input/output pairing, skip
-    if pending_input is not None:
-        interactions.append(Interaction(inputs=pending_input, outputs=None))
-    return await Trace.from_interactions(*interactions)
+    return await trace_from_role_content_turns(messages)
 
 
 _SEVERITY_SCORE = {
