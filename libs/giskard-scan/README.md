@@ -5,12 +5,16 @@ Agent vulnerability scanner — red teaming, prompt injection, adversarial scena
 ## Third-party scanners (experimental)
 
 `third_party_scan` runs an external security scanner against a Giskard target and
-returns a `SuiteResult`. Only [garak](https://github.com/NVIDIA/garak) is supported
-today, and it ships as an optional extra:
+returns a `SuiteResult`. Two scanners are supported, each shipping as an optional
+extra: [garak](https://github.com/NVIDIA/garak) and
+[deepteam](https://github.com/confident-ai/deepteam).
 
 ```bash
 pip install giskard-scan[garak]
+pip install giskard-scan[deepteam]
 ```
+
+### garak
 
 ```python
 import asyncio
@@ -27,7 +31,7 @@ result = asyncio.run(
     third_party_scan(
         target,
         tool="garak",
-        description="A helpful assistant",  # required; lidar builds its target profile from this, garak ignores it
+        description="A helpful assistant",  # required by the API; garak ignores it
         probes=["probes.goodside.ThreatenJSON"],  # omit to run all active probes
         target_mode="multiturn",  # "singleturn" skips garak's iterative probes
     )
@@ -39,6 +43,40 @@ print(result)
 Probes run in parallel; the target is invoked concurrently, so it must be safe to
 call from multiple threads (per-conversation state is tracked in the `Trace`, not on
 the target).
+
+Unknown probe names are logged and skipped rather than raising.
+
+### deepteam
+
+Deepteam generates adversarial attacks with an LLM and judges the responses with an
+LLM, so it needs a working Giskard default generator (see
+`giskard.checks.get_default_generator()`) — there is no keyless mode.
+
+```python
+result = asyncio.run(
+    third_party_scan(
+        target,
+        tool="deepteam",
+        description="A helpful assistant",  # becomes deepteam's target_purpose
+        vulnerabilities=["Bias", "Toxicity"],  # omit for a curated default set
+        attacks=["PromptInjection", "LinearJailbreaking"],  # omit for defaults
+        target_mode="multiturn",
+    )
+)
+```
+
+`vulnerabilities` accepts `Bias`, `Toxicity`, `PIILeakage`, `PromptLeakage`, and
+`Misinformation`.
+
+`attacks` accepts the single-turn `PromptInjection`, `Roleplay`, `Leetspeak`, and
+`ROT13`, plus the multi-turn `LinearJailbreaking`, `CrescendoJailbreaking`,
+`TreeJailbreaking`, `SequentialJailbreak`, and `BadLikertJudge`. An unrecognized
+name raises `ValueError` listing the valid ones.
+
+`target_mode="singleturn"` **drops every multi-turn attack** from the run. If that
+leaves nothing to run — for example `attacks=["CrescendoJailbreaking"]` with
+`target_mode="singleturn"` — the scan returns an empty `SuiteResult`, which reads
+as "nothing failed" rather than as an error.
 
 ### API keys and LLM-judge detectors
 

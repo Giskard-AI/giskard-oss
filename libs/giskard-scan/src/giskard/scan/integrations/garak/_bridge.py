@@ -1,5 +1,4 @@
 import asyncio
-import uuid  # noqa: F401 — re-exported convenience for callers that build uuids
 from collections.abc import Coroutine
 from typing import Any
 

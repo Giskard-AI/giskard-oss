@@ -64,6 +64,9 @@ install-minimal: ## Install with test group only (no provider SDKs, all packages
 install-garak-test: ## Install garak optional extra for scan integration tests
 	uv sync --group garak-test
 
+install-deepteam-test: ## Install deepteam optional extra for scan integration tests
+	uv sync --group deepteam-test
+
 install-lidar-test: ## Install lidar private dependency for scan integration tests
 	uv sync --group lidar-test
 
@@ -82,6 +85,9 @@ test-no-providers: ## Run tests that verify behavior when provider SDKs are miss
 
 test-garak: ## Run garak integration tests (requires: make install-garak-test)
 	uv run pytest libs/giskard-scan/tests/integrations/garak
+
+test-deepteam: ## Run deepteam integration tests (requires: make install-deepteam-test)
+	uv run pytest libs/giskard-scan/tests/integrations/deepteam
 
 test-package-conflict: ## Test package conflict with giskard legacy package installed
 	@echo "Testing package conflict..."

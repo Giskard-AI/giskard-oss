@@ -12,7 +12,13 @@ from ._bridge import _await_on_loop, _conv_uuid
 class TargetGenerator[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     Generator
 ):
-    """Target generator. Just echoes back the prompt."""
+    """Drives a Giskard ``Target`` as a garak generator.
+
+    Garak calls ``_call_model`` once per turn with the conversation so far and has
+    no notion of our ``Trace``. We key the trace by garak's conversation uuid in
+    ``internal_cache`` so a multi-turn probe accumulates one linear trace across
+    its turns, and pop on read so finished conversations don't leak.
+    """
 
     generator_family_name = "target"
     target: Target[InputType, OutputType, TraceType]

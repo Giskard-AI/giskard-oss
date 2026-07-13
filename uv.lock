@@ -1206,6 +1206,9 @@ anthropic = [
 azure = [
     { name = "giskard-llm", extra = ["azure"] },
 ]
+deepteam = [
+    { name = "giskard-scan", extra = ["deepteam"] },
+]
 full = [
     { name = "giskard-agents", extra = ["litellm"] },
     { name = "giskard-checks", extra = ["all"] },
@@ -1283,9 +1286,10 @@ requires-dist = [
     { name = "giskard-llm", extras = ["google"], marker = "extra == 'google'", editable = "libs/giskard-llm" },
     { name = "giskard-llm", extras = ["openai"], marker = "extra == 'openai'", editable = "libs/giskard-llm" },
     { name = "giskard-scan", marker = "extra == 'scan'", editable = "libs/giskard-scan" },
+    { name = "giskard-scan", extras = ["deepteam"], marker = "extra == 'deepteam'", editable = "libs/giskard-scan" },
     { name = "giskard-scan", extras = ["garak"], marker = "extra == 'garak'", editable = "libs/giskard-scan" },
 ]
-provides-extras = ["openai", "google", "anthropic", "azure", "litellm", "regorus", "scan", "garak", "all-llms", "all-checks", "full"]
+provides-extras = ["openai", "google", "anthropic", "azure", "litellm", "regorus", "scan", "garak", "deepteam", "all-llms", "all-checks", "full"]
 
 [package.metadata.requires-dev]
 deepteam-test = [
