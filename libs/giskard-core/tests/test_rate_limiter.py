@@ -121,6 +121,25 @@ class TestRateLimiterRegistry:
         )
         assert _rate_limiter_a._state is not _rate_limiter_b._state
 
+    def test_from_id_finds_second_equal_instance_after_first_is_deleted(self):
+        # Two structurally-equal instances sharing the same id can coexist when
+        # duplicate warnings are downgraded. The registry must track them by
+        # object identity, not by structural equality, or deleting the first
+        # one makes the still-alive second one unreachable via from_id().
+        with patch(
+            "giskard.core.rate_limiter.base.GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS",
+            True,
+        ):
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                rl_id = _uid()
+                rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
+                rate_limiter_b = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
+                del rate_limiter_a
+
+                found = MinIntervalRateLimiter.from_id(rl_id)
+                assert found is rate_limiter_b
+
 
 class TestDeepCopy:
     def test_deepcopy_returns_same_instance(self):
