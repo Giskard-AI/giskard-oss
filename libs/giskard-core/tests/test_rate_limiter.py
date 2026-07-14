@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import gc
 import time
 import uuid
 import warnings
@@ -139,6 +140,20 @@ class TestRateLimiterRegistry:
 
                 found = MinIntervalRateLimiter.from_id(rl_id)
                 assert found is rate_limiter_b
+
+    def test_registry_drops_tracking_entry_once_all_instances_are_collected(self):
+        # Every rate limiter created without an explicit id gets a fresh
+        # random UUID, so leaving an empty WeakValueDictionary behind in
+        # _instances after the last instance for an id is collected would
+        # leak one dict entry per ephemeral rate limiter forever.
+        rl_id = _uid()
+        rate_limiter = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
+        assert rl_id in MinIntervalRateLimiter._registry._instances
+
+        del rate_limiter
+        gc.collect()
+
+        assert rl_id not in MinIntervalRateLimiter._registry._instances
 
 
 class TestDeepCopy:
