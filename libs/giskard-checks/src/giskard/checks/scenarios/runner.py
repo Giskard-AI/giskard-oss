@@ -5,6 +5,7 @@ pattern, where components yield Interactions or CheckResults and receive
 updated Trace objects via the async generator protocol.
 """
 
+import logging
 import time
 from typing import Any, cast
 
@@ -23,6 +24,13 @@ from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
 from ..core.types import Target
 from ..utils.inference import _infer_trace_type
+
+# Progress logging is opt-in via the standard logging hierarchy, e.g.
+# ``logging.getLogger("giskard").setLevel(logging.INFO)``. It stays silent at
+# the default WARNING level, so existing behavior is unchanged. Each record
+# carries the scenario name so output remains readable when scenarios run
+# concurrently under ``Suite.run(parallel=True)``.
+logger = logging.getLogger(__name__)
 
 
 def _validate_multiple_runs(value: int | None) -> int | None:
@@ -132,10 +140,23 @@ class ScenarioRunner:
             properties=shape_props,
         )
 
-        for step in steps:
+        total_steps = len(steps)
+        for step_index, step in enumerate(steps, start=1):
             trace = await trace.with_interactions(*step.interacts)
             last_interaction_index = (
                 len(trace.interactions) - 1 if trace.interactions else None
+            )
+
+            check_names = (
+                ", ".join(str(check.name or check.kind) for check in step.checks)
+                or "<none>"
+            )
+            logger.info(
+                "Scenario %r: running step %d/%d (checks: %s)",
+                scenario.name,
+                step_index,
+                total_steps,
+                check_names,
             )
 
             test_case = TestCase(
@@ -147,6 +168,14 @@ class ScenarioRunner:
                 update={"last_interaction_index": last_interaction_index}
             )
             steps_results.append(step_result)
+
+            logger.info(
+                "Scenario %r: step %d/%d %s",
+                scenario.name,
+                step_index,
+                total_steps,
+                "passed" if step_result.passed else "failed",
+            )
 
             # Stop on first failure
             if not step_result.passed:
