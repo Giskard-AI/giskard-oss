@@ -569,6 +569,32 @@ class TestScenarioEdgeCases:
         assert len(result.final_trace.interactions) == 0
         assert result.passed
 
+    async def test_last_interaction_index_is_none_when_step_adds_no_new_interactions(
+        self,
+    ):
+        """A step whose interaction spec yields zero interactions must report
+        last_interaction_index=None for that step, even when an earlier step
+        already populated the trace -- it must not point at a prior step's
+        interaction."""
+        interaction1 = Interaction(inputs="in1", outputs="out1")
+        spec_with_interaction = MockInteractionSpec(interactions=[interaction1])
+        spec_with_no_interactions = MockInteractionSpec(interactions=[])
+        check1 = MockCheck(result=CheckResult.success(message="c1"))
+        check2 = MockCheck(result=CheckResult.success(message="c2"))
+
+        result = await (
+            Scenario("last_interaction_index_repro")
+            .add_interaction(spec_with_interaction)
+            .check(check1)
+            .add_interaction(spec_with_no_interactions)
+            .check(check2)
+            .run()
+        )
+
+        assert len(result.steps) == 2
+        assert result.steps[0].last_interaction_index == 0
+        assert result.steps[1].last_interaction_index is None
+
     async def test_scenario_with_multiple_consecutive_interactions(self):
         """Test scenario with multiple consecutive interaction specs."""
         mock_interactions: list[InteractionSpec[str, str, Trace[str, str]]] = [

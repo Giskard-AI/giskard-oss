@@ -133,9 +133,12 @@ class ScenarioRunner:
         )
 
         for step in steps:
+            interactions_before = len(trace.interactions)
             trace = await trace.with_interactions(*step.interacts)
             last_interaction_index = (
-                len(trace.interactions) - 1 if trace.interactions else None
+                len(trace.interactions) - 1
+                if len(trace.interactions) > interactions_before
+                else None
             )
 
             test_case = TestCase(
