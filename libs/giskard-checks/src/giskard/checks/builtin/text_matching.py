@@ -624,6 +624,16 @@ class _ContainsBase[InputType, OutputType, TraceType: Trace](  # pyright: ignore
                 ),
             )
 
+        if any(v == "" for v in values):
+            return (
+                None,
+                None,
+                CheckResult.failure(
+                    message="The values list contains an empty string, which would match any text trivially.",
+                    details=details,
+                ),
+            )
+
         if isinstance(text, NoMatch):
             return (
                 None,

@@ -124,6 +124,37 @@ async def test_empty_values_list_fails() -> None:
     assert "empty" in result.message
 
 
+async def test_contains_any_rejects_empty_string_value() -> None:
+    """An empty string in values would match any text trivially, so it's rejected.
+
+    Regression test for the vacuous-match case flagged in review: an empty
+    string in `values` always satisfies `"" in text`, so without this guard
+    ContainsAny would report PASS (matched == [""]) even though none of the
+    real expected topics were mentioned.
+    """
+    check = ContainsAny(
+        text_key="trace.last.outputs.response",
+        values_key="trace.last.inputs.expected_topics",
+    )
+    interaction = Interaction(
+        inputs={"expected_topics": ["pricing", "refunds", ""]},
+        outputs={"response": "Sorry, I cannot help with that."},
+    )
+    result = await check.run(Trace(interactions=[interaction]))
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "empty string" in result.message
+
+
+async def test_contains_all_rejects_empty_string_value() -> None:
+    """The same empty-string guard applies to ContainsAll (shared validation)."""
+    check = ContainsAll(text="Some text", values=["some", ""])
+    result = await check.run(Trace())
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "empty string" in result.message
+
+
 async def test_missing_values_in_trace() -> None:
     """Missing values in the trace produce a failure result, not an exception."""
     check = ContainsAny(
