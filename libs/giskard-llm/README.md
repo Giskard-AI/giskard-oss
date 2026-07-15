@@ -97,6 +97,36 @@ Use `azure_ai/` for the existing Azure AI Foundry compatibility path. Do not
 use `azure_ai/` for new OpenAI v1 endpoints unless you intentionally need that
 legacy endpoint behavior.
 
+## OpenAI-compatible multi-model gateways
+
+Any OpenAI-compatible Chat Completions host can use the `openai` provider with
+a custom `base_url`. Example with [DaoXE](https://daoxe.com)
+(`https://daoxe.com/v1`):
+
+```python
+from giskard.llm import LLMClient
+
+client = LLMClient()
+client.configure(
+    "daoxe",
+    provider="openai",
+    api_key="os.environ/DAOXE_API_KEY",  # pragma: allowlist secret
+    base_url="https://daoxe.com/v1",
+)
+
+response = await client.acompletion(
+    "daoxe/your-account-model-id",  # exact ID from GET /v1/models or dashboard
+    [{"role": "user", "content": "Write one sentence."}],
+)
+```
+
+Notes:
+
+- Model IDs are account-scoped; do not hardcode a static public catalog.
+- Chat Completions path only on this snippet.
+- DaoXE is not available in mainland China.
+- Contributor disclosure: this example was contributed by a DaoXE affiliate.
+
 ## Custom transport and headers
 
 Use `http_client` to provide a caller-owned async HTTP client, for example
