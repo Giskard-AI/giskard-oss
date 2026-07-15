@@ -123,7 +123,7 @@ response = await client.acompletion(
 Notes:
 
 - Model IDs are account-scoped; do not hardcode a static public catalog.
-- Chat Completions path only on this snippet.
+- This snippet only demonstrates the Chat Completions path.
 - DaoXE is not available in mainland China.
 - Contributor disclosure: this example was contributed by a DaoXE affiliate.
 
