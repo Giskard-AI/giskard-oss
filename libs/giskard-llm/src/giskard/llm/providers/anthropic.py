@@ -224,7 +224,7 @@ class AnthropicProvider:
                 raise BadRequestError(
                     400, "Tool messages must have a tool_call_id.", PROVIDER
                 )
-            if m.role in _ANTHROPIC_INSTRUCTION_ROLES and not (m.content or "").strip():
+            if m.role in _ANTHROPIC_INSTRUCTION_ROLES and not (m.text or "").strip():
                 raise BadRequestError(
                     400,
                     "System and developer messages must have non-empty content.",
