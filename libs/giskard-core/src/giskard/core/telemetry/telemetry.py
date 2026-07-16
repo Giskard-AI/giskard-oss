@@ -92,7 +92,11 @@ def _get_or_create_anonymous_id() -> str | None:
     config_path = Path.home() / ".giskard" / "id"
     if config_path.exists():
         try:
-            return config_path.read_text(encoding="utf-8").strip()
+            content = config_path.read_text(encoding="utf-8").strip()
+            # An empty/truncated file (e.g. a crash between the atomic create and
+            # the write below) must not collapse the id to "" — fall back like the
+            # FileExistsError branch does.
+            return content if content else f"anon-{uuid.uuid4()}"
         except OSError:
             # Unreadable path (permissions, race with deletion, etc.): mint ephemeral below.
             pass
