@@ -71,6 +71,66 @@ def test_from_anthropic_refusal_stop():
     assert ch.finish_reason == "stop"
     assert ch.message.content is None
     assert ch.message.refusal == "Policy decline."
+    assert ch.message.is_refusal
+
+
+def test_from_anthropic_refusal_without_stop_details():
+    """A refusal with no ``stop_details`` falls back to the bare stop reason."""
+    raw = _message(
+        {
+            "content": [{"type": "text", "text": "I can't help with that."}],
+            "stop_reason": "refusal",
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    ch = out.choices[0]
+    assert ch.message.refusal == "refusal"
+    assert ch.message.is_refusal
+
+
+def test_from_anthropic_refusal_falls_back_to_category():
+    """Without ``explanation``, the structured ``category`` carries the reason."""
+    raw = _message(
+        {
+            "content": [],
+            "stop_reason": "refusal",
+            "stop_details": {"type": "refusal", "category": "bio"},
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    ch = out.choices[0]
+    assert ch.message.refusal == "bio"
+    assert ch.message.is_refusal
+
+
+def test_from_anthropic_refusal_prefers_explanation_over_category():
+    """``explanation`` stays preferred when both fields are populated."""
+    raw = _message(
+        {
+            "content": [],
+            "stop_reason": "refusal",
+            "stop_details": {
+                "type": "refusal",
+                "category": "bio",
+                "explanation": "Policy decline.",
+            },
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    assert out.choices[0].message.refusal == "Policy decline."
+
+
+def test_from_anthropic_non_refusal_stop_reason_sets_no_refusal():
+    """A normal completion is never marked as a refusal."""
+    raw = _message(
+        {
+            "content": [{"type": "text", "text": "Hello from Claude."}],
+            "stop_reason": "end_turn",
+        }
+    )
+    ch = AnthropicChatTranslator.from_anthropic(raw).choices[0]
+    assert ch.message.refusal is None
+    assert not ch.message.is_refusal
 
 
 def test_from_anthropic_multiple_text_blocks_joined():

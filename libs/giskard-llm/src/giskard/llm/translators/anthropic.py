@@ -313,9 +313,17 @@ class AnthropicChatTranslator:
         )
 
         refusal_out: str | None = None
-        if raw.stop_reason == "refusal" and raw.stop_details is not None:
+        if raw.stop_reason == "refusal":
+            # stop_details and both of its fields are optional, so a refusal may carry
+            # its reason in the structured category, or carry no detail at all. Fall
+            # back to the bare stop reason rather than None so the refusal stays
+            # detectable, the way google_chat falls back when finish_message is absent.
             # stop_details.explanation is a beta Anthropic API attribute; use getattr for safety
-            refusal_out = getattr(raw.stop_details, "explanation", None)
+            refusal_out = (
+                getattr(raw.stop_details, "explanation", None)
+                or getattr(raw.stop_details, "category", None)
+                or raw.stop_reason
+            )
 
         message = AssistantMessage(
             role="assistant",
