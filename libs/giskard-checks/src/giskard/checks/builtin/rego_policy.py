@@ -2,7 +2,6 @@
 
 import importlib
 import json
-import warnings
 from typing import Any, Self, override
 
 from pydantic import Field, PrivateAttr, model_validator
@@ -11,6 +10,7 @@ from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, NoMatch, resolve
 from ..core.result import CheckResult
+from ..utils.optional_deps import require_optional_dependency
 
 _REGORUS_INSTALL_HINT = (
     "The regorus dependency is required to run RegoPolicy. "
@@ -19,10 +19,6 @@ _REGORUS_INSTALL_HINT = (
 )
 
 _POLICY_FILENAME = "giskard_policy.rego"
-_VALIDATION_SKIPPED_WARNING = (
-    "RegoPolicy validation skipped: optional dependency 'regorus' is not installed. "
-    "Install it with: pip install 'giskard-checks[regorus]'."
-)
 
 
 def _result_from_boolean_rule(
@@ -133,25 +129,13 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
 
     @model_validator(mode="after")
     def _validate_rule_path(self) -> Self:
-        """Validate the rule path and (optionally) the policy syntax.
-
-        If `regorus` is installed, this validator parses the provided policy (and
-        loads `data`) to surface syntax errors at instantiation time. If `regorus`
-        is not installed, validation is skipped and a warning is emitted; runtime
-        evaluation will still fail if `regorus` is missing.
-        """
+        """Validate the rule path, dependency, and policy syntax."""
         if not self.rule.startswith("data."):
             raise ValueError("Rule path must start with 'data.'.")
 
-        try:
-            regorus = importlib.import_module("regorus")
-        except ImportError:
-            warnings.warn(
-                _VALIDATION_SKIPPED_WARNING,
-                category=RuntimeWarning,
-                stacklevel=2,
-            )
-            return self
+        regorus = require_optional_dependency(
+            "regorus", install_hint=_REGORUS_INSTALL_HINT
+        )
 
         try:
             self._compile_engine(regorus)
@@ -175,8 +159,8 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
         -------
         CheckResult
             Pass if the rule evaluates to ``True``, fail if ``False`` or
-            undefined, error if regorus is missing, evaluation fails, or the
-            rule value is not boolean.
+            undefined, error if evaluation fails or the rule value is not
+            boolean.
         """
         raw_value = resolve(trace, self.key)
         details: dict[str, Any] = {
@@ -203,13 +187,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
                 details=details,
             )
 
-        try:
-            regorus = importlib.import_module("regorus")
-        except ImportError:
-            return CheckResult.error(
-                message=_REGORUS_INSTALL_HINT,
-                details=details,
-            )
+        regorus = importlib.import_module("regorus")
 
         try:
             engine = self._get_engine(regorus)

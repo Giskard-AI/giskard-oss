@@ -8,6 +8,7 @@ requires-python = ">=3.12"
 dependencies = [
     "jsonpath-ng>=1.7.0,<2",
     "pydantic>=2.12,<3",
+    "pydantic-settings>=2.7,<3",
     "giskard-agents>=1.0.2b2",
     "jinja2>=3.1.6,<4",
     "giskard-core>=1.0.1b3,<2",
@@ -18,8 +19,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-local-embeddings = ["sentence-transformers>=2.0,<4"]
+local-embeddings = ["sentence-transformers>=4,<6"]
+readability = [
+    "textstat>=0.7.0",
+]
 regorus = ["celine-regorus>=0.9.1"]
+all = ["giskard-checks[readability,regorus]"] # Install optional dependencies compatible with the full workspace
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]

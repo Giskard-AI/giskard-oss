@@ -482,20 +482,32 @@ def _all_subclasses(cls: type) -> list[type]:
 
 
 def _make_httpx_sdk_exc(cls: type) -> Exception:
-    """Construct a minimal httpx-based SDK exception (openai / anthropic / google._interactions)."""
-    import httpx  # pyright: ignore[reportMissingImports]
+    """Construct a minimal httpx-based SDK exception (openai / anthropic / google._interactions).
 
-    name = cls.__name__
-    if name == "APITimeoutError":
-        return cls(request=httpx.Request("GET", "https://test"))  # type: ignore[call-arg]
-    if name == "APIConnectionError":
-        return cls(request=httpx.Request("GET", "https://test"), message="conn err")  # type: ignore[call-arg]
-    if name == "APIResponseValidationError":
-        resp = httpx.Response(200, request=httpx.Request("GET", "https://test"))
-        return cls(response=resp, body=None)  # type: ignore[call-arg]
-    # APIStatusError and all its subclasses
-    resp = httpx.Response(400, request=httpx.Request("GET", "https://test"))
-    return cls(message="test", response=resp, body=None)  # type: ignore[call-arg]
+    SDK error classes have inconsistent constructor signatures (some take
+    ``message``, some ``response``, some ``request``, some only keyword args).
+    Rather than special-casing each class name, introspect the constructor and
+    pass only the arguments it accepts.
+    """
+    import inspect
+
+    import httpx
+
+    request = httpx.Request("GET", "https://test")
+    response = httpx.Response(400, request=request)
+
+    available = {
+        "message": "test",
+        "request": request,
+        "response": response,
+        "body": None,
+    }
+
+    params = inspect.signature(cls.__init__).parameters
+    kwargs: dict[str, object] = {
+        name: value for name, value in available.items() if name in params
+    }
+    return cls(**kwargs)
 
 
 @pytest.mark.openai
@@ -582,6 +594,27 @@ async def test_openai_validate_empty_system_content(mock_import):
                 {"role": "user", "content": "Hi"},
             ],
         )
+
+
+@patch("giskard.llm.providers.openai._import_openai")
+@pytest.mark.openai
+async def test_openai_validate_developer_content_as_content_blocks(mock_import):
+    """Developer ``content`` typed as a list of ``TextContent`` blocks (the SDK-native
+    shape, reachable via plain-dict validation) must be normalized through ``.text``,
+    not crash with ``AttributeError`` from calling ``.strip()`` on a list."""
+    mock_import.return_value = MagicMock()
+    provider = _make_openai_provider()
+    provider._client.chat.completions.create = AsyncMock(
+        return_value=_make_openai_response("Hello")
+    )
+    resp = await provider.complete(
+        "gpt-4o",
+        [
+            {"role": "developer", "content": [{"type": "text", "text": "Be helpful"}]},
+            {"role": "user", "content": "Hi"},
+        ],
+    )
+    assert resp.choices[0].message.content == "Hello"
 
 
 @patch("giskard.llm.providers.openai._import_openai")
@@ -708,6 +741,31 @@ async def test_anthropic_validate_empty_developer_content(mock_import):
 
 
 @patch("giskard.llm.providers.anthropic._import_anthropic")
+async def test_anthropic_validate_developer_content_as_content_blocks(mock_import):
+    """Developer ``content`` typed as a list of ``TextContent`` blocks must be
+    normalized through ``.text``, not crash with ``AttributeError`` from calling
+    ``.strip()`` on a list."""
+    mock_import.return_value = MagicMock()
+    provider = _make_anthropic_provider()
+
+    mock_raw = MagicMock()
+    mock_raw.content = [SimpleNamespace(type="text", text="Hello")]
+    mock_raw.stop_reason = "end_turn"
+    mock_raw.model = "claude-3"
+    mock_raw.usage = SimpleNamespace(input_tokens=10, output_tokens=5)
+    provider._client.messages.create = AsyncMock(return_value=mock_raw)
+
+    resp = await provider.complete(
+        "claude-3",
+        [
+            {"role": "developer", "content": [{"type": "text", "text": "Be helpful"}]},
+            {"role": "user", "content": "Hi"},
+        ],
+    )
+    assert resp.choices[0].message.content == [TextContent(text="Hello")]
+
+
+@patch("giskard.llm.providers.anthropic._import_anthropic")
 async def test_anthropic_validate_alternation(mock_import):
     mock_import.return_value = MagicMock()
     provider = _make_anthropic_provider()
@@ -720,6 +778,47 @@ async def test_anthropic_validate_alternation(mock_import):
                 {"role": "user", "content": "Hello again"},
             ],
         )
+
+
+# -- Google message validation --------------------------------------------------
+
+
+@patch("giskard.llm.providers.google._import_genai_errors")
+@pytest.mark.google
+async def test_google_validate_developer_content_as_content_blocks(mock_errors):
+    """Developer ``content`` typed as a list of ``TextContent`` blocks must be
+    normalized through ``.text``, not crash with ``AttributeError`` from calling
+    ``.strip()`` on a list."""
+    genai_types = pytest.importorskip("google.genai.types")
+    mock_errors.return_value = MagicMock()
+    provider = _make_google_provider()
+    provider._client.aio = MagicMock()
+    provider._client.aio.models = MagicMock()
+    raw = genai_types.GenerateContentResponse.model_validate(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Hello"}]},
+                    "finish_reason": "STOP",
+                }
+            ],
+            "usage_metadata": {
+                "prompt_token_count": 3,
+                "candidates_token_count": 4,
+                "total_token_count": 7,
+            },
+        }
+    )
+    provider._client.aio.models.generate_content = AsyncMock(return_value=raw)
+
+    resp = await provider.complete(
+        "gemini-3.5-flash",
+        [
+            {"role": "developer", "content": [{"type": "text", "text": "Be helpful"}]},
+            {"role": "user", "content": "Hi"},
+        ],
+    )
+    assert resp.choices[0].message.content == [TextContent(text="Hello")]
 
 
 # -- OpenAI Responses API (respond) -------------------------------------------

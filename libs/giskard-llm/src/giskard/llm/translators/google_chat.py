@@ -284,7 +284,6 @@ REFUSAL_REASONS = frozenset(
 FINISH_REASON_MAP = {
     "STOP": "stop",
     "MAX_TOKENS": "length",
-    "SAFETY": "content_filter",
 } | {reason: "refusal" for reason in REFUSAL_REASONS}
 
 
@@ -372,16 +371,24 @@ class GoogleChatTranslator:
         if not raw.candidates:
             return CompletionResponse(choices=[], model=model)
 
+        # ``candidate.finish_reason`` is a ``FinishReason`` enum whose ``str()`` is
+        # ``"FinishReason.SAFETY"`` (etc.), not the bare ``"SAFETY"`` the map is keyed
+        # on -- so read ``.value``. The SDK is an optional dep imported by the caller,
+        # so ``FinishReason`` is resolved lazily here (never at module load).
+        from google.genai.types import FinishReason
+
         for i, candidate in enumerate(raw.candidates):
             finish_reason = "stop"
 
-            if candidate.finish_reason:
-                finish_reason = FINISH_REASON_MAP.get(
-                    str(candidate.finish_reason), "stop"
-                )
+            fr = candidate.finish_reason
+            raw_finish_reason = (
+                fr.value if isinstance(fr, FinishReason) else str(fr or "")
+            )
+            if fr:
+                finish_reason = FINISH_REASON_MAP.get(raw_finish_reason, "stop")
 
             refusal_out = (
-                (candidate.finish_message or candidate.finish_reason)
+                (candidate.finish_message or raw_finish_reason)
                 if finish_reason == "refusal"
                 else None
             )

@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 from giskard.agents.embeddings.base import BaseEmbeddingModel
 from giskard.checks import CheckStatus, Interaction, SemanticSimilarity, Trace
+from giskard.checks.utils import optional_deps
 from giskard.checks.utils.embeddings import SentenceTransformerEmbedding
 
 
@@ -68,16 +69,16 @@ async def test_sentence_transformer_embedding_raises_helpful_import_error(
 ) -> None:
     monkeypatch.delitem(sys.modules, "sentence_transformers", raising=False)
 
-    original_import = __import__
+    real_import_module = optional_deps.importlib.import_module
 
-    def raising_import(name: str, *args: object, **kwargs: object) -> object:
+    def fake_import_module(name: str, /, *args: object, **kwargs: object) -> object:
         if name == "sentence_transformers":
             raise ImportError("No module named 'sentence_transformers'")
-        return original_import(name, *args, **kwargs)
+        return real_import_module(name, *args, **kwargs)
 
-    monkeypatch.setattr("builtins.__import__", raising_import)
+    monkeypatch.setattr(optional_deps.importlib, "import_module", fake_import_module)
 
     model = SentenceTransformerEmbedding()
 
-    with pytest.raises(ImportError, match="local-embeddings"):
+    with pytest.raises(ValueError, match="local-embeddings"):
         await model.embed(["Hello world"])

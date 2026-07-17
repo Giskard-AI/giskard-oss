@@ -178,7 +178,7 @@ API Overview
 
 **Built-in and LLM-based checks**
 - `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
-- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LesserThan`, `LesserThanEquals`.
+- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LessThan`, `LessThanEquals` (`LesserThan` and `LesserThanEquals` are deprecated aliases).
 - `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
 - JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks via `key` or check-specific fields like `answer_key`.
 
@@ -188,6 +188,13 @@ API Overview
 **Settings**
 - `giskard.checks.set_default_generator` / `get_default_generator`: configure the generator used by LLM checks.
 - `giskard.checks.set_default_embedding_model` / `get_default_embedding_model`: configure the embedding model used by embedding-based checks such as `SemanticSimilarity`.
+- Environment variables (or `.env` at the project root), prefixed with `GISKARD_CHECKS_`:
+  - `GISKARD_CHECKS_DEFAULT_MODEL` — default LLM model (default: `openai/gpt-4o-mini`).
+  - `GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL` — default embedding model (default: `text-embedding-3-small`).
+  - `GISKARD_CHECKS_MAX_REPORTED_FAILURES` — cap on failures shown in suite reports.
+  - `GISKARD_CHECKS_DISABLE_RICH_PRETTY` — disable rich REPL pretty-printing.
+
+Runtime `set_default_generator()` and `set_default_embedding_model()` overrides take precedence over environment settings.
 
 Testing
 -------
@@ -544,14 +551,39 @@ pip install "giskard-checks[local-embeddings]"
 Then configure the built-in local provider:
 
 ```python
-from giskard.checks import SemanticSimilarity, set_default_embedding_model
+import asyncio
+
+from giskard.checks import (
+    Interaction,
+    SemanticSimilarity,
+    Trace,
+    set_default_embedding_model,
+)
 from giskard.checks.utils.embeddings import SentenceTransformerEmbedding
 
-set_default_embedding_model(
-    SentenceTransformerEmbedding(model_name="all-MiniLM-L6-v2")
-)
+async def main() -> None:
+    set_default_embedding_model(
+        SentenceTransformerEmbedding(model_name="all-MiniLM-L6-v2")
+    )
 
-check = SemanticSimilarity(reference_text="Hello world", threshold=0.8)
+    check = SemanticSimilarity(
+        reference_text="Giskard evaluates AI systems.",
+        actual_answer_key="trace.last.outputs.answer",
+        threshold=0.8,
+    )
+    trace = Trace(
+        interactions=[
+            Interaction(
+                inputs={"question": "What does Giskard do?"},
+                outputs={"answer": "Giskard helps evaluate AI systems."},
+            )
+        ]
+    )
+
+    result = await check.run(trace)
+    assert result.passed, result.message
+
+asyncio.run(main())
 ```
 
 You can also plug in your own provider by subclassing

@@ -6,6 +6,15 @@ from giskard.agents.embeddings import BaseEmbeddingModel
 from giskard.agents.embeddings.base import EmbeddingParams
 from pydantic import Field, PrivateAttr
 
+from .optional_deps import require_optional_dependency
+
+
+_SENTENCE_TRANSFORMERS_INSTALL_HINT = (
+    "The 'sentence-transformers' package is required for "
+    "SentenceTransformerEmbedding. Install it with: "
+    "pip install 'giskard-checks[local-embeddings]'"
+)
+
 
 @BaseEmbeddingModel.register("sentence_transformer")
 class SentenceTransformerEmbedding(BaseEmbeddingModel):
@@ -38,20 +47,17 @@ class SentenceTransformerEmbedding(BaseEmbeddingModel):
         if self._model is not None:
             return self._model
 
-        try:
-            from sentence_transformers import SentenceTransformer
-        except ImportError as exc:
-            raise ImportError(
-                "SentenceTransformerEmbedding requires the optional dependency "
-                "'sentence-transformers'. Install it with "
-                "'pip install \"giskard-checks[local-embeddings]\"'."
-            ) from exc
+        sentence_transformers = require_optional_dependency(
+            "sentence_transformers", install_hint=_SENTENCE_TRANSFORMERS_INSTALL_HINT
+        )
 
         kwargs: dict[str, Any] = {}
         if self.device is not None:
             kwargs["device"] = self.device
 
-        self._model = SentenceTransformer(self.model_name, **kwargs)
+        self._model = sentence_transformers.SentenceTransformer(
+            self.model_name, **kwargs
+        )
         return self._model
 
     def _encode(self, texts: list[str]) -> list[np.ndarray]:
