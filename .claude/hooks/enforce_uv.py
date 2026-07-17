@@ -21,21 +21,28 @@ def main() -> int:
     except Exception:
         return 0  # fail open on unparseable input
 
-    command = payload.get("tool_input", {}).get("command", "")
-    if not isinstance(command, str):
-        return 0
+    try:
+        tool_input = payload.get("tool_input")
+        if not isinstance(tool_input, dict):
+            return 0
 
-    match = BARE.match(command)
-    if not match:
-        return 0
+        command = tool_input.get("command", "")
+        if not isinstance(command, str):
+            return 0
 
-    tool = match.group(1)
-    print(
-        f"Blocked: bare `{tool}` fails with ModuleNotFoundError in this repo.\n"
-        f"Use `uv run {command.strip()}` instead.",
-        file=sys.stderr,
-    )
-    return 2
+        match = BARE.match(command)
+        if not match:
+            return 0
+
+        tool = match.group(1)
+        print(
+            f"Blocked: bare `{tool}` fails with ModuleNotFoundError in this repo.\n"
+            f"Use `uv run {command.strip()}` instead.",
+            file=sys.stderr,
+        )
+        return 2
+    except Exception:
+        return 0
 
 
 if __name__ == "__main__":

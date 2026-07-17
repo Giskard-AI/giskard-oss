@@ -37,76 +37,92 @@ def main() -> int:
     except Exception:
         return 0
 
-    raw_path = payload.get("tool_input", {}).get("file_path")
-    project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
-    if not raw_path or not project_dir:
-        return 0
-
-    root = Path(project_dir)
-    config = root / "pyrightconfig.json"
-    path = Path(raw_path)
-
-    if path.suffix != ".py" or not path.exists():
-        return 0
-
     try:
-        rel = path.resolve().relative_to(root.resolve())
-    except ValueError:
-        return 0  # outside the repo
+        tool_input = payload.get("tool_input")
+        if not isinstance(tool_input, dict):
+            return 0
 
-    parts = rel.parts
-    # Require libs/<lib>/<src|tests>/...
-    if len(parts) < 3 or parts[0] != "libs":
+        raw_path = tool_input.get("file_path")
+        if not isinstance(raw_path, str):
+            return 0
+
+        project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+        if not raw_path or not project_dir:
+            return 0
+
+        root = Path(project_dir)
+        config = root / "pyrightconfig.json"
+        path = Path(raw_path)
+
+        if path.suffix != ".py" or not path.exists():
+            return 0
+
+        try:
+            rel = path.resolve().relative_to(root.resolve())
+        except ValueError:
+            return 0  # outside the repo
+
+        parts = rel.parts
+        # Require libs/<lib>/<src|tests>/...
+        if len(parts) < 3 or parts[0] != "libs":
+            return 0
+
+        # ruff runs on both src and tests; failures here are non-fatal.
+        run(["uv", "tool", "run", "ruff", "format", str(path)], root)
+        run(["uv", "tool", "run", "ruff", "check", "--fix", str(path)], root)
+
+        if parts[2] != "src":
+            # tests: ruff only, never typechecked. CI (make typecheck) DOES
+            # typecheck tests via pyrightconfig include: ["libs"], so this
+            # gap is intentional and one-directional: the hook never blocks
+            # anything CI would pass, it just lets TDD red-phase tests through.
+            return 0
+        if not config.exists():
+            return 0
+
+        proc = run(
+            [
+                "uv",
+                "tool",
+                "run",
+                "basedpyright",
+                "--level",
+                "error",
+                "--project",
+                str(config),
+                "--outputjson",
+                str(path),
+            ],
+            root,
+        )
+        if proc is None:
+            return 0
+
+        try:
+            report = json.loads(proc.stdout)
+            error_count = report["summary"]["errorCount"]
+            diagnostics = report["generalDiagnostics"]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            return 0  # unparseable -> fail open
+
+        if error_count == 0:
+            return 0
+
+        lines = [f"basedpyright found {error_count} error(s) in {rel}:"]
+        for diag in diagnostics:
+            if diag.get("severity") != "error":
+                continue
+            line_no = diag.get("range", {}).get("start", {}).get("line", 0) + 1
+            rule = diag.get("rule", "")
+            suffix = f" [{rule}]" if rule else ""
+            lines.append(f"  {rel}:{line_no} {diag.get('message', '')}{suffix}")
+        lines.append(
+            "Fix these before continuing (CI runs basedpyright --level error)."
+        )
+        print("\n".join(lines), file=sys.stderr)
+        return 2
+    except Exception:
         return 0
-
-    # ruff runs on both src and tests; failures here are non-fatal.
-    run(["uv", "tool", "run", "ruff", "format", str(path)], root)
-    run(["uv", "tool", "run", "ruff", "check", "--fix", str(path)], root)
-
-    if parts[2] != "src":
-        return 0  # tests: ruff only, never typechecked
-    if not config.exists():
-        return 0
-
-    proc = run(
-        [
-            "uv",
-            "tool",
-            "run",
-            "basedpyright",
-            "--level",
-            "error",
-            "--project",
-            str(config),
-            "--outputjson",
-            str(path),
-        ],
-        root,
-    )
-    if proc is None:
-        return 0
-
-    try:
-        report = json.loads(proc.stdout)
-        error_count = report["summary"]["errorCount"]
-        diagnostics = report["generalDiagnostics"]
-    except (json.JSONDecodeError, KeyError, TypeError):
-        return 0  # unparseable -> fail open
-
-    if error_count == 0:
-        return 0
-
-    lines = [f"basedpyright found {error_count} error(s) in {rel}:"]
-    for diag in diagnostics:
-        if diag.get("severity") != "error":
-            continue
-        line_no = diag.get("range", {}).get("start", {}).get("line", 0) + 1
-        rule = diag.get("rule", "")
-        suffix = f" [{rule}]" if rule else ""
-        lines.append(f"  {rel}:{line_no} {diag.get('message', '')}{suffix}")
-    lines.append("Fix these before continuing (CI runs basedpyright --level error).")
-    print("\n".join(lines), file=sys.stderr)
-    return 2
 
 
 if __name__ == "__main__":
