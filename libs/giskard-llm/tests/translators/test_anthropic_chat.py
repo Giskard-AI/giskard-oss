@@ -3,6 +3,7 @@
 Request shape: https://docs.anthropic.com/en/api/messages
 """
 
+import logging
 from typing import Literal
 
 import pytest
@@ -401,3 +402,60 @@ def test_function_message_raises():
     ]
     with pytest.raises(ValueError, match="Unsupported message role"):
         AnthropicChatTranslator.to_anthropic(_MODEL, messages)
+
+
+def test_unknown_completion_params_warn(caplog: pytest.LogCaptureFixture):
+    """Caller-supplied params outside KNOWN_COMPLETION_PARAMS are dropped loudly.
+
+    Regression test for issue #2613: AnthropicChatTranslator previously dropped
+    unknown params silently (pydantic extra="ignore" with no warning), so
+    sampling settings like ``top_p`` or ``stop_sequences`` never reached the
+    Anthropic SDK and the caller had no signal that their config was lost.
+    """
+    msg: UserMessage = UserMessage(content="hi")
+    with caplog.at_level(logging.WARNING, logger="giskard.llm.translators.anthropic"):
+        AnthropicChatTranslator.to_anthropic(
+            _MODEL,
+            [msg],
+            top_p=0.5,
+            top_k=40,
+            stop_sequences=["STOP"],
+        )
+
+    warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert len(warnings) == 1, f"expected 1 warning, got {len(warnings)}"
+    message = warnings[0].getMessage()
+    assert "anthropic" in message.lower()
+    # All three unknown params must be named, sorted alphabetically — mirrors
+    # the OpenAI translator's "ignoring unknown completion params: [...]" format.
+    for dropped in ("stop_sequences", "top_k", "top_p"):
+        assert dropped in message
+
+
+def test_known_completion_params_do_not_warn(caplog: pytest.LogCaptureFixture):
+    """Params declared on AnthropicChatConfigParams pass through silently."""
+    msg: UserMessage = UserMessage(content="hi")
+    with caplog.at_level(logging.WARNING, logger="giskard.llm.translators.anthropic"):
+        payload = AnthropicChatTranslator.to_anthropic(
+            _MODEL,
+            [msg],
+            temperature=0.7,
+            max_tokens=100,
+        )
+
+    assert payload["max_tokens"] == 100
+    assert payload["temperature"] == 0.7
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+def test_unknown_completion_params_sorted_in_warning(caplog: pytest.LogCaptureFixture):
+    """Dropped param names are listed in sorted order, matching OpenAI format."""
+    msg: UserMessage = UserMessage(content="hi")
+    with caplog.at_level(logging.WARNING, logger="giskard.llm.translators.anthropic"):
+        AnthropicChatTranslator.to_anthropic(_MODEL, [msg], zebra=1, alpha=2)
+
+    warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert len(warnings) == 1
+    message = warnings[0].getMessage()
+    # Sorted alphabetically: alpha before zebra.
+    assert "['alpha', 'zebra']" in message

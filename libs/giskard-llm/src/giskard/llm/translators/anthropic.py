@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 
@@ -45,6 +46,25 @@ else:
     httpxTimeout = Any
 
 _PROVIDER = "anthropic/chat"
+
+logger = logging.getLogger(__name__)
+
+PROVIDER = "anthropic"
+
+# Completion params that ``to_anthropic(**params)`` accepts. Anything outside
+# this set is silently dropped by ``AnthropicChatConfigParams`` (pydantic
+# ``extra="ignore"``); warn so callers learn their config did not reach the SDK.
+# Mirrors the OpenAI translator's allowlist in ``openai_chat.py``.
+KNOWN_COMPLETION_PARAMS = frozenset(
+    {
+        "max_tokens",
+        "temperature",
+        "timeout",
+        "output_config",
+        "response_format",
+        "system",
+    }
+)
 
 
 @ToolDef.register_serializer(_PROVIDER)
@@ -249,6 +269,14 @@ class AnthropicChatTranslator:
         tools: Sequence[ToolDef] | None = None,
         **params: Any,
     ) -> "CompletionCreateParams":
+        unknown = set(params) - KNOWN_COMPLETION_PARAMS
+        if unknown:
+            logger.warning(
+                "%s provider: ignoring unknown completion params: %s",
+                PROVIDER,
+                sorted(unknown),
+            )
+
         anthropic_params = AnthropicChatConfigParams(
             model=model,
             messages=messages,
