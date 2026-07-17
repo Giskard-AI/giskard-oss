@@ -182,3 +182,7 @@ mlruns
 local/
 *.local
 .claude/settings.local.json
+
+# Agent tooling state (generated, machine-local)
+.deepeval/
+.superpowers/
