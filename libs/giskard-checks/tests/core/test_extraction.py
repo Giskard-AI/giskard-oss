@@ -1,7 +1,12 @@
 """Unit tests for JSONPath validation in extraction.py."""
 
 import pytest
-from giskard.checks.core.extraction import JSONPathStr, _validate_jsonpath_syntax
+from giskard.checks.core.extraction import (
+    JSONPathStr,
+    _validate_jsonpath_syntax,
+    resolve,
+)
+from giskard.checks.core.interaction import Interaction, Trace
 from pydantic import BaseModel, ValidationError
 
 
@@ -73,6 +78,44 @@ class TestValidateJsonpathSyntax:
     def test_valid_descendants_operator(self):
         """JSONPath descendants operator (..) should be valid."""
         assert _validate_jsonpath_syntax("trace..outputs") == "trace..outputs"
+
+
+class TestResolveDotWildcard:
+    """Tests for resolve()'s handling of dot-wildcard/multi-field JSONPath expressions.
+
+    A dot-wildcard (``trace.last.metadata.*``) or multi-field selector must always
+    resolve to a list, regardless of how many keys it actually matches -- otherwise
+    ComparisonCheck's match=any/all/none (which requires list/set/tuple) breaks
+    whenever the matched dict happens to have exactly one key.
+    """
+
+    def test_wildcard_with_single_match_returns_a_list_not_a_bare_scalar(self):
+        trace = Trace[str, str](
+            interactions=[
+                Interaction(inputs="hi", outputs="hello", metadata={"only_key": "v1"})
+            ]
+        )
+        assert resolve(trace, "trace.last.metadata.*") == ["v1"]
+
+    def test_wildcard_with_multiple_matches_returns_a_list(self):
+        trace = Trace[str, str](
+            interactions=[
+                Interaction(
+                    inputs="hi",
+                    outputs="hello",
+                    metadata={"k1": "v1", "k2": "v2"},
+                )
+            ]
+        )
+        result = resolve(trace, "trace.last.metadata.*")
+        assert isinstance(result, list)
+        assert sorted(result) == ["v1", "v2"]
+
+    def test_non_wildcard_single_field_still_returns_a_bare_scalar(self):
+        trace = Trace[str, str](
+            interactions=[Interaction(inputs="hi", outputs="hello")]
+        )
+        assert resolve(trace, "trace.last.outputs") == "hello"
 
 
 class TestJSONPathStrAnnotatedType:

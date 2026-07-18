@@ -166,7 +166,7 @@ class _StepRunner:
 
     async def _run_tools(self, chat: Chat[Any]) -> AsyncGenerator[ToolMessage, None]:
         if (
-            not chat.last
+            not chat.messages
             or not isinstance(chat.last, AssistantMessage)
             or not chat.last.tool_calls
         ):
