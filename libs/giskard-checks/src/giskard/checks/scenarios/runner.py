@@ -6,6 +6,7 @@ updated Trace objects via the async generator protocol.
 """
 
 import time
+import traceback
 from typing import Any, cast
 
 from giskard.core import (
@@ -133,7 +134,39 @@ class ScenarioRunner:
         )
 
         for step in steps:
-            trace = await trace.with_interactions(*step.interacts)
+            try:
+                trace = await trace.with_interactions(*step.interacts)
+            except Exception as exc:
+                if not return_exception:
+                    raise
+                message = f"Input generation failed: {exc}"
+                error_details = {
+                    "phase": "input_generation",
+                    "exception_type": type(exc).__name__,
+                    "traceback": traceback.format_exc(),
+                }
+                steps_results.append(
+                    TestCaseResult(
+                        results=[
+                            CheckResult.error(
+                                message=message,
+                                details={
+                                    **error_details,
+                                    "check_kind": check.kind,
+                                    "check_name": check.name,
+                                    "check_description": check.description,
+                                },
+                            )
+                            for check in step.checks
+                        ]
+                        or [CheckResult.error(message=message, details=error_details)],
+                        duration_ms=0,
+                        last_interaction_index=(
+                            len(trace.interactions) - 1 if trace.interactions else None
+                        ),
+                    )
+                )
+                break
             last_interaction_index = (
                 len(trace.interactions) - 1 if trace.interactions else None
             )
