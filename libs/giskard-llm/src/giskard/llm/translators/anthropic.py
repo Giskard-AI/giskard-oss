@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 
@@ -45,6 +46,24 @@ else:
     httpxTimeout = Any
 
 _PROVIDER = "anthropic/chat"
+PROVIDER = "anthropic"
+logger = logging.getLogger(__name__)
+
+# Params accepted by AnthropicChatConfigParams / to_anthropic (plus tools which
+# is a dedicated keyword arg). Anything else is dropped by pydantic extra=ignore
+# — warn so callers notice, matching OpenAI/Google translators (#2613).
+KNOWN_COMPLETION_PARAMS = frozenset(
+    {
+        "max_tokens",
+        "temperature",
+        "timeout",
+        "tools",
+        "system",
+        "output_config",
+        "response_format",
+    }
+)
+
 
 
 @ToolDef.register_serializer(_PROVIDER)
@@ -249,6 +268,14 @@ class AnthropicChatTranslator:
         tools: Sequence[ToolDef] | None = None,
         **params: Any,
     ) -> "CompletionCreateParams":
+        unknown = set(params) - KNOWN_COMPLETION_PARAMS
+        if unknown:
+            logger.warning(
+                "%s provider: ignoring unknown completion params: %s",
+                PROVIDER,
+                sorted(unknown),
+            )
+
         anthropic_params = AnthropicChatConfigParams(
             model=model,
             messages=messages,
@@ -313,9 +340,14 @@ class AnthropicChatTranslator:
         )
 
         refusal_out: str | None = None
-        if raw.stop_reason == "refusal" and raw.stop_details is not None:
-            # stop_details.explanation is a beta Anthropic API attribute; use getattr for safety
-            refusal_out = getattr(raw.stop_details, "explanation", None)
+        if raw.stop_reason == "refusal":
+            # Prefer free-text explanation; fall back to structured category or a
+            # bare "refusal" marker so message.is_refusal still fires when
+            # stop_details / explanation are absent (#2615).
+            details = getattr(raw, "stop_details", None)
+            explanation = getattr(details, "explanation", None) if details is not None else None
+            category = getattr(details, "category", None) if details is not None else None
+            refusal_out = explanation or category or "refusal"
 
         message = AssistantMessage(
             role="assistant",

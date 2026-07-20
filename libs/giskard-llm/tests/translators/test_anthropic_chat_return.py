@@ -139,3 +139,26 @@ def test_from_anthropic_tool_use_only():
     assert msg.tool_calls is not None
     assert msg.tool_calls[0].function.name == "add"
     assert msg.tool_calls[0].function.arguments == {"a": 1, "b": 2}
+
+
+def test_from_anthropic_refusal_without_details():
+    """Refusal with no stop_details still populates message.refusal (#2615)."""
+    raw = _message({"content": [], "stop_reason": "refusal", "stop_details": None})
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    ch = out.choices[0]
+    assert ch.finish_reason == "stop"
+    assert ch.message.refusal == "refusal"
+    assert ch.message.is_refusal
+
+
+def test_from_anthropic_refusal_category_only():
+    """Category without explanation is used as the refusal text (#2615)."""
+    raw = _message(
+        {
+            "content": [{"type": "text", "text": "I can't help with that."}],
+            "stop_reason": "refusal",
+            "stop_details": {"type": "refusal", "category": "bio"},
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    assert out.choices[0].message.refusal == "bio"

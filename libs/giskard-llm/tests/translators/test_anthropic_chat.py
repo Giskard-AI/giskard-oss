@@ -401,3 +401,20 @@ def test_function_message_raises():
     ]
     with pytest.raises(ValueError, match="Unsupported message role"):
         AnthropicChatTranslator.to_anthropic(_MODEL, messages)
+
+
+def test_unknown_completion_params_warn(caplog):
+    """Unsupported kwargs are dropped but callers get a warning (#2613)."""
+    import logging
+
+    msg = UserMessage(content="Hello.")
+    with caplog.at_level(logging.WARNING):
+        payload = AnthropicChatTranslator.to_anthropic(
+            _MODEL, [msg], top_p=0.5, stop_sequences=["STOP"], temperature=0.2
+        )
+    assert payload["temperature"] == 0.2
+    assert "top_p" not in payload
+    assert "stop_sequences" not in payload
+    joined = " ".join(r.message for r in caplog.records)
+    assert "top_p" in joined
+    assert "stop_sequences" in joined
