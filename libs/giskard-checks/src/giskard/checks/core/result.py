@@ -352,12 +352,7 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
 
         for step in self.steps:
             if step.error is not None:
-                phase = f" during {step.error.phase}" if step.error.phase else ""
-                yield (
-                    f"[{status['color']} bold]Test case[/{status['color']} bold]\t"
-                    f"[{status['color']}]ERROR[/{status['color']}]\t"
-                    f"{step.error.exception_type}{phase}: {step.error.message}"
-                )
+                yield step.error.rich_line(status["color"])
             for result in step.results:
                 yield from result.__rich_console__(console, options)
 
@@ -392,7 +387,19 @@ class TestCaseError(BaseModel, frozen=True):
     exception_type: str
     traceback: str | None = None
     phase: str | None = None
-    details: dict[str, Any] = Field(default_factory=dict)
+
+    def summary(self) -> str:
+        """One-line description: ``<ExceptionType>[ during <phase>]: <message>``."""
+        phase = f" during {self.phase}" if self.phase else ""
+        return f"{self.exception_type}{phase}: {self.message}"
+
+    def rich_line(self, color: str) -> str:
+        """Rich-markup row rendering this error under a step, in the given color."""
+        return (
+            f"[{color} bold]Test case[/{color} bold]\t"
+            f"[{color}]ERROR[/{color}]\t"
+            f"{self.summary()}"
+        )
 
 
 class TestCaseResult(BaseResult, frozen=True):
@@ -495,10 +502,7 @@ class TestCaseResult(BaseResult, frozen=True):
         """
         failure_messages: list[str] = []
         if self.error is not None:
-            phase = f" during {self.error.phase}" if self.error.phase else ""
-            failure_messages.append(
-                f"Test case ERRORED{phase}: {self.error.exception_type}: {self.error.message}"
-            )
+            failure_messages.append(f"Test case ERRORED: {self.error.summary()}")
         for result in self.results:
             if result.failed or result.errored:
                 check_name: str = result.details.get(
@@ -538,12 +542,7 @@ class TestCaseResult(BaseResult, frozen=True):
         yield Rule(status["title"], style=f"{status['color']} bold")
 
         if self.error is not None:
-            phase = f" during {self.error.phase}" if self.error.phase else ""
-            yield (
-                f"[{status['color']} bold]Test case[/{status['color']} bold]\t"
-                f"[{status['color']}]ERROR[/{status['color']}]\t"
-                f"{self.error.exception_type}{phase}: {self.error.message}"
-            )
+            yield self.error.rich_line(status["color"])
 
         for result in self.results:
             yield from result.__rich_console__(console, options)
