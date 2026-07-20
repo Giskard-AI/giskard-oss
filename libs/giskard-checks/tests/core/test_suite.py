@@ -218,6 +218,34 @@ async def test_suite_append_chaining():
     assert result.results[1].scenario_name == "b"
 
 
+@pytest.mark.asyncio
+async def test_suite_records_input_generation_errors_and_continues():
+    """A scenario whose input generation fails errors out but the suite continues."""
+
+    async def flaky_target(inputs):
+        if inputs == "boom":
+            raise RuntimeError("boom")
+        return inputs
+
+    suite = Suite(name="input_gen_error_suite", target=flaky_target)
+    suite.append(Scenario("boom").interact("boom"))
+    suite.append(
+        Scenario("ok")
+        .interact("ok")
+        .check(Equals(expected_value="ok", key="trace.last.outputs"))
+    )
+
+    result = await suite.run(return_exception=True)
+
+    assert len(result.results) == 2
+    assert result.results[0].errored
+    error = result.results[0].steps[0].results[0]
+    assert error.message == "Input generation failed: boom"
+    assert error.details["phase"] == "input_generation"
+    assert error.details["exception_type"] == "RuntimeError"
+    assert result.results[1].passed
+
+
 def test_suite_result_rich_console_respects_max_reported_failures_env(
     monkeypatch: pytest.MonkeyPatch,
 ):

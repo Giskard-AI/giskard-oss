@@ -795,6 +795,30 @@ class TestScenarioErrorHandling:
                 .run()
             )
 
+    async def test_generator_error_recorded_when_return_exception(self):
+        """With return_exception=True, generation errors become an errored result."""
+        check1 = MockCheck(result=CheckResult.success(message="Check 1"))
+        generator_error_component = GeneratorErrorComponent()
+        check2 = MockCheck(result=CheckResult.success(message="Check 2"))
+
+        result = await (
+            Scenario("generator_exception")
+            .check(check1)
+            .add_interaction(generator_error_component)
+            .check(check2)
+            .run(return_exception=True)
+        )
+
+        assert result.errored
+        errored_steps = [step for step in result.steps if step.errored]
+        assert len(errored_steps) == 1
+        error_result = errored_steps[0].results[0]
+        assert error_result.errored
+        assert "Input generation failed" in error_result.message
+        assert error_result.details["phase"] == "input_generation"
+        assert error_result.details["exception_type"] == "RuntimeError"
+        assert "Generator error" in error_result.details["traceback"]
+
     async def test_all_executed_results_collected(self):
         """Test that all checks in a step are executed and results collected."""
         checks = [
