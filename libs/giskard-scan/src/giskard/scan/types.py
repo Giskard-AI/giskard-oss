@@ -21,6 +21,9 @@ class ScanOptions(TypedDict, total=False):
             ``None`` runs all scenarios at once. Defaults to ``None``.
         commercial_use: When ``True``, exclude generators whose datasets do not
             permit commercial use. Defaults to ``False``.
+        return_exception: When ``True``, a scenario whose input generation fails
+            is recorded as an errored result and the scan continues. When
+            ``False`` (default), the failure propagates and aborts the scan.
     """
 
     max_scenarios: int | None
@@ -29,6 +32,7 @@ class ScanOptions(TypedDict, total=False):
     parallel: bool
     max_concurrency: int | None
     commercial_use: bool
+    return_exception: bool
 
 
 class ResolvedScanOptions(TypedDict):
@@ -49,3 +53,4 @@ class ResolvedScanOptions(TypedDict):
     parallel: bool
     max_concurrency: int | None
     commercial_use: bool
+    return_exception: bool

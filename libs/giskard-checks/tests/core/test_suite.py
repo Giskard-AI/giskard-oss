@@ -368,6 +368,43 @@ async def test_suite_parallel_fail_fast_when_return_exception_is_false():
 
 
 @pytest.mark.asyncio
+async def test_suite_continues_after_input_generation_error_with_return_exception():
+    def target(inputs):
+        if inputs == "boom":
+            raise RuntimeError("target failed")
+        return inputs
+
+    failing = (
+        Scenario("failing_input_generation")
+        .interact("boom")
+        .check(Equals(expected_value="boom", key="trace.last.outputs"))
+    )
+    passing = (
+        Scenario("passing_after_error")
+        .interact("ok")
+        .check(Equals(expected_value="ok", key="trace.last.outputs"))
+    )
+    suite = Suite(name="input_generation_errors", target=target)
+    suite.append(failing).append(passing)
+
+    result = await suite.run(return_exception=True, verbose=False)
+
+    assert len(result.results) == 2
+    assert result.errored_count == 1
+    assert result.passed_count == 1
+
+    failing_result = result.results[0]
+    assert failing_result.errored
+    assert failing_result.steps[0].error is not None
+    assert failing_result.steps[0].error.message == "target failed"
+    assert failing_result.steps[0].error.exception_type == "RuntimeError"
+    assert failing_result.steps[0].error.phase == "input_generation"
+    assert failing_result.steps[0].results[0].skipped
+
+    assert result.results[1].passed
+
+
+@pytest.mark.asyncio
 async def test_suite_parallel_telemetry_includes_flag(monkeypatch):
     events = []
 

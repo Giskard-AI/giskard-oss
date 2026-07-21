@@ -780,20 +780,45 @@ class TestScenarioErrorHandling:
 
     async def test_generator_raises_exception_after_yield(self):
         """Test that generator exceptions from InteractionSpec propagate."""
-        check1 = MockCheck(result=CheckResult.success(message="Check 1"))
         generator_error_component = GeneratorErrorComponent()
-        check2 = MockCheck(result=CheckResult.success(message="Check 2"))
+        check = MockCheck(result=CheckResult.success(message="Check"))
 
-        # InteractionSpec generator errors currently propagate and stop execution
-        # The first interaction should be added before the error is raised
+        # InteractionSpec generator errors propagate when exceptions are not returned.
         with pytest.raises(RuntimeError, match="Generator error"):
             _ = await (
                 Scenario("generator_exception")
-                .check(check1)
                 .add_interaction(generator_error_component)
-                .check(check2)
+                .check(check)
                 .run()
             )
+
+    async def test_generator_exception_returned_as_test_case_error(self):
+        """Test input generation exceptions become test case errors when requested."""
+        generator_error_component = GeneratorErrorComponent()
+        check = MockCheck(result=CheckResult.success(message="Check"))
+
+        result = await (
+            Scenario("generator_exception")
+            .add_interaction(generator_error_component)
+            .check(check)
+            .run(return_exception=True)
+        )
+
+        assert result.errored
+        assert len(result.steps) == 1
+
+        step = result.steps[0]
+        assert step.errored
+        assert step.error is not None
+        assert step.error.message == "Generator error"
+        assert step.error.exception_type == "RuntimeError"
+        assert step.error.phase == "input_generation"
+        assert step.error.traceback is not None
+        assert "Generator error" in step.error.traceback
+
+        assert len(step.results) == 1
+        assert step.results[0].skipped
+        assert "input generation failure" in (step.results[0].message or "")
 
     async def test_all_executed_results_collected(self):
         """Test that all checks in a step are executed and results collected."""

@@ -44,6 +44,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     group_by: str | None = "component",
     parallel: bool = True,
     max_concurrency: int | None = None,
+    return_exception: bool = False,
     target_mode: TargetMode = "multiturn",
 ) -> SuiteResult:
     """Generate and run the standard quality scan suite.
@@ -66,6 +67,9 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         parallel: When ``True``, run scenarios concurrently (default).
         max_concurrency: Cap on concurrent scenarios when ``parallel=True``.
             ``None`` runs all scenarios at once.
+        return_exception: When ``True``, a scenario whose input generation fails
+            is recorded as an errored result and the scan continues. When
+            ``False`` (default), the failure propagates and aborts the scan.
         target_mode: Whether the agent under test supports single-turn or
             multi-turn conversations. ``"singleturn"`` skips generators that
             are multi-turn by design and caps turn budgets to 1 on others.
@@ -92,6 +96,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         target,
         parallel=parallel,
         max_concurrency=max_concurrency,
+        return_exception=return_exception,
     )
     try:
         recommendation = await generate_quality_recommendation(result)
