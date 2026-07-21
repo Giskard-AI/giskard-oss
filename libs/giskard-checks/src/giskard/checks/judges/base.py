@@ -1,7 +1,6 @@
 from typing import Any, override
 
-from giskard.agents.templates import MessageTemplate
-from giskard.agents.workflow import ChatWorkflow, TemplateReference
+from giskard.agents import ChatWorkflow, MessageTemplate, TemplateReference
 from giskard.llm.types import ChatMessage
 from pydantic import BaseModel, Field
 

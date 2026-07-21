@@ -18,6 +18,8 @@ from .comparison import (
     GreaterThan,
     LesserThan,
     LesserThanEquals,
+    LessThan,
+    LessThanEquals,
     NotEquals,
 )
 
@@ -43,6 +45,8 @@ __all__ = [
     "RegexMatching",
     "Equals",
     "NotEquals",
+    "LessThan",
+    "LessThanEquals",
     "LesserThan",
     "GreaterThan",
     "LesserThanEquals",

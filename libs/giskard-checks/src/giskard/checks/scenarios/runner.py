@@ -6,6 +6,7 @@ updated Trace objects via the async generator protocol.
 """
 
 import time
+import traceback
 from collections.abc import AsyncGenerator
 from typing import Any, cast
 
@@ -20,7 +21,7 @@ from .._telemetry_props import scenario_shape_properties
 from ..core import Trace
 from ..core.interaction import Interact, InteractionSpec
 from ..core.interaction.interaction import Interaction
-from ..core.result import CheckResult, ScenarioResult, TestCaseResult
+from ..core.result import CheckResult, ScenarioResult, TestCaseError, TestCaseResult
 from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
 from ..core.types import Target
@@ -39,7 +40,7 @@ def _validate_multiple_runs(value: int | None) -> int | None:
 
 def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
-    target: Target[InputType, OutputType, TraceType] | MISSING,
+    target: Target[InputType, OutputType, TraceType] | MISSING,  # pyright: ignore[reportInvalidTypeForm]
 ) -> list[Step[InputType, OutputType, TraceType]]:
     """Build steps with target bound to Interact outputs where needed.
 
@@ -67,7 +68,7 @@ def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
 
 def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
-    run_target: Target[InputType, OutputType, TraceType] | MISSING,
+    run_target: Target[InputType, OutputType, TraceType] | MISSING,  # pyright: ignore[reportInvalidTypeForm]
 ) -> type[TraceType]:
     if scenario.trace_type is not None:
         return scenario.trace_type
@@ -131,6 +132,22 @@ def _bind_step_index[InputType, OutputType, TraceType: Trace[Any, Any]](
     ]
 
 
+def _skipped_check_results_for_step[InputType, OutputType, TraceType: Trace[Any, Any]](
+    step: Step[InputType, OutputType, TraceType], message: str
+) -> list[CheckResult]:
+    return [
+        CheckResult.skip(
+            message=message,
+            details={
+                "check_kind": check.kind,
+                "check_name": check.name,
+                "check_description": check.description,
+            },
+        )
+        for check in step.checks
+    ]
+
+
 class ScenarioRunner:
     """Execute scenarios by running their steps sequentially.
 
@@ -166,7 +183,7 @@ class ScenarioRunner:
     async def _run_once[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,  # pyright: ignore[reportInvalidTypeForm]
         return_exception: bool = False,
     ) -> ScenarioResult[TraceType]:
         start_time = time.perf_counter()
@@ -174,7 +191,7 @@ class ScenarioRunner:
         telemetry_tag("giskard_operation", "scenario_run")
 
         trace_cls = _resolve_trace_type(scenario, target)
-        trace = cast(TraceType, trace_cls(annotations=scenario.annotations))
+        trace = trace_cls(annotations=scenario.annotations)
 
         steps = _build_steps(scenario, target)
         steps_results: list[TestCaseResult] = []
@@ -190,8 +207,35 @@ class ScenarioRunner:
         )
 
         for step_index, step in enumerate(steps):
-            trace = await trace.with_interactions(
-                *_bind_step_index(step, step_index=step_index)
+            try:
+                trace = await trace.with_interactions(
+                    *_bind_step_index(step, step_index=step_index)
+                )
+            except Exception as e:
+                if not return_exception:
+                    raise
+
+                step_result = TestCaseResult(
+                    results=_skipped_check_results_for_step(
+                        step,
+                        "Checks were skipped due to input generation failure",
+                    ),
+                    duration_ms=int((time.perf_counter() - start_time) * 1000),
+                    last_interaction_index=(
+                        len(trace.interactions) - 1 if trace.interactions else None
+                    ),
+                    error=TestCaseError(
+                        message=str(e),
+                        exception_type=type(e).__name__,
+                        traceback=traceback.format_exc(),
+                        phase="input_generation",
+                    ),
+                )
+                steps_results.append(step_result)
+                break
+
+            last_interaction_index = (
+                len(trace.interactions) - 1 if trace.interactions else None
             )
 
             test_case = TestCase(
@@ -199,6 +243,9 @@ class ScenarioRunner:
                 checks=step.checks,
             )
             step_result = await test_case.run(return_exception)
+            step_result = step_result.model_copy(
+                update={"last_interaction_index": last_interaction_index}
+            )
             steps_results.append(step_result)
 
             # Stop on first failure
@@ -206,15 +253,19 @@ class ScenarioRunner:
                 break
 
         if len(steps_results) < len(steps):
+            # Skipped steps own no new interaction; point them at the trace as it stood
+            # when execution stopped so the index is never left unset.
+            skipped_last_interaction_index = (
+                len(trace.interactions) - 1 if trace.interactions else None
+            )
             for i in range(len(steps_results), len(steps)):
                 step_result = TestCaseResult(
-                    results=[
-                        CheckResult.skip(
-                            message=f"Step {i + 1} was skipped due to previous failure"
-                        )
-                        for _ in steps[i].checks
-                    ],
+                    results=_skipped_check_results_for_step(
+                        steps[i],
+                        f"Step {i + 1} was skipped due to previous failure",
+                    ),
                     duration_ms=0,
+                    last_interaction_index=skipped_last_interaction_index,
                 )
                 steps_results.append(step_result)
 
@@ -243,7 +294,7 @@ class ScenarioRunner:
     async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,  # pyright: ignore[reportInvalidTypeForm]
         return_exception: bool = False,
         multiple_runs: int | None = None,
     ) -> ScenarioResult[TraceType]:

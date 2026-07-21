@@ -7,7 +7,6 @@ import pytest
 from giskard.checks import Equals, Scenario, Suite
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.result import (
-    MAX_REPORTED_FAILURES_ENV_VAR,
     CheckResult,
     GroupedSuiteResult,
     GroupStats,
@@ -19,6 +18,7 @@ from giskard.checks.core.result import (
     TestCaseResult as CheckTestCaseResult,
 )
 from giskard.checks.scenarios.suite import _OverallOnly, _SuiteProgress
+from giskard.checks.settings import MAX_REPORTED_FAILURES_ENV_VAR
 from rich.console import Console
 from rich.progress import MofNCompleteColumn, Progress
 from rich.text import Text
@@ -237,7 +237,7 @@ def test_suite_result_rich_console_respects_max_reported_failures_env(
     assert "... and 1 more" in output
 
 
-def test_suite_result_rich_console_uses_default_failure_limit(
+def test_suite_result_rich_console_reports_all_failures_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.delenv(MAX_REPORTED_FAILURES_ENV_VAR, raising=False)
@@ -252,8 +252,8 @@ def test_suite_result_rich_console_uses_default_failure_limit(
     output = console.export_text()
     assert "s1" in output
     assert "s20" in output
-    assert "s21" not in output
-    assert "... and 1 more" in output
+    assert "s21" in output
+    assert "... and" not in output
 
 
 def test_suite_result_rich_console_can_hide_all_failure_details(
@@ -289,8 +289,8 @@ def test_suite_result_rich_console_ignores_invalid_failure_limit_env(
 
     output = console.export_text()
     assert "s20" in output
-    assert "s21" not in output
-    assert "... and 1 more" in output
+    assert "s21" in output
+    assert "... and" not in output
 
 
 @pytest.mark.asyncio
@@ -365,6 +365,43 @@ async def test_suite_parallel_fail_fast_when_return_exception_is_false():
 
     assert started.is_set()
     assert cancelled.is_set()
+
+
+@pytest.mark.asyncio
+async def test_suite_continues_after_input_generation_error_with_return_exception():
+    def target(inputs):
+        if inputs == "boom":
+            raise RuntimeError("target failed")
+        return inputs
+
+    failing = (
+        Scenario("failing_input_generation")
+        .interact("boom")
+        .check(Equals(expected_value="boom", key="trace.last.outputs"))
+    )
+    passing = (
+        Scenario("passing_after_error")
+        .interact("ok")
+        .check(Equals(expected_value="ok", key="trace.last.outputs"))
+    )
+    suite = Suite(name="input_generation_errors", target=target)
+    suite.append(failing).append(passing)
+
+    result = await suite.run(return_exception=True, verbose=False)
+
+    assert len(result.results) == 2
+    assert result.errored_count == 1
+    assert result.passed_count == 1
+
+    failing_result = result.results[0]
+    assert failing_result.errored
+    assert failing_result.steps[0].error is not None
+    assert failing_result.steps[0].error.message == "target failed"
+    assert failing_result.steps[0].error.exception_type == "RuntimeError"
+    assert failing_result.steps[0].error.phase == "input_generation"
+    assert failing_result.steps[0].results[0].skipped
+
+    assert result.results[1].passed
 
 
 @pytest.mark.asyncio

@@ -1,5 +1,4 @@
-from giskard.agents.embeddings import BaseEmbeddingModel
-from giskard.agents.generators.base import BaseGenerator
+from giskard.agents import BaseEmbeddingModel, BaseGenerator
 from pydantic import BaseModel, Field
 
 from ..settings import get_default_embedding_model, get_default_generator

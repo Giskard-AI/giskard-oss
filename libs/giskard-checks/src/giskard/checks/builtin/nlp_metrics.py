@@ -9,6 +9,12 @@ from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, NoMatch, resolve
 from ..core.result import CheckResult, CheckStatus, Metric
+from ..utils.optional_deps import require_optional_dependency
+
+_TEXTSTAT_INSTALL_HINT = (
+    "The 'textstat' package is required for the Readability check. "
+    "Install it with: pip install 'giskard-checks[readability]'"
+)
 
 ReadabilityMetric = Literal[
     "flesch_reading_ease",
@@ -57,6 +63,9 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
     The check extracts a string from the trace, computes a readability score
     with ``textstat``, and optionally validates that score against configured
     minimum and maximum thresholds.
+
+    Requires the optional ``readability`` extra
+    (``pip install 'giskard-checks[readability]'``).
     """
 
     key: JSONPathStr = Field(
@@ -97,20 +106,16 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
             raise ValueError("min_score must be less than or equal to max_score")
         return self
 
+    @model_validator(mode="after")
+    def _require_textstat(self) -> Self:
+        """Ensure the optional textstat dependency is installed."""
+        require_optional_dependency("textstat", install_hint=_TEXTSTAT_INSTALL_HINT)
+        return self
+
     @override
     async def run(self, trace: TraceType) -> CheckResult:
         """Execute the readability check against the provided trace."""
-        try:
-            textstat = import_module("textstat")
-        except ImportError:
-            return CheckResult(
-                status=CheckStatus.ERROR,
-                message=(
-                    "The 'textstat' package is required for the Readability check. "
-                    "Install it with: pip install 'giskard-checks[readability]'"
-                ),
-                details={"package": "textstat"},
-            )
+        textstat = import_module("textstat")
 
         text = resolve(trace, self.key)
         details = {

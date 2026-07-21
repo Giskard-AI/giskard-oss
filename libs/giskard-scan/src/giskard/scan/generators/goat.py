@@ -3,10 +3,7 @@
 from typing import Any, override
 
 import numpy as np
-from giskard.checks.core.interaction import Trace
-from giskard.checks.core.scenario import Scenario
-from giskard.checks.generators import LLMGenerator
-from giskard.checks.judges import LLMJudge
+from giskard.checks import LLMGenerator, LLMJudge, Scenario, Trace
 from pydantic import BaseModel, Field
 
 from .base import ScenarioContext, ScenarioGenerator, TargetMode
@@ -180,6 +177,7 @@ class GOATAttackScenarioGenerator(ScenarioGenerator):
         assignments = list(DEFAULT_GOAT_OBJECTIVES.items())
         selected_assignments: list[tuple[str, str]]
         rng = rng or np.random.default_rng()
+        languages = languages or ["en"]
 
         if max_scenarios is None or max_scenarios >= len(assignments):
             selected_assignments = assignments

@@ -1,6 +1,6 @@
 from typing import Any, Literal, override
 
-from giskard.agents.workflow import TemplateReference
+from giskard.agents import TemplateReference
 from pydantic import Field
 from pydantic.experimental.missing_sentinel import MISSING
 
@@ -70,7 +70,7 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
 
     Check only for hate speech and harassment:
 
-    >>> from giskard.agents.generators import Generator
+    >>> from giskard.agents import Generator
     >>> check = Toxicity(
     ...     output="This is a safe response.",
     ...     categories=["hate_speech", "harassment"],

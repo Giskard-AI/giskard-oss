@@ -147,6 +147,44 @@ async def test_closest_documents_recomputes_all_embeddings_when_any_is_missing()
     ]
 
 
+async def test_closest_documents_to_text_embeds_query_against_cached_documents():
+    embedding_model = _StubEmbeddingModel(
+        embeddings=[[0.0, 1.0]],
+        calls=[],
+    )
+    knowledge_base = KnowledgeBase(
+        documents=(
+            Document(content="seed", embeddings=[1.0, 0.0]),
+            Document(content="match", embeddings=[0.0, 1.0]),
+        ),
+        embedding_model=embedding_model,
+    )
+
+    closest = await knowledge_base.closest_documents_to_text(
+        text="query",
+        max_documents=1,
+    )
+
+    assert embedding_model.calls == [["query"]]
+    assert [document.content for document in closest] == ["match"]
+
+
+async def test_closest_documents_to_text_rejects_empty_query_without_embedding():
+    embedding_model = _StubEmbeddingModel(
+        embeddings=[[0.0, 1.0]],
+        calls=[],
+    )
+    knowledge_base = KnowledgeBase(
+        documents=(Document(content="seed", embeddings=[1.0, 0.0]),),
+        embedding_model=embedding_model,
+    )
+
+    with pytest.raises(ValueError, match="Query text must not be empty"):
+        await knowledge_base.closest_documents_to_text(text="  \n\t", max_documents=1)
+
+    assert embedding_model.calls == []
+
+
 async def test_closest_documents_rejects_non_finite_embeddings():
     """NaN/Inf embeddings must raise, not slip past the zero-vector guard."""
     knowledge_base = KnowledgeBase(
