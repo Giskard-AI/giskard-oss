@@ -351,6 +351,8 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
         yield Rule(status["title"], style=f"{status['color']} bold")
 
         for step in self.steps:
+            if step.error is not None:
+                yield step.error.rich_line(status["color"])
             for result in step.results:
                 yield from result.__rich_console__(console, options)
 
@@ -378,6 +380,28 @@ class TestCaseStatus(str, Enum):
     SKIP = "skip"
 
 
+class TestCaseError(BaseModel, frozen=True):
+    """Captures why a test case failed to execute."""
+
+    message: str
+    exception_type: str
+    traceback: str | None = None
+    phase: str | None = None
+
+    def summary(self) -> str:
+        """One-line description: ``<ExceptionType>[ during <phase>]: <message>``."""
+        phase = f" during {self.phase}" if self.phase else ""
+        return f"{self.exception_type}{phase}: {self.message}"
+
+    def rich_line(self, color: str) -> str:
+        """Rich-markup row rendering this error under a step, in the given color."""
+        return (
+            f"[{color} bold]Test case[/{color} bold]\t"
+            f"[{color}]ERROR[/{color}]\t"
+            f"{self.summary()}"
+        )
+
+
 class TestCaseResult(BaseResult, frozen=True):
     """Immutable summary of a test case execution with full run history.
 
@@ -392,6 +416,9 @@ class TestCaseResult(BaseResult, frozen=True):
         this step added before its checks ran. ``None`` when the step added no
         interactions (e.g. skipped). Consumers (such as the Giskard Hub upload
         flow) use this to attribute check results to a specific interaction.
+    error : TestCaseError | None
+        Execution error that prevented the test case from running normally,
+        such as an input-generation failure.
     status : TestCaseStatus
         Aggregated outcome of the test case derived from its results.
     passed : bool
@@ -413,11 +440,19 @@ class TestCaseResult(BaseResult, frozen=True):
             "interacts before checks ran; None when no interactions were added."
         ),
     )
+    error: TestCaseError | None = Field(
+        default=None,
+        description=(
+            "Execution error that prevented this test case from running normally."
+        ),
+    )
 
     @computed_field
     @property
     def status(self) -> TestCaseStatus:
         """The status of the test case."""
+        if self.error is not None:
+            return TestCaseStatus.ERROR
         if not self.results:
             return TestCaseStatus.PASS
 
@@ -466,6 +501,8 @@ class TestCaseResult(BaseResult, frozen=True):
             the check name/kind and the failure reason.
         """
         failure_messages: list[str] = []
+        if self.error is not None:
+            failure_messages.append(f"Test case ERRORED: {self.error.summary()}")
         for result in self.results:
             if result.failed or result.errored:
                 check_name: str = result.details.get(
@@ -504,11 +541,15 @@ class TestCaseResult(BaseResult, frozen=True):
         status = STATUS_MAPPING[self.status]
         yield Rule(status["title"], style=f"{status['color']} bold")
 
+        if self.error is not None:
+            yield self.error.rich_line(status["color"])
+
         for result in self.results:
             yield from result.__rich_console__(console, options)
 
         status_counts = {
-            "error": sum(1 for r in self.results if r.errored),
+            "error": sum(1 for r in self.results if r.errored)
+            + (1 if self.error is not None else 0),
             "fail": sum(1 for r in self.results if r.failed),
             "skip": sum(1 for r in self.results if r.skipped),
             "pass": sum(1 for r in self.results if r.passed),

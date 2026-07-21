@@ -218,34 +218,6 @@ async def test_suite_append_chaining():
     assert result.results[1].scenario_name == "b"
 
 
-@pytest.mark.asyncio
-async def test_suite_records_input_generation_errors_and_continues():
-    """A scenario whose input generation fails errors out but the suite continues."""
-
-    async def flaky_target(inputs):
-        if inputs == "boom":
-            raise RuntimeError("boom")
-        return inputs
-
-    suite = Suite(name="input_gen_error_suite", target=flaky_target)
-    suite.append(Scenario("boom").interact("boom"))
-    suite.append(
-        Scenario("ok")
-        .interact("ok")
-        .check(Equals(expected_value="ok", key="trace.last.outputs"))
-    )
-
-    result = await suite.run(return_exception=True)
-
-    assert len(result.results) == 2
-    assert result.results[0].errored
-    error = result.results[0].steps[0].results[0]
-    assert error.message == "Input generation failed: boom"
-    assert error.details["phase"] == "input_generation"
-    assert error.details["exception_type"] == "RuntimeError"
-    assert result.results[1].passed
-
-
 def test_suite_result_rich_console_respects_max_reported_failures_env(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -393,6 +365,43 @@ async def test_suite_parallel_fail_fast_when_return_exception_is_false():
 
     assert started.is_set()
     assert cancelled.is_set()
+
+
+@pytest.mark.asyncio
+async def test_suite_continues_after_input_generation_error_with_return_exception():
+    def target(inputs):
+        if inputs == "boom":
+            raise RuntimeError("target failed")
+        return inputs
+
+    failing = (
+        Scenario("failing_input_generation")
+        .interact("boom")
+        .check(Equals(expected_value="boom", key="trace.last.outputs"))
+    )
+    passing = (
+        Scenario("passing_after_error")
+        .interact("ok")
+        .check(Equals(expected_value="ok", key="trace.last.outputs"))
+    )
+    suite = Suite(name="input_generation_errors", target=target)
+    suite.append(failing).append(passing)
+
+    result = await suite.run(return_exception=True, verbose=False)
+
+    assert len(result.results) == 2
+    assert result.errored_count == 1
+    assert result.passed_count == 1
+
+    failing_result = result.results[0]
+    assert failing_result.errored
+    assert failing_result.steps[0].error is not None
+    assert failing_result.steps[0].error.message == "target failed"
+    assert failing_result.steps[0].error.exception_type == "RuntimeError"
+    assert failing_result.steps[0].error.phase == "input_generation"
+    assert failing_result.steps[0].results[0].skipped
+
+    assert result.results[1].passed
 
 
 @pytest.mark.asyncio

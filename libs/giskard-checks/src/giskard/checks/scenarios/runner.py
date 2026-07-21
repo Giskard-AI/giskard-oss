@@ -19,7 +19,7 @@ from pydantic.experimental.missing_sentinel import MISSING
 from .._telemetry_props import scenario_shape_properties
 from ..core import Trace
 from ..core.interaction import Interact
-from ..core.result import CheckResult, ScenarioResult, TestCaseResult
+from ..core.result import CheckResult, ScenarioResult, TestCaseError, TestCaseResult
 from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
 from ..core.types import Target
@@ -73,6 +73,22 @@ def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
     effective_target = run_target if run_target is not MISSING else scenario.target
     inferred = _infer_trace_type(effective_target)
     return cast(type[TraceType], inferred if inferred is not None else Trace)
+
+
+def _skipped_check_results_for_step[InputType, OutputType, TraceType: Trace[Any, Any]](
+    step: Step[InputType, OutputType, TraceType], message: str
+) -> list[CheckResult]:
+    return [
+        CheckResult.skip(
+            message=message,
+            details={
+                "check_kind": check.kind,
+                "check_name": check.name,
+                "check_description": check.description,
+            },
+        )
+        for check in step.checks
+    ]
 
 
 class ScenarioRunner:
@@ -135,38 +151,31 @@ class ScenarioRunner:
 
         for step in steps:
             try:
-                trace = await trace.with_interactions(*step.interacts)
-            except Exception as exc:
+                for interaction in step.interacts:
+                    trace = await trace.with_interaction(interaction)
+            except Exception as e:
                 if not return_exception:
                     raise
-                message = f"Input generation failed: {exc}"
-                error_details = {
-                    "phase": "input_generation",
-                    "exception_type": type(exc).__name__,
-                    "traceback": traceback.format_exc(),
-                }
-                steps_results.append(
-                    TestCaseResult(
-                        results=[
-                            CheckResult.error(
-                                message=message,
-                                details={
-                                    **error_details,
-                                    "check_kind": check.kind,
-                                    "check_name": check.name,
-                                    "check_description": check.description,
-                                },
-                            )
-                            for check in step.checks
-                        ]
-                        or [CheckResult.error(message=message, details=error_details)],
-                        duration_ms=0,
-                        last_interaction_index=(
-                            len(trace.interactions) - 1 if trace.interactions else None
-                        ),
-                    )
+
+                step_result = TestCaseResult(
+                    results=_skipped_check_results_for_step(
+                        step,
+                        "Checks were skipped due to input generation failure",
+                    ),
+                    duration_ms=int((time.perf_counter() - start_time) * 1000),
+                    last_interaction_index=(
+                        len(trace.interactions) - 1 if trace.interactions else None
+                    ),
+                    error=TestCaseError(
+                        message=str(e),
+                        exception_type=type(e).__name__,
+                        traceback=traceback.format_exc(),
+                        phase="input_generation",
+                    ),
                 )
+                steps_results.append(step_result)
                 break
+
             last_interaction_index = (
                 len(trace.interactions) - 1 if trace.interactions else None
             )
@@ -193,17 +202,10 @@ class ScenarioRunner:
             )
             for i in range(len(steps_results), len(steps)):
                 step_result = TestCaseResult(
-                    results=[
-                        CheckResult.skip(
-                            message=f"Step {i + 1} was skipped due to previous failure",
-                            details={
-                                "check_kind": check.kind,
-                                "check_name": check.name,
-                                "check_description": check.description,
-                            },
-                        )
-                        for check in steps[i].checks
-                    ],
+                    results=_skipped_check_results_for_step(
+                        steps[i],
+                        f"Step {i + 1} was skipped due to previous failure",
+                    ),
                     duration_ms=0,
                     last_interaction_index=skipped_last_interaction_index,
                 )
