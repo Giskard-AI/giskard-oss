@@ -22,7 +22,7 @@ dependencies = [
 readability = [
     "textstat>=0.7.0",
 ]
-regorus = ["celine-regorus>=0.9.1"]
+regorus = ["celine-regorus>=0.9.1; sys_platform != 'win32'"]
 all = ["giskard-checks[regorus]"] # Install all optional dependencies
 
 [tool.pytest.ini_options]

@@ -967,18 +967,18 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
-    { name = "celine-regorus" },
+    { name = "celine-regorus", marker = "sys_platform != 'win32'" },
 ]
 readability = [
     { name = "textstat" },
 ]
 regorus = [
-    { name = "celine-regorus" },
+    { name = "celine-regorus", marker = "sys_platform != 'win32'" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "celine-regorus", marker = "extra == 'regorus'", specifier = ">=0.9.1" },
+    { name = "celine-regorus", marker = "sys_platform != 'win32' and extra == 'regorus'", specifier = ">=0.9.1" },
     { name = "giskard-agents", editable = "libs/giskard-agents" },
     { name = "giskard-checks", extras = ["regorus"], marker = "extra == 'all'", editable = "libs/giskard-checks" },
     { name = "giskard-core", editable = "libs/giskard-core" },
