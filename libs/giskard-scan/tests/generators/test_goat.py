@@ -2,6 +2,7 @@ import numpy as np
 from giskard.checks.core import Interact
 from giskard.checks.generators import LLMGenerator
 from giskard.checks.judges import LLMJudge
+from giskard.scan.generators.base import ScenarioContext
 from giskard.scan.generators.goat import (
     DEFAULT_GOAT_MAX_TURNS,
     DEFAULT_GOAT_OBJECTIVES,
@@ -12,7 +13,9 @@ from giskard.scan.generators.goat import (
 
 async def test_goat_generator_returns_default_objectives():
     gen = GOATAttackScenarioGenerator()
-    scenarios = await gen.generate_scenario("A safety chatbot", ["en"])
+    scenarios = await gen.generate_scenario(
+        ScenarioContext(description="A safety chatbot", languages=["en"])
+    )
 
     assert len(scenarios) == len(DEFAULT_GOAT_OBJECTIVES)
     assert scenarios[0].annotations["objective_name"] == "botulinum toxin"
@@ -25,14 +28,12 @@ async def test_goat_generator_budget_subsamples_reproducibly():
     gen = GOATAttackScenarioGenerator()
 
     first = await gen.generate_scenario(
-        "A safety chatbot",
-        ["en", "fr"],
+        ScenarioContext(description="A safety chatbot", languages=["en", "fr"]),
         max_scenarios=3,
         rng=np.random.default_rng(42),
     )
     second = await gen.generate_scenario(
-        "A safety chatbot",
-        ["en", "fr"],
+        ScenarioContext(description="A safety chatbot", languages=["en", "fr"]),
         max_scenarios=3,
         rng=np.random.default_rng(42),
     )
@@ -48,7 +49,9 @@ async def test_goat_generator_budget_subsamples_reproducibly():
 
 async def test_goat_generator_builds_multiturn_scenario_with_annotations():
     gen = GOATAttackScenarioGenerator(max_turns=4)
-    scenarios = await gen.generate_scenario("A safety chatbot", ["en", "fr"])
+    scenarios = await gen.generate_scenario(
+        ScenarioContext(description="A safety chatbot", languages=["en", "fr"])
+    )
     scenario = scenarios[0]
 
     assert scenario.annotations["description"] == "A safety chatbot"
@@ -71,3 +74,34 @@ async def test_goat_generator_builds_multiturn_scenario_with_annotations():
 
 def test_goat_generator_uses_default_max_turns():
     assert GOATAttackScenarioGenerator().max_turns == DEFAULT_GOAT_MAX_TURNS
+
+
+async def test_goat_singleturn_returns_empty():
+    gen = GOATAttackScenarioGenerator()
+    scenarios = await gen.generate_scenario(
+        ScenarioContext(description="A safety chatbot", languages=["en"]),
+        target_mode="singleturn",
+    )
+    assert scenarios == []
+
+
+async def test_goat_multiturn_still_returns_scenarios():
+    gen = GOATAttackScenarioGenerator()
+    scenarios = await gen.generate_scenario(
+        ScenarioContext(description="A safety chatbot", languages=["en"]),
+        target_mode="multiturn",
+    )
+    assert len(scenarios) == len(DEFAULT_GOAT_OBJECTIVES)
+
+
+async def test_goat_generator_falls_back_to_english_with_empty_languages():
+    """An empty `languages` list should fall back to English, mirroring
+    KnowledgeBaseScenarioGenerator._sample_languages, instead of crashing in
+    `rng.integers(0)`."""
+    gen = GOATAttackScenarioGenerator()
+    scenarios = await gen.generate_scenario(
+        ScenarioContext(description="A safety chatbot", languages=[])
+    )
+
+    assert len(scenarios) == len(DEFAULT_GOAT_OBJECTIVES)
+    assert all(scenario.annotations["language"] == "en" for scenario in scenarios)

@@ -3,15 +3,20 @@ from collections import defaultdict
 from collections.abc import Mapping
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
+
+if TYPE_CHECKING:
+    from giskard.checks.scenarios.suite import Suite
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 from rich.console import Console, ConsoleOptions, RenderResult
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
+from ..settings import get_settings
 from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
 
@@ -399,6 +404,8 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
         yield Rule(status["title"], style=f"{status['color']} bold")
 
         for step in self.steps:
+            if step.error is not None:
+                yield step.error.rich_line(status["color"])
             for result in step.results:
                 yield from result.__rich_console__(console, options)
 
@@ -426,6 +433,28 @@ class TestCaseStatus(str, Enum):
     SKIP = "skip"
 
 
+class TestCaseError(BaseModel, frozen=True):
+    """Captures why a test case failed to execute."""
+
+    message: str
+    exception_type: str
+    traceback: str | None = None
+    phase: str | None = None
+
+    def summary(self) -> str:
+        """One-line description: ``<ExceptionType>[ during <phase>]: <message>``."""
+        phase = f" during {self.phase}" if self.phase else ""
+        return f"{self.exception_type}{phase}: {self.message}"
+
+    def rich_line(self, color: str) -> str:
+        """Rich-markup row rendering this error under a step, in the given color."""
+        return (
+            f"[{color} bold]Test case[/{color} bold]\t"
+            f"[{color}]ERROR[/{color}]\t"
+            f"{self.summary()}"
+        )
+
+
 class TestCaseResult(BaseResult, frozen=True):
     """Immutable summary of a test case execution with full run history.
 
@@ -435,6 +464,14 @@ class TestCaseResult(BaseResult, frozen=True):
         Check results produced during the test case execution.
     duration_ms : int
         Total execution time in milliseconds.
+    last_interaction_index : int | None
+        0-based index, in the scenario's final trace, of the last interaction
+        this step added before its checks ran. ``None`` when the step added no
+        interactions (e.g. skipped). Consumers (such as the Giskard Hub upload
+        flow) use this to attribute check results to a specific interaction.
+    error : TestCaseError | None
+        Execution error that prevented the test case from running normally,
+        such as an input-generation failure.
     status : TestCaseStatus
         Aggregated outcome of the test case derived from its results.
     passed : bool
@@ -449,11 +486,26 @@ class TestCaseResult(BaseResult, frozen=True):
 
     results: list[CheckResult] = Field(..., description="Check results for each run")
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
+    last_interaction_index: int | None = Field(
+        default=None,
+        description=(
+            "0-based index of the last trace interaction added by this step's "
+            "interacts before checks ran; None when no interactions were added."
+        ),
+    )
+    error: TestCaseError | None = Field(
+        default=None,
+        description=(
+            "Execution error that prevented this test case from running normally."
+        ),
+    )
 
     @computed_field
     @property
     def status(self) -> TestCaseStatus:
         """The status of the test case."""
+        if self.error is not None:
+            return TestCaseStatus.ERROR
         if not self.results:
             return TestCaseStatus.PASS
 
@@ -502,6 +554,8 @@ class TestCaseResult(BaseResult, frozen=True):
             the check name/kind and the failure reason.
         """
         failure_messages: list[str] = []
+        if self.error is not None:
+            failure_messages.append(f"Test case ERRORED: {self.error.summary()}")
         for result in self.results:
             if result.failed or result.errored:
                 check_name = result.check_label
@@ -545,11 +599,15 @@ class TestCaseResult(BaseResult, frozen=True):
         status = STATUS_MAPPING[self.status]
         yield Rule(status["title"], style=f"{status['color']} bold")
 
+        if self.error is not None:
+            yield self.error.rich_line(status["color"])
+
         for result in self.results:
             yield from result.__rich_console__(console, options)
 
         status_counts = {
-            "error": sum(1 for r in self.results if r.errored),
+            "error": sum(1 for r in self.results if r.errored)
+            + (1 if self.error is not None else 0),
             "fail": sum(1 for r in self.results if r.failed),
             "skip": sum(1 for r in self.results if r.skipped),
             "pass": sum(1 for r in self.results if r.passed),
@@ -570,6 +628,11 @@ class SuiteResult(BaseResult, frozen=True):
         Scenario results produced during the suite execution.
     duration_ms : int
         Total execution time in milliseconds.
+    suite : Suite | None
+        The Suite that produced this result. Excluded from serialization
+        (``None`` after a serialize/deserialize round-trip).
+    recommendation : str | None
+        Optional Markdown-friendly guidance attached by scan or suite producers.
     passed_count : int
         Number of scenarios that passed.
     failed_count : int
@@ -586,6 +649,13 @@ class SuiteResult(BaseResult, frozen=True):
         ..., description="List of scenario results"
     )
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
+    suite: "Suite[Any, Any] | None" = Field(
+        default=None, exclude=True, description="The Suite that produced this result"
+    )
+    recommendation: str | None = Field(
+        default=None,
+        description="Optional Markdown-friendly recommendation for this suite result",
+    )
 
     @computed_field
     @property
@@ -629,6 +699,17 @@ class SuiteResult(BaseResult, frozen=True):
         from ..export.junit import to_junit_xml
 
         return to_junit_xml(self, path=path)
+
+    def to_hub_format(self) -> dict[str, Any]:
+        """Convert the suite result into a JSON-serializable Giskard Hub payload.
+
+        The returned dict can be passed directly to
+        :meth:`giskard_hub.HubClient.evaluations.upload` to upload the suite
+        result to the Hub.
+        """
+        from ..export.hub import to_hub_format
+
+        return to_hub_format(self)
 
     def group_by(self, key: str) -> "GroupedSuiteResult":
         """Group results by a tag key and return a GroupedSuiteResult.
@@ -689,62 +770,73 @@ class SuiteResult(BaseResult, frozen=True):
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        yield Rule("Suite Results", style="bold blue")
+        yield from _suite_report_renderables(self, console, options)
+        yield from _recommendation_renderables(self.recommendation)
 
-        # Dots view
-        yield "".join(
-            f"[{STATUS_MAPPING[r.status]['color']}]{STATUS_MAPPING[r.status]['symbol']}[/{STATUS_MAPPING[r.status]['color']}]"
-            for r in self.results
-        )
-        yield ""
 
-        failures_and_errors = self.failures_and_errors
+def _suite_report_renderables(
+    result: SuiteResult,
+    console: Console,
+    options: ConsoleOptions,
+) -> RenderResult:
+    yield Rule("Suite Results", style="bold blue")
 
-        if failures_and_errors:
-            n_loggable_failures = 20  # TODO: make this configurable
+    # Dots view
+    yield "".join(
+        f"[{STATUS_MAPPING[r.status]['color']}]{STATUS_MAPPING[r.status]['symbol']}[/{STATUS_MAPPING[r.status]['color']}]"
+        for r in result.results
+    )
+    yield ""
 
-            # Details
-            yield Rule("FAILURES", characters="=", style="grey")
-            for f in failures_and_errors[:n_loggable_failures]:
-                yield Panel(
-                    f,
-                    title=f.scenario_name,
-                    border_style=f"{STATUS_MAPPING[f.status]['color']} bold",
-                )
-            if len(failures_and_errors) > n_loggable_failures:
-                yield f"  ... and {len(failures_and_errors) - n_loggable_failures} more"
+    failures_and_errors = result.failures_and_errors
 
-            # Summary
-            yield Rule("SUMMARY", characters="=", style="grey")
-            for f in failures_and_errors[:n_loggable_failures]:
-                status = STATUS_MAPPING[f.status]
-                yield f"[{status['color']} bold]{f.scenario_name}[/{status['color']} bold]\t[{status['color']}]{f.status.value.upper()}[/{status['color']}]"
-                for tc in f.failures_and_errors:
-                    for c in tc.failures_and_errors:
-                        yield from (
-                            f"\t{line}" for line in c.__rich_console__(console, options)
-                        )
-            if len(failures_and_errors) > n_loggable_failures:
-                yield f"  ... and {len(failures_and_errors) - n_loggable_failures} more"
+    if failures_and_errors:
+        max_reported_failures = get_settings().max_reported_failures
+        reported_failures = failures_and_errors[:max_reported_failures]
+        n_hidden = len(failures_and_errors) - len(reported_failures)
 
-        yield Rule(style="bold blue")
-
-        # Summary metrics
-        count_parts = [
-            f"[{STATUS_MAPPING['total']['color']} bold]{len(self.results)} total[/{STATUS_MAPPING['total']['color']} bold]"
-        ]
-        count_parts.extend(
-            format_status_count_parts(
-                {
-                    "error": self.errored_count,
-                    "fail": self.failed_count,
-                    "skip": self.skipped_count,
-                    "pass": self.passed_count,
-                }
+        # Details
+        yield Rule("FAILURES", characters="=", style="grey")
+        for f in reported_failures:
+            yield Panel(
+                f,
+                title=f.scenario_name,
+                border_style=f"{STATUS_MAPPING[f.status]['color']} bold",
             )
+        if n_hidden > 0:
+            yield f"  ... and {n_hidden} more"
+
+        # Summary
+        yield Rule("SUMMARY", characters="=", style="grey")
+        for f in reported_failures:
+            status = STATUS_MAPPING[f.status]
+            yield f"[{status['color']} bold]{f.scenario_name}[/{status['color']} bold]\t[{status['color']}]{f.status.value.upper()}[/{status['color']}]"
+            for tc in f.failures_and_errors:
+                for c in tc.failures_and_errors:
+                    yield from (
+                        f"\t{line}" for line in c.__rich_console__(console, options)
+                    )
+        if n_hidden > 0:
+            yield f"  ... and {n_hidden} more"
+
+    yield Rule(style="bold blue")
+
+    # Summary metrics
+    count_parts = [
+        f"[{STATUS_MAPPING['total']['color']} bold]{len(result.results)} total[/{STATUS_MAPPING['total']['color']} bold]"
+    ]
+    count_parts.extend(
+        format_status_count_parts(
+            {
+                "error": result.errored_count,
+                "fail": result.failed_count,
+                "skip": result.skipped_count,
+                "pass": result.passed_count,
+            }
         )
-        summary = ", ".join(count_parts)
-        yield f"Summary: {summary} | Pass Rate: [default bold]{self.pass_rate:.1%}[/default bold] | Total Duration: {self.duration_ms}ms"
+    )
+    summary = ", ".join(count_parts)
+    yield f"Summary: {summary} | Pass Rate: [default bold]{result.pass_rate:.1%}[/default bold] | Total Duration: {result.duration_ms}ms"
 
 
 def _parse_tag(tag: str) -> tuple[str, str]:
@@ -803,7 +895,7 @@ class GroupedSuiteResult(BaseResult, frozen=True):
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        yield from self.suite_result.__rich_console__(console, options)
+        yield from _suite_report_renderables(self.suite_result, console, options)
 
         table = Table(title=f"Results by {self.key}")
         table.add_column(self.key, style="bold")
@@ -824,3 +916,17 @@ class GroupedSuiteResult(BaseResult, frozen=True):
             table.add_row(display_name, rate)
 
         yield table
+        yield from _recommendation_renderables(self.suite_result.recommendation)
+
+
+def _recommendation_renderables(recommendation: str | None) -> RenderResult:
+    if recommendation and recommendation.strip():
+        yield _recommendation_panel(recommendation)
+
+
+def _recommendation_panel(recommendation: str) -> Panel:
+    return Panel(
+        Markdown(recommendation),
+        title="Recommendation",
+        border_style="blue",
+    )

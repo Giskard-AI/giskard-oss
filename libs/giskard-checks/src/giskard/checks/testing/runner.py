@@ -68,7 +68,7 @@ async def _run_check[
                 "check_kind": check.kind,
                 "check_description": check.description,
                 "check_params": _check_params(check),
-            }
+            },
         }
     )
 

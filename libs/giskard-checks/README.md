@@ -178,7 +178,7 @@ API Overview
 
 **Built-in and LLM-based checks**
 - `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
-- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LesserThan`, `LesserThanEquals`.
+- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LessThan`, `LessThanEquals` (`LesserThan` and `LesserThanEquals` are deprecated aliases).
 - `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
 - JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks via `key` or check-specific fields like `answer_key`.
 
@@ -187,6 +187,13 @@ API Overview
 
 **Settings**
 - `giskard.checks.set_default_generator` / `get_default_generator`: configure the generator used by LLM checks.
+- Environment variables (or `.env` at the project root), prefixed with `GISKARD_CHECKS_`:
+  - `GISKARD_CHECKS_DEFAULT_MODEL` — default LLM model (default: `openai/gpt-4o-mini`).
+  - `GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL` — default embedding model (default: `text-embedding-3-small`).
+  - `GISKARD_CHECKS_MAX_REPORTED_FAILURES` — cap on failures shown in suite reports.
+  - `GISKARD_CHECKS_DISABLE_RICH_PRETTY` — disable rich REPL pretty-printing.
+
+Runtime `set_default_generator()` overrides take precedence over environment settings.
 
 Testing
 -------

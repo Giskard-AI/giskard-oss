@@ -2,8 +2,8 @@ from collections.abc import AsyncGenerator
 from typing import Any, cast, override
 
 from giskard.checks.utils.injectable import ValueGenerator, ValueProvider
-from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import Field, PrivateAttr, model_validator
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ...utils.inference import _infer_input_type
 from ..input_generator import InputGenerator
@@ -79,10 +79,11 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         Input specification. Can be a static value, callable, or generator.
         Callables can take no arguments or the current `Trace` as an argument.
         Generators yield multiple inputs and receive updated traces via `asend()`.
-    outputs : OutputType | Callable[..., OutputType | Awaitable[OutputType | Interaction]]
-        Output specification. Can be a static value or callable.
-        Callables receive the current `InputType` and optionally the current `Trace`.
-        Can return an `Interaction` object directly to override default metadata.
+    outputs : Target | MISSING
+        Output specification, or ``MISSING`` (default) to bind the scenario or
+        ``run()`` target at execution time. Can also be a static value or callable.
+        Callables receive the current ``InputType`` and optionally the current ``Trace``.
+        Can return an ``Interaction`` object directly to override default metadata.
     metadata : dict[str, Any]
         Default metadata to attach to interactions. Can be overridden if `outputs`
         returns an `Interaction` object directly.
@@ -132,8 +133,8 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         | GeneratorType[[], InputType, None]
         | GeneratorType[[TraceType], InputType, TraceType]
     ) = Field(..., description="The inputs of the interaction.")
-    outputs: Target[InputType, OutputType, TraceType] | NotProvided = Field(
-        default=NOT_PROVIDED, description="The outputs of the interaction."
+    outputs: Target[InputType, OutputType, TraceType] | MISSING = Field(
+        default=MISSING, description="The outputs of the interaction."
     )
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="The metadata of the interaction."
@@ -155,7 +156,7 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
 
     def _validate_outputs(self) -> None:
         try:
-            if not isinstance(self.outputs, NotProvided):
+            if self.outputs is not MISSING:
                 self._output_injectable = ValueProvider(
                     self.outputs, {"inputs", "trace"}
                 )
@@ -175,7 +176,7 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
 
     def set_outputs(
         self,
-        outputs: Target[InputType, OutputType, TraceType] | NotProvided,
+        outputs: Target[InputType, OutputType, TraceType] | MISSING,
     ) -> "Interact[InputType, OutputType, TraceType]":
         """Update the outputs of the interact and recompute the injection mappings. Returns self for chaining."""
         self.outputs = outputs
@@ -195,7 +196,7 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         try:
             inputs = await anext(generator)
             while True:
-                if isinstance(self.outputs, NotProvided):
+                if self.outputs is MISSING:
                     raise ValueError(
                         "Interaction outputs are not provided and no target was bound."
                     )

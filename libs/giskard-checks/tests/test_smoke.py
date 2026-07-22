@@ -2,13 +2,15 @@
 
 - The first two tests run on every install: they verify the package imports
   safely and exposes its public API without any optional dependency.
-- The last test uses pytest.skipif to guard against regorus being present;
-  it verifies that RegoPolicy.run() raises a helpful error when regorus is absent.
+- The last test patches ``regorus`` import failure and verifies that
+  ``RegoPolicy`` fails fast at instantiation with a helpful validation error.
 """
 
-import importlib.util
+import importlib
 
 import pytest
+from giskard.checks.utils import optional_deps
+from pydantic import ValidationError
 
 
 def test_package_import_does_not_raise():
@@ -30,18 +32,21 @@ def test_public_api_is_accessible():
         assert hasattr(m, name), f"giskard.checks missing attribute: {name}"
 
 
-@pytest.mark.skipif(
-    importlib.util.find_spec("regorus") is not None,
-    reason="regorus is installed; ImportError would not be raised",
-)
-async def test_rego_policy_raises_import_error_when_regorus_absent():
-    from giskard.checks import CheckStatus, Interaction, RegoPolicy, Trace
+def test_rego_policy_raises_validation_error_when_regorus_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from giskard.checks import RegoPolicy
 
-    check = RegoPolicy(
-        policy="package giskard\nallow := true", rule="data.giskard.allow"
-    )
-    trace = await Trace.from_interactions(Interaction(inputs="test", outputs={}))
-    result = await check.run(trace)
+    real_import_module = importlib.import_module
 
-    assert result.status == CheckStatus.ERROR
-    assert "giskard-checks[regorus]" in (result.message or "")
+    def fake_import_module(name: str, /, *args, **kwargs):
+        if name == "regorus":
+            raise ImportError("missing regorus")
+        return real_import_module(name, *args, **kwargs)
+
+    monkeypatch.setattr(optional_deps.importlib, "import_module", fake_import_module)
+
+    with pytest.raises(ValidationError, match="giskard-checks\\[regorus\\]"):
+        _ = RegoPolicy(
+            policy="package giskard\nallow := true", rule="data.giskard.allow"
+        )

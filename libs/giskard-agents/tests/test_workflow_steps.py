@@ -120,3 +120,29 @@ async def test_run_returns_successful_chat():
 
     assert not chat.failed
     assert chat.last.content == "World!"
+
+
+async def test_run_with_no_messages_does_not_raise_indexerror():
+    """A ChatWorkflow with no messages added must not crash with IndexError.
+
+    ``_run_tools``'s guard checks ``not chat.last`` before checking whether
+    there is anything to process, but ``Chat.last`` indexes ``messages[-1]``,
+    which raises ``IndexError`` on an empty list instead of behaving falsy.
+    """
+    gen = MagicMock(spec=BaseGenerator)
+    gen.complete = AsyncMock(
+        return_value=CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content="Hello!"),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
+        )
+    )
+
+    chat = await ChatWorkflow(generator=gen).run()
+
+    assert not chat.failed
+    assert chat.last.content == "Hello!"
