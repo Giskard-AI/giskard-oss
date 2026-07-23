@@ -136,7 +136,7 @@ async def test_quality_scan_runs_registry_scenarios_and_returns_suite_result(
     assert "Failure messages" not in rendered_prompt
 
 
-async def test_quality_scan_forwards_parallel_and_max_concurrency(
+async def test_quality_scan_forwards_run_options(
     monkeypatch: pytest.MonkeyPatch,
 ):
     quality_suite_generator_registry.register(_DeterministicQualityGenerator())
@@ -155,6 +155,7 @@ async def test_quality_scan_forwards_parallel_and_max_concurrency(
             {
                 "parallel": parallel,
                 "max_concurrency": max_concurrency,
+                "return_exception": return_exception,
             }
         )
         return await original_run(
@@ -180,9 +181,12 @@ async def test_quality_scan_forwards_parallel_and_max_concurrency(
         max_scenarios=1,
         parallel=True,
         max_concurrency=3,
+        return_exception=True,
     )
 
-    assert run_kwargs == [{"parallel": True, "max_concurrency": 3}]
+    assert run_kwargs == [
+        {"parallel": True, "max_concurrency": 3, "return_exception": True}
+    ]
 
 
 async def test_quality_scan_uses_empty_registry_by_default(
@@ -232,8 +236,9 @@ async def test_quality_scan_warns_and_skips_empty_raw_knowledge_base(
             target: object,
             parallel: bool = True,
             max_concurrency: int | None = None,
+            return_exception: bool = False,
         ) -> SuiteResult:
-            _ = target, parallel, max_concurrency
+            _ = target, parallel, max_concurrency, return_exception
             return SuiteResult(results=[], duration_ms=0)
 
     async def generate_suite_spy(**kwargs: Any) -> _FakeSuite:
@@ -283,8 +288,9 @@ async def test_quality_scan_configures_knowledge_base_generator(
             target: object,
             parallel: bool = True,
             max_concurrency: int | None = None,
+            return_exception: bool = False,
         ) -> SuiteResult:
-            _ = target, parallel, max_concurrency
+            _ = target, parallel, max_concurrency, return_exception
             return SuiteResult(results=[], duration_ms=0)
 
     async def generate_suite_spy(**kwargs: Any) -> _FakeSuite:

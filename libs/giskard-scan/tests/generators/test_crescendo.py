@@ -93,3 +93,16 @@ async def test_crescendo_multiturn_still_returns_scenarios():
         target_mode="multiturn",
     )
     assert len(scenarios) == len(DEFAULT_CRESCENDO_OBJECTIVES)
+
+
+async def test_crescendo_generator_falls_back_to_english_with_empty_languages():
+    """An empty `languages` list should fall back to English, mirroring
+    KnowledgeBaseScenarioGenerator._sample_languages, instead of crashing in
+    `rng.integers(0)`."""
+    gen = CrescendoAttackScenarioGenerator()
+    scenarios = await gen.generate_scenario(
+        ScenarioContext(description="A safety chatbot", languages=[])
+    )
+
+    assert len(scenarios) == len(DEFAULT_CRESCENDO_OBJECTIVES)
+    assert all(scenario.annotations["language"] == "en" for scenario in scenarios)

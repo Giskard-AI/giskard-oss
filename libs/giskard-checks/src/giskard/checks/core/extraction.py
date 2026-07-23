@@ -4,6 +4,7 @@ from jsonpath_ng import (
     Child,
     DatumInContext,
     Descendants,
+    Fields,
     Intersect,
     JSONPath,
     Slice,
@@ -74,6 +75,9 @@ def _is_list_expression(expression: JSONPath) -> bool:
 
     if isinstance(expression, Slice | Union | Intersect):
         return True
+
+    if isinstance(expression, Fields):
+        return len(expression.fields) > 1 or "*" in expression.fields
 
     return False
 

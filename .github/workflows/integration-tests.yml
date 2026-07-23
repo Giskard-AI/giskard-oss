@@ -83,6 +83,14 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Deliberate opt-in: this job installs and executes fork-authored
+          # code (make install, pytest) with live provider API keys in scope.
+          # Compensating controls: the `ci` environment requires a reviewer to
+          # approve each run before secrets are injected (server-enforced,
+          # per-run), the authorize job requires a fresh `labeled` event for
+          # external contributors, and the immutable head.sha pin keeps the
+          # reviewed commit identical to the executed one.
+          allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
         with:
           enable-cache: true
@@ -135,6 +143,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Deliberate opt-in — see test-agents-functional for the full
+          # rationale and compensating controls.
+          allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
         with:
           enable-cache: true
@@ -173,6 +184,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
+          # Deliberate opt-in — see test-agents-functional for the full
+          # rationale and compensating controls.
+          allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
         with:
           enable-cache: true

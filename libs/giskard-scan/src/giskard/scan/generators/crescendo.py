@@ -88,6 +88,7 @@ class CrescendoAttackScenarioGenerator(ScenarioGenerator):
         assignments = list(DEFAULT_CRESCENDO_OBJECTIVES.items())
         selected_assignments: list[tuple[str, str]]
         rng = rng or np.random.default_rng()
+        languages = languages or ["en"]
 
         if max_scenarios is None or max_scenarios >= len(assignments):
             selected_assignments = assignments
