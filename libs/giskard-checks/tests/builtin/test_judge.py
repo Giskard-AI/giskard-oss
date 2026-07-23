@@ -48,6 +48,40 @@ class MockGenerator(BaseGenerator):
         )
 
 
+@BaseGenerator.register("mock_sequence")
+class SequenceMockGenerator(BaseGenerator):
+    """Mock generator returning a different passed/reason per call, cycling a sequence."""
+
+    results: list[bool] = Field(default_factory=list)
+    calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
+
+    @override
+    async def _call_model(
+        self,
+        messages: Sequence[ChatMessage],
+        params: GenerationParams,
+        metadata: dict[str, Any] | None = None,
+    ) -> CompletionResponse:
+        index = len(self.calls)
+        self.calls.append(messages)
+        passed = self.results[index % len(self.results)]
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(
+                        role="assistant",
+                        content=json.dumps(
+                            {"passed": passed, "reason": f"run {index}"}
+                        ),
+                    ),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ],
+            model="mock",
+        )
+
+
 def serialization_roundtrip[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     judge: LLMJudge[InputType, OutputType, TraceType],
 ) -> LLMJudge[InputType, OutputType, TraceType]:
@@ -175,3 +209,99 @@ async def test_validate_both_prompt_or_path() -> None:
             prompt="Evaluate the answer.",
             prompt_path="prompts/judge_prompt.j2",
         )
+
+
+# --- num_runs / consensus (#2372) ---
+
+
+async def test_num_runs_defaults_preserve_single_run_behavior() -> None:
+    """Default num_runs=1 makes exactly one call and skips the consensus wrapper."""
+    generator = MockGenerator(passed=True, reason="Looks good")
+    judge = LLMJudge(generator=generator, prompt="Evaluate the answer.")
+
+    assert judge.num_runs == 1
+    assert judge.consensus == "majority"
+
+    result = await judge.run(Trace())
+    assert result.status == CheckStatus.PASS
+    assert len(generator.calls) == 1
+    # Single-run details shape is unchanged: no "runs" wrapper key.
+    assert "runs" not in result.details
+    assert result.details["reason"] == "Looks good"
+
+
+async def test_num_runs_all_pass() -> None:
+    generator = MockGenerator(passed=True, reason="Looks good")
+    judge = LLMJudge(generator=generator, prompt="Evaluate the answer.", num_runs=3)
+
+    result = await judge.run(Trace())
+    assert result.status == CheckStatus.PASS
+    assert len(generator.calls) == 3
+    assert result.details["num_runs"] == 3
+    assert result.details["passed_count"] == 3
+    assert len(result.details["runs"]) == 3
+    assert all(r.passed for r in result.details["runs"])
+
+
+async def test_num_runs_all_fail() -> None:
+    generator = MockGenerator(passed=False, reason="Looks bad")
+    judge = LLMJudge(generator=generator, prompt="Evaluate the answer.", num_runs=3)
+
+    result = await judge.run(Trace())
+    assert result.status == CheckStatus.FAIL
+    assert len(generator.calls) == 3
+    assert result.details["passed_count"] == 0
+    assert len(result.details["runs"]) == 3
+    assert all(r.failed for r in result.details["runs"])
+
+
+async def test_consensus_majority_split_decision() -> None:
+    """2 of 3 runs pass: majority consensus passes."""
+    generator = SequenceMockGenerator(results=[True, True, False])
+    judge = LLMJudge(
+        generator=generator,
+        prompt="Evaluate the answer.",
+        num_runs=3,
+        consensus="majority",
+    )
+
+    result = await judge.run(Trace())
+    assert result.status == CheckStatus.PASS
+    assert result.details["passed_count"] == 2
+
+
+async def test_consensus_unanimous_split_decision() -> None:
+    """2 of 3 runs pass: unanimous consensus fails (not all runs passed)."""
+    generator = SequenceMockGenerator(results=[True, True, False])
+    judge = LLMJudge(
+        generator=generator,
+        prompt="Evaluate the answer.",
+        num_runs=3,
+        consensus="unanimous",
+    )
+
+    result = await judge.run(Trace())
+    assert result.status == CheckStatus.FAIL
+    assert result.details["passed_count"] == 2
+
+
+async def test_consensus_any_split_decision() -> None:
+    """1 of 3 runs pass: 'any' consensus passes (at least one passed)."""
+    generator = SequenceMockGenerator(results=[False, False, True])
+    judge = LLMJudge(
+        generator=generator,
+        prompt="Evaluate the answer.",
+        num_runs=3,
+        consensus="any",
+    )
+
+    result = await judge.run(Trace())
+    assert result.status == CheckStatus.PASS
+    assert result.details["passed_count"] == 1
+
+
+async def test_num_runs_must_be_at_least_one() -> None:
+    generator = MockGenerator(passed=True, reason=None)
+
+    with pytest.raises(ValidationError):
+        _ = LLMJudge(generator=generator, prompt="Evaluate the answer.", num_runs=0)

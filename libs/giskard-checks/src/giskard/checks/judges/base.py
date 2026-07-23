@@ -1,4 +1,4 @@
-from typing import Any, override
+from typing import Any, Literal, override
 
 from giskard.agents import ChatWorkflow, MessageTemplate, TemplateReference
 from giskard.llm.types import ChatMessage
@@ -33,7 +33,31 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     generator : BaseGenerator
         Generator for LLM evaluation. Defaults to the global
         default generator if not specified.
+    num_runs : int
+        Number of times to run the LLM evaluation. Defaults to 1 (single run,
+        identical to historical behavior). When greater than 1, the check runs
+        `num_runs` times and combines the individual results via `consensus`.
+    consensus : Literal["majority", "unanimous", "any"]
+        Rule used to combine multiple run results into a final pass/fail when
+        `num_runs > 1`. Ignored when `num_runs == 1`.
     """
+
+    num_runs: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "Number of times to run the LLM evaluation. When > 1, results are "
+            "combined using `consensus`."
+        ),
+    )
+    consensus: Literal["majority", "unanimous", "any"] = Field(
+        default="majority",
+        description=(
+            "How to combine multiple run results when `num_runs > 1`: "
+            "'majority' (more than half pass), 'unanimous' (all pass), or "
+            "'any' (at least one passes)."
+        ),
+    )
 
     @property
     def output_type(self) -> type[BaseModel] | None:
@@ -74,9 +98,28 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
 
         return ChatWorkflow(generator=self._generator, messages=[prompt])
 
+    async def _run_once(self, trace: TraceType) -> CheckResult:
+        """Execute a single LLM evaluation pass."""
+        workflow = await self._build_workflow(trace)
+
+        inputs = await self.get_inputs(trace)
+        workflow = workflow.with_inputs(**inputs)
+
+        if self.output_type is not None:
+            workflow = workflow.with_output(self.output_type)
+
+        chat = await workflow.run()
+
+        return await self._handle_output(chat.output, inputs, trace)
+
     @override
     async def run(self, trace: TraceType) -> CheckResult:
         """Execute the LLM-based check.
+
+        Runs the evaluation `num_runs` times (default 1, i.e. today's single-run
+        behavior) and, when `num_runs > 1`, combines the individual results into
+        a final pass/fail according to `consensus`. Individual per-run results
+        are kept in `details["runs"]` for observability.
 
         Parameters
         ----------
@@ -90,17 +133,36 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         CheckResult
             The result of the check evaluation.
         """
-        workflow = await self._build_workflow(trace)
+        if self.num_runs == 1:
+            return await self._run_once(trace)
 
-        inputs = await self.get_inputs(trace)
-        workflow = workflow.with_inputs(**inputs)
+        results = [await self._run_once(trace) for _ in range(self.num_runs)]
+        passed_count = sum(1 for result in results if result.passed)
+        total = len(results)
 
-        if self.output_type is not None:
-            workflow = workflow.with_output(self.output_type)
+        if self.consensus == "unanimous":
+            passed = passed_count == total
+        elif self.consensus == "any":
+            passed = passed_count > 0
+        else:  # "majority"
+            passed = passed_count > total / 2
 
-        chat = await workflow.run()
+        message = (
+            f"{passed_count}/{total} runs passed "
+            f"(consensus={self.consensus}) -> {'PASS' if passed else 'FAIL'}"
+        )
+        details: dict[str, Any] = {
+            "num_runs": total,
+            "consensus": self.consensus,
+            "passed_count": passed_count,
+            "runs": results,
+        }
 
-        return await self._handle_output(chat.output, inputs, trace)
+        return (
+            CheckResult.success(message=message, details=details)
+            if passed
+            else CheckResult.failure(message=message, details=details)
+        )
 
     async def get_inputs(self, trace: TraceType) -> dict[str, Any]:
         """Get template inputs for the LLM prompt.
