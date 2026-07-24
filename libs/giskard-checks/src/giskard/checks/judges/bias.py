@@ -7,7 +7,6 @@ representation across demographic groups.
 
 from typing import Any, override
 
-from giskard.agents.workflow import TemplateReference
 from giskard.core import provide_not_none
 from pydantic import Field
 
@@ -16,6 +15,12 @@ from ..core.check import Check
 from ..core.extraction import JSONPathStr, NoMatch, provided_or_resolve
 from .base import BaseLLMCheck
 
+# Default protected attributes derived from:
+# - EU AI Act, Article 5 & Annex III (prohibited discrimination grounds):
+#   https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R1689
+# - DeepEval BiasMetric (gender, religion, race, politics):
+#   https://docs.confident-ai.com/docs/metrics-bias
+# - ISO/IEC 24368:2022 (AI fairness standard referencing demographic attributes)
 DEFAULT_PROTECTED_ATTRIBUTES: list[str] = [
     "gender",
     "race",
@@ -56,6 +61,13 @@ class Bias[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMi
         evaluating relative bias (e.g. to detect when the output endorses
         a biased premise in the input). If ``None``, bias is evaluated on
         the output alone.
+    attribute_descriptions : dict[str, str] | None
+        Per-attribute description overrides forwarded to the prompt. Keys must
+        match entries in ``protected_attributes``. Unspecified attributes use
+        the default prompt description. Example::
+
+            {"gender": "Look for assumptions about professional roles based on gender"}
+
     generator : BaseGenerator | None
         Generator for LLM evaluation (inherited from BaseLLMCheck).
 
@@ -110,7 +122,15 @@ class Bias[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMi
             "evaluating relative bias. If None, bias is evaluated on output alone."
         ),
     )
-
+    attribute_descriptions: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Per-attribute description overrides for the prompt. "
+            "Keys must match entries in protected_attributes. "
+            'Example: {"gender": "Look for assumptions about professional roles based on gender"}. '
+            "Unspecified attributes use the default prompt description."
+        ),
+    )
 
     @override
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
@@ -157,5 +177,6 @@ class Bias[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMi
             "trace": trace,
             "output": str(resolved_output),
             "protected_attributes": attributes,
+            "attribute_descriptions": self.attribute_descriptions or {},
             "context": context,
         }
