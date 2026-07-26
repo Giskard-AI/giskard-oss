@@ -154,6 +154,30 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                 },
             )
 
+        # A list-valued key (a wildcard, `..`, or a multi-match path) would
+        # otherwise reach str() below and be embedded as its Python repr --
+        # brackets, quotes and all -- yielding a similarity score computed on
+        # text no one wrote. Reject it instead, the way Readability rejects a
+        # value it cannot score. Scalars still stringify as before.
+        resolved: list[tuple[str, str, object]] = [
+            ("reference text", self.reference_text_key, reference_text),
+            ("actual answer", self.actual_answer_key, actual_answer),
+        ]
+        for label, key, value in resolved:
+            if isinstance(value, (list, tuple, set, dict)):
+                return CheckResult.failure(
+                    message=(
+                        f"Value for {label} key '{key}' must be a single value, but "
+                        f"found {type(value).__name__}. Use a key that resolves to "
+                        "one value."
+                    ),
+                    details={
+                        "reference_text_key": self.reference_text_key,
+                        "actual_answer_key": self.actual_answer_key,
+                        "value": str(value),
+                    },
+                )
+
         actual_answer = str(actual_answer)
         reference_text = str(reference_text)
 

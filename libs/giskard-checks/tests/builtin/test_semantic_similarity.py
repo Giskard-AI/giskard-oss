@@ -623,3 +623,59 @@ async def test_similarity_at_exact_threshold() -> None:
     # Should pass when similarity >= threshold
     assert result.status == CheckStatus.PASS
     assert result.details["similarity"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_list_valued_key_is_rejected_instead_of_embedding_its_repr():
+    """A key resolving to several values must not be embedded as `str(list)`.
+
+    Without this guard the check embeds "['a', 'b']" -- brackets and quotes
+    included -- and reports an ordinary pass/fail on a score computed from
+    text no one wrote.
+    """
+    embedded: list[list[str]] = []
+
+    @BaseEmbeddingModel.register("recording")
+    class RecordingEmbeddingModel(BaseEmbeddingModel):
+        async def _embed(
+            self, texts: list[str], params: EmbeddingParams | None = None
+        ) -> list[np.ndarray]:
+            embedded.append(list(texts))
+            return [np.array([1.0, 0.0, 0.0]) for _ in texts]
+
+    trace = Trace[str, str](
+        interactions=[
+            Interaction(inputs="q1", outputs="a1", metadata={"ref": "first"}),
+            Interaction(inputs="q2", outputs="a2", metadata={"ref": "second"}),
+        ]
+    )
+    check = SemanticSimilarity(
+        actual_answer_key="trace.last.outputs",
+        reference_text_key="trace.interactions[*].metadata.ref",
+        threshold=0.5,
+        embedding_model=RecordingEmbeddingModel(),
+    )
+
+    result = await check.run(trace)
+
+    assert not result.passed
+    assert "must be a single value" in (result.message or "")
+    assert embedded == [], "nothing should have been sent to the embedding model"
+
+
+@pytest.mark.asyncio
+async def test_scalar_key_still_stringifies():
+    """Non-string scalars keep working; only collections are rejected."""
+    trace = Trace[str, str](
+        interactions=[Interaction(inputs="q", outputs="42", metadata={"ref": 42})]
+    )
+    check = SemanticSimilarity(
+        actual_answer_key="trace.last.outputs",
+        reference_text_key="trace.last.metadata.ref",
+        threshold=0.5,
+        embedding_model=MockEmbeddingModel(embeddings={}),
+    )
+
+    result = await check.run(trace)
+
+    assert result.passed
