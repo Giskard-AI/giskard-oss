@@ -65,7 +65,15 @@ class NoMatch(BaseModel):
 
 
 def _is_list_expression(expression: JSONPath) -> bool:
-    if isinstance(expression, Child | Descendants):
+    # `..` searches a whole subtree, so how many values it finds is a property
+    # of the data, not of the expression. Treat it as a list-expression the way
+    # bracket wildcards are, or resolve() falls back to its match-count
+    # heuristic and returns a bare scalar whenever the data happens to hold one
+    # match.
+    if isinstance(expression, Descendants):
+        return True
+
+    if isinstance(expression, Child):
         return _is_list_expression(expression.right) or _is_list_expression(
             expression.left
         )
