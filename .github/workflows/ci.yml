@@ -17,8 +17,7 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     permissions:
-      # write: push auto-format commits on same-repo PRs only (guarded below; unused on forks/main)
-      contents: write
+      contents: write # push auto-format commits on same-repo PRs (guarded below; unused on forks/main)
     timeout-minutes: 10
     env:
       SAME_REPO_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
@@ -31,6 +30,7 @@ jobs:
         with:
           # Immutable SHA (not head_ref) to avoid ref injection; push targets BRANCH below
           ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
 
       - name: Checkout (check-only)
         if: env.SAME_REPO_PR != 'true'
@@ -49,6 +49,8 @@ jobs:
         id: autofix
         env:
           BRANCH: ${{ github.head_ref }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           make format
           if git diff --quiet && git diff --cached --quiet; then
@@ -57,8 +59,13 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add -u -- '*.py'
+          if git diff --cached --quiet; then
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           git commit -m "style: auto-format"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
           git push origin "HEAD:refs/heads/$BRANCH"
           echo "pushed=true" >> "$GITHUB_OUTPUT"
 

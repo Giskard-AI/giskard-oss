@@ -72,14 +72,12 @@ from giskard.checks import Scenario, Groundedness
 
 client = OpenAI()
 
-
 def get_answer(inputs: str) -> str:
     response = client.chat.completions.create(
         model="gpt-5-mini",
         messages=[{"role": "user", "content": inputs}],
     )
     return response.choices[0].message.content
-
 
 scenario = (
     Scenario("test_dynamic_output")
@@ -123,14 +121,12 @@ Use Giskard Scan to:
 import asyncio
 from giskard.scan import vulnerability_scan
 
-
 async def main():
     await vulnerability_scan(
         target=my_agent,
         description="A customer support chatbot for an e-commerce platform.",
         languages=["en"],
     )
-
 
 asyncio.run(main())
 ```
@@ -151,12 +147,10 @@ Wrap your model and run the scan:
 import giskard
 import pandas as pd
 
-
 # Replace my_llm_chain with your actual LLM chain or model inference logic
 def model_predict(df: pd.DataFrame):
     """The function takes a DataFrame and must return a list of outputs (one per row)."""
     return [my_llm_chain.run({"query": question}) for question in df["question"]]
-
 
 giskard_model = giskard.Model(
     model=model_predict,
@@ -189,7 +183,7 @@ knowledge_base = KnowledgeBase.from_pandas(df, columns=["column_1", "column_2"])
 testset = generate_testset(
     knowledge_base,
     num_questions=60,
-    language="en",
+    language='en',
     agent_description="A customer support chatbot for company X",
 )
 ```

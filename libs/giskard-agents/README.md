@@ -63,7 +63,8 @@ Or add multiple messages to the workflow:
 ```python
 # The chat message role is "user" by default.
 chat = await (
-    generator.chat("You are a helpful assistant.", role="system")
+    generator
+    .chat("You are a helpful assistant.", role="system")
     .chat("Hello, how are you?")
     .chat("I'm fine, thank you!", role="assistant")
     .chat("What's your name?")
@@ -91,9 +92,7 @@ generator = agents.Generator(
 Or use the convenience method:
 
 ```python
-generator = agents.Generator(model="openai/gpt-4o-mini").with_retries(
-    5, base_delay=2.0, max_delay=30.0
-)
+generator = agents.Generator(model="openai/gpt-4o-mini").with_retries(5, base_delay=2.0, max_delay=30.0)
 ```
 
 ### Rate limiting
@@ -110,9 +109,7 @@ generator = agents.Generator(
 Or use the convenience method:
 
 ```python
-generator = generator.with_rate_limiter(
-    MinIntervalRateLimiter.from_rpm(60, max_concurrent=5)
-)
+generator = generator.with_rate_limiter(MinIntervalRateLimiter.from_rpm(60, max_concurrent=5))
 ```
 
 ## Custom middleware
@@ -127,7 +124,6 @@ from giskard.agents.generators import GenerationParams
 from giskard.agents.generators.middleware import CompletionMiddleware, NextFn
 from giskard.llm.types import ChatMessage, CompletionResponse
 
-
 @CompletionMiddleware.register("logging")
 class LoggingMiddleware(CompletionMiddleware):
     async def call(
@@ -141,7 +137,6 @@ class LoggingMiddleware(CompletionMiddleware):
         response = await next_fn(messages, params, metadata)
         logging.info(f"Got response: {response.choices[0].finish_reason}")
         return response
-
 
 generator = agents.Generator(
     model="openai/gpt-4o-mini",
@@ -159,13 +154,15 @@ each completion call:
 ```python
 from pydantic import BaseModel
 
-
 class SimpleOutput(BaseModel):
     mood: str
     greeting: str
 
-
-chat = await generator.chat("Hello!").with_output(SimpleOutput).run()
+chat = await (
+    generator.chat("Hello!")
+    .with_output(SimpleOutput)
+    .run()
+)
 
 assert isinstance(chat.output, SimpleOutput)
 assert chat.output.mood == "happy"
@@ -182,7 +179,9 @@ Here's an example:
 ```python
 # This will run a chat with the message "Hello Test Bot, how are you?"
 chat = await (
-    generator.chat("Hello {{ name_of_the_bot }}, how are you?", as_template=True)
+    generator.chat(
+        "Hello {{ name_of_the_bot }}, how are you?", as_template=True
+    )
     .with_inputs(name_of_the_bot="Test Bot")
     .run()
 )
@@ -247,9 +246,7 @@ You can then load the template as usual:
 ```python
 chat = await (
     generator.template("evaluators.scientific_theory")
-    .with_inputs(
-        theory="Normandy is actually the center of the universe because its perfect balance of rain, cheese, and cider creates a quantum field that bends space-time, making it the most harmonious place on Earth."
-    )
+    .with_inputs(theory="Normandy is actually the center of the universe because its perfect balance of rain, cheese, and cider creates a quantum field that bends space-time, making it the most harmonious place on Earth.")
     .run()
 )
 
@@ -262,9 +259,10 @@ assert score == 5
 You can run multiple chats with different inputs by passing a list of inputs to the `run_batch` method.
 
 ```python
-chats = await generator.chat(
-    "What's the weather in {{ city }}?", as_template=True
-).run_batch([{"city": "Paris"}, {"city": "London"}])
+chats = await (
+    generator.chat("What's the weather in {{ city }}?", as_template=True)
+    .run_batch([{"city": "Paris"}, {"city": "London"}])
+)
 assert len(chats) == 2
 ```
 
@@ -279,7 +277,6 @@ This can be combined with all functionalities described earlier. Here's an examp
 ```python
 from giskard import agents
 
-
 @agents.tool
 def get_weather(city: str) -> str:
     """Get the weather in a city.
@@ -293,7 +290,6 @@ def get_weather(city: str) -> str:
         return f"It's raining in {city}."
 
     return f"It's sunny in {city}."
-
 
 # Run parallel chats with tools
 chats = await (
@@ -371,16 +367,10 @@ Note: when running a single chat (`workflow.run(...)`), error policy `SKIP` beha
 from giskard.agents import ErrorPolicy
 
 # This may return fewer than 3 chats if some fail.
-chats = (
-    await generator.chat("Hello!", role="user").on_error(ErrorPolicy.SKIP).run_many(n=3)
-)
+chats = await generator.chat("Hello!", role="user").on_error(ErrorPolicy.SKIP).run_many(n=3)
 
 # This will return 3 chats, some may be in failed state.
-chats = (
-    await generator.chat("Hello!", role="user")
-    .on_error(ErrorPolicy.RETURN)
-    .run_many(n=3)
-)
+chats = await generator.chat("Hello!", role="user").on_error(ErrorPolicy.RETURN).run_many(n=3)
 
 for chat in chats:
     if chat.failed:
@@ -398,16 +388,14 @@ You can change this behavior by passing the `catch=None` on the tool decorator. 
 def get_weather(city: str) -> str:
     raise ValueError("City not found")
 
-
 result = await get_weather.run(arguments={"city": "Paris"})
-print(result)  # "ERROR: City not found"
+print(result) # "ERROR: City not found"
 
 
 # Opt out of the catch
 @agents.tool(catch=None)
 def get_weather(city: str) -> str:
     raise ValueError("City not found")
-
 
 # This will raise an exception
 result = await get_weather.run(arguments={"city": "Paris"})
