@@ -65,7 +65,6 @@ KNOWN_COMPLETION_PARAMS = frozenset(
 )
 
 
-
 @ToolDef.register_serializer(_PROVIDER)
 def serialize_tool_def(tool: ToolDef, _info: SerializationInfo) -> "ToolUnionParam":
     return {
@@ -345,8 +344,12 @@ class AnthropicChatTranslator:
             # bare "refusal" marker so message.is_refusal still fires when
             # stop_details / explanation are absent (#2615).
             details = getattr(raw, "stop_details", None)
-            explanation = getattr(details, "explanation", None) if details is not None else None
-            category = getattr(details, "category", None) if details is not None else None
+            explanation = (
+                getattr(details, "explanation", None) if details is not None else None
+            )
+            category = (
+                getattr(details, "category", None) if details is not None else None
+            )
             refusal_out = explanation or category or "refusal"
 
         message = AssistantMessage(
