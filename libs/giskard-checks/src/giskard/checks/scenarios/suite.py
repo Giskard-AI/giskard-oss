@@ -134,7 +134,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     scenarios: list[Scenario[InputType, OutputType, Trace[Any, Any]]] = Field(
         default_factory=list, description="Scenarios in the suite"
     )
-    target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = Field(
+    target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = Field(  # pyright: ignore[reportInvalidTypeForm]
         default=MISSING,
         description="Suite-level target SUT that will override any scenario-level target.",
     )
@@ -160,7 +160,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
     async def run(
         self,
-        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),
+        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),  # pyright: ignore[reportInvalidTypeForm]
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
@@ -176,11 +176,17 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         return_exception : bool
             If True, return results even when exceptions occur instead of raising.
         parallel : bool
-            If True, run all scenarios concurrently while preserving result order.
+            If True, run scenarios concurrently against the target while
+            preserving result order. Defaults to ``False`` (serial execution).
+            This controls *suite execution*, not scenario generation
+            (``generate_suite`` always runs generators concurrently).
+            Scan helpers such as ``quality_scan`` / ``vulnerability_scan``
+            pass ``parallel=True`` by default.
         max_concurrency : int | None
             Max concurrent scenarios when ``parallel=True`` (positive int).
             ``None`` (default) is unbounded: all scenarios start at once, so the
-            provider's rate limits become the effective cap.
+            provider's rate limits become the effective cap. Ignored when
+            ``parallel=False``.
         verbose : bool
             If True (default), display a progress bar showing which scenario is
             currently running. Set to False for non-interactive environments.
