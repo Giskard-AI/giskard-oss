@@ -4,6 +4,16 @@ from giskard.core import disable_telemetry
 
 
 @pytest.fixture(autouse=True)
+def disable_auto_checkpoints(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep unit tests from writing/resuming shared ``.giskard/checkpoints``.
+
+    Explicit ``checkpoint_dir=...`` in checkpoint tests still works; only the
+    auto default is disabled.
+    """
+    monkeypatch.setenv("GISKARD_CHECKPOINT", "0")
+
+
+@pytest.fixture(autouse=True)
 def reset_default_generator():
     """Restore the global default generator after each test."""
     original = settings_module._default_generator

@@ -87,7 +87,7 @@ async def _generate_scenarios(
                 await store.append(
                     "scenario_generated",
                     id=cid,
-                    payload=scenario.model_dump(mode="json"),
+                    payload=scenario.model_dump(mode="json", exclude={"target"}),
                 )
                 scenario_ids.append(cid)
             await store.append(

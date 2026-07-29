@@ -3,6 +3,16 @@ from giskard.scan.quality import quality_suite_generator_registry
 from giskard.scan.vulnerability import vulnerability_suite_generator_registry
 
 
+@pytest.fixture(autouse=True)
+def disable_auto_checkpoints(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep unit tests from writing/resuming shared ``.giskard/checkpoints``.
+
+    Explicit ``checkpoint_dir=...`` in checkpoint tests still works; only the
+    auto default is disabled.
+    """
+    monkeypatch.setenv("GISKARD_CHECKPOINT", "0")
+
+
 @pytest.fixture
 def isolated_vulnerability_registry():
     """Snapshot and restore the vulnerability generator registry."""

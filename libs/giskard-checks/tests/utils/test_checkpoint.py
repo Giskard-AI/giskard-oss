@@ -126,11 +126,23 @@ def test_resolve_checkpoint_dir_false_disables(
     assert resume is False
 
 
-def test_resolve_env_disables(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_env_disables_auto_only(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GISKARD_CHECKPOINT", "0")
     path, resume = resolve_checkpoint_options(fingerprint={"phase": "run"})
     assert path is None
     assert resume is False
+
+
+def test_resolve_env_disable_allows_explicit_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GISKARD_CHECKPOINT", "0")
+    fingerprint = {"phase": "run", "suite": "x"}
+    path, resume = resolve_checkpoint_options(
+        checkpoint_dir=tmp_path / "ck", fingerprint=fingerprint
+    )
+    assert resume is True
+    assert path == store_path_for(tmp_path / "ck", fingerprint)
 
 
 def test_resolve_explicit_root_nests_fingerprint(

@@ -150,13 +150,15 @@ def resolve_checkpoint_options(
     tuple[Path | None, bool | Literal[\"force\"]]
         Concrete store directory (or ``None`` if disabled) and resume mode.
     """
-    if checkpoint_dir is False or _env_checkpoint_disabled():
+    if checkpoint_dir is False:
         return None, False
 
     if isinstance(checkpoint_dir, bool):
         raise TypeError("checkpoint_dir must be a path, None, or False")
 
     if checkpoint_dir is None:
+        if _env_checkpoint_disabled():
+            return None, False
         env_dir = os.environ.get(CHECKPOINT_DIR_ENV)
         root = Path(env_dir) if env_dir else DEFAULT_CHECKPOINT_ROOT
     else:
