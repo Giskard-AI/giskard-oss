@@ -53,6 +53,8 @@ def main() -> int:
         root = Path(project_dir)
         config = root / "pyrightconfig.json"
         path = Path(raw_path)
+        if not path.is_absolute():
+            path = root / path
 
         if path.suffix != ".py" or not path.exists():
             return 0
@@ -68,8 +70,8 @@ def main() -> int:
             return 0
 
         # ruff runs on both src and tests; failures here are non-fatal.
-        run(["uv", "tool", "run", "ruff", "format", str(path)], root)
-        run(["uv", "tool", "run", "ruff", "check", "--fix", str(path)], root)
+        run(["uv", "run", "ruff", "format", str(path)], root)
+        run(["uv", "run", "ruff", "check", "--fix", str(path)], root)
 
         if parts[2] != "src":
             # tests: ruff only, never typechecked. CI (make typecheck) DOES
@@ -83,7 +85,6 @@ def main() -> int:
         proc = run(
             [
                 "uv",
-                "tool",
                 "run",
                 "basedpyright",
                 "--level",
@@ -110,9 +111,11 @@ def main() -> int:
 
         lines = [f"basedpyright found {error_count} error(s) in {rel}:"]
         for diag in diagnostics:
-            if diag.get("severity") != "error":
+            if not isinstance(diag, dict) or diag.get("severity") != "error":
                 continue
-            line_no = diag.get("range", {}).get("start", {}).get("line", 0) + 1
+            range_val = diag.get("range") or {}
+            start_val = range_val.get("start") or {}
+            line_no = start_val.get("line", 0) + 1
             rule = diag.get("rule", "")
             suffix = f" [{rule}]" if rule else ""
             lines.append(f"  {rel}:{line_no} {diag.get('message', '')}{suffix}")
