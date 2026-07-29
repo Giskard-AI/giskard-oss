@@ -412,7 +412,7 @@ def test_unknown_completion_params_warn(caplog):
         payload = AnthropicChatTranslator.to_anthropic(
             _MODEL, [msg], top_p=0.5, stop_sequences=["STOP"], temperature=0.2
         )
-    assert payload["temperature"] == 0.2
+    assert payload.get("temperature") == 0.2
     assert "top_p" not in payload
     assert "stop_sequences" not in payload
     joined = " ".join(r.message for r in caplog.records)
