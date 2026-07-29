@@ -31,7 +31,8 @@ async def test_run_static_scenario_as_scan_stub(
     )
 
     class _FakeSuite:
-        scenarios = [scenario]
+        def __init__(self) -> None:
+            self.scenarios = [scenario]
 
         async def run(
             self,
