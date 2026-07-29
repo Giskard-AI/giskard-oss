@@ -130,6 +130,7 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
             return CheckResult.failure(
                 message=f"No value found for key '{self.key}'.",
                 details={**details, "text": text},
+                evaluable=False,
             )
 
         if not isinstance(text, str):
@@ -139,6 +140,7 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
                     f"{type(text).__name__}."
                 ),
                 details={**details, "value": str(text)},
+                evaluable=False,
             )
 
         try:

@@ -82,6 +82,7 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
             return CheckResult.failure(
                 message=f"No value found for key '{self.key}'.",
                 details=details,
+                evaluable=False,
             )
 
         if self.parse:
@@ -89,6 +90,7 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
                 return CheckResult.failure(
                     message=f"Value at key '{self.key}' is not a string: {value!r}",
                     details=details,
+                    evaluable=False,
                 )
             try:
                 value = json.loads(value)

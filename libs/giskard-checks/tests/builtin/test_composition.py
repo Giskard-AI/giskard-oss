@@ -307,6 +307,47 @@ class TestNot:
 
         assert result.passed
 
+    async def test_unevaluable_failure_not_inverted(self):
+        """FAIL with evaluable=False is passed through without inversion."""
+
+        async def _unevaluable(trace: Trace[Any, Any]) -> CheckResult:
+            return CheckResult.failure(
+                message="No value found for key 'x'.",
+                evaluable=False,
+            )
+
+        check = Not(check=FnCheck(fn=_unevaluable))
+        result = await check.run(Trace())
+
+        assert result.status == CS.FAIL
+        assert result.failed
+        assert result.evaluable is False
+        assert result.message == "No value found for key 'x'."
+
+    async def test_missing_key_not_inverted_to_pass(self):
+        """Not must not turn a missing-key Equals failure into a pass (#2637)."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="q", outputs="the answer")
+        )
+        inner = Equals(key="trace.last.metadata.nope", expected_value="x")
+        result = await Not(check=inner).run(trace)
+
+        assert result.status == CS.FAIL
+        assert result.evaluable is False
+        assert "No value found for key" in (result.message or "")
+
+    async def test_match_type_mismatch_not_inverted_to_pass(self):
+        """Not must not invert Equals match= type mismatches into a pass (#2637)."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="q", outputs="the answer")
+        )
+        inner = Equals(key="trace.last.outputs", expected_value="x", match="any")
+        result = await Not(check=inner).run(trace)
+
+        assert result.status == CS.FAIL
+        assert result.evaluable is False
+        assert "Expected a list, set, or tuple" in (result.message or "")
+
 
 # ---------------------------------------------------------------------------
 # Nested composition

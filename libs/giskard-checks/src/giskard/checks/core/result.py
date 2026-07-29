@@ -131,6 +131,10 @@ class CheckResult(BaseResult, frozen=True):
     details : dict[str, Any]
         Arbitrary structured payload with additional context (e.g., failure reasons,
         timings, and any metadata the check wishes to include).
+    evaluable : bool
+        False when the check could not be evaluated (missing key, wrong type for
+        the configured mode, unsupported comparison, etc.). Defaults to True.
+        Composition operators such as ``Not`` must not invert unevaluable failures.
     passed : bool
         True if ``status`` is ``PASS``.
     failed : bool
@@ -147,6 +151,13 @@ class CheckResult(BaseResult, frozen=True):
     message: str | None = Field(default=None, description="Check message")
     metrics: list[Metric] = Field(default_factory=list, description="Check metric")
     details: dict[str, Any] = Field(default_factory=dict, description="Check details")
+    evaluable: bool = Field(
+        default=True,
+        description=(
+            "False when the check could not be evaluated (e.g. missing key or "
+            "type mismatch). Not must not invert unevaluable failures."
+        ),
+    )
 
     # Convenience constructors
     @classmethod
@@ -173,12 +184,25 @@ class CheckResult(BaseResult, frozen=True):
         *,
         message: str | None = None,
         details: dict[str, Any] | None = None,
+        evaluable: bool = True,
     ) -> "CheckResult":
-        """Construct a failure result."""
+        """Construct a failure result.
+
+        Parameters
+        ----------
+        message : str or None
+            Optional short failure reason.
+        details : dict or None
+            Optional structured context.
+        evaluable : bool
+            Set to False when the assertion could not be evaluated (for example
+            a missing key). Defaults to True.
+        """
         return cls(
             status=CheckStatus.FAIL,
             message=message,
             details={} if details is None else details,
+            evaluable=evaluable,
         )
 
     @classmethod

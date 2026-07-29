@@ -174,6 +174,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
             return CheckResult.failure(
                 message=f"No value found for key '{self.key}'.",
                 details=details,
+                evaluable=False,
             )
 
         details["input"] = raw_value
@@ -185,6 +186,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
             return CheckResult.failure(
                 message=f"Value at key '{self.key}' is not JSON serializable: {err}",
                 details=details,
+                evaluable=False,
             )
 
         regorus = importlib.import_module("regorus")

@@ -161,6 +161,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
                     f"{self.match!r}, but got {type(actual_value).__name__}."
                 ),
                 details=details,
+                evaluable=False,
             )
 
         collection: MatchCollection[Any] = actual_value
@@ -179,6 +180,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
                     actual_value, expected_value
                 ),
                 details=details,
+                evaluable=False,
             )
 
         if self.match == "any":
@@ -225,12 +227,14 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
             return CheckResult.failure(
                 message=f"No value found for expected value key '{self.expected_value_key}'.",
                 details=details,
+                evaluable=False,
             )
 
         if isinstance(actual_value, NoMatch):
             return CheckResult.failure(
                 message=f"No value found for key '{self.key}', expected a value {self._comparison_message} {repr(self.expected_value)}.",
                 details=details,
+                evaluable=False,
             )
 
         if self.match is not MISSING:
@@ -241,6 +245,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
             return CheckResult.failure(
                 message=f"Comparison not supported: {type(actual_value).__name__} does not support {self._operator_symbol} comparison with {type(expected_value).__name__}",
                 details=details,
+                evaluable=False,
             )
         if compare_result:
             return CheckResult.success(

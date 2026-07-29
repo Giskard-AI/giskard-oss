@@ -92,6 +92,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
                 CheckResult.failure(
                     message=f"No value found for {target_name} key '{target_key}'.",
                     details=details,
+                    evaluable=False,
                 ),
             )
 
@@ -102,6 +103,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
                 CheckResult.failure(
                     message=f"Value for {target_name} is not a string, expected string but got {type(target).__name__}.",
                     details=details,
+                    evaluable=False,
                 ),
             )
 
@@ -113,6 +115,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
                 CheckResult.failure(
                     message=f"No value found for text key '{self.text_key}'.",
                     details=details,
+                    evaluable=False,
                 ),
             )
 
@@ -123,6 +126,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
                 CheckResult.failure(
                     message=f"Value for text is not a string, expected string but got {type(text).__name__}.",
                     details=details,
+                    evaluable=False,
                 ),
             )
 

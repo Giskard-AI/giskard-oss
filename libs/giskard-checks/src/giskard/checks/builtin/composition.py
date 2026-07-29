@@ -147,7 +147,8 @@ class Not[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMis
     """Inverts the result of an inner check.
 
     A passing inner result becomes a failure, and a failing inner result
-    becomes a pass. Error and skip results are passed through unchanged.
+    becomes a pass. Error, skip, and unevaluable results
+    (``evaluable=False``) are passed through unchanged.
 
     Attributes
     ----------
@@ -169,7 +170,8 @@ class Not[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMis
     async def run(self, trace: TraceType) -> CheckResult:
         """Run the inner check and invert its pass/fail result.
 
-        Error and skip results are passed through without inversion.
+        Error, skip, and unevaluable results are passed through without
+        inversion.
 
         Parameters
         ----------
@@ -179,11 +181,15 @@ class Not[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMis
         Returns
         -------
         CheckResult
-            Inverted result (pass→fail, fail→pass). Error/skip unchanged.
+            Inverted result (pass→fail, fail→pass). Error/skip/unevaluable
+            unchanged.
         """
         result = await self.check.run(trace)
 
-        if result.status in (CheckStatus.ERROR, CheckStatus.SKIP):
+        if (
+            result.status in (CheckStatus.ERROR, CheckStatus.SKIP)
+            or not result.evaluable
+        ):
             return result
 
         if result.passed:

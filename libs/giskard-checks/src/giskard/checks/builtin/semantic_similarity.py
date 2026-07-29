@@ -127,6 +127,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                     "reference_text_key": self.reference_text_key,
                     "reference_text": reference_text,
                 },
+                evaluable=False,
             )
         if reference_text is None or reference_text == "":
             return CheckResult.failure(
@@ -135,6 +136,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                     "reference_text_key": self.reference_text_key,
                     "reference_text": reference_text,
                 },
+                evaluable=False,
             )
         actual_answer = resolve(trace, self.actual_answer_key)
         if isinstance(actual_answer, NoMatch):
@@ -144,6 +146,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                     "actual_answer": actual_answer,
                     "actual_answer_key": self.actual_answer_key,
                 },
+                evaluable=False,
             )
         if actual_answer is None or actual_answer == "":
             return CheckResult.failure(
@@ -152,6 +155,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                     "actual_answer": actual_answer,
                     "actual_answer_key": self.actual_answer_key,
                 },
+                evaluable=False,
             )
 
         actual_answer = str(actual_answer)
