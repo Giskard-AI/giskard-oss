@@ -46,7 +46,7 @@ class Contradiction[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     @override
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
         return {
-            "answer": str(
+            "answer": format_prompt_text(
                 provided_or_resolve(trace, key=self.answer_key, value=self.answer)
             ),
             "context": format_prompt_text(

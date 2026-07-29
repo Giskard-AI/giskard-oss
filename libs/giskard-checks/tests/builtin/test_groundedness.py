@@ -231,6 +231,34 @@ async def test_list_context_is_joined_without_python_repr_artifacts() -> None:
     assert "\\'" not in context_str
 
 
+async def test_list_answer_from_trace_is_joined_without_python_repr_artifacts() -> None:
+    """A list-valued answer extracted via answer_key must not leak Python repr."""
+    generator = MockGenerator(passed=True, reason=None)
+    groundedness = Groundedness(
+        generator=generator,
+        answer_key="trace.last.metadata.answer_parts",
+        context="Paris is the capital of France.",
+    )
+    interaction = Interaction(
+        inputs={"query": "Where is Paris?"},
+        outputs={"response": "unused"},
+        metadata={
+            "answer_parts": [
+                "Paris is the capital of France.",
+                "It's located in Europe.",
+            ]
+        },
+    )
+    result = await groundedness.run(Trace(interactions=[interaction]))
+
+    answer_str = cast(str, result.details["inputs"]["answer"])
+    assert answer_str == "Paris is the capital of France.\nIt's located in Europe."
+    assert "[" not in answer_str
+    assert "]" not in answer_str
+    assert '\\"' not in answer_str
+    assert "\\'" not in answer_str
+
+
 async def test_missing_answer_in_trace() -> None:
     """Test behavior when answer is not found in trace."""
     generator = MockGenerator(passed=True, reason=None)

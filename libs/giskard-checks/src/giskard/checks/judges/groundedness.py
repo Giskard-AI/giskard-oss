@@ -84,7 +84,7 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             Template variables with 'answer' and 'context' keys.
         """
         return {
-            "answer": str(
+            "answer": format_prompt_text(
                 provided_or_resolve(
                     trace,
                     key=self.answer_key,

@@ -22,15 +22,14 @@ class LLMCheckResult(BaseModel):
 def format_prompt_text(value: Any) -> str:
     """Render a resolved trace/input value as plain text for an LLM prompt.
 
-    Several judge inputs (e.g. ``context``) accept either a single string or a
-    list of strings (multiple context documents). A bare ``str(value)`` on a
-    list renders Python's ``repr`` -- brackets, comma separators, and quoted
-    (sometimes escaped) items -- which leaks implementation syntax into the
-    prompt instead of the actual text. Join list values into a single
-    newline-separated block instead, matching the ``"\\n".join(...)``
-    convention used elsewhere in this codebase for combining text fragments.
-    Any other value (a plain string, ``NoMatch``, or arbitrary trace payload)
-    is stringified as before.
+    Judge inputs such as ``context`` accept ``str | list[str]``, and
+    JSONPath resolution can also return a list for ``answer`` (multi-match
+    paths, or a single match whose value is already a list). A bare
+    ``str(value)`` on a list renders Python's ``repr`` -- brackets, comma
+    separators, and quoted (sometimes escaped) items -- which leaks
+    implementation syntax into the prompt. Join list values into a single
+    newline-separated block instead. Any other value (a plain string,
+    ``NoMatch``, or arbitrary trace payload) is stringified as before.
     """
     if isinstance(value, list):
         return "\n".join(str(item) for item in value)
