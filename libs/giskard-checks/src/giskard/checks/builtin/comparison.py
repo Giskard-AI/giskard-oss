@@ -37,13 +37,17 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     """
 
     key: JSONPathStr = Field(
-        ..., description="The key to extract the actual value from the trace"
+        default="trace.last.outputs",
+        description=(
+            "JSONPath to extract the actual value from the trace "
+            "(default: trace.last.outputs)."
+        ),
     )
-    expected_value: ExpectedType | MISSING = Field(
+    expected_value: ExpectedType | MISSING = Field(  # pyright: ignore[reportInvalidTypeForm]
         default=MISSING,
         description="The expected value to compare against. If omitted, the expected value is extracted from the trace using expected_value_key. Explicit None is valid and compares against None.",
     )
-    expected_value_key: JSONPathStr | MISSING = Field(
+    expected_value_key: JSONPathStr | MISSING = Field(  # pyright: ignore[reportInvalidTypeForm]
         default=MISSING,
         description="The key to extract the expected value from the trace. If omitted, use expected_value directly. If provided, the expected value is extracted from the trace using this key.",
     )
@@ -51,7 +55,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         default="NFKC",
         description="Unicode normalization form to apply before comparison. Defaults to NFKC.",
     )
-    match: MatchMode | MISSING = Field(
+    match: MatchMode | MISSING = Field(  # pyright: ignore[reportInvalidTypeForm]
         default=MISSING,
         description=(
             "How to apply the comparison when the resolved actual value is a collection. "
@@ -276,7 +280,8 @@ class LessThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrigh
     expected_value : ExpectedType
         The expected value to compare against the extracted values
     key : str
-        The key to extract the actual value from the trace
+        JSONPath to extract the actual value from the trace
+        (default: ``trace.last.outputs``).
     """
 
     @override
@@ -339,7 +344,8 @@ class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyr
     expected_value : ExpectedType
         The expected value to compare against the extracted values
     key : str
-        The key to extract the actual value from the trace
+        JSONPath to extract the actual value from the trace
+        (default: ``trace.last.outputs``).
     """
 
     @override
@@ -382,7 +388,8 @@ class LessThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # 
     expected_value : ExpectedType
         The expected value to compare against the extracted values
     key : str
-        The key to extract the actual value from the trace
+        JSONPath to extract the actual value from the trace
+        (default: ``trace.last.outputs``).
     """
 
     @override
@@ -445,7 +452,8 @@ class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # p
     expected_value : ExpectedType
         The expected value to compare against the extracted values
     key : str
-        The key to extract the actual value from the trace
+        JSONPath to extract the actual value from the trace
+        (default: ``trace.last.outputs``).
     """
 
     @override
@@ -488,7 +496,8 @@ class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright:
     expected_value : ExpectedType
         The expected value to compare against the extracted values
     key : str
-        The key to extract the actual value from the trace
+        JSONPath to extract the actual value from the trace
+        (default: ``trace.last.outputs``).
     """
 
     @override
@@ -531,7 +540,8 @@ class NotEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrig
     expected_value : ExpectedType
         The expected value to compare against the extracted values
     key : str
-        The key to extract the actual value from the trace
+        JSONPath to extract the actual value from the trace
+        (default: ``trace.last.outputs``).
     """
 
     @override

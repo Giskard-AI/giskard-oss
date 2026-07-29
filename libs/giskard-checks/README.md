@@ -113,12 +113,12 @@ from giskard.checks import Equals, Scenario, Suite
 scenario1 = (
     Scenario("s1")
     .interact("hello")
-    .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+    .check(Equals(expected_value="Echo: hello"))
 )
 scenario2 = (
     Scenario("s2")
     .interact("world")
-    .check(Equals(expected_value="Echo: world", key="trace.last.outputs"))
+    .check(Equals(expected_value="Echo: world"))
 )
 
 # Create a suite with a shared target
@@ -180,7 +180,23 @@ API Overview
 - `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
 - `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LessThan`, `LessThanEquals` (`LesserThan` and `LesserThanEquals` are deprecated aliases).
 - `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
-- JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks via `key` or check-specific fields like `answer_key`.
+
+### Selecting values from the trace
+
+Most checks read `trace.last.outputs` by default. Override with `key=` / `*_key=`:
+
+| Check family | Parameter | Default path |
+| --- | --- | --- |
+| Comparisons (`Equals`, `LessThan`, …) | `key` | `trace.last.outputs` |
+| String / regex (`StringMatching`, `RegexMatching`) | `text_key` | `trace.last.outputs` |
+| `JsonValid`, `Readability`, `RegoPolicy` | `key` | `trace.last.outputs` |
+| Semantic similarity | `actual_answer_key` | `trace.last.outputs` |
+| Semantic similarity | `reference_text_key` | `trace.last.metadata.reference_text` |
+| Judges (`Groundedness`, `AnswerRelevance`, …) | `answer_key` | `trace.last.outputs` |
+| Groundedness / contradiction context | `context_key` | `trace.last.metadata.context` |
+| Toxicity | `output_key` | `trace.last.outputs` |
+
+Constructor args like `context=` / `text=` / `answer=` take priority over the matching `*_key` when provided.
 
 **Testing utilities**
 - `giskard.checks.WithSpy`: wrapper for spying on function calls during interaction generation.

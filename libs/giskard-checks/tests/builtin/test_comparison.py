@@ -910,6 +910,32 @@ class TestNotEquals:
         assert result.details["expected_value"] == [1, 2]
 
 
+class TestComparisonDefaultKey:
+    """Comparisons default key to trace.last.outputs (aligned with judges)."""
+
+    async def test_equals_without_explicit_key(self):
+        """Equals(expected_value=...) without key= reads trace.last.outputs."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="capital?", outputs="Paris")
+        )
+        check = Equals(expected_value="Paris")
+
+        assert check.key == "trace.last.outputs"
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.details["actual_value"] == "Paris"
+
+    @pytest.mark.parametrize(
+        "check_cls",
+        [Equals, GreaterThan, LessThan, GreaterEquals, LessThanEquals, NotEquals],
+    )
+    def test_default_key_on_constructors(self, check_cls):
+        """All comparison constructors default key to trace.last.outputs."""
+        check = check_cls(expected_value=1)
+        assert check.key == "trace.last.outputs"
+
+
 class TestComparisonSentinelDefault:
     """Regression tests for issue #2501: omitting expected_value must raise an error."""
 
@@ -920,7 +946,7 @@ class TestComparisonSentinelDefault:
     def test_omitting_both_raises(self, check_cls):
         """Omitting both expected_value and expected_value_key must raise ValueError."""
         with pytest.raises(ValueError, match="expected_value"):
-            check_cls(key="trace.last.outputs")
+            check_cls()
 
     def test_explicit_none_is_valid(self):
         """explicit expected_value=None must be accepted (compares against None)."""
