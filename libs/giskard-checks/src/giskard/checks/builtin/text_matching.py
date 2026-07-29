@@ -3,6 +3,8 @@
 This module provides checks for text matching:
 - StringMatching: Literal substring matching with normalization
 - RegexMatching: Regular expression pattern matching
+- ContainsAny: Validates if at least one value from a list appears within a text string
+- ContainsAll: Validates if all values from a list appear within a text string
 """
 
 from abc import ABC, abstractmethod
@@ -470,5 +472,365 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
             )
         return CheckResult.failure(
             message=f"Text does not match the regex pattern '{pattern}'.",
+            details=details,
+        )
+
+
+class ListTextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    Check[InputType, OutputType, TraceType], ABC
+):
+    """Base class for checks that validate text against a list of target values.
+
+    This abstract class handles the common pattern of:
+    1. Extracting text from a trace or direct value
+    2. Extracting a target list of values from trace or direct value
+    3. Validating both exist and have correct types
+    4. Delegating to subclass for specific matching logic
+
+    Attributes
+    ----------
+    text : str | MISSING
+        The text string to search within. If omitted, extracted from
+        trace using ``text_key``.
+    text_key : JSONPathStr
+        JSONPath expression to extract the text from the trace. Defaults to
+        "trace.last.outputs" which extracts the last interaction's outputs.
+    values : list[str] | MISSING
+        The list of values to search for. Either this or ``values_key`` must be provided.
+    values_key : JSONPathStr | MISSING
+        JSONPath expression to extract the values from the trace. Either this or ``values`` must be provided.
+    normalization_form : NormalizationForm | None
+        Unicode normalization form to apply before matching. Options:
+        - "NFC": Canonical Composition
+        - "NFD": Canonical Decomposition
+        - "NFKC": Compatibility Composition (default)
+        - "NFKD": Compatibility Decomposition
+        If None, no normalization is applied. Defaults to "NFKC".
+    case_sensitive : bool
+        If True, matching is case-sensitive. If False, both text and values
+        are converted to lowercase before comparison. Defaults to False.
+    """
+
+    text: str | MISSING = Field(
+        default=MISSING,
+        description="The text string to search within.",
+    )
+    text_key: JSONPathStr = Field(
+        default="trace.last.outputs",
+        description="JSONPath expression to extract text from trace.",
+    )
+    values: list[str] | MISSING = Field(
+        default=MISSING,
+        description="The list of values to search for.",
+    )
+    values_key: JSONPathStr | MISSING = Field(
+        default=MISSING,
+        description="JSONPath expression to extract the values from the trace.",
+    )
+    normalization_form: NormalizationForm | None = Field(
+        default="NFKC",
+        description="Unicode normalization form to apply (NFC, NFD, NFKC, NFKD). Defaults to NFKC.",
+    )
+    case_sensitive: bool = Field(
+        default=False,
+        description="If True, matching is case-sensitive. If False, strings are lowercased before comparison.",
+    )
+
+    @model_validator(mode="after")
+    def validate_values_or_values_key(self) -> Self:
+        """Validate that exactly one of values or values_key is provided.
+
+        Returns
+        -------
+        Self
+            The validated instance.
+
+        Raises
+        ------
+        ValueError
+            If neither or both values and values_key are provided.
+        """
+        if (self.values is MISSING) == (self.values_key is MISSING):
+            raise ValueError(
+                "Exactly one of 'values' or 'values_key' must be provided, not both or neither."
+            )
+        return self
+
+    def _extract_and_validate(
+        self,
+        trace: TraceType,
+    ) -> tuple[str, list[str], dict[str, Any]] | tuple[None, None, CheckResult]:
+        """Extract and validate text and target values from trace or direct values.
+
+        Parameters
+        ----------
+        trace : TraceType
+            The trace to extract values from.
+
+        Returns
+        -------
+        tuple[str, list[str], dict] | tuple[None, None, CheckResult]
+            Either (text, values, details) on success, or (None, None, error_result) on failure.
+        """
+        text = provided_or_resolve(trace, key=self.text_key, value=self.text)
+        target = provided_or_resolve(
+            trace,
+            key=self.values_key,
+            value=self.values,
+        )
+
+        details = {"text": text, "values": target}
+
+        if isinstance(target, NoMatch):
+            return (
+                None,
+                None,
+                CheckResult.failure(
+                    message=f"No value found for values key '{self.values_key}'.",
+                    details=details,
+                ),
+            )
+
+        if not isinstance(target, list) or not all(isinstance(x, str) for x in target):
+            return (
+                None,
+                None,
+                CheckResult.failure(
+                    message="Value for values must be a list of strings.",
+                    details=details,
+                ),
+            )
+
+        if isinstance(text, NoMatch):
+            return (
+                None,
+                None,
+                CheckResult.failure(
+                    message=f"No value found for text key '{self.text_key}'.",
+                    details=details,
+                ),
+            )
+
+        if not isinstance(text, str):
+            return (
+                None,
+                None,
+                CheckResult.failure(
+                    message=f"Value for text is not a string, expected string but got {type(text).__name__}.",
+                    details=details,
+                ),
+            )
+
+        return text, target, details
+
+    def _format_str(self, value: str) -> str:
+        """Format a string for matching by applying normalization and case handling.
+
+        This method:
+        1. Applies Unicode normalization if specified
+        2. Converts to lowercase if case-insensitive matching is enabled
+
+        Parameters
+        ----------
+        value : str
+            The string to format.
+
+        Returns
+        -------
+        str
+            The formatted string ready for comparison.
+        """
+        value = normalize_string(value, self.normalization_form)
+        if not self.case_sensitive:
+            value = value.lower()
+        return value
+
+
+@Check.register("contains_any")
+class ContainsAny[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    ListTextBasedCheck[InputType, OutputType, TraceType]
+):
+    """Check that validates if at least one value appears within a text string.
+
+    This check performs substring matching between a list of values and text, with
+    support for Unicode normalization and case sensitivity control. Both the
+    text and values can be provided directly or extracted from a trace using
+    JSONPath expressions.
+
+    Attributes
+    ----------
+    text : str | MISSING
+        The text string to search within. If omitted, extracted from
+        trace using ``text_key``.
+    text_key : JSONPathStr
+        JSONPath expression to extract the text from the trace. Defaults to
+        "trace.last.outputs" which extracts the last interaction's outputs.
+    values : list[str] | MISSING
+        The list of values to search for. Either this or ``values_key`` must be provided.
+    values_key : JSONPathStr | MISSING
+        JSONPath expression to extract the values from the trace. Either this or ``values`` must be provided.
+    normalization_form : NormalizationForm | None
+        Unicode normalization form to apply before matching. Options:
+        - "NFC": Canonical Composition
+        - "NFD": Canonical Decomposition
+        - "NFKC": Compatibility Composition (default)
+        - "NFKD": Compatibility Decomposition
+        If None, no normalization is applied. Defaults to "NFKC".
+    case_sensitive : bool
+        If True, matching is case-sensitive. If False, both text and values
+        are converted to lowercase before comparison. Defaults to False.
+
+    Examples
+    --------
+    Direct text and values::
+
+        check = ContainsAny(
+            text="Hello World",
+            values=["world", "java"],
+            case_sensitive=False
+        )
+
+    Extract both from trace::
+
+        check = ContainsAny(
+            text_key="trace.last.outputs.answer",
+            values_key="trace.last.inputs.expected_keywords"
+        )
+    """
+
+    @override
+    async def run(self, trace: TraceType) -> CheckResult:
+        """Execute the ContainsAny check.
+
+        Parameters
+        ----------
+        trace : TraceType
+            The trace to evaluate.
+
+        Returns
+        -------
+        CheckResult
+            The result of the check execution.
+        """
+        result = self._extract_and_validate(trace)
+        if result[0] is None:
+            return result[2]  # type: ignore[return-value]
+
+        text, values, details = result[0], result[1], result[2]
+        details["normalization_form"] = self.normalization_form
+        details["case_sensitive"] = self.case_sensitive
+
+        formatted_text = self._format_str(text)
+        formatted_values = [self._format_str(v) for v in values]
+
+        matched_values = [
+            v for v, fv in zip(values, formatted_values) if fv in formatted_text
+        ]
+
+        details["matched_values"] = matched_values
+
+        if matched_values:
+            return CheckResult.success(
+                message=f"The text contains at least one of the values: {', '.join(matched_values)}.",
+                details=details,
+            )
+
+        return CheckResult.failure(
+            message="The text does not contain any of the provided values.",
+            details=details,
+        )
+
+
+@Check.register("contains_all")
+class ContainsAll[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    ListTextBasedCheck[InputType, OutputType, TraceType]
+):
+    """Check that validates if all values appear within a text string.
+
+    This check performs substring matching between a list of values and text, with
+    support for Unicode normalization and case sensitivity control. Both the
+    text and values can be provided directly or extracted from a trace using
+    JSONPath expressions.
+
+    Attributes
+    ----------
+    text : str | MISSING
+        The text string to search within. If omitted, extracted from
+        trace using ``text_key``.
+    text_key : JSONPathStr
+        JSONPath expression to extract the text from the trace. Defaults to
+        "trace.last.outputs" which extracts the last interaction's outputs.
+    values : list[str] | MISSING
+        The list of values to search for. Either this or ``values_key`` must be provided.
+    values_key : JSONPathStr | MISSING
+        JSONPath expression to extract the values from the trace. Either this or ``values`` must be provided.
+    normalization_form : NormalizationForm | None
+        Unicode normalization form to apply before matching. Options:
+        - "NFC": Canonical Composition
+        - "NFD": Canonical Decomposition
+        - "NFKC": Compatibility Composition (default)
+        - "NFKD": Compatibility Decomposition
+        If None, no normalization is applied. Defaults to "NFKC".
+    case_sensitive : bool
+        If True, matching is case-sensitive. If False, both text and values
+        are converted to lowercase before comparison. Defaults to False.
+
+    Examples
+    --------
+    Direct text and values::
+
+        check = ContainsAll(
+            text="Hello World",
+            values=["hello", "world"],
+            case_sensitive=False
+        )
+
+    Extract both from trace::
+
+        check = ContainsAll(
+            text_key="trace.last.outputs.answer",
+            values_key="trace.last.inputs.all_keywords"
+        )
+    """
+
+    @override
+    async def run(self, trace: TraceType) -> CheckResult:
+        """Execute the ContainsAll check.
+
+        Parameters
+        ----------
+        trace : TraceType
+            The trace to evaluate.
+
+        Returns
+        -------
+        CheckResult
+            The result of the check execution.
+        """
+        result = self._extract_and_validate(trace)
+        if result[0] is None:
+            return result[2]  # type: ignore[return-value]
+
+        text, values, details = result[0], result[1], result[2]
+        details["normalization_form"] = self.normalization_form
+        details["case_sensitive"] = self.case_sensitive
+
+        formatted_text = self._format_str(text)
+        formatted_values = [self._format_str(v) for v in values]
+
+        missing_values = [
+            v for v, fv in zip(values, formatted_values) if fv not in formatted_text
+        ]
+
+        details["missing_values"] = missing_values
+
+        if not missing_values:
+            return CheckResult.success(
+                message="The text contains all of the provided values.",
+                details=details,
+            )
+
+        return CheckResult.failure(
+            message=f"The text is missing the following values: {', '.join(missing_values)}.",
             details=details,
         )

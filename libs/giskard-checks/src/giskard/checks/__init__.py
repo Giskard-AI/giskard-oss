@@ -9,6 +9,8 @@ from . import builtin, judges
 from .builtin import (
     AllOf,
     AnyOf,
+    ContainsAll,
+    ContainsAny,
     Equals,
     FnCheck,
     GreaterEquals,
@@ -135,6 +137,8 @@ __all__ = [
     "Toxicity",
     "StringMatching",
     "RegexMatching",
+    "ContainsAll",
+    "ContainsAny",
     # Exceptions
     "InputGenerationException",
     # LLM-based generators
