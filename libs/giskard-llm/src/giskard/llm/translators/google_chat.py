@@ -426,11 +426,11 @@ class GoogleChatTranslator:
             # input_tokens + output_tokens == total_tokens when the model thinks.
             um = raw.usage_metadata
             usage = Usage(
-                input_tokens=(um.prompt_token_count or 0)
-                + (um.tool_use_prompt_token_count or 0),
-                output_tokens=(um.candidates_token_count or 0)
-                + (um.thoughts_token_count or 0),
-                total_tokens=um.total_token_count or 0,
+                input_tokens=(getattr(um, "prompt_token_count", 0) or 0)
+                + (getattr(um, "tool_use_prompt_token_count", 0) or 0),
+                output_tokens=(getattr(um, "candidates_token_count", 0) or 0)
+                + (getattr(um, "thoughts_token_count", 0) or 0),
+                total_tokens=getattr(um, "total_token_count", 0) or 0,
             )
 
         return CompletionResponse(choices=choices, model=model, usage=usage)
