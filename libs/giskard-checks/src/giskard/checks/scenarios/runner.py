@@ -147,17 +147,18 @@ class ScenarioRunner:
                 len(trace.interactions) - 1 if trace.interactions else None
             )
 
-            check_names = (
-                ", ".join(str(check.name or check.kind) for check in step.checks)
-                or "<none>"
-            )
-            logger.info(
-                "Scenario %r: running step %d/%d (checks: %s)",
-                scenario.name,
-                step_index,
-                total_steps,
-                check_names,
-            )
+            if logger.isEnabledFor(logging.INFO):
+                check_names = (
+                    ", ".join(str(check.name or check.kind) for check in step.checks)
+                    or "<none>"
+                )
+                logger.info(
+                    "Scenario %r: running step %d/%d (checks: %s)",
+                    scenario.name,
+                    step_index,
+                    total_steps,
+                    check_names,
+                )
 
             test_case = TestCase(
                 trace=trace,
