@@ -2,6 +2,7 @@ from giskard.agents import BaseEmbeddingModel, BaseGenerator
 from pydantic import BaseModel, Field
 
 from ..settings import get_default_embedding_model, get_default_generator
+from .suite_usage import get_active_suite_usage_collector, with_usage_recording
 
 
 class WithGeneratorMixin(BaseModel):
@@ -13,7 +14,12 @@ class WithGeneratorMixin(BaseModel):
     @property
     def _generator(self) -> BaseGenerator:
         """Get the generator. If not set, return the global default generator."""
-        return self.generator if self.generator is not None else get_default_generator()
+        generator = (
+            self.generator if self.generator is not None else get_default_generator()
+        )
+        if get_active_suite_usage_collector() is None:
+            return generator
+        return with_usage_recording(generator)
 
 
 class WithEmbeddingMixin(BaseModel):
