@@ -93,10 +93,10 @@ def _get_or_create_anonymous_id() -> str | None:
     if config_path.exists():
         try:
             content = config_path.read_text(encoding="utf-8").strip()
-            # An empty/truncated file (e.g. a crash between the atomic create and
-            # the write below) must not collapse the id to "" — fall back like the
-            # FileExistsError branch does.
-            return content if content else f"anon-{uuid.uuid4()}"
+            if content:
+                return content
+            # Delete the empty/truncated file so the creation block below can recreate it and persist a new ID.
+            config_path.unlink(missing_ok=True)
         except OSError:
             # Unreadable path (permissions, race with deletion, etc.): mint ephemeral below.
             pass
