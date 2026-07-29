@@ -7,6 +7,7 @@ from giskard.checks import Scenario, Suite, Trace
 
 from .generators.base import ScenarioContext, ScenarioGenerator, TargetMode
 from .registry import _normalize_generator
+from .utils.dataset_loader import activate_dataset_cache, deactivate_dataset_cache
 from .utils.knowledge_base import KnowledgeBase, normalize_knowledge_base
 
 
@@ -95,7 +96,11 @@ async def generate_suite(
         knowledge_base=normalize_knowledge_base(knowledge_base),
     )
     resolved = [_normalize_generator(g) for g in generators]
-    scenarios = await _generate_scenarios(
-        context, resolved, max_scenarios, seed, target_mode=target_mode
-    )
+    activate_dataset_cache()
+    try:
+        scenarios = await _generate_scenarios(
+            context, resolved, max_scenarios, seed, target_mode=target_mode
+        )
+    finally:
+        deactivate_dataset_cache()
     return Suite(name="Scenarios", scenarios=scenarios)
