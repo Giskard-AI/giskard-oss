@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 
 class ScanOptions(TypedDict, total=False):
@@ -24,6 +24,10 @@ class ScanOptions(TypedDict, total=False):
         return_exception: When ``True``, a scenario whose input generation fails
             is recorded as an errored result and the scan continues. When
             ``False`` (default), the failure propagates and aborts the scan.
+        checkpoint_dir: Checkpoint root (``None`` = auto under
+            ``.giskard/checkpoints/<fingerprint>/``, ``False`` = off).
+        resume: Resume matching checkpoints (defaults to ``True`` when on).
+            Use ``"force"`` to ignore fingerprint mismatches.
     """
 
     max_scenarios: int | None
@@ -33,6 +37,8 @@ class ScanOptions(TypedDict, total=False):
     max_concurrency: int | None
     commercial_use: bool
     return_exception: bool
+    checkpoint_dir: str | bool | None
+    resume: bool | Literal["force"] | None
 
 
 class ResolvedScanOptions(TypedDict):
@@ -54,3 +60,5 @@ class ResolvedScanOptions(TypedDict):
     max_concurrency: int | None
     commercial_use: bool
     return_exception: bool
+    checkpoint_dir: str | bool | None
+    resume: bool | Literal["force"] | None

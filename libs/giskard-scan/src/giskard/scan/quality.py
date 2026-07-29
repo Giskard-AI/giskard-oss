@@ -2,6 +2,7 @@
 
 import logging
 import warnings
+from typing import Literal
 
 from giskard.checks import SuiteResult, Target, Trace
 
@@ -46,6 +47,8 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     max_concurrency: int | None = None,
     return_exception: bool = False,
     target_mode: TargetMode = "multiturn",
+    checkpoint_dir: str | bool | None = None,
+    resume: bool | Literal["force"] | None = None,
 ) -> SuiteResult:
     """Generate and run the standard quality scan suite.
 
@@ -74,6 +77,10 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
             multi-turn conversations. ``"singleturn"`` skips generators that
             are multi-turn by design and caps turn budgets to 1 on others.
             Defaults to ``"multiturn"``.
+        checkpoint_dir: Checkpoint root (``None`` = auto fingerprint dir,
+            ``False`` = off). Generate and run phases use separate fingerprint
+            subdirs so they do not collide.
+        resume: Resume from matching checkpoints (default ``True`` when on).
 
     Returns:
         The completed suite result with a generated quality recommendation.
@@ -90,6 +97,8 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         seed=seed,
         target_mode=target_mode,
         knowledge_base=knowledge_base,
+        checkpoint_dir=checkpoint_dir,
+        resume=resume,
     )
 
     result: SuiteResult = await suite.run(
@@ -97,6 +106,8 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         parallel=parallel,
         max_concurrency=max_concurrency,
         return_exception=return_exception,
+        checkpoint_dir=checkpoint_dir,
+        resume=resume,
     )
     try:
         recommendation = await generate_quality_recommendation(result)
