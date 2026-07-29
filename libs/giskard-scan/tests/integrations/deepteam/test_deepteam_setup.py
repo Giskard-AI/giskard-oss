@@ -40,13 +40,13 @@ async def test_singleturn_with_only_multiturn_attacks_emits_skips():
 async def test_attacks_per_vulnerability_type_forwarded(monkeypatch):
     import deepteam
 
-    captured: dict = {}
+    captured: dict[str, object] = {}
 
-    def fake_red_team(**kwargs):
+    def fake_red_team(**kwargs: object) -> object:
         captured.update(kwargs)
 
         class _Empty:
-            test_cases: list = []
+            test_cases: list[object] = []
 
         return _Empty()
 

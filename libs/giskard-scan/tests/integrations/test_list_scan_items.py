@@ -7,7 +7,7 @@ def test_list_scan_items_rejects_unknown_tool() -> None:
     from giskard.scan import list_scan_items
 
     with pytest.raises(ValueError, match="Unknown tool"):
-        list_scan_items("not-a-tool")  # type: ignore[arg-type]
+        list_scan_items("not-a-tool")
 
 
 def test_list_scan_items_garak() -> None:

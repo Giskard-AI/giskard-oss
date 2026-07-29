@@ -21,7 +21,7 @@ def _list_giskard_generators() -> list[str]:
 
 
 def list_scan_items(
-    tool: ScanTool,
+    tool: str,
     *,
     include_inactive: bool = False,
 ) -> list[str]:
@@ -30,7 +30,8 @@ def list_scan_items(
     Args:
         tool: ``"giskard"`` returns scenario generator class names,
             ``"garak"`` returns probe plugin names, ``"deepteam"`` returns
-            supported vulnerability and attack names.
+            supported vulnerability and attack names. Other values raise
+            ``ValueError``.
         include_inactive: Garak only — also include inactive catalog probes.
             Ignored for other tools.
 
