@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import sys
 from typing import Any
 
 import numpy as np
@@ -395,3 +397,39 @@ async def test_generate_suite_unbudgeted_reproducibility():
     # The two generators must draw from independent streams, not the same value.
     draws = sorted(name.split("-")[1] for name in names_a)
     assert draws[0] != draws[1]
+
+
+async def test_generate_suite_verbose_false_emits_no_progress(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+):
+    monkeypatch.setattr(sys.stderr, "isatty", lambda: False)
+    caplog.set_level(logging.INFO, logger="giskard.scan.catalog")
+
+    await generate_suite(
+        "My chatbot",
+        languages=["en"],
+        generators=[_StubGenerator(name="a"), _StubGenerator(name="b")],
+        verbose=False,
+    )
+
+    assert not [r for r in caplog.records if r.name == "giskard.scan.catalog"]
+
+
+async def test_generate_suite_emits_progress_log_on_non_tty(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+):
+    monkeypatch.setattr(sys.stderr, "isatty", lambda: False)
+    caplog.set_level(logging.INFO, logger="giskard.scan.catalog")
+
+    await generate_suite(
+        "My chatbot",
+        languages=["en"],
+        generators=[_StubGenerator(name="a"), _StubGenerator(name="b")],
+        verbose=True,
+    )
+
+    messages = [r.message for r in caplog.records if r.name == "giskard.scan.catalog"]
+    assert any("done generator=_StubGenerator" in message for message in messages)
+    assert any("finished total_scenarios=" in message for message in messages)

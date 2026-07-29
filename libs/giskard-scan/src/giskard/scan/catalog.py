@@ -1,13 +1,140 @@
+import logging
+import sys
 from asyncio import TaskGroup
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager, nullcontext
 from typing import Any
 
 import numpy as np
 from giskard.checks import Scenario, Suite, Trace
+from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TaskID,
+    TextColumn,
+)
 
 from .generators.base import ScenarioContext, ScenarioGenerator, TargetMode
 from .registry import _normalize_generator
 from .utils.knowledge_base import KnowledgeBase, normalize_knowledge_base
+
+logger = logging.getLogger(__name__)
+
+
+def _generator_name(generator: ScenarioGenerator) -> str:
+    return type(generator).__name__
+
+
+class _GenerationProgressReporter:
+    """Callbacks for generation progress updates."""
+
+    def __init__(
+        self,
+        generator_count: int,
+        max_scenarios: int | None,
+        use_logs: bool,
+    ) -> None:
+        self._generator_count = generator_count
+        self._max_scenarios = max_scenarios
+        self._use_logs = use_logs
+        self._completed = 0
+        self._scenario_count = 0
+        self._progress: Progress | None = None
+        self._task_id: TaskID | None = None
+
+    def start_rich(self, progress: Progress, task_id: TaskID) -> None:
+        self._progress = progress
+        self._task_id = task_id
+
+    def start_logs(self) -> None:
+        logger.info(
+            "generate_suite: start generators=%d max_scenarios=%s",
+            self._generator_count,
+            self._max_scenarios,
+        )
+
+    def on_generator_done(self, generator_name: str, scenario_count: int) -> None:
+        self._completed += 1
+        self._scenario_count += scenario_count
+        if self._progress is not None and self._task_id is not None:
+            self._progress.update(
+                self._task_id,
+                advance=1,
+                description=(
+                    f"Generating suite [{self._completed}/{self._generator_count}] "
+                    f"{generator_name}"
+                ),
+            )
+        elif self._use_logs:
+            logger.info(
+                "generate_suite: done generator=%s scenarios=%d",
+                generator_name,
+                scenario_count,
+            )
+
+    def finish(self, use_rich: bool) -> None:
+        if self._use_logs:
+            logger.info(
+                "generate_suite: finished total_scenarios=%d",
+                self._scenario_count,
+            )
+        if use_rich and self._generator_count > 0:
+            Console(stderr=True).print(f"Generated {self._scenario_count} scenarios.")
+
+
+@contextmanager
+def _generation_progress(
+    generator_count: int,
+    max_scenarios: int | None,
+    verbose: bool,
+) -> Iterator[_GenerationProgressReporter]:
+    use_rich = verbose and sys.stderr.isatty()
+    use_logs = verbose and not sys.stderr.isatty()
+    reporter = _GenerationProgressReporter(generator_count, max_scenarios, use_logs)
+
+    if use_rich and generator_count > 0:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            console=Console(stderr=True),
+        ) as progress:
+            task_id = progress.add_task("Generating suite", total=generator_count)
+            reporter.start_rich(progress, task_id)
+            try:
+                yield reporter
+            finally:
+                reporter.finish(use_rich=True)
+    else:
+        if use_logs:
+            reporter.start_logs()
+        try:
+            yield reporter
+        finally:
+            reporter.finish(use_rich=False)
+
+
+async def _generate_one(
+    generator: ScenarioGenerator,
+    context: ScenarioContext,
+    max_scenarios: int | None,
+    rng: np.random.Generator,
+    target_mode: TargetMode,
+    progress: _GenerationProgressReporter | None,
+) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+    scenarios = await generator.generate_scenario(
+        context,
+        max_scenarios=max_scenarios,
+        rng=rng,
+        target_mode=target_mode,
+    )
+    if progress is not None:
+        progress.on_generator_done(_generator_name(generator), len(scenarios))
+    return scenarios
 
 
 async def _generate_scenarios(
@@ -16,6 +143,7 @@ async def _generate_scenarios(
     max_scenarios: int | None = None,
     seed: int = 42,
     target_mode: TargetMode = "multiturn",
+    verbose: bool = True,
 ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
     rng = np.random.default_rng(seed)
 
@@ -33,21 +161,30 @@ async def _generate_scenarios(
         counts = [None] * len(generators)
     child_rngs = rng.spawn(len(generators))
 
-    tasks = []
-    async with TaskGroup() as task_group:
-        for generator, n, child_rng in zip(generators, counts, child_rngs):
-            tasks.append(
-                task_group.create_task(
-                    generator.generate_scenario(
-                        context,
-                        max_scenarios=n,
-                        rng=child_rng,
-                        target_mode=target_mode,
+    progress_ctx = (
+        _generation_progress(len(generators), max_scenarios, verbose)
+        if verbose and len(generators) > 0
+        else nullcontext()
+    )
+
+    with progress_ctx as progress:
+        tasks = []
+        async with TaskGroup() as task_group:
+            for generator, n, child_rng in zip(generators, counts, child_rngs):
+                tasks.append(
+                    task_group.create_task(
+                        _generate_one(
+                            generator,
+                            context,
+                            n,
+                            child_rng,
+                            target_mode,
+                            progress,
+                        )
                     )
                 )
-            )
 
-    return [scenario for task in tasks for scenario in task.result()]
+        return [scenario for task in tasks for scenario in task.result()]
 
 
 async def generate_suite(
@@ -58,6 +195,7 @@ async def generate_suite(
     seed: int = 42,
     target_mode: TargetMode = "multiturn",
     knowledge_base: KnowledgeBase | list[str] | None = None,
+    verbose: bool = True,
 ) -> Suite[Any, Any]:
     """Generate a test suite by running the supplied generators.
 
@@ -80,6 +218,9 @@ async def generate_suite(
         knowledge_base: Optional documents forwarded via the context to
             generators that use knowledge-base context. Raw strings are
             normalized to a :class:`KnowledgeBase`.
+        verbose: When ``True`` (default), show generation progress on a TTY
+            or emit INFO logs when stderr is not a TTY. Set to ``False`` for
+            fully quiet generation.
 
     Returns:
         A Suite containing all generated scenarios, ready for execution.
@@ -96,6 +237,11 @@ async def generate_suite(
     )
     resolved = [_normalize_generator(g) for g in generators]
     scenarios = await _generate_scenarios(
-        context, resolved, max_scenarios, seed, target_mode=target_mode
+        context,
+        resolved,
+        max_scenarios,
+        seed,
+        target_mode=target_mode,
+        verbose=verbose,
     )
     return Suite(name="Scenarios", scenarios=scenarios)
