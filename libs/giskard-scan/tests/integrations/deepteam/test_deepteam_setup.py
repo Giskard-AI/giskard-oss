@@ -1,4 +1,4 @@
-"""Availability gate + kwarg-rejection + singleturn early-return tests."""
+"""Availability gate + kwarg-rejection + singleturn skip tests."""
 
 import pytest
 from giskard.scan.integrations.deepteam._adapter import (
@@ -20,14 +20,44 @@ async def test_unexpected_kwarg_rejected():
 
 
 @pytest.mark.skipif(not deepteam_available(), reason="deepteam not installed")
-async def test_singleturn_with_only_multiturn_attacks_returns_empty():
+async def test_singleturn_with_only_multiturn_attacks_emits_skips():
     from giskard.checks import SuiteResult
 
     result = await DeepTeamScanAdapter().run(
         target=lambda x: x,
         description="d",
-        attacks=["LinearJailbreaking"],  # multi-turn only
-        target_mode="singleturn",  # -> filtered out -> empty
+        attacks=["LinearJailbreaking"],
+        vulnerabilities=["Bias"],
+        target_mode="singleturn",
     )
     assert isinstance(result, SuiteResult)
-    assert result.results == []
+    assert len(result.results) >= 1
+    assert all(s.steps[0].results[0].skipped for s in result.results)
+    assert any("LinearJailbreaking" in s.scenario_name for s in result.results)
+
+
+@pytest.mark.skipif(not deepteam_available(), reason="deepteam not installed")
+async def test_attacks_per_vulnerability_type_forwarded(monkeypatch):
+    import deepteam
+
+    captured: dict = {}
+
+    def fake_red_team(**kwargs):
+        captured.update(kwargs)
+
+        class _Empty:
+            test_cases: list = []
+
+        return _Empty()
+
+    monkeypatch.setattr(deepteam, "red_team", fake_red_team, raising=False)
+
+    await DeepTeamScanAdapter().run(
+        target=lambda x: "ok",
+        description="d",
+        vulnerabilities=["Bias"],
+        attacks=["PromptInjection"],
+        attacks_per_vulnerability_type=2,
+        target_mode="singleturn",
+    )
+    assert captured["attacks_per_vulnerability_type"] == 2

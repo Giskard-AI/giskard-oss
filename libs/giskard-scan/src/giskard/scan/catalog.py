@@ -5,7 +5,12 @@ from typing import Any
 import numpy as np
 from giskard.checks import Scenario, Suite, Trace
 
-from .generators.base import ScenarioContext, ScenarioGenerator, TargetMode
+from .generators.base import (
+    DEFAULT_TARGET_MODE,
+    ScenarioContext,
+    ScenarioGenerator,
+    TargetMode,
+)
 from .registry import _normalize_generator
 from .utils.knowledge_base import KnowledgeBase, normalize_knowledge_base
 
@@ -15,7 +20,7 @@ async def _generate_scenarios(
     generators: list[ScenarioGenerator],
     max_scenarios: int | None = None,
     seed: int = 42,
-    target_mode: TargetMode = "multiturn",
+    target_mode: TargetMode = DEFAULT_TARGET_MODE,
 ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
     rng = np.random.default_rng(seed)
 
@@ -56,7 +61,7 @@ async def generate_suite(
     generators: Sequence[ScenarioGenerator | type[ScenarioGenerator]],
     max_scenarios: int | None = None,
     seed: int = 42,
-    target_mode: TargetMode = "multiturn",
+    target_mode: TargetMode = DEFAULT_TARGET_MODE,
     knowledge_base: KnowledgeBase | list[str] | None = None,
 ) -> Suite[Any, Any]:
     """Generate a test suite by running the supplied generators.
@@ -76,7 +81,7 @@ async def generate_suite(
         target_mode: Whether the agent under test supports single-turn or
             multi-turn conversations. ``"singleturn"`` skips generators that
             are multi-turn by design and caps turn budgets to 1 on others.
-            Defaults to ``"multiturn"``.
+            Defaults to :data:`~giskard.scan.generators.base.DEFAULT_TARGET_MODE`.
         knowledge_base: Optional documents forwarded via the context to
             generators that use knowledge-base context. Raw strings are
             normalized to a :class:`KnowledgeBase`.

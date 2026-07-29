@@ -38,7 +38,9 @@ _PROBE = "probes.goodside.ThreatenJSON"
 
 @pytest.mark.skipif(not garak_available(), reason="garak is not installed")
 def test_resolve_probes_empty_list_returns_no_probes() -> None:
-    assert _resolve_probes([]) == []
+    probes, skipped = _resolve_probes([])
+    assert probes == []
+    assert skipped == []
 
 
 @pytest.mark.skipif(not garak_available(), reason="garak is not installed")
@@ -62,8 +64,8 @@ async def test_run_actual_garak_probe() -> None:
 
     scenario = result.results[0]
     # The scenario name reflects a single run (no "— run 5" fan-out).
-    assert scenario.scenario_name.startswith("Garak")
-    assert scenario.scenario_name.endswith("#1 — run 1")
+    assert "ThreatenJSON" in scenario.scenario_name
+    assert scenario.scenario_name.endswith("#1")
 
     # The stub response was recorded on a clean, single-turn trace.
     assert len(scenario.final_trace.interactions) == 1

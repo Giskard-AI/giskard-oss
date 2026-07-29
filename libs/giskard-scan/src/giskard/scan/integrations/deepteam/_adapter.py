@@ -23,8 +23,10 @@ from giskard.checks import (
     get_default_generator,
 )
 
+from ...generators.base import DEFAULT_TARGET_MODE
 from .._shared import reject_unexpected_kwargs, trace_from_role_content_turns
 from ._bridge import ScanTargetCallback
+from ._selection import SkipMarker
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +35,7 @@ logger = logging.getLogger(__name__)
 # (at least partly) succeeded -> a vulnerability -> scan failure.
 _HIT_THRESHOLD = 1.0
 
-# Pinned volume of attacks generated per vulnerability type. Not exposed as a
-# kwarg (YAGNI); small to keep default runtime/LLM cost bounded.
-_ATTACKS_PER_VULNERABILITY_TYPE = 3
+_DEFAULT_ATTACKS_PER_VULNERABILITY_TYPE = 1
 
 
 def deepteam_available() -> bool:
@@ -96,6 +96,45 @@ def _check_name(vulnerability: Any, vulnerability_type: str | None) -> str:
     return "deepteam"
 
 
+def _skip_message(marker: SkipMarker, *, kind: str) -> str:
+    if marker.reason == "unknown":
+        return (
+            f"{kind.capitalize()} '{marker.name}' is not supported by this "
+            "integration and was not run."
+        )
+    if marker.reason.startswith("filtered by target_mode"):
+        return (
+            f"Attack '{marker.name}' requires multiturn mode and was not run "
+            f"({marker.reason})."
+        )
+    return f"{kind.capitalize()} '{marker.name}' was skipped: {marker.reason}."
+
+
+def _skip_scenario(marker: SkipMarker, *, kind: str) -> ScenarioResult:  # pyright: ignore[reportMissingTypeArgument]
+    """Build a SuiteResult scenario that records a skipped name."""
+    return ScenarioResult(
+        scenario_name=f"{marker.name} (skipped)",
+        steps=[
+            TestCaseResult(
+                results=[
+                    CheckResult.skip(
+                        message=_skip_message(marker, kind=kind),
+                        details={
+                            "check_name": marker.name,
+                            kind: marker.name,
+                            "reason": marker.reason,
+                        },
+                    )
+                ],
+                duration_ms=0,
+            )
+        ],
+        final_trace=Trace(),
+        duration_ms=0,
+        tags=[],
+    )
+
+
 async def _testcase_to_scenario(
     test_case: Any, callback: ScanTargetCallback
 ) -> ScenarioResult:  # pyright: ignore[reportMissingTypeArgument]
@@ -107,9 +146,9 @@ async def _testcase_to_scenario(
     risk_category = getattr(test_case, "risk_category", None)
     check_name = _check_name(vulnerability, vulnerability_type_label)
 
-    name = f"DeepTeam {check_name}"
+    name = check_name
     if attack_method:
-        name += f" — {attack_method}"
+        name = f"{check_name} · {attack_method}"
 
     details: dict[str, Any] = {
         "check_name": check_name,
@@ -167,7 +206,8 @@ class DeepTeamScanAdapter:
 
         ``description`` becomes DeepTeam's ``target_purpose``. ``languages`` has
         no DeepTeam equivalent and is ignored. ``vulnerabilities``/``attacks``
-        (name lists, or None for defaults) and ``target_mode`` come from kwargs.
+        (name lists, or None for defaults), ``attacks_per_vulnerability_type``,
+        and ``target_mode`` come from kwargs.
         """
         _require_deepteam()
         import asyncio
@@ -179,15 +219,38 @@ class DeepTeamScanAdapter:
 
         vulnerabilities = kwargs.pop("vulnerabilities", None)
         attacks = kwargs.pop("attacks", None)
-        target_mode = kwargs.pop("target_mode", None)
+        target_mode = kwargs.pop("target_mode", DEFAULT_TARGET_MODE)
+        attacks_per = kwargs.pop(
+            "attacks_per_vulnerability_type", _DEFAULT_ATTACKS_PER_VULNERABILITY_TYPE
+        )
         reject_unexpected_kwargs("deepteam", kwargs)
 
+        if not isinstance(attacks_per, int) or attacks_per < 1:
+            raise ValueError(
+                f"attacks_per_vulnerability_type must be a positive int, got {attacks_per!r}"
+            )
+
         singleturn = target_mode == "singleturn"
-        resolved_vulns = resolve_vulnerabilities(vulnerabilities)
-        resolved_attacks = resolve_attacks(attacks, singleturn=singleturn)
+        resolved_vulns, skipped_vulns = resolve_vulnerabilities(vulnerabilities)
+        resolved_attacks, skipped_attacks = resolve_attacks(
+            attacks, singleturn=singleturn
+        )
+
+        skip_scenarios = [
+            *(_skip_scenario(m, kind="vulnerability") for m in skipped_vulns),
+            *(_skip_scenario(m, kind="attack") for m in skipped_attacks),
+        ]
+        for marker in skipped_vulns:
+            logger.warning(
+                "DeepTeam vulnerability %r skipped: %s", marker.name, marker.reason
+            )
+        for marker in skipped_attacks:
+            logger.warning("DeepTeam attack %r skipped: %s", marker.name, marker.reason)
+
         if not resolved_attacks or not resolved_vulns:
-            logger.debug("deepteam: no attacks/vulnerabilities to run.")
-            return SuiteResult(results=[], duration_ms=0)
+            if not skip_scenarios:
+                logger.debug("deepteam: no attacks/vulnerabilities to run.")
+            return SuiteResult(results=skip_scenarios, duration_ms=0)
 
         # The callback is async and is awaited by deepteam directly, so it needs no
         # loop; the judge LLM does -- deepeval calls its sync `generate` from a
@@ -208,7 +271,7 @@ class DeepTeamScanAdapter:
             target_purpose=description,
             vulnerabilities=resolved_vulns,
             attacks=resolved_attacks,
-            attacks_per_vulnerability_type=_ATTACKS_PER_VULNERABILITY_TYPE,
+            attacks_per_vulnerability_type=attacks_per,
             simulator_model=llm,
             evaluation_model=llm,
         )
@@ -216,6 +279,7 @@ class DeepTeamScanAdapter:
 
         test_cases = getattr(risk_assessment, "test_cases", None) or []
         scenario_results = [
-            await _testcase_to_scenario(tc, callback) for tc in test_cases
+            *skip_scenarios,
+            *[await _testcase_to_scenario(tc, callback) for tc in test_cases],
         ]
         return SuiteResult(results=scenario_results, duration_ms=duration_ms)

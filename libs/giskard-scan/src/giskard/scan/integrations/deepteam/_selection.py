@@ -2,10 +2,13 @@
 
 Name->class maps are the single source of truth for what this integration
 supports. Single-turn vs multi-turn is decided by which map an attack lives in.
+Unknown or filtered names become skip markers (log + SuiteResult skips) rather
+than raising, matching the garak adapter.
 All ``deepteam`` imports are lazy so this module imports without deepteam
 installed.
 """
 
+from dataclasses import dataclass
 from typing import Any
 
 # Curated defaults (broad, balanced) used when the caller passes None.
@@ -23,6 +26,14 @@ DEFAULT_ATTACKS: list[str] = [
     "LinearJailbreaking",
     "CrescendoJailbreaking",
 ]
+
+
+@dataclass(frozen=True)
+class SkipMarker:
+    """A requested vulnerability/attack name that will not run."""
+
+    name: str
+    reason: str
 
 
 def _vulnerability_classes() -> dict[str, type]:
@@ -58,41 +69,60 @@ def _multiturn_attack_classes() -> dict[str, type]:
     return {name: getattr(m, name) for name in names}
 
 
-def resolve_vulnerabilities(names: "list[str] | None") -> list[Any]:
-    """Return instantiated DeepTeam vulnerability objects for *names*.
+def list_vulnerabilities() -> list[str]:
+    """Return supported DeepTeam vulnerability names for this integration."""
+    return list(_vulnerability_classes())
 
-    ``None`` -> the curated default set. ``[]`` -> ``[]``.
+
+def list_attacks() -> list[str]:
+    """Return supported DeepTeam attack names (single- and multi-turn)."""
+    return sorted({*_singleturn_attack_classes(), *_multiturn_attack_classes()})
+
+
+def resolve_vulnerabilities(
+    names: "list[str] | None",
+) -> tuple[list[Any], list[SkipMarker]]:
+    """Return instantiated vulnerabilities plus skip markers for unknown names.
+
+    ``None`` -> the curated default set. ``[]`` -> ``([], [])``.
     """
     classes = _vulnerability_classes()
     selected = DEFAULT_VULNERABILITIES if names is None else names
-    return [_instantiate(name, classes, "vulnerability") for name in selected]
+    resolved: list[Any] = []
+    skipped: list[SkipMarker] = []
+    for name in selected:
+        if name not in classes:
+            skipped.append(SkipMarker(name=name, reason="unknown"))
+            continue
+        resolved.append(classes[name]())
+    return resolved, skipped
 
 
-def resolve_attacks(names: "list[str] | None", *, singleturn: bool) -> list[Any]:
-    """Return instantiated DeepTeam attack objects for *names*.
+def resolve_attacks(
+    names: "list[str] | None", *, singleturn: bool
+) -> tuple[list[Any], list[SkipMarker]]:
+    """Return instantiated attacks plus skip markers for unknown/filtered names.
 
-    ``None`` -> the curated default set. ``[]`` -> ``[]``. When ``singleturn`` is
-    True, every attack whose class lives in ``deepteam.attacks.multi_turn`` is
-    dropped (a multi-turn attack has no valid single-turn form).
+    ``None`` -> the curated default set. ``[]`` -> ``([], [])``. When
+    ``singleturn`` is True, multi-turn attacks are skipped (not raised).
     """
     single = _singleturn_attack_classes()
     multi = _multiturn_attack_classes()
     combined = {**single, **multi}
     selected = DEFAULT_ATTACKS if names is None else names
     resolved: list[Any] = []
+    skipped: list[SkipMarker] = []
     for name in selected:
-        if singleturn and name in multi:
+        if name not in combined:
+            skipped.append(SkipMarker(name=name, reason="unknown"))
             continue
-        resolved.append(_instantiate(name, combined, "attack"))
-    return resolved
-
-
-def _instantiate(name: str, classes: dict[str, type], kind: str) -> Any:
-    try:
-        cls = classes[name]
-    except KeyError:
-        valid = ", ".join(sorted(classes))
-        raise ValueError(
-            f"Unknown deepteam {kind} {name!r}. Valid names: {valid}"
-        ) from None
-    return cls()
+        if singleturn and name in multi:
+            skipped.append(
+                SkipMarker(
+                    name=name,
+                    reason="filtered by target_mode='singleturn'",
+                )
+            )
+            continue
+        resolved.append(combined[name]())
+    return resolved, skipped

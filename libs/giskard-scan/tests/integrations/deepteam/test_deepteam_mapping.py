@@ -69,7 +69,7 @@ async def test_details_carry_attack_method_and_risk_category():
 async def test_scenario_name_and_tags():
     cb = ScanTargetCallback(target=lambda x: x)
     scenario = await _adapter._testcase_to_scenario(_TC(), cb)
-    assert scenario.scenario_name.startswith("DeepTeam Bias/race")
+    assert scenario.scenario_name.startswith("Bias/race · PromptInjection")
     assert "Bias" in scenario.tags
 
 
@@ -94,7 +94,7 @@ async def test_check_name_resolves_enum_vulnerability_type():
     check = _check(scenario)
     assert check.details["check_name"] == "Bias/race"
     assert check.details["vulnerability_type"] == "race"
-    assert scenario.scenario_name.startswith("DeepTeam Bias/race")
+    assert scenario.scenario_name.startswith("Bias/race · PromptInjection")
 
 
 async def test_scenario_name_resolves_real_deepteam_enum():
@@ -111,7 +111,7 @@ async def test_scenario_name_resolves_real_deepteam_enum():
     )
     assert (
         scenario.scenario_name
-        == "DeepTeam Misinformation/expertize_misrepresentation — Linear Jailbreaking"
+        == "Misinformation/expertize_misrepresentation · Linear Jailbreaking"
     )
     assert _check(scenario).details["check_name"] == (
         "Misinformation/expertize_misrepresentation"

@@ -74,5 +74,5 @@ async def test_third_party_scan_deepteam_end_to_end(monkeypatch):
 
     assert isinstance(result, SuiteResult)
     assert len(result.results) == 1
-    assert result.results[0].scenario_name.startswith("DeepTeam Bias/race")
+    assert result.results[0].scenario_name.startswith("Bias/race")
     assert result.results[0].steps[0].results[0].status == "pass"

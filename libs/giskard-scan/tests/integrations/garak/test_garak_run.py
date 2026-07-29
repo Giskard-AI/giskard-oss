@@ -28,7 +28,7 @@ def _patch_resolvers(monkeypatch: pytest.MonkeyPatch, probes, detectors):
     """
     from giskard.scan.integrations.garak import _adapter
 
-    monkeypatch.setattr(_adapter, "_resolve_probes", lambda probes_arg: probes)
+    monkeypatch.setattr(_adapter, "_resolve_probes", lambda probes_arg: (probes, []))
     monkeypatch.setattr(
         _adapter, "_resolve_detectors", lambda probe, loop, *_: (detectors, [])
     )
@@ -142,7 +142,7 @@ async def test_run_produces_suite_result_from_fake_probe(
     assert len(result.results) == 2
     assert result.duration_ms >= 0
     for scenario in result.results:
-        assert scenario.scenario_name.startswith("Garak fake.Probe")
+        assert scenario.scenario_name.startswith("fake.Probe")
         assert scenario.tags == probe.tags
 
 
@@ -175,7 +175,7 @@ async def test_run_ignores_probe_exception(
     result = await adapter_cls().run(target=target)
 
     assert len(result.results) == 1
-    assert result.results[0].scenario_name.startswith("Garak fake.Probe")
+    assert result.results[0].scenario_name.startswith("fake.Probe")
 
 
 async def test_run_uses_separate_generator_per_probe(
@@ -230,7 +230,7 @@ async def test_third_party_scan_routes_to_garak_adapter(
 
     assert isinstance(result, SuiteResult)
     assert len(result.results) == 1
-    assert result.results[0].scenario_name.startswith("Garak fake.Probe")
+    assert result.results[0].scenario_name.startswith("fake.Probe")
 
 
 async def test_third_party_scan_rejects_unknown_tool(target) -> None:
@@ -346,7 +346,7 @@ async def test_run_does_not_deadlock_when_probes_exceed_thread_pool(
     probes = [_LoopBlockingProbe(f"p{i}", loop) for i in range(40)]
 
     monkeypatch.setattr(
-        _adapter, "_resolve_probes", lambda probes_arg: probes_arg or []
+        _adapter, "_resolve_probes", lambda probes_arg: (probes_arg or [], [])
     )
     monkeypatch.setattr(
         _adapter,

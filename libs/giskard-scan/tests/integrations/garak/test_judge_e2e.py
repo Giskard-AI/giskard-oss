@@ -96,7 +96,7 @@ def _install_judge_generator(monkeypatch: pytest.MonkeyPatch, verdict: str) -> N
 
 def _patch_probe(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        _adapter, "_resolve_probes", lambda probes_arg: [_RefusalJudgeProbe()]
+        _adapter, "_resolve_probes", lambda probes_arg: ([_RefusalJudgeProbe()], [])
     )
 
 

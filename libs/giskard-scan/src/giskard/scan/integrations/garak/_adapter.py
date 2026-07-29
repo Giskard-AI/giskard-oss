@@ -8,7 +8,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.util import find_spec
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from giskard.checks import (
     CheckResult,
@@ -21,7 +21,7 @@ from giskard.checks import (
     get_default_generator,
 )
 
-from ...generators.base import TargetMode
+from ...generators.base import DEFAULT_TARGET_MODE, TargetMode
 from .._shared import reject_unexpected_kwargs
 
 if TYPE_CHECKING:
@@ -41,6 +41,18 @@ _HIT_THRESHOLD = 0.5
 # loop waiting for the target), so this is about not stampeding the target under test
 # with ~90 simultaneous conversations, not about CPU.
 _MAX_PROBE_WORKERS = 8
+
+# Curated defaults aligned with DeepTeam vulnerability themes (Bias/Toxicity,
+# PIILeakage, Misinformation, PromptLeakage, jailbreak/injection, data exfil).
+# Small and keyless-friendly — use probes="all" for every active loadable probe.
+DEFAULT_PROBES: list[str] = [
+    "probes.lmrc.SlurUsage",
+    "probes.goodside.WhoIsRiley",
+    "probes.lmrc.QuackMedicine",
+    "probes.goodside.ThreatenJSON",
+    "probes.dan.AutoDANCached",
+    "probes.web_injection.StringAssemblyDataExfil",
+]
 
 
 @dataclass(frozen=True)
@@ -87,34 +99,129 @@ def _configure_garak() -> None:
     setattr(garak_config.transient, "reportfile", io.StringIO())
 
 
-def _resolve_probes(probes: Iterable[str] | None) -> "list[Probe]":
+def list_probes(*, include_inactive: bool = False) -> list[str]:
+    """Return garak probe plugin names available to this integration.
+
+    By default only loadable (active) probes are listed. Pass
+    ``include_inactive=True`` to also include catalog entries marked inactive
+    (those still skip if requested explicitly).
+    """
+    _require_garak()
+    from garak._plugins import enumerate_plugins
+
+    return sorted(
+        name
+        for name, loadable in enumerate_plugins("probes")
+        if loadable or include_inactive
+    )
+
+
+def _probe_short_name(probename: str) -> str:
+    """Short label from a garak ``probename`` (drop leading ``garak.probes.``)."""
+    for prefix in ("garak.probes.", "probes."):
+        if probename.startswith(prefix):
+            return probename[len(prefix) :]
+    return probename
+
+
+def _skip_message(marker: _SkipMarker) -> str:
+    if marker.reason == "inactive":
+        return f"Probe '{marker.name}' is inactive in garak and was not run."
+    if marker.reason == "unknown":
+        return f"Probe '{marker.name}' is not a known garak probe and was not run."
+    if marker.reason.startswith("load failed"):
+        return (
+            f"Probe '{marker.name}' failed to load and was not run ({marker.reason})."
+        )
+    return f"Probe '{marker.name}' was skipped: {marker.reason}."
+
+
+def _resolve_probes(
+    probes: Iterable[str] | Literal["all"] | None,
+) -> "tuple[list[Probe], list[_SkipMarker]]":
+    """Resolve probe names to instances plus skip markers for ones that cannot run.
+
+    When *probes* is ``None``, returns the curated :data:`DEFAULT_PROBES` set.
+    When *probes* is ``"all"``, returns every active loadable probe.
+    When *probes* is an explicit list, each name that is unknown, inactive, or
+    fails to load yields a ``_SkipMarker`` instead of being dropped quietly.
+
+    Always configures garak first: probe instantiation copies ``parallel_attempts``
+    / ``generations`` from the global config, so loading before configure produces
+    broken instances (and garak may cache them).
+    """
     from garak._plugins import enumerate_plugins, load_plugin
 
-    available = {
-        full_name for full_name, loadable in enumerate_plugins("probes") if loadable
+    _configure_garak()
+
+    catalog = {
+        full_name: loadable for full_name, loadable in enumerate_plugins("probes")
     }
+    available = {name for name, loadable in catalog.items() if loadable}
 
-    if probes is not None:
-        requested = set(probes)
-        missing = requested - available
-        if missing:
-            logger.warning(f"Unknown probes: {missing}")
-        probe_names = requested & available
+    if probes is None:
+        requested: list[str] = list(DEFAULT_PROBES)
+    elif probes == "all":
+        loaded_probes: list[Probe] = []
+        for probe_name in available:
+            try:
+                loaded_probes.append(cast("Probe", load_plugin(probe_name)))
+            except Exception as exc:  # noqa: BLE001 — one bad plugin must not abort
+                logger.warning("Failed to load probe %s: %s", probe_name, exc)
+        return [probe for probe in loaded_probes if probe.active], []
     else:
-        probe_names = available
+        requested = list(probes)
 
-    loaded_probes: list[Probe] = []
-    for probe_name in probe_names:
+    loaded_probes = []
+    skipped: list[_SkipMarker] = []
+    seen: set[str] = set()
+    for name in requested:
+        if name in seen:
+            continue
+        seen.add(name)
+
+        if name not in catalog:
+            logger.warning("Unknown probe %s", name)
+            skipped.append(_SkipMarker(name=name, reason="unknown"))
+            continue
+        if not catalog[name]:
+            logger.warning("Probe %s skipped: inactive", name)
+            skipped.append(_SkipMarker(name=name, reason="inactive"))
+            continue
+
         try:
-            loaded_probes.append(cast("Probe", load_plugin(probe_name)))
+            loaded_probes.append(cast("Probe", load_plugin(name)))
         except Exception as exc:  # noqa: BLE001 — one bad plugin must not abort the scan
-            logger.warning("Failed to load probe %s: %s", probe_name, exc)
+            logger.warning("Failed to load probe %s: %s", name, exc)
+            skipped.append(_SkipMarker(name=name, reason=f"load failed: {exc}"))
 
-    if probes is not None:
-        return loaded_probes
+    return loaded_probes, skipped
 
-    # Filter out inactive probes if a list of probes was not provided
-    return [probe for probe in loaded_probes if probe.active]
+
+def _skip_probe_scenario(marker: _SkipMarker) -> ScenarioResult:  # pyright: ignore[reportMissingTypeArgument]
+    """Build a SuiteResult scenario that records a skipped requested probe."""
+    short = _probe_short_name(marker.name)
+    return ScenarioResult(
+        scenario_name=f"{short} (skipped)",
+        steps=[
+            TestCaseResult(
+                results=[
+                    CheckResult.skip(
+                        message=_skip_message(marker),
+                        details={
+                            "check_name": marker.name,
+                            "probe": marker.name,
+                            "reason": marker.reason,
+                        },
+                    )
+                ],
+                duration_ms=0,
+            )
+        ],
+        final_trace=Trace(),
+        duration_ms=0,
+        tags=[],
+    )
 
 
 def _detector_class(name: str) -> "type[Detector] | None":
@@ -343,7 +450,15 @@ class GarakScanAdapter:
             for conversation_idx, test_case_result in enumerate(test_case_results):
                 scenario_results.append(
                     ScenarioResult(
-                        scenario_name=f"Garak {probe.probename} #{attempt_idx + 1} — run {conversation_idx + 1}",
+                        scenario_name=(
+                            f"{_probe_short_name(probe.probename)} "
+                            f"#{attempt_idx + 1}"
+                            + (
+                                f" · turn {conversation_idx + 1}"
+                                if conversation_idx > 0 or len(test_case_results) > 1
+                                else ""
+                            )
+                        ),
                         steps=[test_case_result],
                         final_trace=generator.get_trace(
                             attempt.conversations[conversation_idx]
@@ -380,8 +495,8 @@ class GarakScanAdapter:
         # instantiation time (see _configure_garak).
         _configure_garak()
 
-        probes = _resolve_probes(kwargs.pop("probes", None))
-        target_mode: TargetMode = kwargs.pop("target_mode", "multiturn")
+        probes, skipped_probes = _resolve_probes(kwargs.pop("probes", None))
+        target_mode: TargetMode = kwargs.pop("target_mode", DEFAULT_TARGET_MODE)
         reject_unexpected_kwargs("garak", kwargs)
 
         if target_mode == "singleturn":
@@ -434,7 +549,10 @@ class GarakScanAdapter:
         # Results are only available once the TaskGroup has exited and every
         # task has completed; reading task.result() inside the block would hit
         # InvalidStateError because the tasks have not run yet.
-        scenario_results = [scenario for task in tasks for scenario in task.result()]
+        scenario_results = [_skip_probe_scenario(marker) for marker in skipped_probes]
+        scenario_results.extend(
+            scenario for task in tasks for scenario in task.result()
+        )
         duration_ms = int((time.perf_counter() - start_time) * 1000)
 
         return SuiteResult(results=scenario_results, duration_ms=duration_ms)

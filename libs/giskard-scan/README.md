@@ -2,6 +2,23 @@
 
 Agent vulnerability scanner — red teaming, prompt injection, adversarial scenario generation.
 
+## Shared defaults
+
+`DEFAULT_TARGET_MODE` (`"multiturn"`) is shared by `generate_suite`,
+`vulnerability_scan`, `quality_scan`, and `third_party_scan`. Pass
+`target_mode="singleturn"` to skip multi-turn generators/attacks and cap turn
+budgets to 1.
+
+Discover selectable items for any tool with `list_scan_items`:
+
+```python
+from giskard.scan import list_scan_items
+
+list_scan_items("giskard")   # scenario generator class names
+list_scan_items("garak")     # active garak probe names
+list_scan_items("deepteam")  # vulnerability + attack names
+```
+
 ## Third-party scanners (experimental)
 
 `third_party_scan` runs an external security scanner against a Giskard target and
@@ -19,7 +36,7 @@ pip install giskard-scan[deepteam]
 ```python
 import asyncio
 
-from giskard.scan import third_party_scan
+from giskard.scan import list_scan_items, third_party_scan
 
 
 def target(inputs: str) -> str:
@@ -32,19 +49,27 @@ result = asyncio.run(
         target,
         tool="garak",
         description="A helpful assistant",  # required by the API; garak ignores it
-        probes=["probes.goodside.ThreatenJSON"],  # omit to run all active probes
-        target_mode="multiturn",  # "singleturn" skips garak's iterative probes
+        # probes=None -> curated default set; probes="all" -> every active probe
+        probes=["probes.goodside.ThreatenJSON"],
+        # target_mode defaults to "multiturn"; pass "singleturn" to drop iterative probes
     )
 )
 
 print(result)
+print(list_scan_items("garak")[:5])
 ```
 
 Probes run in parallel; the target is invoked concurrently, so it must be safe to
 call from multiple threads (per-conversation state is tracked in the `Trace`, not on
 the target).
 
-Unknown probe names are logged and skipped rather than raising.
+Omitting `probes` runs a small curated default set aligned with DeepTeam themes
+(Bias/Toxicity, PII, Misinformation, PromptLeakage, jailbreak/injection, data
+exfil) — not the full garak catalog. Pass `probes="all"` for every active probe,
+or an explicit name list.
+
+Unknown, inactive, or unloadable probe names are logged and emitted as
+``CheckResult.skip`` scenarios rather than raising.
 
 ### deepteam
 
@@ -60,23 +85,27 @@ result = asyncio.run(
         description="A helpful assistant",  # becomes deepteam's target_purpose
         vulnerabilities=["Bias", "Toxicity"],  # omit for a curated default set
         attacks=["PromptInjection", "LinearJailbreaking"],  # omit for defaults
-        target_mode="multiturn",
+        attacks_per_vulnerability_type=1,  # default; each vuln subtype × this many
+        # target_mode defaults to "multiturn" (shared with native Giskard scans)
     )
 )
 ```
 
 `vulnerabilities` accepts `Bias`, `Toxicity`, `PIILeakage`, `PromptLeakage`, and
-`Misinformation`.
+`Misinformation`. Instantiating those classes without subtypes runs **all** of
+their types (for example Bias → race, gender, politics, religion), so cost scales
+with types × `attacks_per_vulnerability_type` × attacks.
 
 `attacks` accepts the single-turn `PromptInjection`, `Roleplay`, `Leetspeak`, and
 `ROT13`, plus the multi-turn `LinearJailbreaking`, `CrescendoJailbreaking`,
-`TreeJailbreaking`, `SequentialJailbreak`, and `BadLikertJudge`. An unrecognized
-name raises `ValueError` listing the valid ones.
+`TreeJailbreaking`, `SequentialJailbreak`, and `BadLikertJudge`. Unrecognized
+names are logged and emitted as skip scenarios (valid names in the same call still
+run).
 
-`target_mode="singleturn"` **drops every multi-turn attack** from the run. If that
-leaves nothing to run — for example `attacks=["CrescendoJailbreaking"]` with
-`target_mode="singleturn"` — the scan returns an empty `SuiteResult`, which reads
-as "nothing failed" rather than as an error.
+`target_mode` defaults to the shared `DEFAULT_TARGET_MODE` (`"multiturn"`).
+Pass `"singleturn"` to drop multi-turn attacks (they surface as skip scenarios).
+Unknown names also skip — the suite is never an empty "everything passed"
+result when you asked for attacks that could not run.
 
 ### API keys and LLM-judge detectors
 

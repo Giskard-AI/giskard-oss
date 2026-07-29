@@ -1,4 +1,5 @@
 from giskard.scan import (
+    DEFAULT_TARGET_MODE,
     AdversarialScenarioGenerator,
     CrescendoAttackScenarioGenerator,
     Document,
@@ -13,6 +14,7 @@ from giskard.scan import (
     SuiteGeneratorRegistry,
     SycophancyScenarioGenerator,
     generate_suite,
+    list_scan_items,
     quality_scan,
     quality_suite_generator_registry,
     third_party_scan,
@@ -30,6 +32,8 @@ def test_all_public_symbols_importable():
     assert callable(vulnerability_scan)
     assert isinstance(vulnerability_suite_generator_registry, SuiteGeneratorRegistry)
     assert callable(third_party_scan)
+    assert callable(list_scan_items)
+    assert DEFAULT_TARGET_MODE == "multiturn"
 
 
 def test_vulnerability_suite_generator_registry_contains_builtin_generators():
@@ -48,7 +52,7 @@ def test_vulnerability_scan_accepts_target_mode_param():
 
     sig = inspect.signature(vulnerability_scan)
     assert "target_mode" in sig.parameters
-    assert sig.parameters["target_mode"].default == "multiturn"
+    assert sig.parameters["target_mode"].default == DEFAULT_TARGET_MODE
 
 
 def test_quality_scan_accepts_target_mode_param():
@@ -59,7 +63,7 @@ def test_quality_scan_accepts_target_mode_param():
 
     sig = inspect.signature(quality_scan)
     assert "target_mode" in sig.parameters
-    assert sig.parameters["target_mode"].default == "multiturn"
+    assert sig.parameters["target_mode"].default == DEFAULT_TARGET_MODE
 
 
 def test_quality_suite_generator_registry_contains_builtin_generators():
@@ -70,3 +74,9 @@ def test_quality_suite_generator_registry_contains_builtin_generators():
     assert OutOfScopeScenarioGenerator in types
     assert SplitQuestionsScenarioGenerator in types
     assert SycophancyScenarioGenerator in types
+
+
+def test_list_scan_items_giskard():
+    names = list_scan_items("giskard")
+    assert "AdversarialScenarioGenerator" in names
+    assert "HallucinationScenarioGenerator" in names

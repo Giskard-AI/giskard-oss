@@ -68,7 +68,9 @@ def _patch_probe(monkeypatch: pytest.MonkeyPatch, probe_cls):
     """
     from giskard.scan.integrations.garak import _adapter
 
-    monkeypatch.setattr(_adapter, "_resolve_probes", lambda probes_arg: [probe_cls()])
+    monkeypatch.setattr(
+        _adapter, "_resolve_probes", lambda probes_arg: ([probe_cls()], [])
+    )
     return _adapter.GarakScanAdapter
 
 
@@ -83,7 +85,7 @@ async def test_real_iterative_probe_accumulates_multiturn_trace(
         return f"reply to: {inputs}"
 
     adapter_cls = _patch_probe(monkeypatch, _TinyMultiturnProbe)
-    result = await adapter_cls().run(target=target)
+    result = await adapter_cls().run(target=target, target_mode="multiturn")
 
     assert isinstance(result, SuiteResult)
 
@@ -93,7 +95,7 @@ async def test_real_iterative_probe_accumulates_multiturn_trace(
     # The completed root attempt (#1) carries the full 2-turn conversation,
     # so its final_trace accumulated both interactions on one Trace — proof the
     # uuid cache threaded the conversation across separate _call_model calls.
-    root = next(s for s in result.results if s.scenario_name.endswith("#1 — run 1"))
+    root = next(s for s in result.results if s.scenario_name.endswith("#1"))
     assert len(root.final_trace.interactions) == 2
     assert root.final_trace.last is not None
     assert root.final_trace.last.outputs == "reply to: turn-2 follow-up"

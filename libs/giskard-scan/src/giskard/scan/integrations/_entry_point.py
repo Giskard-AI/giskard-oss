@@ -10,6 +10,8 @@ from typing import Any, Literal, overload
 
 from giskard.checks import SuiteResult, Target, Trace
 
+from ..generators.base import DEFAULT_TARGET_MODE
+
 
 @overload
 async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
@@ -18,8 +20,8 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
     *,
     description: str,
     languages: list[str] | None = None,
-    probes: list[str] | None = None,
-    target_mode: str = "multiturn",
+    probes: list[str] | Literal["all"] | None = None,
+    target_mode: str = DEFAULT_TARGET_MODE,
 ) -> SuiteResult: ...
 
 
@@ -32,7 +34,7 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
     languages: list[str] | None = None,
     probes: list[str] | None = None,
     tags: list[str] | None = None,
-    target_mode: str = "multiturn",
+    target_mode: str = DEFAULT_TARGET_MODE,
 ) -> SuiteResult: ...
 
 
@@ -45,7 +47,8 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
     languages: list[str] | None = None,
     vulnerabilities: list[str] | None = None,
     attacks: list[str] | None = None,
-    target_mode: str = "multiturn",
+    attacks_per_vulnerability_type: int = 1,
+    target_mode: str = DEFAULT_TARGET_MODE,
 ) -> SuiteResult: ...
 
 
@@ -68,14 +71,16 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
         description: Natural-language description of the agent under test.
             Deepteam uses it as ``red_team``'s ``target_purpose``; garak has no
             target-profile concept and ignores it.
-        languages: BCP-47 language codes the agent handles. Ignored by garak and
-            deepteam.
-        **kwargs: Tool-specific options. For garak: ``probes: list[str] | None``
-            (None runs every active probe) and ``target_mode: str`` (default
-            ``"multiturn"``; ``"singleturn"`` drops garak's iterative probes).
-            For deepteam: ``vulnerabilities: list[str] | None`` and ``attacks:
-            list[str] | None`` (name lists; None runs a curated default set), and
-            ``target_mode: str`` (default ``"multiturn"``) which drops
+        languages: BCP-47 language codes the agent handles. Used by lidar only;
+            ignored by garak and deepteam.
+        **kwargs: Tool-specific options. For garak: ``probes`` (``None`` runs a
+            curated default set, ``"all"`` runs every active probe, or pass an
+            explicit name list) and ``target_mode`` (defaults to
+            :data:`~giskard.scan.generators.base.DEFAULT_TARGET_MODE`;
+            ``"multiturn"`` keeps garak's iterative probes). For deepteam:
+            ``vulnerabilities`` / ``attacks`` (name lists; ``None`` runs a
+            curated default set), ``attacks_per_vulnerability_type`` (default
+            ``1``), and ``target_mode`` (same shared default) which drops
             multi-turn attacks when set to ``"singleturn"``.
 
     Returns:
@@ -83,8 +88,7 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
 
     Raises:
         ImportError: The selected scanner's optional extra is not installed.
-        ValueError: ``tool`` is unknown, or a deepteam vulnerability/attack name
-            is not recognized.
+        ValueError: ``tool`` is unknown.
         TypeError: A keyword argument is not valid for the selected tool.
     """
     if tool == "garak":
