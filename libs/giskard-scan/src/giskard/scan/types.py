@@ -24,6 +24,9 @@ class ScanOptions(TypedDict, total=False):
         return_exception: When ``True``, a scenario whose input generation fails
             is recorded as an errored result and the scan continues. When
             ``False`` (default), the failure propagates and aborts the scan.
+        verbose: When ``True``, show generation and run progress and print the
+            grouped report. Set to ``False`` to suppress Rich UI and
+            ``print_report``. Defaults to ``True``.
     """
 
     max_scenarios: int | None
@@ -33,6 +36,7 @@ class ScanOptions(TypedDict, total=False):
     max_concurrency: int | None
     commercial_use: bool
     return_exception: bool
+    verbose: bool
 
 
 class ResolvedScanOptions(TypedDict):
@@ -54,3 +58,4 @@ class ResolvedScanOptions(TypedDict):
     max_concurrency: int | None
     commercial_use: bool
     return_exception: bool
+    verbose: bool
