@@ -2,8 +2,6 @@
 
 import pytest
 from giskard.scan import list_scan_items
-from giskard.scan.integrations.deepteam import deepteam_available
-from giskard.scan.integrations.garak import garak_available
 
 
 def test_list_scan_items_rejects_unknown_tool() -> None:
@@ -11,16 +9,17 @@ def test_list_scan_items_rejects_unknown_tool() -> None:
         list_scan_items("not-a-tool")
 
 
-@pytest.mark.skipif(not garak_available(), reason="garak is not installed")
 def test_list_scan_items_garak() -> None:
+    # Unit CI may see a top-level ``garak`` without the real plugin package.
+    pytest.importorskip("garak._plugins")
     from giskard.scan.integrations.garak import list_probes
 
     assert list_scan_items("garak") == list_probes()
     assert "probes.goodside.ThreatenJSON" in list_scan_items("garak")
 
 
-@pytest.mark.skipif(not deepteam_available(), reason="deepteam is not installed")
 def test_list_scan_items_deepteam() -> None:
+    pytest.importorskip("deepteam.vulnerabilities")
     from giskard.scan.integrations.deepteam import list_attacks, list_vulnerabilities
 
     names = list_scan_items("deepteam")
