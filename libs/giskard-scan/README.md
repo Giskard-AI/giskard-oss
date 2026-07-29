@@ -14,8 +14,8 @@ Discover selectable items for any tool with `list_scan_items`:
 ```python
 from giskard.scan import list_scan_items
 
-list_scan_items("giskard")   # scenario generator class names
-list_scan_items("garak")     # active garak probe names
+list_scan_items("giskard")  # scenario generator class names
+list_scan_items("garak")  # active garak probe names
 list_scan_items("deepteam")  # vulnerability + attack names
 ```
 
