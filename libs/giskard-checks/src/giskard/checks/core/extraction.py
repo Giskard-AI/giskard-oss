@@ -65,7 +65,10 @@ class NoMatch(BaseModel):
 
 
 def _is_list_expression(expression: JSONPath) -> bool:
-    if isinstance(expression, Child | Descendants):
+    if isinstance(expression, Descendants):
+        return True
+
+    if isinstance(expression, Child):
         return _is_list_expression(expression.right) or _is_list_expression(
             expression.left
         )
@@ -94,7 +97,7 @@ def resolve[TraceType: Trace](trace: TraceType, key: str) -> Any:  # pyright: ig
 
 def provided_or_resolve[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     trace: TraceType,
-    key: str | MISSING = MISSING,
+    key: str | MISSING = MISSING,  # pyright: ignore[reportInvalidTypeForm]
     value: Any = MISSING,
 ) -> Any:
     if key is MISSING or value is not MISSING:
