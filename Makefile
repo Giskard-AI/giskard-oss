@@ -68,6 +68,10 @@ else
 	$(foreach lib,$(LIBS),uv run pytest libs/$(lib) -m "not functional" &&) true
 endif
 
+test-examples: ## Run canonical examples and README snippet lint
+	uv run pytest examples -q
+	uv run python examples/lint_readme_snippets.py
+
 test-no-providers: ## Run tests that verify behavior when provider SDKs are missing
 	uv run pytest libs/giskard-llm -m "no_providers"
 

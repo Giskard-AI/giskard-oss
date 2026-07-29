@@ -68,4 +68,10 @@ make test      # pytest for packages under libs/
 
 Run `make help` for other targets (for example scoped tests with `PACKAGE=giskard-checks`).
 
+See also [`.cursor/rules/documentation.mdc`](.cursor/rules/documentation.mdc) for module-level and inline comment guidance.
+
+### Public examples
+
+Keep `examples/` and in-repo README Python fences runnable and importable. When you change a public API shown in documentation, update the matching example and run `make test-examples`.
+
 **This guide was heavily inspired by the awesome [Hugging Face guide to contributing](https://github.com/huggingface/transformers/blob/main/CONTRIBUTING.md).**
