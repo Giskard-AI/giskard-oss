@@ -170,13 +170,14 @@ class ScenarioRunner:
             )
             steps_results.append(step_result)
 
-            logger.info(
-                "Scenario %r: step %d/%d %s",
-                scenario.name,
-                step_index,
-                total_steps,
-                "passed" if step_result.passed else "failed",
-            )
+            if logger.isEnabledFor(logging.INFO):
+                logger.info(
+                    "Scenario %r: step %d/%d %s",
+                    scenario.name,
+                    step_index,
+                    total_steps,
+                    "passed" if step_result.passed else "failed",
+                )
 
             # Stop on first failure
             if not step_result.passed:
