@@ -73,6 +73,42 @@ def test_from_anthropic_refusal_stop():
     assert ch.message.refusal == "Policy decline."
 
 
+def test_from_anthropic_refusal_stop_category_only():
+    """A refusal whose ``stop_details`` carries only the structured ``category``
+    (``explanation`` is optional) must still populate ``message.refusal``."""
+    raw = _message(
+        {
+            "content": [],
+            "stop_reason": "refusal",
+            "stop_details": {
+                "type": "refusal",
+                "category": "cyber",
+            },
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    ch = out.choices[0]
+    assert ch.finish_reason == "stop"
+    assert ch.message.refusal == "cyber"
+    assert ch.message.is_refusal
+
+
+def test_from_anthropic_refusal_stop_without_details():
+    """``stop_details`` is optional; a refusal without it must still be marked
+    as a refusal instead of being silently dropped."""
+    raw = _message(
+        {
+            "content": [],
+            "stop_reason": "refusal",
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    ch = out.choices[0]
+    assert ch.finish_reason == "stop"
+    assert ch.message.refusal == "refusal"
+    assert ch.message.is_refusal
+
+
 def test_from_anthropic_multiple_text_blocks_joined():
     """Several `text` blocks are joined with newlines in `message.content`."""
     raw = _message(
