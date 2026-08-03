@@ -1,6 +1,7 @@
 """Quality scan entry points for giskard.scan."""
 
 import logging
+import sys
 import warnings
 
 from giskard.checks import SuiteResult, Target, Trace
@@ -46,6 +47,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     max_concurrency: int | None = None,
     return_exception: bool = False,
     target_mode: TargetMode = "multiturn",
+    verbose: bool = True,
 ) -> SuiteResult:
     """Generate and run the standard quality scan suite.
 
@@ -74,6 +76,9 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
             multi-turn conversations. ``"singleturn"`` skips generators that
             are multi-turn by design and caps turn budgets to 1 on others.
             Defaults to ``"multiturn"``.
+        verbose: When ``True`` (default), show generation and run progress and
+            print the grouped report. Set to ``False`` to suppress Rich UI and
+            ``print_report`` while still returning a :class:`SuiteResult`.
 
     Returns:
         The completed suite result with a generated quality recommendation.
@@ -81,6 +86,9 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     knowledge_base = normalize_knowledge_base(
         _warn_if_missing_knowledge_base(knowledge_base)
     )
+
+    if verbose and not sys.stderr.isatty():
+        logger.info("quality_scan: phase=generating")
 
     suite = await generate_suite(
         description=description,
@@ -90,13 +98,19 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         seed=seed,
         target_mode=target_mode,
         knowledge_base=knowledge_base,
+        verbose=verbose,
     )
+
+    if verbose and not sys.stderr.isatty():
+        scenario_count = len(suite.scenarios) if hasattr(suite, "scenarios") else 0
+        logger.info("quality_scan: phase=running scenarios=%d", scenario_count)
 
     result: SuiteResult = await suite.run(
         target,
         parallel=parallel,
         max_concurrency=max_concurrency,
         return_exception=return_exception,
+        verbose=verbose,
     )
     try:
         recommendation = await generate_quality_recommendation(result)
@@ -104,7 +118,8 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         logger.exception("Quality recommendation generation failed")
         recommendation = ""
     quality_result = result.model_copy(update={"recommendation": recommendation})
-    quality_result.print_report(group_by=group_by)
+    if verbose:
+        quality_result.print_report(group_by=group_by)
     return quality_result
 
 

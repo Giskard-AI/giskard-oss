@@ -31,6 +31,7 @@ from ..core.result import (
     format_status_count_text,
 )
 from ..core.scenario import Scenario
+from ..core.suite_usage import suite_usage_collector
 from ..core.types import Target
 
 InputType = TypeVar("InputType", infer_variance=True)
@@ -134,7 +135,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     scenarios: list[Scenario[InputType, OutputType, Trace[Any, Any]]] = Field(
         default_factory=list, description="Scenarios in the suite"
     )
-    target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = Field(
+    target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = Field(  # pyright: ignore[reportInvalidTypeForm]
         default=MISSING,
         description="Suite-level target SUT that will override any scenario-level target.",
     )
@@ -160,7 +161,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
     async def run(
         self,
-        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),
+        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),  # pyright: ignore[reportInvalidTypeForm]
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
@@ -227,20 +228,24 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             )
 
             start_time = time.perf_counter()
-            with self._progress_bar(enabled=verbose) as tracker:
-                if parallel:
-                    results = await self._run_parallel(
-                        target, return_exception, max_concurrency, tracker
-                    )
-                else:
-                    results = await self._run_serial(target, return_exception, tracker)
-            end_time = time.perf_counter()
+            with suite_usage_collector() as usage_collector:
+                with self._progress_bar(enabled=verbose) as tracker:
+                    if parallel:
+                        results = await self._run_parallel(
+                            target, return_exception, max_concurrency, tracker
+                        )
+                    else:
+                        results = await self._run_serial(
+                            target, return_exception, tracker
+                        )
+                end_time = time.perf_counter()
 
-            suite_result = SuiteResult(
-                results=results,
-                duration_ms=int((end_time - start_time) * 1000),
-                suite=self,
-            )
+                suite_result = SuiteResult(
+                    results=results,
+                    duration_ms=int((end_time - start_time) * 1000),
+                    suite=self,
+                    usage=usage_collector.snapshot(),
+                )
 
             telemetry_capture(
                 "checks_suite_run_finished",

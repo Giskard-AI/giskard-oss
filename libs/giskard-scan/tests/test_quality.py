@@ -156,6 +156,7 @@ async def test_quality_scan_forwards_run_options(
                 "parallel": parallel,
                 "max_concurrency": max_concurrency,
                 "return_exception": return_exception,
+                "verbose": verbose,
             }
         )
         return await original_run(
@@ -185,8 +186,66 @@ async def test_quality_scan_forwards_run_options(
     )
 
     assert run_kwargs == [
-        {"parallel": True, "max_concurrency": 3, "return_exception": True}
+        {
+            "parallel": True,
+            "max_concurrency": 3,
+            "return_exception": True,
+            "verbose": True,
+        }
     ]
+
+
+async def test_quality_scan_verbose_false_skips_print_report(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    quality_suite_generator_registry.register(_DeterministicQualityGenerator())
+    printed_reports: list[str | None] = []
+    run_kwargs: list[dict[str, object]] = []
+    original_run = Suite.run
+
+    def print_report_spy(
+        self: SuiteResult,
+        console: Any = None,
+        group_by: str | None = None,
+    ) -> None:
+        _ = self, console
+        printed_reports.append(group_by)
+
+    async def run_spy(
+        self: Suite[Any, Any],
+        target: object,
+        return_exception: bool = False,
+        parallel: bool = False,
+        max_concurrency: int | None = None,
+        verbose: bool = True,
+    ) -> SuiteResult:
+        run_kwargs.append({"verbose": verbose})
+        return await original_run(
+            self,
+            target,
+            return_exception=return_exception,
+            parallel=parallel,
+            max_concurrency=max_concurrency,
+            verbose=verbose,
+        )
+
+    monkeypatch.setattr(SuiteResult, "print_report", print_report_spy)
+    monkeypatch.setattr(Suite, "run", run_spy)
+
+    async def target(inputs: str) -> str:
+        return inputs
+
+    await quality_scan(
+        target=target,
+        description="Support agent",
+        languages=["en"],
+        knowledge_base=["reference document"],
+        max_scenarios=1,
+        verbose=False,
+    )
+
+    assert printed_reports == []
+    assert run_kwargs == [{"verbose": False}]
 
 
 async def test_quality_scan_uses_empty_registry_by_default(
@@ -237,8 +296,9 @@ async def test_quality_scan_warns_and_skips_empty_raw_knowledge_base(
             parallel: bool = True,
             max_concurrency: int | None = None,
             return_exception: bool = False,
+            verbose: bool = True,
         ) -> SuiteResult:
-            _ = target, parallel, max_concurrency, return_exception
+            _ = target, parallel, max_concurrency, return_exception, verbose
             return SuiteResult(results=[], duration_ms=0)
 
     async def generate_suite_spy(**kwargs: Any) -> _FakeSuite:
@@ -289,8 +349,9 @@ async def test_quality_scan_configures_knowledge_base_generator(
             parallel: bool = True,
             max_concurrency: int | None = None,
             return_exception: bool = False,
+            verbose: bool = True,
         ) -> SuiteResult:
-            _ = target, parallel, max_concurrency, return_exception
+            _ = target, parallel, max_concurrency, return_exception, verbose
             return SuiteResult(results=[], duration_ms=0)
 
     async def generate_suite_spy(**kwargs: Any) -> _FakeSuite:

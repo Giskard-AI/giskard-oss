@@ -18,6 +18,7 @@ from rich.text import Text
 from ..settings import get_settings
 from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
+from .suite_usage import SuiteUsage
 
 STATUS_MAPPING = {
     "total": {
@@ -585,12 +586,18 @@ class SuiteResult(BaseResult, frozen=True):
         Number of scenarios that were skipped.
     pass_rate : float
         Fraction of non-skipped scenarios that passed (1.0 when all scenarios are skipped).
+    usage : SuiteUsage
+        Aggregated LLM token usage for the suite run (zeros when no LLM steps ran).
     """
 
     results: list[ScenarioResult[Any]] = Field(
         ..., description="List of scenario results"
     )
     duration_ms: int = Field(..., description="Total execution time in milliseconds")
+    usage: SuiteUsage = Field(
+        default_factory=SuiteUsage,
+        description="Aggregated LLM token usage for the suite run.",
+    )
     suite: "Suite[Any, Any] | None" = Field(
         default=None, exclude=True, description="The Suite that produced this result"
     )
@@ -779,6 +786,14 @@ def _suite_report_renderables(
     )
     summary = ", ".join(count_parts)
     yield f"Summary: {summary} | Pass Rate: [default bold]{result.pass_rate:.1%}[/default bold] | Total Duration: {result.duration_ms}ms"
+    if result.usage.total_tokens > 0:
+        usage = result.usage
+        yield (
+            "tokens: "
+            f"in={usage.prompt_tokens}  "
+            f"out={usage.completion_tokens}  "
+            f"total={usage.total_tokens}"
+        )
 
 
 def _parse_tag(tag: str) -> tuple[str, str]:
