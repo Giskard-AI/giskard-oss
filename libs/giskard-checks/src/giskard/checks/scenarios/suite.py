@@ -134,7 +134,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     scenarios: list[Scenario[InputType, OutputType, Trace[Any, Any]]] = Field(
         default_factory=list, description="Scenarios in the suite"
     )
-    target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = Field(  # pyright: ignore[reportInvalidTypeForm]
+    target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = Field(
         default=MISSING,
         description="Suite-level target SUT that will override any scenario-level target.",
     )
@@ -160,7 +160,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
     async def run(
         self,
-        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),  # pyright: ignore[reportInvalidTypeForm]
+        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
