@@ -87,6 +87,8 @@ jobs:
         with:
           app-id: ${{ vars.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
 
       - name: Push format commit
         if: env.SAME_REPO_PR == 'true' && steps.autofix.outputs.has_commit == 'true'
