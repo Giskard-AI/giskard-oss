@@ -17,18 +17,25 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     permissions:
-      contents: write # push auto-format commits on same-repo PRs (guarded below; unused on forks/main)
+      # contents:write is not needed on GITHUB_TOKEN: format pushes use a GitHub App
+      # token (same as release.yml) so the follow-up pull_request run is not stuck in
+      # action_required. SAME_REPO_PR gates autofix; forks / main / workflow_dispatch
+      # stay check-only.
+      contents: read
     timeout-minutes: 10
     env:
+      # True only for same-repo pull_request events (not forks, push to main, or workflow_dispatch).
       SAME_REPO_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     outputs:
-      format_pushed: ${{ steps.autofix.outputs.pushed }}
+      format_pushed: ${{ steps.push.outputs.pushed }}
     steps:
       - name: Checkout (same-repo PR)
         if: env.SAME_REPO_PR == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Immutable SHA (not head_ref) to avoid ref injection; push targets BRANCH below
+          # Immutable SHA (not head_ref) to avoid ref injection; push targets BRANCH below.
+          # persist-credentials: false — checkout must not retain credentials; the App
+          # token is injected only for the push step via git remote set-url.
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
@@ -47,39 +54,57 @@ jobs:
       - name: Format and commit
         if: env.SAME_REPO_PR == 'true'
         id: autofix
-        env:
-          BRANCH: ${{ github.head_ref }}
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
         run: |
           make format
           if git diff --quiet && git diff --cached --quiet; then
-            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            echo "has_commit=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -u -- '*.py'
           if git diff --cached --quiet; then
-            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            echo "has_commit=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "style: auto-format"
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
-          git push origin "HEAD:refs/heads/$BRANCH"
-          echo "pushed=true" >> "$GITHUB_OUTPUT"
+          echo "has_commit=true" >> "$GITHUB_OUTPUT"
 
       - name: Check (same-repo PR)
-        if: env.SAME_REPO_PR == 'true' && steps.autofix.outputs.pushed != 'true'
+        if: env.SAME_REPO_PR == 'true'
         run: make check
 
       - name: Check (forks / main / dispatch)
         if: env.SAME_REPO_PR != 'true'
         run: make check
 
+      # App token (not GITHUB_TOKEN) so the format push triggers a real follow-up CI run.
+      # GITHUB_TOKEN pushes land in action_required and do not auto-run workflows.
+      - name: Generate app token
+        if: env.SAME_REPO_PR == 'true' && steps.autofix.outputs.has_commit == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Push format commit
+        if: env.SAME_REPO_PR == 'true' && steps.autofix.outputs.has_commit == 'true'
+        id: push
+        env:
+          BRANCH: ${{ github.head_ref }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          git remote set-url origin "https://x-access-token:${APP_TOKEN}@github.com/${REPO}.git"
+          git push origin "HEAD:refs/heads/$BRANCH"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
   test-unit:
     name: test-unit / ${{ matrix.package }} / ${{ matrix.python-version }}
     needs: lint
+    # Skip when this run already pushed a format commit; the App-token push triggers a
+    # follow-up CI run on the formatted SHA that executes the full suite.
     if: needs.lint.outputs.format_pushed != 'true'
     runs-on: ubuntu-latest
     permissions:
