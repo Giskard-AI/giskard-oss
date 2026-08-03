@@ -1,3 +1,5 @@
+import giskard.scan as scan
+import giskard.scan.generators as generators
 from giskard.scan import (
     AdversarialScenarioGenerator,
     CrescendoAttackScenarioGenerator,
@@ -18,6 +20,21 @@ from giskard.scan import (
     vulnerability_scan,
     vulnerability_suite_generator_registry,
 )
+
+
+def _registry_generator_types(registry: SuiteGeneratorRegistry) -> set[type]:
+    return {type(generator) for generator in registry.generators()}
+
+
+def test_default_registry_generators_are_public():
+    generator_types = _registry_generator_types(
+        vulnerability_suite_generator_registry
+    ) | _registry_generator_types(quality_suite_generator_registry)
+    for module in (scan, generators):
+        public_names = set(module.__all__)
+        for generator_type in generator_types:
+            assert generator_type.__name__ in public_names
+            assert getattr(module, generator_type.__name__) is generator_type
 
 
 def test_all_public_symbols_importable():
