@@ -14,7 +14,7 @@ PROMPT_PLACEHOLDER = "{{prompt}}"
 _MAPPING_TEMPLATE = "giskard.checks::generators/dataset_input_mapping.j2"
 
 
-class MappingTemplate[T](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
+class MappingTemplate[T](BaseModel):
     """LLM output: a valid instance of the target schema with a {{prompt}} marker.
 
     Either ``message`` (a valid ``T`` containing the ``{{prompt}}`` token in the
