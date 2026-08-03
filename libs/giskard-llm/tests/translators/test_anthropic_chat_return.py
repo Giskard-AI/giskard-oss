@@ -160,5 +160,6 @@ def test_from_anthropic_refusal_category_only():
             "stop_details": {"type": "refusal", "category": "bio"},
         }
     )
-    out = AnthropicChatTranslator.from_anthropic(raw)
-    assert out.choices[0].message.refusal == "bio"
+    msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    assert msg.refusal == "bio"
+    assert msg.is_refusal

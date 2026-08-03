@@ -3,6 +3,7 @@
 Request shape: https://docs.anthropic.com/en/api/messages
 """
 
+import logging
 from typing import Literal
 
 import pytest
@@ -405,8 +406,6 @@ def test_function_message_raises():
 
 def test_unknown_completion_params_warn(caplog):
     """Unsupported kwargs are dropped but callers get a warning (#2613)."""
-    import logging
-
     msg = UserMessage(content="Hello.")
     with caplog.at_level(logging.WARNING):
         payload = AnthropicChatTranslator.to_anthropic(

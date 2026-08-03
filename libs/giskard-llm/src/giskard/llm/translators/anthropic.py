@@ -46,12 +46,9 @@ else:
     httpxTimeout = Any
 
 _PROVIDER = "anthropic/chat"
-PROVIDER = "anthropic"
+_PROVIDER_NAME = "anthropic"
 logger = logging.getLogger(__name__)
 
-# Params accepted by AnthropicChatConfigParams / to_anthropic (plus tools which
-# is a dedicated keyword arg). Anything else is dropped by pydantic extra=ignore
-# — warn so callers notice, matching OpenAI/Google translators (#2613).
 KNOWN_COMPLETION_PARAMS = frozenset(
     {
         "max_tokens",
@@ -271,7 +268,7 @@ class AnthropicChatTranslator:
         if unknown:
             logger.warning(
                 "%s provider: ignoring unknown completion params: %s",
-                PROVIDER,
+                _PROVIDER_NAME,
                 sorted(unknown),
             )
 
@@ -338,19 +335,15 @@ class AnthropicChatTranslator:
             FINISH_REASON_MAP.get(raw.stop_reason, "stop") if raw.stop_reason else None
         )
 
+        # Prefer explanation, then category; bare "refusal" so is_refusal still fires.
         refusal_out: str | None = None
         if raw.stop_reason == "refusal":
-            # Prefer free-text explanation; fall back to structured category or a
-            # bare "refusal" marker so message.is_refusal still fires when
-            # stop_details / explanation are absent (#2615).
-            details = getattr(raw, "stop_details", None)
-            explanation = (
-                getattr(details, "explanation", None) if details is not None else None
-            )
-            category = (
-                getattr(details, "category", None) if details is not None else None
-            )
-            refusal_out = explanation or category or "refusal"
+            details = raw.stop_details
+            refusal_out = (
+                (details.explanation or details.category)
+                if details is not None
+                else None
+            ) or "refusal"
 
         message = AssistantMessage(
             role="assistant",
