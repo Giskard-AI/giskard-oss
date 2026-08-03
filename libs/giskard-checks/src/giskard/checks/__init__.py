@@ -68,6 +68,14 @@ from .scenarios.suite import Suite
 from .settings import get_default_generator, get_settings, set_default_generator
 from .testing import WithSpy
 from .testing.runner import TestCaseRunner
+from .utils.checkpoint import (
+    CheckpointFingerprintError,
+    RunStore,
+    ensure_checkpoint_id,
+    generate_fingerprint,
+    generator_checkpoint_key,
+    resolve_checkpoint_options,
+)
 
 __version__ = get_lib_version("giskard-checks")
 
@@ -152,4 +160,11 @@ __all__ = [
     # Settings
     "set_default_generator",
     "get_default_generator",
+    # Checkpoint / resume
+    "CheckpointFingerprintError",
+    "RunStore",
+    "ensure_checkpoint_id",
+    "generate_fingerprint",
+    "generator_checkpoint_key",
+    "resolve_checkpoint_options",
 ]

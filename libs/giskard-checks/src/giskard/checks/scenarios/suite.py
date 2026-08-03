@@ -2,7 +2,8 @@ import asyncio
 import time
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager, nullcontext
-from typing import Any, Generic, Self, TypeVar
+from pathlib import Path
+from typing import Any, Generic, Literal, Self, TypeVar
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
 from pydantic import BaseModel, Field
@@ -32,6 +33,14 @@ from ..core.result import (
 )
 from ..core.scenario import Scenario
 from ..core.types import Target
+from ..utils.checkpoint import (
+    RunStore,
+    ensure_checkpoint_id,
+    resolve_checkpoint_options,
+    run_fingerprint,
+)
+
+type ResumeMode = bool | Literal["force"]
 
 InputType = TypeVar("InputType", infer_variance=True)
 OutputType = TypeVar("OutputType", infer_variance=True)
@@ -134,7 +143,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     scenarios: list[Scenario[InputType, OutputType, Trace[Any, Any]]] = Field(
         default_factory=list, description="Scenarios in the suite"
     )
-    target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = Field(
+    target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = Field(  # pyright: ignore[reportInvalidTypeForm]
         default=MISSING,
         description="Suite-level target SUT that will override any scenario-level target.",
     )
@@ -160,11 +169,13 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
     async def run(
         self,
-        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),
+        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = MISSING,  # pyright: ignore[reportInvalidTypeForm]
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
         verbose: bool = True,
+        checkpoint_dir: Path | str | bool | None = None,
+        resume: ResumeMode | None = None,
     ) -> SuiteResult:
         """Run all scenarios in the suite.
 
@@ -184,6 +195,16 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         verbose : bool
             If True (default), display a progress bar showing which scenario is
             currently running. Set to False for non-interactive environments.
+        checkpoint_dir : Path | str | bool | None, optional
+            Checkpoint root. ``None`` (default) uses
+            ``.giskard/checkpoints/<fingerprint>/`` (or ``GISKARD_CHECKPOINT_DIR``
+            as root). ``False`` disables checkpointing. A path is used as the
+            root with a fingerprint subdir. Checkpoints may contain sensitive
+            traces; keep them local.
+        resume : bool | Literal["force"] | None, optional
+            Skip scenarios already present in the checkpoint. Defaults to
+            ``True`` when checkpointing is enabled. Use ``False`` for a fresh
+            store, or ``"force"`` to ignore fingerprint mismatches.
 
         Returns
         -------
@@ -212,6 +233,29 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             if max_concurrency < 1:
                 raise ValueError("max_concurrency must be greater than 0")
 
+        scenario_ids = [
+            ensure_checkpoint_id(
+                scenario.annotations,
+                name=scenario.name,
+                index=index,
+                suite_name=self.name,
+            )
+            for index, scenario in enumerate(self.scenarios)
+        ]
+        fingerprint = run_fingerprint(self.name, scenario_ids)
+        ck_path, resume_mode = resolve_checkpoint_options(
+            checkpoint_dir, resume, fingerprint=fingerprint
+        )
+        store: RunStore | None = None
+        cached: dict[str, ScenarioResult[Trace[Any, Any]]] = {}
+        if ck_path is not None:
+            store = await RunStore.open(
+                ck_path, fingerprint=fingerprint, resume=resume_mode
+            )
+            if resume_mode:
+                for cid, payload in store.load_payloads("scenario_finished").items():
+                    cached[cid] = ScenarioResult.model_validate(payload)
+
         with telemetry_run_context():
             telemetry_tag("giskard_component", "suite")
             telemetry_tag("giskard_operation", "suite_run")
@@ -230,10 +274,23 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             with self._progress_bar(enabled=verbose) as tracker:
                 if parallel:
                     results = await self._run_parallel(
-                        target, return_exception, max_concurrency, tracker
+                        target,
+                        return_exception,
+                        max_concurrency,
+                        tracker,
+                        scenario_ids=scenario_ids,
+                        store=store,
+                        cached=cached,
                     )
                 else:
-                    results = await self._run_serial(target, return_exception, tracker)
+                    results = await self._run_serial(
+                        target,
+                        return_exception,
+                        tracker,
+                        scenario_ids=scenario_ids,
+                        store=store,
+                        cached=cached,
+                    )
             end_time = time.perf_counter()
 
             suite_result = SuiteResult(
@@ -270,17 +327,42 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             progress.start_overall(len(self.scenarios))
             yield progress
 
+    async def _run_one(
+        self,
+        scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
+        checkpoint_id: str,
+        target: Any,
+        return_exception: bool,
+        store: RunStore | None,
+        cached: dict[str, ScenarioResult[Trace[Any, Any]]],
+    ) -> ScenarioResult[Trace[Any, Any]]:
+        if checkpoint_id in cached:
+            return cached[checkpoint_id]
+        result = await scenario.run(target=target, return_exception=return_exception)
+        if store is not None:
+            await store.append(
+                "scenario_finished",
+                id=checkpoint_id,
+                payload=result.model_dump(mode="json"),
+            )
+            cached[checkpoint_id] = result
+        return result
+
     async def _run_serial(
         self,
         target: Any,
         return_exception: bool,
         progress: _SuiteProgress,
+        *,
+        scenario_ids: list[str],
+        store: RunStore | None,
+        cached: dict[str, ScenarioResult[Trace[Any, Any]]],
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
         results: list[ScenarioResult[Trace[Any, Any]]] = []
-        for scenario in self.scenarios:
+        for scenario, checkpoint_id in zip(self.scenarios, scenario_ids, strict=True):
             progress.describe(f"Running: {scenario.name}")
-            result = await scenario.run(
-                target=target, return_exception=return_exception
+            result = await self._run_one(
+                scenario, checkpoint_id, target, return_exception, store, cached
             )
             results.append(result)
             progress.record(result.status)
@@ -292,6 +374,10 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         return_exception: bool,
         max_concurrency: int | None,
         progress: _SuiteProgress,
+        *,
+        scenario_ids: list[str],
+        store: RunStore | None,
+        cached: dict[str, ScenarioResult[Trace[Any, Any]]],
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
         semaphore = (
             asyncio.Semaphore(max_concurrency) if max_concurrency else nullcontext()
@@ -299,11 +385,17 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
         async def run_scenario(
             scenario: Scenario[InputType, OutputType, Trace[Any, Any]],
+            checkpoint_id: str,
         ) -> ScenarioResult[Trace[Any, Any]]:
             async with semaphore:
                 with progress.scenario_row(scenario.name):
-                    result = await scenario.run(
-                        target=target, return_exception=return_exception
+                    result = await self._run_one(
+                        scenario,
+                        checkpoint_id,
+                        target,
+                        return_exception,
+                        store,
+                        cached,
                     )
                 progress.record(result.status)
             return result
@@ -311,8 +403,10 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         try:
             async with asyncio.TaskGroup() as task_group:
                 tasks = [
-                    task_group.create_task(run_scenario(scenario))
-                    for scenario in self.scenarios
+                    task_group.create_task(run_scenario(scenario, checkpoint_id))
+                    for scenario, checkpoint_id in zip(
+                        self.scenarios, scenario_ids, strict=True
+                    )
                 ]
         except* Exception as exc_group:
             if len(exc_group.exceptions) == 1:

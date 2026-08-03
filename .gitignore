@@ -6,6 +6,7 @@ local_report.md
 .run
 .DS_Store
 .claude/worktrees/
+.giskard/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

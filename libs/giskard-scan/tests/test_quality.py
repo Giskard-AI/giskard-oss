@@ -150,6 +150,7 @@ async def test_quality_scan_forwards_run_options(
         parallel: bool = False,
         max_concurrency: int | None = None,
         verbose: bool = True,
+        **kwargs: Any,
     ) -> SuiteResult:
         run_kwargs.append(
             {
@@ -165,6 +166,7 @@ async def test_quality_scan_forwards_run_options(
             parallel=parallel,
             max_concurrency=max_concurrency,
             verbose=verbose,
+            **kwargs,
         )
 
     monkeypatch.setattr(Suite, "run", run_spy)
@@ -237,8 +239,9 @@ async def test_quality_scan_warns_and_skips_empty_raw_knowledge_base(
             parallel: bool = True,
             max_concurrency: int | None = None,
             return_exception: bool = False,
+            **kwargs: object,
         ) -> SuiteResult:
-            _ = target, parallel, max_concurrency, return_exception
+            _ = target, parallel, max_concurrency, return_exception, kwargs
             return SuiteResult(results=[], duration_ms=0)
 
     async def generate_suite_spy(**kwargs: Any) -> _FakeSuite:
@@ -289,8 +292,9 @@ async def test_quality_scan_configures_knowledge_base_generator(
             parallel: bool = True,
             max_concurrency: int | None = None,
             return_exception: bool = False,
+            **kwargs: object,
         ) -> SuiteResult:
-            _ = target, parallel, max_concurrency, return_exception
+            _ = target, parallel, max_concurrency, return_exception, kwargs
             return SuiteResult(results=[], duration_ms=0)
 
     async def generate_suite_spy(**kwargs: Any) -> _FakeSuite:
