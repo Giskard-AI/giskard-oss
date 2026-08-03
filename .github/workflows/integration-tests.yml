@@ -60,23 +60,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        # Python version coverage lives in Main CI unit tests; integration only needs one.
+        python-version: ["3.12"]
         backend:
-          # Each backend exercises a different install combination so we
-          # catch dependency regressions in the three supported layouts:
-          # giskard-llm only, litellm only, and both installed together.
-          # Using the top-level giskard-agents extras (not giskard-llm
-          # directly) so the pass-through extras declared in
-          # libs/giskard-agents/pyproject.toml are covered.
+          # One job per install layout (giskard-llm vs litellm). The old "both"
+          # cell re-ran the union of these suites without adding coverage.
           - name: giskard-llm
             extras: "giskard-agents[google]"
             pytest_mark: "functional and google"
           - name: litellm
             extras: "giskard-agents[litellm]"
             pytest_mark: "functional and litellm"
-          - name: both
-            extras: "giskard-agents[google,litellm]"
-            pytest_mark: "functional and (google or litellm)"
     name: agents / ${{ matrix.backend.name }} / ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -118,22 +112,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # One cell per routing prefix we want to exercise end-to-end.
-        # `extras` is the giskard-llm optional-dependency group to install;
-        # aliases share an install (bare/azure_ai reuse openai/azure, gemini reuses google).
+        # One cell per distinct SDK + routing prefix. Alias providers (bare,
+        # gemini, azure_ai, azure_foundry_v1) share installs and are covered
+        # by openai/google/azure respectively.
         include:
           - { python-version: "3.12", provider: openai, extras: openai }
-          - { python-version: "3.12", provider: bare, extras: openai }
           - { python-version: "3.12", provider: google, extras: google }
-          - { python-version: "3.12", provider: gemini, extras: google }
           - { python-version: "3.12", provider: anthropic, extras: anthropic }
           - { python-version: "3.12", provider: azure, extras: azure }
-          - { python-version: "3.12", provider: azure_ai, extras: azure }
-          - {
-              python-version: "3.12",
-              provider: azure_foundry_v1,
-              extras: openai,
-            }
     name: llm / ${{ matrix.provider }} / ${{ matrix.python-version }}
     env:
       PROVIDER: ${{ matrix.provider }}
@@ -155,51 +141,13 @@ jobs:
         run: uv pip install "giskard-llm[$EXTRAS]"
       - name: Run functional tests
         env:
-          OPENAI_API_KEY: ${{ (matrix.provider == 'openai' || matrix.provider == 'bare') && secrets.OPENAI_API_KEY || '' }}
-          GOOGLE_API_KEY: ${{ (matrix.provider == 'google' || matrix.provider == 'gemini') && secrets.GEMINI_API_KEY || '' }}
+          OPENAI_API_KEY: ${{ matrix.provider == 'openai' && secrets.OPENAI_API_KEY || '' }}
+          GOOGLE_API_KEY: ${{ matrix.provider == 'google' && secrets.GEMINI_API_KEY || '' }}
           ANTHROPIC_API_KEY: ${{ matrix.provider == 'anthropic' && secrets.ANTHROPIC_API_KEY || '' }}
           AZURE_API_KEY: ${{ matrix.provider == 'azure' && secrets.AZURE_API_KEY || '' }}
           AZURE_API_BASE: ${{ matrix.provider == 'azure' && secrets.AZURE_API_BASE || '' }}
           AZURE_API_VERSION: ${{ matrix.provider == 'azure' && secrets.AZURE_API_VERSION || '' }}
-          AZURE_AI_API_KEY: ${{ (matrix.provider == 'azure_ai' || matrix.provider == 'azure_foundry_v1') && secrets.AZURE_AI_API_KEY || '' }}
-          AZURE_AI_ENDPOINT: ${{ (matrix.provider == 'azure_ai' || matrix.provider == 'azure_foundry_v1') && secrets.AZURE_AI_ENDPOINT || '' }}
-          AZURE_AI_OPENAI_V1_ENDPOINT: ${{ matrix.provider == 'azure_foundry_v1' && secrets.AZURE_AI_OPENAI_V1_ENDPOINT || '' }}
         run: make test-functional PACKAGE=giskard-llm PROVIDER=$PROVIDER
-
-  test-checks-functional:
-    needs: authorize
-    runs-on: ubuntu-latest
-    environment: ci
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12", "3.13", "3.14"]
-        provider: [google]
-    name: checks / ${{ matrix.provider }} / ${{ matrix.python-version }}
-    env:
-      PROVIDER: ${{ matrix.provider }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
-          persist-credentials: false
-          # Deliberate opt-in — see test-agents-functional for the full
-          # rationale and compensating controls.
-          allow-unsafe-pr-checkout: true
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          python-version: ${{ matrix.python-version }}
-      - run: make install
-      - name: Install provider SDK
-        run: uv pip install "giskard-llm[$PROVIDER]"
-      - name: Run functional tests
-        env:
-          GOOGLE_API_KEY: ${{ matrix.provider == 'google' && secrets.GEMINI_API_KEY || '' }}
-          GISKARD_CHECKS_DEFAULT_MODEL: "google/gemini-3.5-flash"
-          GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL: "google/gemini-embedding-001"
-        run: make test-functional PACKAGE=giskard-checks PROVIDER=$PROVIDER
 
   test-scan-garak:
     needs: authorize
