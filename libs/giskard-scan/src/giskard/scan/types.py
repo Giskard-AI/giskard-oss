@@ -16,9 +16,18 @@ class ScanOptions(TypedDict, total=False):
             Defaults to ``42``.
         group_by: Result annotation key used to group the printed report.
             ``None`` prints the ungrouped report. Defaults to ``"threat-type"``.
-        parallel: When ``True``, run scenarios concurrently. Defaults to ``True``.
+        parallel: When ``True``, run generated scenarios concurrently against
+            the target (suite *execution*). Defaults to ``True`` for scans.
+            Distinct from scenario *generation*, which always runs generators
+            concurrently in :func:`~giskard.scan.catalog.generate_suite`.
+            Pass ``False`` to force serial execution. Note that
+            :meth:`~giskard.checks.scenarios.suite.Suite.run` itself defaults
+            to ``parallel=False``.
         max_concurrency: Cap on concurrent scenarios when ``parallel=True``.
-            ``None`` runs all scenarios at once. Defaults to ``None``.
+            ``None`` runs all scenarios at once (provider rate limits become
+            the effective cap). When ``parallel=False``, a valid value has no
+            effect on scheduling, but invalid values are still rejected.
+            Defaults to ``None``.
         commercial_use: When ``True``, exclude generators whose datasets do not
             permit commercial use. Defaults to ``False``.
         return_exception: When ``True``, a scenario whose input generation fails
