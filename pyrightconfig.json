@@ -9,5 +9,6 @@
     ],
     "failOnWarnings": false,
     "typeCheckingMode": "recommended",
-    "reportImportCycles": "warning"
+    "reportImportCycles": "warning",
+    "reportUnnecessaryTypeIgnoreComment": "error"
   }
