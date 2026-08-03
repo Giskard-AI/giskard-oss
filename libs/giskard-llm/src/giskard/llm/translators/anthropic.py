@@ -340,9 +340,7 @@ class AnthropicChatTranslator:
         if raw.stop_reason == "refusal":
             explanation = getattr(raw.stop_details, "explanation", None)
             category = getattr(raw.stop_details, "category", None)
-            stop_reason = getattr(raw, "stop_reason", None)
-            refusal_list = [item for item in [stop_reason, category, explanation] if item is not None]
-            refusal_out = "\n".join(refusal_out) or "refusal"
+            refusal_out = explanation or category or raw.stop_reason
 
         message = AssistantMessage(
             role="assistant",
