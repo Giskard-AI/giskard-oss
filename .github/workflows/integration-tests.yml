@@ -58,58 +58,8 @@ jobs:
           echo "::error::External contributors require a maintainer to add the 'safe for build' label."
           exit 1
 
-  detect-changes:
-    needs: authorize
-    name: detect-changes
-    runs-on: ubuntu-latest
-    outputs:
-      agents: ${{ steps.paths.outputs.agents }}
-      llm: ${{ steps.paths.outputs.llm }}
-    steps:
-      - name: Detect integration-relevant paths
-        id: paths
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "agents=true" >> "$GITHUB_OUTPUT"
-            echo "llm=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          agents=false
-          llm=false
-          shared=false
-
-          while IFS= read -r file; do
-            case "$file" in
-              libs/giskard-agents/*)
-                agents=true
-                ;;
-              libs/giskard-llm/*)
-                llm=true
-                agents=true
-                ;;
-              libs/giskard-core/*|.github/workflows/integration-tests.yml|pyproject.toml|uv.lock|Makefile)
-                shared=true
-                ;;
-            esac
-          done < <(
-            gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
-              --paginate -q '.[].filename'
-          )
-
-          if [[ "$shared" == true ]]; then
-            agents=true
-            llm=true
-          fi
-
-          echo "agents=$agents" >> "$GITHUB_OUTPUT"
-          echo "llm=$llm" >> "$GITHUB_OUTPUT"
-
   test-agents-functional:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.agents == 'true'
+    needs: authorize
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
@@ -163,8 +113,7 @@ jobs:
         run: uv run pytest libs/giskard-agents -m "$PYTEST_MARK"
 
   test-llm-functional:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.llm == 'true'
+    needs: authorize
     runs-on: ubuntu-latest
     environment: ci
     timeout-minutes: 30
