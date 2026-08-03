@@ -10,6 +10,7 @@ from .result import (
     Metric,
     ScenarioResult,
     SuiteResult,
+    TestCaseError,
     TestCaseResult,
 )
 from .scenario import Scenario, Step
@@ -32,6 +33,7 @@ __all__ = [
     "Metric",
     "ScenarioResult",
     "SuiteResult",
+    "TestCaseError",
     "TestCaseResult",
     "TestCase",
     "InputGenerationException",
