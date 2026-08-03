@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 
@@ -45,6 +46,20 @@ else:
     httpxTimeout = Any
 
 _PROVIDER = "anthropic/chat"
+_PROVIDER_NAME = "anthropic"
+logger = logging.getLogger(__name__)
+
+KNOWN_COMPLETION_PARAMS = frozenset(
+    {
+        "max_tokens",
+        "temperature",
+        "timeout",
+        "tools",
+        "system",
+        "output_config",
+        "response_format",
+    }
+)
 
 
 @ToolDef.register_serializer(_PROVIDER)
@@ -249,6 +264,14 @@ class AnthropicChatTranslator:
         tools: Sequence[ToolDef] | None = None,
         **params: Any,
     ) -> "CompletionCreateParams":
+        unknown = set(params) - KNOWN_COMPLETION_PARAMS
+        if unknown:
+            logger.warning(
+                "%s provider: ignoring unknown completion params: %s",
+                _PROVIDER_NAME,
+                sorted(unknown),
+            )
+
         anthropic_params = AnthropicChatConfigParams(
             model=model,
             messages=messages,
@@ -312,17 +335,14 @@ class AnthropicChatTranslator:
             FINISH_REASON_MAP.get(raw.stop_reason, "stop") if raw.stop_reason else None
         )
 
+        # Prefer explanation, then category; bare "refusal" so is_refusal still fires.
         refusal_out: str | None = None
         if raw.stop_reason == "refusal":
-            # ``stop_details`` and its free-text ``explanation`` are optional,
-            # while ``category`` carries the structured refusal reason. Fall
-            # back through them (mirroring the Google translator's
-            # ``finish_message or raw_finish_reason``) so an SDK-valid refusal
-            # never surfaces with ``refusal=None`` and slips past
-            # ``is_refusal`` consumers as a regular completion.
             explanation = getattr(raw.stop_details, "explanation", None)
             category = getattr(raw.stop_details, "category", None)
-            refusal_out = explanation or category or raw.stop_reason
+            stop_reason = getattr(raw, "stop_reason", None)
+            refusal_list = [item for item in [stop_reason, category, explanation] if item is not None]
+            refusal_out = "\n".join(refusal_out) or "refusal"
 
         message = AssistantMessage(
             role="assistant",

@@ -30,12 +30,22 @@
 ## Install
 
 ```sh
-pip install giskard
+pip install giskard           # checks (+ agents, llm, core)
+pip install "giskard[scan]"   # + vulnerability / quality scan
+pip install "giskard[openai]" # provider SDK for LLM judges / generators
 ```
 
 Requires Python 3.12+.
 
-**Telemetry:** Libraries built on `giskard-core` (including `giskard-checks`) may send **optional, aggregated usage analytics** to help improve the product. No prompts, model outputs, or scenario text are included. See [what is collected and how to opt out](libs/giskard-core/README.md#telemetry).
+| Extra | Adds |
+| --- | --- |
+| *(none)* | `giskard-checks` and dependencies |
+| `scan` | `giskard-scan` |
+| `openai` / `anthropic` / … | provider SDKs (see `pyproject.toml` optional deps) |
+
+**Telemetry:** optional aggregated analytics via `giskard-core`. No prompts or outputs are sent.
+Opt out **before importing Giskard**: `export DO_NOT_TRACK=1` or `export GISKARD_TELEMETRY_DISABLED=1`.
+Details: [`giskard-core` README](libs/giskard-core/README.md#telemetry).
 
 ---
 
@@ -64,47 +74,55 @@ Use Giskard Checks to:
 
 Built-in evals include string matching, comparisons, regex, semantic similarity, and LLM-as-judge checks (`Groundedness`, `Conformity`, `LLMJudge`).
 
+### Concepts
+
+- **Target** — your system under test: any sync/async callable `(inputs) -> outputs` (optionally with `trace`)
+- **Scenario** — one eval: interactions + checks
+- **Check** — assertion or LLM judge over the trace
+- **Suite** — many scenarios run together
+
+`giskard.agents.Generator` is an LLM client for workflows/judges — not the same as
+`giskard.checks` input generators (`LLMGenerator`) that synthesize user messages.
+
 ### Quickstart
 
 ```python
-from openai import OpenAI
+import asyncio
 from giskard.checks import Scenario, Groundedness
 
-client = OpenAI()
 
 def get_answer(inputs: str) -> str:
-    response = client.chat.completions.create(
-        model="gpt-5-mini",
-        messages=[{"role": "user", "content": inputs}],
-    )
-    return response.choices[0].message.content
+    return "Paris"  # replace with your model / agent
 
-scenario = (
-    Scenario("test_dynamic_output")
-    .interact(
-        inputs="What is the capital of France?",
-        outputs=get_answer,
-    )
-    .check(
-        Groundedness(
-            name="answer is grounded",
-            context="France is a country in Western Europe. Its capital is Paris.",
+
+async def main() -> None:
+    scenario = (
+        Scenario("test_france_capital")
+        .interact(inputs="What is the capital of France?", outputs=get_answer)
+        .check(
+            Groundedness(
+                name="answer is grounded",
+                context="France is in Western Europe. Its capital is Paris.",
+            )
         )
     )
-)
+    result = await scenario.run()
+    result.print_report()
 
-result = await scenario.run()
-result.print_report()
+
+asyncio.run(main())
 ```
 
-> The `run()` method is async. In a script, wrap it with `asyncio.run()`. See the [full docs](https://docs.giskard.ai/oss/checks) for `Suites`, `LLMJudge`, multi-turn scenarios, and more.
+`Groundedness` is an LLM judge — install a provider extra (e.g. `pip install "giskard[openai]"`) and set the matching API key. Default model: `openai/gpt-4o-mini`.
+
+See the [full docs](https://docs.giskard.ai/oss/checks) for `Suites`, `LLMJudge`, multi-turn scenarios, and more.
 
 ---
 
 ## Giskard Scan — vulnerability scanner for AI agents
 
 ```sh
-pip install giskard-scan
+pip install "giskard[scan]"   # or: pip install giskard-scan
 ```
 
 **Giskard Scan** is the red-teaming and vulnerability scanning layer for agentic systems. It generates adversarial test suites automatically from a plain-language description of your agent, covering prompt injection, harmful content, stereotypes, misinformation, and more.
@@ -121,15 +139,24 @@ Use Giskard Scan to:
 import asyncio
 from giskard.scan import vulnerability_scan
 
-async def main():
+
+async def my_agent(inputs: str) -> str:
+    # Replace with your agent / model call
+    return f"Echo: {inputs}"
+
+
+async def main() -> None:
     await vulnerability_scan(
         target=my_agent,
         description="A customer support chatbot for an e-commerce platform.",
         languages=["en"],
     )
 
+
 asyncio.run(main())
 ```
+
+Scan generators also need an LLM provider extra and API key (same as Checks judges above).
 
 ## Looking for Giskard v2?
 
@@ -147,10 +174,12 @@ Wrap your model and run the scan:
 import giskard
 import pandas as pd
 
+
 # Replace my_llm_chain with your actual LLM chain or model inference logic
 def model_predict(df: pd.DataFrame):
     """The function takes a DataFrame and must return a list of outputs (one per row)."""
     return [my_llm_chain.run({"query": question}) for question in df["question"]]
+
 
 giskard_model = giskard.Model(
     model=model_predict,
@@ -183,7 +212,7 @@ knowledge_base = KnowledgeBase.from_pandas(df, columns=["column_1", "column_2"])
 testset = generate_testset(
     knowledge_base,
     num_questions=60,
-    language='en',
+    language="en",
     agent_description="A customer support chatbot for company X",
 )
 ```
