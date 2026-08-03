@@ -44,6 +44,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     group_by: str | None = "component",
     parallel: bool = True,
     max_concurrency: int | None = None,
+    return_exception: bool = False,
     target_mode: TargetMode = "multiturn",
 ) -> SuiteResult:
     """Generate and run the standard quality scan suite.
@@ -63,9 +64,17 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         seed: Integer seed used for reproducible scenario generation.
         group_by: Result annotation key used to group the printed report.
             ``None`` prints the ungrouped report.
-        parallel: When ``True``, run scenarios concurrently (default).
+        parallel: When ``True`` (default), run generated scenarios concurrently
+            against the target. Pass ``False`` for serial execution. This is
+            suite *execution*; scenario *generation* always runs generators
+            concurrently via :func:`~giskard.scan.catalog.generate_suite`.
         max_concurrency: Cap on concurrent scenarios when ``parallel=True``.
-            ``None`` runs all scenarios at once.
+            ``None`` runs all scenarios at once (provider rate limits become
+            the effective cap). When ``parallel=False``, a valid value has no
+            effect on scheduling, but invalid values are still rejected.
+        return_exception: When ``True``, a scenario whose input generation fails
+            is recorded as an errored result and the scan continues. When
+            ``False`` (default), the failure propagates and aborts the scan.
         target_mode: Whether the agent under test supports single-turn or
             multi-turn conversations. ``"singleturn"`` skips generators that
             are multi-turn by design and caps turn budgets to 1 on others.
@@ -92,6 +101,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         target,
         parallel=parallel,
         max_concurrency=max_concurrency,
+        return_exception=return_exception,
     )
     try:
         recommendation = await generate_quality_recommendation(result)
