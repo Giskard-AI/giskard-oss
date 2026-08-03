@@ -121,7 +121,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
             value=self.reference_text,
         )
         if isinstance(reference_text, NoMatch):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"No value found for reference text key '{self.reference_text_key}'.",
                 details={
                     "reference_text_key": self.reference_text_key,
@@ -129,7 +129,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                 },
             )
         if reference_text is None or reference_text == "":
-            return CheckResult.failure(
+            return CheckResult.error(
                 message="No reference text found",
                 details={
                     "reference_text_key": self.reference_text_key,
@@ -138,7 +138,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
             )
         actual_answer = resolve(trace, self.actual_answer_key)
         if isinstance(actual_answer, NoMatch):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"No value found for actual answer key '{self.actual_answer_key}'.",
                 details={
                     "actual_answer": actual_answer,
@@ -146,7 +146,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                 },
             )
         if actual_answer is None or actual_answer == "":
-            return CheckResult.failure(
+            return CheckResult.error(
                 message="No actual answer found",
                 details={
                     "actual_answer": actual_answer,

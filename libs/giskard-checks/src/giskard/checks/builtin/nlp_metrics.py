@@ -127,13 +127,13 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
         }
 
         if isinstance(text, NoMatch):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"No value found for key '{self.key}'.",
                 details={**details, "text": text},
             )
 
         if not isinstance(text, str):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=(
                     f"Value for key '{self.key}' must be a string, but found "
                     f"{type(text).__name__}."

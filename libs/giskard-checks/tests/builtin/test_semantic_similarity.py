@@ -325,8 +325,8 @@ async def test_empty_trace() -> None:
     )
     result = await check.run(Trace())
 
-    # When trace is empty, resolve returns NoMatch which causes check to fail
-    assert result.status == CheckStatus.FAIL
+    # When trace is empty, resolve returns NoMatch which causes check to error
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for actual answer key 'trace.last.outputs'." in result.message
@@ -416,7 +416,7 @@ async def test_missing_reference_text_in_trace() -> None:
     result = await check.run(Trace(interactions=[interaction]))
 
     # When reference is not found, check fails early
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for reference text key 'trace.last.metadata.reference_text'."
@@ -448,7 +448,7 @@ async def test_missing_actual_answer_in_trace() -> None:
     result = await check.run(Trace(interactions=[interaction]))
 
     # When answer field is not found, check fails early
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for actual answer key 'trace.last.outputs.nonexistent_field'."
@@ -479,7 +479,7 @@ async def test_both_reference_and_answer_missing() -> None:
     result = await check.run(Trace(interactions=[interaction]))
 
     # Check fails when reference text is missing (checked first)
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for reference text key 'trace.last.metadata.missing'."
@@ -502,7 +502,7 @@ async def test_empty_trace_with_no_direct_reference() -> None:
     result = await check.run(Trace())
 
     # Check fails when reference text is missing
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for reference text key 'trace.last.metadata.reference_text'."
@@ -532,7 +532,7 @@ async def test_missing_outputs_field_in_interaction() -> None:
     result = await check.run(Trace(interactions=[interaction]))
 
     # When response field doesn't exist in outputs, check fails
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for actual answer key 'trace.last.outputs.response'."
@@ -563,7 +563,7 @@ async def test_missing_metadata_in_interaction() -> None:
     result = await check.run(Trace(interactions=[interaction]))
 
     # When metadata doesn't exist, check fails (reference not found)
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for reference text key 'trace.last.metadata.reference'."
@@ -592,8 +592,8 @@ async def test_invalid_jsonpath_key() -> None:
     )
     result = await check.run(Trace(interactions=[interaction]))
 
-    # Invalid path resolves to NoMatch, causing check to fail
-    assert result.status == CheckStatus.FAIL
+    # Invalid path resolves to NoMatch, causing check to error
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for reference text key 'trace.nonexistent.deeply.nested.field'."
