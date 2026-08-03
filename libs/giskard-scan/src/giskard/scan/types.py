@@ -25,8 +25,9 @@ class ScanOptions(TypedDict, total=False):
             to ``parallel=False``.
         max_concurrency: Cap on concurrent scenarios when ``parallel=True``.
             ``None`` runs all scenarios at once (provider rate limits become
-            the effective cap). Ignored when ``parallel=False``. Defaults to
-            ``None``.
+            the effective cap). When ``parallel=False``, a valid value has no
+            effect on scheduling, but invalid values are still rejected.
+            Defaults to ``None``.
         commercial_use: When ``True``, exclude generators whose datasets do not
             permit commercial use. Defaults to ``False``.
         return_exception: When ``True``, a scenario whose input generation fails

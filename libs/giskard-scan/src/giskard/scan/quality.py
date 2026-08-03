@@ -70,7 +70,8 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
             concurrently via :func:`~giskard.scan.catalog.generate_suite`.
         max_concurrency: Cap on concurrent scenarios when ``parallel=True``.
             ``None`` runs all scenarios at once (provider rate limits become
-            the effective cap). Ignored when ``parallel=False``.
+            the effective cap). When ``parallel=False``, a valid value has no
+            effect on scheduling, but invalid values are still rejected.
         return_exception: When ``True``, a scenario whose input generation fails
             is recorded as an errored result and the scan continues. When
             ``False`` (default), the failure propagates and aborts the scan.

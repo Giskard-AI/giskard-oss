@@ -185,8 +185,9 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         max_concurrency : int | None
             Max concurrent scenarios when ``parallel=True`` (positive int).
             ``None`` (default) is unbounded: all scenarios start at once, so the
-            provider's rate limits become the effective cap. Ignored when
-            ``parallel=False``.
+            provider's rate limits become the effective cap. When
+            ``parallel=False``, a valid value has no effect on scheduling, but
+            invalid values are still rejected.
         verbose : bool
             If True (default), display a progress bar showing which scenario is
             currently running. Set to False for non-interactive environments.
