@@ -38,7 +38,7 @@ def _validate_multiple_runs(value: int | None) -> int | None:
 
 def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
-    target: Target[InputType, OutputType, TraceType] | MISSING,  # pyright: ignore[reportInvalidTypeForm]
+    target: Target[InputType, OutputType, TraceType] | MISSING,
 ) -> list[Step[InputType, OutputType, TraceType]]:
     """Build steps with target bound to Interact outputs where needed.
 
@@ -66,7 +66,7 @@ def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
 
 def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
-    run_target: Target[InputType, OutputType, TraceType] | MISSING,  # pyright: ignore[reportInvalidTypeForm]
+    run_target: Target[InputType, OutputType, TraceType] | MISSING,
 ) -> type[TraceType]:
     if scenario.trace_type is not None:
         return scenario.trace_type
@@ -126,7 +126,7 @@ class ScenarioRunner:
     async def _run_once[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,  # pyright: ignore[reportInvalidTypeForm]
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
         return_exception: bool = False,
     ) -> ScenarioResult[TraceType]:
         start_time = time.perf_counter()
@@ -236,7 +236,7 @@ class ScenarioRunner:
     async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,  # pyright: ignore[reportInvalidTypeForm]
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
         return_exception: bool = False,
         multiple_runs: int | None = None,
     ) -> ScenarioResult[TraceType]:

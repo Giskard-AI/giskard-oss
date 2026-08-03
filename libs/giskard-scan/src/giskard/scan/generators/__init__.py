@@ -3,7 +3,9 @@
 from .adversarial import AdversarialScenarioGenerator
 from .base import LocalDatasetScenarioGenerator, ScenarioContext, ScenarioGenerator
 from .crescendo import CrescendoAttackScenarioGenerator
+from .gcg import GCGInjectionScenarioGenerator
 from .goat import GOATAttackScenarioGenerator
+from .huggingface import HuggingFaceDatasetScenarioGenerator
 from .knowledge_base import (
     HallucinationScenarioGenerator,
     KnowledgeBaseScenarioGenerator,
@@ -18,8 +20,10 @@ __all__ = [
     "AdversarialScenarioGenerator",
     "CrescendoAttackScenarioGenerator",
     "LocalDatasetScenarioGenerator",
+    "GCGInjectionScenarioGenerator",
     "GOATAttackScenarioGenerator",
     "HallucinationScenarioGenerator",
+    "HuggingFaceDatasetScenarioGenerator",
     "KnowledgeBaseScenarioGenerator",
     "MultiTopicScenarioGenerator",
     "OutOfScopeScenarioGenerator",

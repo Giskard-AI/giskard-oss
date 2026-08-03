@@ -115,7 +115,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
 
     def _compile_engine(self, regorus: Any) -> Any:
         """Load policy and data into a regorus engine and cache it."""
-        engine = regorus.Engine()  # pyright: ignore[reportAttributeAccessIssue]
+        engine = regorus.Engine()
         engine.add_policy(_POLICY_FILENAME, self.policy)
         if self.data:
             engine.add_data(self.data)
