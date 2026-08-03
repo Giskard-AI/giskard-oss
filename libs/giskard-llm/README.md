@@ -38,19 +38,25 @@ from giskard.llm import LLMClient
 client = LLMClient()
 
 # Configure with explicit values or env var references
-client.configure("openai", api_key="sk-...") # pragma: allowlist secret
-client.configure("azure-prod", provider="azure",
-    api_key="os.environ/AZURE_PROD_KEY", # pragma: allowlist secret
+client.configure("openai", api_key="sk-...")  # pragma: allowlist secret
+client.configure(
+    "azure-prod",
+    provider="azure",
+    api_key="os.environ/AZURE_PROD_KEY",  # pragma: allowlist secret
     base_url="os.environ/AZURE_PROD_ENDPOINT",
     api_version="2024-02-01",
 )
-client.configure("anthropic-relaxed", provider="anthropic",
-    api_key="os.environ/ANTHROPIC_API_KEY", # pragma: allowlist secret
+client.configure(
+    "anthropic-relaxed",
+    provider="anthropic",
+    api_key="os.environ/ANTHROPIC_API_KEY",  # pragma: allowlist secret
     merge_system=True,
 )
 
 response = await client.acompletion("azure-prod/gpt-4o", messages)
-response = await client.acompletion("anthropic-relaxed/claude-3-5-haiku-latest", messages)
+response = await client.acompletion(
+    "anthropic-relaxed/claude-3-5-haiku-latest", messages
+)
 ```
 
 ## Provider reference
@@ -77,7 +83,7 @@ client = LLMClient()
 client.configure(
     "foundry-v1",
     provider="openai",
-    api_key="os.environ/AZURE_OPENAI_API_KEY", # pragma: allowlist secret
+    api_key="os.environ/AZURE_OPENAI_API_KEY",  # pragma: allowlist secret
     base_url="https://example.openai.azure.com/openai/v1/",
 )
 
@@ -113,7 +119,7 @@ client = LLMClient()
 client.configure(
     "azure-secure",
     provider="azure_ai",
-    api_key="os.environ/AZURE_AI_API_KEY", # pragma: allowlist secret
+    api_key="os.environ/AZURE_AI_API_KEY",  # pragma: allowlist secret
     base_url="os.environ/AZURE_AI_ENDPOINT",
     http_client=http_client,
     default_headers={"x-ms-useragent": "giskard-llm"},
@@ -121,7 +127,7 @@ client.configure(
 client.configure(
     "google-secure",
     provider="google",
-    api_key="os.environ/GEMINI_API_KEY", # pragma: allowlist secret
+    api_key="os.environ/GEMINI_API_KEY",  # pragma: allowlist secret
     http_client=http_client,
 )
 

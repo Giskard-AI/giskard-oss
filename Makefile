@@ -13,8 +13,13 @@ help: ## Show this help message
 install: ## Install project dependencies
 	uv sync
 
+# Ruff formatting output changes between releases, so an unpinned install can turn
+# `make check` red on a tree nobody touched. Pinned for the same reason as
+# LICENSECHECK_VERSION below.
+RUFF_VERSION := 0.16.1
+
 install-tools: ## Install development tools
-	uv tool install ruff
+	uv tool install ruff==$(RUFF_VERSION)
 	uv tool install vermin
 	uv tool install basedpyright
 	uv tool install pre-commit --with pre-commit-uv
