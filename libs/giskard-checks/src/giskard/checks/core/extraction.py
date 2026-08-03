@@ -97,7 +97,7 @@ def resolve[TraceType: Trace](trace: TraceType, key: str) -> Any:  # pyright: ig
 
 def provided_or_resolve[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     trace: TraceType,
-    key: str | MISSING = MISSING,  # pyright: ignore[reportInvalidTypeForm]
+    key: str | MISSING = MISSING,
     value: Any = MISSING,
 ) -> Any:
     if key is MISSING or value is not MISSING:
