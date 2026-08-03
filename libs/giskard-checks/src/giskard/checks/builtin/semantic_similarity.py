@@ -154,6 +154,15 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                 },
             )
 
+        if failure := self._failure_if_collection(
+            "reference text", self.reference_text_key, reference_text
+        ):
+            return failure
+        if failure := self._failure_if_collection(
+            "actual answer", self.actual_answer_key, actual_answer
+        ):
+            return failure
+
         actual_answer = str(actual_answer)
         reference_text = str(reference_text)
 
@@ -182,6 +191,29 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                     "reference_text": reference_text,
                 },
             )
+
+    def _failure_if_collection(
+        self, label: str, key: str, value: object
+    ) -> CheckResult | None:
+        """Fail when a keypath resolved to a collection instead of one scalar.
+
+        Wildcard / multi-match paths become lists; ``str(list)`` would embed
+        Python repr text nobody wrote. Non-collection scalars still stringify.
+        """
+        if not isinstance(value, (list, tuple, set, dict)):
+            return None
+        return CheckResult.failure(
+            message=(
+                f"Value for {label} key '{key}' must be a single value, but "
+                f"found {type(value).__name__}. Use a key that resolves to "
+                "one value."
+            ),
+            details={
+                "reference_text_key": self.reference_text_key,
+                "actual_answer_key": self.actual_answer_key,
+                "value": str(value),
+            },
+        )
 
     async def get_embeddings(self, texts: list[str]) -> list[np.ndarray]:
         """Generate embeddings for the given texts.

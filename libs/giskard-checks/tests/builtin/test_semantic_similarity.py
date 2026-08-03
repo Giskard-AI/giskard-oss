@@ -34,6 +34,26 @@ class MockEmbeddingModel(BaseEmbeddingModel):
         return result
 
 
+def _recording_embedding_model(
+    embedded: list[list[str]],
+) -> BaseEmbeddingModel:
+    """Embed mock that records texts without touching the kind registry.
+
+    Do not use ``@BaseEmbeddingModel.register`` here: a kind registered inside
+    a test body raises ``ValueError`` on the second run in the same process.
+    Direct injection does not require a registered kind.
+    """
+
+    class RecordingEmbeddingModel(BaseEmbeddingModel):
+        async def _embed(
+            self, texts: list[str], params: EmbeddingParams | None = None
+        ) -> list[np.ndarray]:
+            embedded.append(list(texts))
+            return [np.array([1.0, 0.0, 0.0]) for _ in texts]
+
+    return RecordingEmbeddingModel()
+
+
 def serialization_roundtrip[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     similarity: SemanticSimilarity[InputType, OutputType, TraceType],
 ) -> SemanticSimilarity[InputType, OutputType, TraceType]:
@@ -623,3 +643,88 @@ async def test_similarity_at_exact_threshold() -> None:
     # Should pass when similarity >= threshold
     assert result.status == CheckStatus.PASS
     assert result.details["similarity"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_list_valued_key_is_rejected_instead_of_embedding_its_repr():
+    """A key resolving to several values must not be embedded as `str(list)`.
+
+    Without this guard the check embeds "['a', 'b']" -- brackets and quotes
+    included -- and reports an ordinary pass/fail on a score computed from
+    text no one wrote.
+    """
+    embedded: list[list[str]] = []
+    trace = Trace[str, str](
+        interactions=[
+            Interaction(inputs="q1", outputs="a1", metadata={"ref": "first"}),
+            Interaction(inputs="q2", outputs="a2", metadata={"ref": "second"}),
+        ]
+    )
+    check = SemanticSimilarity(
+        actual_answer_key="trace.last.outputs",
+        reference_text_key="trace.interactions[*].metadata.ref",
+        threshold=0.5,
+        embedding_model=_recording_embedding_model(embedded),
+    )
+
+    result = await check.run(trace)
+
+    assert not result.passed
+    assert "must be a single value" in (result.message or "")
+    assert "reference text" in (result.message or "")
+    assert "list" in (result.message or "")
+    assert embedded == [], "nothing should have been sent to the embedding model"
+
+
+@pytest.mark.asyncio
+async def test_dict_valued_actual_answer_key_is_rejected():
+    """Default-style dict outputs must fail on the actual_answer guard path.
+
+    The list-valued reference test only exercises the first loop iteration.
+    `trace.last.outputs` often resolves to a dict; that path must reject
+    before embedding too.
+    """
+    embedded: list[list[str]] = []
+    trace = Trace[str, dict[str, str]](
+        interactions=[
+            Interaction(
+                inputs="q",
+                outputs={"response": "Paris"},
+                metadata={"ref": "Paris"},
+            )
+        ]
+    )
+    check = SemanticSimilarity(
+        actual_answer_key="trace.last.outputs",
+        reference_text_key="trace.last.metadata.ref",
+        threshold=0.5,
+        embedding_model=_recording_embedding_model(embedded),
+    )
+
+    result = await check.run(trace)
+
+    assert not result.passed
+    assert "must be a single value" in (result.message or "")
+    assert "actual answer" in (result.message or "")
+    assert "dict" in (result.message or "")
+    assert embedded == [], "nothing should have been sent to the embedding model"
+
+
+@pytest.mark.asyncio
+async def test_scalar_key_still_stringifies():
+    """Non-string scalars keep working; only collections are rejected."""
+    embedded: list[list[str]] = []
+    trace = Trace[str, str](
+        interactions=[Interaction(inputs="q", outputs="42", metadata={"ref": 42})]
+    )
+    check = SemanticSimilarity(
+        actual_answer_key="trace.last.outputs",
+        reference_text_key="trace.last.metadata.ref",
+        threshold=0.5,
+        embedding_model=_recording_embedding_model(embedded),
+    )
+
+    result = await check.run(trace)
+
+    assert result.passed
+    assert embedded == [["42", "42"]]

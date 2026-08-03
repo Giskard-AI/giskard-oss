@@ -9,6 +9,7 @@ from .catalog import generate_suite
 from .generators.adversarial import AdversarialScenarioGenerator
 from .generators.base import LocalDatasetScenarioGenerator, ScenarioGenerator
 from .generators.crescendo import CrescendoAttackScenarioGenerator
+from .generators.gcg import GCGInjectionScenarioGenerator
 from .generators.goat import GOATAttackScenarioGenerator
 from .generators.huggingface import HuggingFaceDatasetScenarioGenerator
 from .generators.knowledge_base import (
@@ -36,6 +37,7 @@ __all__ = [
     "LocalDatasetScenarioGenerator",
     "AdversarialScenarioGenerator",
     "CrescendoAttackScenarioGenerator",
+    "GCGInjectionScenarioGenerator",
     "GOATAttackScenarioGenerator",
     "HuggingFaceDatasetScenarioGenerator",
     "PromptInjectionScenarioGenerator",
