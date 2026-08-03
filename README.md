@@ -113,6 +113,8 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
+`Groundedness` is an LLM judge — install a provider extra (e.g. `pip install "giskard[openai]"`) and set the matching API key. Default model: `openai/gpt-4o-mini`.
+
 See the [full docs](https://docs.giskard.ai/oss/checks) for `Suites`, `LLMJudge`, multi-turn scenarios, and more.
 
 ---
@@ -120,7 +122,7 @@ See the [full docs](https://docs.giskard.ai/oss/checks) for `Suites`, `LLMJudge`
 ## Giskard Scan — vulnerability scanner for AI agents
 
 ```sh
-pip install giskard-scan
+pip install "giskard[scan]"   # or: pip install giskard-scan
 ```
 
 **Giskard Scan** is the red-teaming and vulnerability scanning layer for agentic systems. It generates adversarial test suites automatically from a plain-language description of your agent, covering prompt injection, harmful content, stereotypes, misinformation, and more.
@@ -153,6 +155,8 @@ async def main() -> None:
 
 asyncio.run(main())
 ```
+
+Scan generators also need an LLM provider extra and API key (same as Checks judges above).
 
 ## Looking for Giskard v2?
 
