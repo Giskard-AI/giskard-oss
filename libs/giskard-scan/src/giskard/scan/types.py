@@ -10,9 +10,18 @@ class SharedScanOptions(TypedDict, total=False):
         seed: Integer seed used for reproducible scenario generation.
         group_by: Result annotation key used to group the printed report.
             ``None`` prints the ungrouped report.
-        parallel: When ``True``, run scenarios concurrently.
+        parallel: When ``True``, run generated scenarios concurrently against
+            the target (suite *execution*). Defaults to ``True`` for scans.
+            Distinct from scenario *generation*, which always runs generators
+            concurrently in :func:`~giskard.scan.catalog.generate_suite`.
+            Pass ``False`` to force serial execution. Note that
+            :meth:`~giskard.checks.scenarios.suite.Suite.run` itself defaults
+            to ``parallel=False``.
         max_concurrency: Cap on concurrent scenarios when ``parallel=True``.
-            ``None`` runs all scenarios at once.
+            ``None`` runs all scenarios at once (provider rate limits become
+            the effective cap). When ``parallel=False``, a valid value has no
+            effect on scheduling, but invalid values are still rejected.
+            Defaults to ``None``.
         return_exception: When ``True``, a scenario whose input generation fails
             is recorded as an errored result and the scan continues. When
             ``False``, the failure propagates and aborts the scan.
@@ -89,9 +98,14 @@ def resolve_scan_options(
     group_by : str or None
         Result annotation key used to group the printed report.
     parallel : bool
-        When ``True``, run scenarios concurrently.
+        When ``True``, run generated scenarios concurrently against the target.
+        This is suite *execution*; scenario *generation* always runs generators
+        concurrently in :func:`~giskard.scan.catalog.generate_suite`.
     max_concurrency : int or None
-        Cap on concurrent scenarios when ``parallel=True``.
+        Cap on concurrent scenarios when ``parallel=True``. ``None`` runs all
+        scenarios at once (provider rate limits become the effective cap).
+        When ``parallel=False``, a valid value has no effect on scheduling,
+        but invalid values are still rejected.
     return_exception : bool
         When ``True``, record input-generation failures as errored results.
     commercial_use : bool, optional
