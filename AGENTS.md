@@ -48,3 +48,14 @@ giskard-oss — behavioral config for interactive coding assistants with a human
 – Simplicity First: make every change as simple as possible; prefer deleting lines over adding them
 – No Laziness: find root causes; no band-aids, no temporary fixes; senior developer standards
 – Minimal Impact: only touch what's necessary; no side effects; no reformatting untouched lines
+
+## Cursor Cloud specific instructions
+
+Non-obvious context for cloud agents (dependencies are already installed by the startup `uv sync`; `uv` is on `PATH` for login shells via `~/.bashrc`).
+
+– This repo is a `uv` workspace monorepo of pure Python libraries (`libs/giskard-*`). There is no server, daemon, or CLI to start — "running" the product means importing the libraries from Python or running `pytest`. Standard commands live in the root `Makefile` (`make help`).
+– Import namespace is `giskard.<sublib>` (e.g. `import giskard.checks`), not `giskard_checks`.
+– `make setup` includes a `pre-commit-install` step that fails in this environment with `Cowardly refusing to install hooks with core.hooksPath set`. This is expected (the VM sets a global `core.hooksPath`) and does not affect lint/test/build/run. Use `make install` + `make install-tools` instead of full `make setup`; git hooks are not needed to validate work.
+– Lint/test/build/run all work without secrets: `make lint`, `make test-unit [PACKAGE=<lib>]`, and importing the libs. Unit tests exclude anything marked `functional`.
+– Functional/integration tests are excluded by default and require live LLM provider API keys (e.g. `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `ANTHROPIC_API_KEY`); `giskard-scan` may also reach Hugging Face Hub. Do not expect these to run without those secrets and network access.
+– `make check` runs `security` (`pip-audit`) and license checks (`check-licenses`/`check-notices`) that reach the network (PyPI / license metadata); if offline these steps can fail even when the code is fine.
