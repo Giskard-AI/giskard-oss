@@ -1,7 +1,6 @@
 import inspect
 
 import pytest
-
 from giskard.scan.quality import quality_scan
 from giskard.scan.types import resolve_scan_options
 from giskard.scan.vulnerability import vulnerability_scan
