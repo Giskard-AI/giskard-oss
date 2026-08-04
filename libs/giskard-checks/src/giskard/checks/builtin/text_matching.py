@@ -89,7 +89,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
             return (
                 None,
                 None,
-                CheckResult.failure(
+                CheckResult.error(
                     message=f"No value found for {target_name} key '{target_key}'.",
                     details=details,
                 ),
@@ -99,7 +99,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
             return (
                 None,
                 None,
-                CheckResult.failure(
+                CheckResult.error(
                     message=f"Value for {target_name} is not a string, expected string but got {type(target).__name__}.",
                     details=details,
                 ),
@@ -110,7 +110,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
             return (
                 None,
                 None,
-                CheckResult.failure(
+                CheckResult.error(
                     message=f"No value found for text key '{self.text_key}'.",
                     details=details,
                 ),
@@ -120,7 +120,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
             return (
                 None,
                 None,
-                CheckResult.failure(
+                CheckResult.error(
                     message=f"Value for text is not a string, expected string but got {type(text).__name__}.",
                     details=details,
                 ),
@@ -458,7 +458,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         try:
             matched = regex.search(pattern, text, timeout=self.match_timeout_seconds)
         except regex.error as e:
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"Invalid regex pattern '{pattern}': {str(e)}",
                 details=details,
             )
