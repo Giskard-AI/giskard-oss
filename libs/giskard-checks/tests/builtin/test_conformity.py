@@ -26,7 +26,7 @@ async def test_run_returns_failure() -> None:
 
 
 async def test_trace_in_result_details_inputs() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     conformity = Conformity(generator=generator, rule="Test rule")
     interaction = Interaction(
         inputs={"query": "What is AI?"}, outputs={"response": "AI is..."}
@@ -44,7 +44,7 @@ async def test_trace_in_result_details_inputs() -> None:
 
 
 async def test_empty_trace_in_result_details_inputs() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     conformity = Conformity(generator=generator, rule="Test rule")
     trace = Trace()
     result = await conformity.run(trace)

@@ -11,7 +11,7 @@ import pytest
 from giskard.llm import LLMClient
 from giskard.llm.errors import BadRequestError
 from giskard.llm.types import ToolDefParam
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from .helpers import azure_foundry_v1_base_url
 
@@ -339,10 +339,17 @@ class ColorModel(BaseModel):
 
 
 class JudgeLikeResult(BaseModel):
-    """Shape aligned with checks that use optional ``reason`` (nullable, not required key)."""
+    """Shape aligned with LLM checks: required non-blank ``reason``."""
 
     passed: bool
-    reason: str | None = None
+    reason: str = Field(..., min_length=1)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def _strip_reason(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
 
 @pytest.mark.parametrize("provider", _PROVIDER_PARAMS)
@@ -366,8 +373,8 @@ async def test_response_format(provider: str):
 
 
 @pytest.mark.parametrize("provider", _PROVIDER_PARAMS)
-async def test_response_format_optional_nullable_reason(provider: str):
-    """Judge-like schema: ``passed`` plus optional nullable ``reason`` (matches LLM checks)."""
+async def test_response_format_required_nonblank_reason(provider: str):
+    """Judge-like schema: ``passed`` plus required non-blank ``reason`` (matches LLM checks)."""
     client, model = _make_client(provider)
     resp = await client.acompletion(
         model,
@@ -376,7 +383,7 @@ async def test_response_format_optional_nullable_reason(provider: str):
                 "role": "user",
                 "content": (
                     "Judge whether 2 equals 2. Use the structured format. "
-                    "Include a brief reason field when you explain."
+                    "Always include a clear non-empty reason for your decision."
                 ),
             },
         ],
@@ -390,7 +397,8 @@ async def test_response_format_optional_nullable_reason(provider: str):
     parsed = json.loads(raw_json)
     result = JudgeLikeResult.model_validate(parsed)
     assert isinstance(result.passed, bool)
-    assert result.reason is None or isinstance(result.reason, str)
+    assert isinstance(result.reason, str)
+    assert result.reason.strip()
 
 
 # -- LLMClient.configure() scenarios ------------------------------------------

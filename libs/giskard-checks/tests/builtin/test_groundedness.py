@@ -52,7 +52,7 @@ async def test_prompt_allows_explicit_refusals_without_context_support() -> None
 
 
 async def test_answer_and_context_from_trace() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(generator=generator)
     interaction = Interaction(
         inputs={"query": "Where is the Eiffel Tower?"},
@@ -62,7 +62,7 @@ async def test_answer_and_context_from_trace() -> None:
     result = await groundedness.run(Trace(interactions=[interaction]))
 
     assert result.status == CheckStatus.PASS
-    assert result.details["reason"] is None
+    assert result.details["reason"] == "Mock reason."
 
     assert len(generator.calls) == 1
     # Verify that answer and context were extracted from trace
@@ -77,7 +77,7 @@ async def test_answer_and_context_from_trace() -> None:
 
 
 async def test_direct_answer_and_context() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(
         generator=generator,
         answer="Direct answer",
@@ -115,7 +115,7 @@ async def test_direct_answer_and_single_string_context() -> None:
 
 
 async def test_custom_keys() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(
         generator=generator,
         answer_key="trace.interactions[0].outputs.response",
@@ -137,7 +137,7 @@ async def test_custom_keys() -> None:
 
 async def test_answer_priority_over_trace() -> None:
     """Test that direct answer takes priority over trace extraction."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(
         generator=generator,
         answer="Direct answer takes priority",
@@ -154,7 +154,7 @@ async def test_answer_priority_over_trace() -> None:
 
 async def test_context_priority_over_trace() -> None:
     """Test that direct context takes priority over trace extraction."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(
         generator=generator,
         context=["Direct context"],
@@ -172,7 +172,7 @@ async def test_context_priority_over_trace() -> None:
 
 async def test_empty_string_context_is_preserved() -> None:
     """Test that an empty string context is preserved and does not fall back to trace."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(
         generator=generator,
         answer="Some answer",
@@ -205,7 +205,7 @@ async def test_empty_context() -> None:
 
 async def test_missing_answer_in_trace() -> None:
     """Test behavior when answer is not found in trace."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(generator=generator)
     # Empty trace - no interactions
     result = await groundedness.run(Trace())
@@ -217,7 +217,7 @@ async def test_missing_answer_in_trace() -> None:
 
 async def test_missing_context_in_trace() -> None:
     """Test behavior when context is not found in trace."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(generator=generator)
     interaction = Interaction(
         inputs={"query": "Test"},
@@ -236,7 +236,7 @@ async def test_missing_context_in_trace() -> None:
 
 async def test_using_trace_last_property() -> None:
     """Test that demonstrates using trace.last instead of trace.interactions[-1]."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     interaction1 = Interaction(
         inputs={"query": "First question"},
         outputs={"response": "First answer"},
@@ -271,7 +271,7 @@ async def test_using_trace_last_property() -> None:
 
 async def test_trace_last_with_empty_trace() -> None:
     """Test that trace.last returns None for empty trace."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     trace = Trace()
 
     # Verify trace.last returns None for empty trace
