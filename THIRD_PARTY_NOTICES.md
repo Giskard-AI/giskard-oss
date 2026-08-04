@@ -96,7 +96,7 @@ Find a list of packages below
 - License: Python Software Foundation License
 - Compatible: True
 
-### aiohttp-3.14.1
+### aiohttp-3.14.3
 
 - HomePage:
 - Author:
@@ -187,7 +187,7 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### cryptography-49.0.0
+### cryptography-50.0.0
 
 - HomePage:
 - Author: The Python Cryptographic Authority and individual contributors

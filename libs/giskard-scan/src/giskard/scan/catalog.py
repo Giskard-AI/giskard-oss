@@ -68,7 +68,13 @@ async def generate_suite(
 
     Resolves generator classes or instances, builds one run-wide
     :class:`ScenarioContext`, distributes the optional scenario budget, runs
-    generation concurrently, and wraps the results in a named Suite.
+    generators concurrently (always — there is no serial generation flag),
+    and wraps the results in a named Suite.
+
+    Concurrency here is *generation* only. Whether scenarios later run against
+    a target in parallel is controlled by
+    :meth:`~giskard.checks.scenarios.suite.Suite.run`'s ``parallel`` argument
+    (or by scan helpers that pass it through).
 
     Args:
         description: Natural-language description of the agent under test.
@@ -77,7 +83,9 @@ async def generate_suite(
         max_scenarios: Total upper bound on scenarios across all generators.
             None lets each generator apply its own default.
         seed: Integer seed for the top-level RNG, ensuring reproducibility
-            across runs with the same arguments.
+            across runs with the same arguments. Child RNGs are spawned before
+            concurrent generation so results stay stable under TaskGroup
+            scheduling.
         target_mode: Whether the agent under test supports single-turn or
             multi-turn conversations. ``"singleturn"`` skips generators that
             are multi-turn by design and caps turn budgets to 1 on others.
