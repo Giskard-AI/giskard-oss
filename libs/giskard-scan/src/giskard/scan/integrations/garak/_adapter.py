@@ -229,9 +229,7 @@ def _skip_probe_scenario(marker: _SkipMarker) -> ScenarioResult:  # pyright: ign
     )
 
 
-def _error_probe_scenario(  # pyright: ignore[reportMissingTypeArgument]
-    probe_name: str, exc: BaseException
-) -> ScenarioResult:
+def _error_probe_scenario(probe_name: str, exc: BaseException) -> ScenarioResult:  # pyright: ignore[reportMissingTypeArgument]
     """Build a SuiteResult scenario that records a probe that raised at runtime."""
     short = _probe_short_name(probe_name)
     return ScenarioResult(

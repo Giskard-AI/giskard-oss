@@ -186,6 +186,7 @@ async def test_run_emits_error_for_probe_exception(
     assert result.pass_rate < 1.0
     assert result.errored_count == 1
 
+
 async def test_run_uses_separate_generator_per_probe(
     monkeypatch: pytest.MonkeyPatch, target
 ) -> None:

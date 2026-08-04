@@ -74,9 +74,13 @@ def test_env_var_detector_without_key_is_skipped(monkeypatch):
 
 def test_detector_garak_exception_without_key_is_skipped(monkeypatch):
     """Non-key GarakException on load must yield a SkipMarker, not (None, None)."""
+    import importlib
+
     from garak.exception import GarakException
     from garak.probes.base import Probe
-    from giskard.scan.integrations.garak._adapter import _DetectorCache
+
+    # Re-bind after block_garak_import may have purged sys.modules.
+    live = importlib.import_module("giskard.scan.integrations.garak._adapter")
 
     class _BrokenProbe(Probe):
         primary_detector = "always.Fail"
@@ -87,16 +91,19 @@ def test_detector_garak_exception_without_key_is_skipped(monkeypatch):
 
     monkeypatch.setattr("garak._plugins.load_plugin", _boom)
     # Bypass judge short-circuit so load_plugin is exercised.
-    monkeypatch.setattr(_adapter, "_detector_class", lambda name: None)
+    monkeypatch.setattr(live, "_detector_class", lambda name: None)
 
-    cache = _DetectorCache(None)
+    cache = live._DetectorCache(None)
     detector, marker = cache.get("always.Fail")
     assert detector is None
-    assert isinstance(marker, _SkipMarker)
+    assert marker is not None
+    assert isinstance(marker, live._SkipMarker)
     assert marker.reason.startswith("load failed")
     assert "plugin broken" in marker.reason
 
-    detectors, skipped = _resolve_detectors(_BrokenProbe.__new__(_BrokenProbe), None)
+    detectors, skipped = live._resolve_detectors(
+        _BrokenProbe.__new__(_BrokenProbe), None
+    )
     assert detectors == []
     assert len(skipped) == 1
     assert skipped[0].reason.startswith("load failed")
@@ -104,8 +111,11 @@ def test_detector_garak_exception_without_key_is_skipped(monkeypatch):
 
 def test_detector_bare_exception_is_skipped(monkeypatch):
     """Bare Exception on load must yield a SkipMarker, not (None, None)."""
+    import importlib
+
     from garak.probes.base import Probe
-    from giskard.scan.integrations.garak._adapter import _DetectorCache
+
+    live = importlib.import_module("giskard.scan.integrations.garak._adapter")
 
     class _BrokenProbe(Probe):
         primary_detector = "always.Fail"
@@ -115,16 +125,19 @@ def test_detector_bare_exception_is_skipped(monkeypatch):
         raise RuntimeError("import exploded")
 
     monkeypatch.setattr("garak._plugins.load_plugin", _boom)
-    monkeypatch.setattr(_adapter, "_detector_class", lambda name: None)
+    monkeypatch.setattr(live, "_detector_class", lambda name: None)
 
-    cache = _DetectorCache(None)
+    cache = live._DetectorCache(None)
     detector, marker = cache.get("always.Fail")
     assert detector is None
-    assert isinstance(marker, _SkipMarker)
+    assert marker is not None
+    assert isinstance(marker, live._SkipMarker)
     assert marker.reason.startswith("load failed")
     assert "import exploded" in marker.reason
 
-    detectors, skipped = _resolve_detectors(_BrokenProbe.__new__(_BrokenProbe), None)
+    detectors, skipped = live._resolve_detectors(
+        _BrokenProbe.__new__(_BrokenProbe), None
+    )
     assert detectors == []
     assert len(skipped) == 1
 
