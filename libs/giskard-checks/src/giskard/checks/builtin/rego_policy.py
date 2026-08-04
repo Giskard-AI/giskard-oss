@@ -171,7 +171,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
 
         if isinstance(raw_value, NoMatch):
             details["input"] = raw_value
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"No value found for key '{self.key}'.",
                 details=details,
             )
@@ -182,7 +182,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
             input_json = json.dumps(raw_value)
         except (TypeError, ValueError) as err:
             details["error"] = str(err)
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"Value at key '{self.key}' is not JSON serializable: {err}",
                 details=details,
             )
