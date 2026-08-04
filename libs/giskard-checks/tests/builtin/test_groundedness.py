@@ -145,6 +145,7 @@ async def test_answer_priority_over_trace() -> None:
     interaction = Interaction(
         inputs={"query": "Test"},
         outputs={"response": "Trace answer"},
+        metadata={"context": ["Supporting context"]},
     )
     result = await groundedness.run(Trace(interactions=[interaction]))
 
@@ -289,17 +290,17 @@ async def test_using_trace_last_property() -> None:
 
 
 async def test_trace_last_with_empty_trace() -> None:
-    """Test that trace.last returns None for empty trace."""
+    """Empty trace has no last interaction; Groundedness returns ERROR."""
     generator = MockGenerator(passed=True, reason=None)
     trace = Trace()
 
     # Verify trace.last returns None for empty trace
     assert trace.last is None
 
-    # Groundedness should handle empty trace gracefully
     groundedness = Groundedness(generator=generator)
     result = await groundedness.run(trace)
 
-    assert result.status == CheckStatus.PASS
-    # When resolve returns NoMatch, str(NoMatch) becomes "No match for key: ..."
-    assert result.details["inputs"]["answer"] == "No match for key: trace.last.outputs"
+    assert result.status == CheckStatus.ERROR
+    assert result.errored
+    assert "answer key" in (result.message or "")
+    assert len(generator.calls) == 0
