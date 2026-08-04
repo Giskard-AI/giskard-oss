@@ -151,7 +151,7 @@ class LidarScanAdapter:
         # wait_for_completion() to block, then read .scan_result off it. Failures
         # propagate: an empty suite would read as "scan succeeded, no vulnerabilities".
         scan_run = await run_scan(
-            target=bridged,  # pyright: ignore[reportArgumentType]
+            target=bridged,
             target_info=target_info,
             probe_ids=probes,
             tags_filter=tags_filter,

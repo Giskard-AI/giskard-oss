@@ -267,7 +267,7 @@ class DeepTeamScanAdapter:
             # deepteam's model_callback type hint is sync-only, but it awaits the
             # return value at runtime when given a coroutine (our __call__ is
             # async def) -- see ScanTargetCallback / test_deepteam_bridge.py.
-            model_callback=callback,  # pyright: ignore[reportArgumentType]
+            model_callback=callback,
             target_purpose=description,
             vulnerabilities=resolved_vulns,
             attacks=resolved_attacks,

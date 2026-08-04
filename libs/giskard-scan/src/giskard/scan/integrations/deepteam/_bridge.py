@@ -12,7 +12,7 @@ imported lazily so this module imports without deepteam installed.
 import uuid as uuid_module
 from typing import Any
 
-from giskard.checks import (  # pyright: ignore[reportMissingTypeArgument]
+from giskard.checks import (
     DatasetInputGenerator,
     Interact,
     Target,
