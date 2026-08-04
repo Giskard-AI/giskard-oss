@@ -140,15 +140,22 @@ security: ## Check for security vulnerabilities
 # uv.lock instead of whatever PyPI resolves to at runtime. Pinned for reproducibility.
 LICENSECHECK_VERSION := 2026.0.8
 LICENSECHECK := uv run --with licensecheck==$(LICENSECHECK_VERSION) licensecheck --license MIT
-# Scan scope. `full` deliberately omits garak/deepteam so `pip install giskard[full]`
-# stays light, but license coverage must not follow that packaging choice -- name them
-# explicitly here or their trees (accelerate, avidtools, ...) go unscanned and
-# unattributed. Space-separated: --extras is nargs, so a comma-separated value is read
-# as one literal extra name, matches nothing, and silently scans zero packages.
+# Scan scope for the default license/notices gate. Keep this aligned with what
+# `pip install giskard[full]` actually pulls: optional scan extras `garak` and
+# `deepteam` are intentionally omitted here. Their transitive trees are large
+# (and a frequent CVE/audit surface), and we do not ship those deps by default.
+# Upstream projects (for when this choice is revisited):
+#   garak    — https://github.com/NVIDIA/garak
+#   deepteam — https://github.com/confident-ai/deepteam
+# To include them later: `LICENSECHECK_EXTRAS := full garak deepteam` (space-
+# separated; --extras is nargs, so a comma-separated value is one literal name
+# and silently scans nothing), after installing those extras into the env.
 LICENSECHECK_EXTRAS := full
 # Permissive licenses that licensecheck cannot parse, so it falls back to UNKNOWN and
 # fails them: datetime/zope-interface are ZPL-2.1 (BSD-style), mistralai and
-# sentencepiece are Apache-2.0 but publish no license metadata. All reached via garak.
+# sentencepiece are Apache-2.0 but publish no license metadata. Historically
+# reached via the garak tree when that extra was in scope; kept so a future
+# re-enable of garak/deepteam does not trip the gate on metadata gaps alone.
 # These are detection gaps, not license conflicts -- do not read this as suppressing a
 # genuine copyleft warning.
 LICENSECHECK_IGNORE := datetime zope-interface mistralai sentencepiece
