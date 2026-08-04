@@ -111,6 +111,37 @@ def test_resolve_load_failure_is_skipped(monkeypatch: pytest.MonkeyPatch) -> Non
     assert skipped[0].reason.startswith("load failed")
 
 
+def test_resolve_probes_all_records_load_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import garak._plugins as plugins
+
+    good = "probes.goodside.ThreatenJSON"
+    bad = "probes.lmrc.SlurUsage"
+
+    monkeypatch.setattr(
+        plugins,
+        "enumerate_plugins",
+        lambda category: [(good, True), (bad, True)],
+    )
+
+    def _load(name: str):
+        if name == bad:
+            raise RuntimeError("boom")
+        # Minimal active probe stub — only ``active`` is read after load.
+        probe = type("Probe", (), {"active": True, "probename": name})()
+        return probe
+
+    monkeypatch.setattr(plugins, "load_plugin", _load)
+
+    probes, skipped = _resolve_probes("all")
+    assert len(probes) == 1
+    assert probes[0].probename == good
+    assert len(skipped) == 1
+    assert skipped[0].name == bad
+    assert skipped[0].reason.startswith("load failed")
+
+
 async def test_run_emits_skip_scenario_for_missing_probes() -> None:
     def target(inputs: str) -> str:
         return "ok"

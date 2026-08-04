@@ -72,6 +72,63 @@ def test_env_var_detector_without_key_is_skipped(monkeypatch):
     assert "PERSPECTIVE_API_KEY" in skipped[0].reason
 
 
+def test_detector_garak_exception_without_key_is_skipped(monkeypatch):
+    """Non-key GarakException on load must yield a SkipMarker, not (None, None)."""
+    from garak.exception import GarakException
+    from garak.probes.base import Probe
+    from giskard.scan.integrations.garak._adapter import _DetectorCache
+
+    class _BrokenProbe(Probe):
+        primary_detector = "always.Fail"
+        extended_detectors = []
+
+    def _boom(name: str):
+        raise GarakException("plugin broken")
+
+    monkeypatch.setattr("garak._plugins.load_plugin", _boom)
+    # Bypass judge short-circuit so load_plugin is exercised.
+    monkeypatch.setattr(_adapter, "_detector_class", lambda name: None)
+
+    cache = _DetectorCache(None)
+    detector, marker = cache.get("always.Fail")
+    assert detector is None
+    assert isinstance(marker, _SkipMarker)
+    assert marker.reason.startswith("load failed")
+    assert "plugin broken" in marker.reason
+
+    detectors, skipped = _resolve_detectors(_BrokenProbe.__new__(_BrokenProbe), None)
+    assert detectors == []
+    assert len(skipped) == 1
+    assert skipped[0].reason.startswith("load failed")
+
+
+def test_detector_bare_exception_is_skipped(monkeypatch):
+    """Bare Exception on load must yield a SkipMarker, not (None, None)."""
+    from garak.probes.base import Probe
+    from giskard.scan.integrations.garak._adapter import _DetectorCache
+
+    class _BrokenProbe(Probe):
+        primary_detector = "always.Fail"
+        extended_detectors = []
+
+    def _boom(name: str):
+        raise RuntimeError("import exploded")
+
+    monkeypatch.setattr("garak._plugins.load_plugin", _boom)
+    monkeypatch.setattr(_adapter, "_detector_class", lambda name: None)
+
+    cache = _DetectorCache(None)
+    detector, marker = cache.get("always.Fail")
+    assert detector is None
+    assert isinstance(marker, _SkipMarker)
+    assert marker.reason.startswith("load failed")
+    assert "import exploded" in marker.reason
+
+    detectors, skipped = _resolve_detectors(_BrokenProbe.__new__(_BrokenProbe), None)
+    assert detectors == []
+    assert len(skipped) == 1
+
+
 def test_skipped_detectors_emit_skip_results(monkeypatch):
     """Test that skip markers from _resolve_detectors are emitted as CheckResult.skip() per conversation."""
     from garak.attempt import Attempt, Conversation

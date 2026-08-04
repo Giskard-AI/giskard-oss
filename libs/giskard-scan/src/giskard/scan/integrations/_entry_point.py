@@ -71,8 +71,9 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
         description: Natural-language description of the agent under test.
             Deepteam uses it as ``red_team``'s ``target_purpose``; garak has no
             target-profile concept and ignores it.
-        languages: BCP-47 language codes the agent handles. Used by lidar only;
-            ignored by garak and deepteam.
+        languages: BCP-47 language codes the agent handles. Reserved for
+            scanners that support language filtering; ignored by garak and
+            deepteam.
         **kwargs: Tool-specific options. For garak: ``probes`` (``None`` runs a
             curated default set, ``"all"`` runs every active probe, or pass an
             explicit name list) and ``target_mode`` (defaults to

@@ -142,7 +142,8 @@ def _resolve_probes(
     """Resolve probe names to instances plus skip markers for ones that cannot run.
 
     When *probes* is ``None``, returns the curated :data:`DEFAULT_PROBES` set.
-    When *probes* is ``"all"``, returns every active loadable probe.
+    When *probes* is ``"all"``, returns every active loadable probe; probes that
+    fail to load yield ``_SkipMarker`` entries (same as the explicit-list path).
     When *probes* is an explicit list, each name that is unknown, inactive, or
     fails to load yields a ``_SkipMarker`` instead of being dropped quietly.
 
@@ -163,12 +164,16 @@ def _resolve_probes(
         requested: list[str] = list(DEFAULT_PROBES)
     elif probes == "all":
         loaded_probes: list[Probe] = []
+        skipped_all: list[_SkipMarker] = []
         for probe_name in available:
             try:
                 loaded_probes.append(cast("Probe", load_plugin(probe_name)))
             except Exception as exc:  # noqa: BLE001 — one bad plugin must not abort
                 logger.warning("Failed to load probe %s: %s", probe_name, exc)
-        return [probe for probe in loaded_probes if probe.active], []
+                skipped_all.append(
+                    _SkipMarker(name=probe_name, reason=f"load failed: {exc}")
+                )
+        return [probe for probe in loaded_probes if probe.active], skipped_all
     else:
         requested = list(probes)
 
@@ -212,6 +217,34 @@ def _skip_probe_scenario(marker: _SkipMarker) -> ScenarioResult:  # pyright: ign
                             "check_name": marker.name,
                             "probe": marker.name,
                             "reason": marker.reason,
+                        },
+                    )
+                ],
+                duration_ms=0,
+            )
+        ],
+        final_trace=Trace(),
+        duration_ms=0,
+        tags=[],
+    )
+
+
+def _error_probe_scenario(  # pyright: ignore[reportMissingTypeArgument]
+    probe_name: str, exc: BaseException
+) -> ScenarioResult:
+    """Build a SuiteResult scenario that records a probe that raised at runtime."""
+    short = _probe_short_name(probe_name)
+    return ScenarioResult(
+        scenario_name=f"{short} (error)",
+        steps=[
+            TestCaseResult(
+                results=[
+                    CheckResult.error(
+                        message=f"Probe '{probe_name}' raised: {exc}",
+                        details={
+                            "check_name": probe_name,
+                            "probe": probe_name,
+                            "error": repr(exc),
                         },
                     )
                 ],
@@ -334,9 +367,10 @@ class _DetectorCache:
             if isinstance(cause, APIKeyMissingError):
                 return None, _SkipMarker(name=name, reason=str(cause))
             logger.warning("Failed to load detector %s: %s", name, exc)
+            return None, _SkipMarker(name=name, reason=f"load failed: {exc}")
         except Exception as exc:  # noqa: BLE001 — one bad detector must not abort the scan
             logger.warning("Failed to load detector %s: %s", name, exc)
-        return None, None
+            return None, _SkipMarker(name=name, reason=f"load failed: {exc}")
 
 
 def _detector_details(detector_label: str) -> dict[str, Any]:
@@ -479,9 +513,10 @@ class GarakScanAdapter:
     ) -> list[ScenarioResult[TraceType]]:
         try:
             return self._run_probe(probe, target, loop, detector_cache)
-        except Exception as exc:  # noqa: BLE001 — probe errors are ignored per spec
+        except Exception as exc:  # noqa: BLE001 — one bad probe must not abort the scan
             logger.warning("Probe %s raised: %s", probe.probename, exc)
-            return []
+            # Emit an error scenario so an empty suite cannot report pass_rate 1.0.
+            return [_error_probe_scenario(probe.probename, exc)]
 
     async def run[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
         self,

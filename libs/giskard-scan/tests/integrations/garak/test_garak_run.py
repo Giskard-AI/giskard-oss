@@ -163,7 +163,7 @@ async def test_run_failure_score_marks_check_failed(
     assert check_results[0].details["check_name"] == "fake.Detector"
 
 
-async def test_run_ignores_probe_exception(
+async def test_run_emits_error_for_probe_exception(
     monkeypatch: pytest.MonkeyPatch, target
 ) -> None:
     adapter_cls = _patch_resolvers(
@@ -174,9 +174,17 @@ async def test_run_ignores_probe_exception(
 
     result = await adapter_cls().run(target=target)
 
-    assert len(result.results) == 1
-    assert result.results[0].scenario_name.startswith("fake.Probe")
-
+    assert len(result.results) == 2
+    by_name = {s.scenario_name: s for s in result.results}
+    assert any(n.startswith("fake.Probe") for n in by_name)
+    error_key = next(n for n in by_name if "FailingProbe" in n)
+    assert by_name[error_key].errored
+    check = by_name[error_key].steps[0].results[0]
+    assert check.errored
+    assert "probe blew up" in (check.message or "")
+    # A crashing probe must not inflate pass_rate via an empty suite.
+    assert result.pass_rate < 1.0
+    assert result.errored_count == 1
 
 async def test_run_uses_separate_generator_per_probe(
     monkeypatch: pytest.MonkeyPatch, target
