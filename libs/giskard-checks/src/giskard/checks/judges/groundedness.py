@@ -7,6 +7,8 @@ from pydantic.experimental.missing_sentinel import MISSING
 from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
+from ..core.result import CheckResult
+from ._inputs import error_if_unresolved_answer_or_context
 from .base import BaseLLMCheck
 
 
@@ -68,6 +70,19 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     @override
     def get_prompt(self) -> TemplateReference:
         return TemplateReference(template_name="giskard.checks::judges/groundedness.j2")
+
+    @override
+    async def run(self, trace: TraceType) -> CheckResult:
+        """Run after ERROR on unresolved answer/context keys."""
+        if early := error_if_unresolved_answer_or_context(
+            trace,
+            answer=self.answer,
+            answer_key=self.answer_key,
+            context=self.context,
+            context_key=self.context_key,
+        ):
+            return early
+        return await super().run(trace)
 
     @override
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:

@@ -152,15 +152,49 @@ async def test_direct_values_take_priority_over_trace() -> None:
     assert result.details["inputs"]["context"] == "['Direct context']"
 
 
-async def test_missing_trace_values_are_passed_to_judge_as_no_match() -> None:
+async def test_missing_trace_values_return_error_without_judge() -> None:
     generator = MockGenerator(passed=True, reason=None)
     contradiction = Contradiction(generator=generator)
 
     result = await contradiction.run(Trace())
 
-    assert result.status == CheckStatus.PASS
-    assert result.details["inputs"]["answer"] == "No match for key: trace.last.outputs"
-    assert (
-        result.details["inputs"]["context"]
-        == "No match for key: trace.last.metadata.context"
+    assert result.status == CheckStatus.ERROR
+    assert result.errored
+    assert "answer key" in (result.message or "")
+    assert "trace.last.outputs" in (result.message or "")
+    assert len(generator.calls) == 0
+
+
+async def test_missing_context_returns_error_without_judge() -> None:
+    generator = MockGenerator(passed=True, reason=None)
+    contradiction = Contradiction(generator=generator)
+    interaction = Interaction(
+        inputs={"query": "Where is the Eiffel Tower?"},
+        outputs={"response": "The Eiffel Tower is in Paris."},
     )
+
+    result = await contradiction.run(Trace(interactions=[interaction]))
+
+    assert result.status == CheckStatus.ERROR
+    assert result.errored
+    assert "context key" in (result.message or "")
+    assert "trace.last.metadata.context" in (result.message or "")
+    assert len(generator.calls) == 0
+
+
+async def test_not_does_not_invert_missing_context_error() -> None:
+    from giskard.checks import Not
+
+    generator = MockGenerator(passed=True, reason=None)
+    contradiction = Contradiction(generator=generator)
+    interaction = Interaction(
+        inputs={"query": "Where is the Eiffel Tower?"},
+        outputs={"response": "The Eiffel Tower is in Paris."},
+    )
+
+    result = await Not(check=contradiction).run(Trace(interactions=[interaction]))
+
+    assert result.status == CheckStatus.ERROR
+    assert result.errored
+    assert "context key" in (result.message or "")
+    assert len(generator.calls) == 0
