@@ -88,7 +88,9 @@ def test_scan_entrypoints_require_keyword_only_options_after_languages():
     languages = ["en"]
 
     with pytest.raises(TypeError):
-        vulnerability_scan(target, description, languages, "singleturn")  # type: ignore[misc]
+        inspect.signature(vulnerability_scan).bind(
+            target, description, languages, "singleturn"
+        )
 
     with pytest.raises(TypeError):
-        quality_scan(target, description, languages, ["doc"])  # type: ignore[misc]
+        inspect.signature(quality_scan).bind(target, description, languages, ["doc"])
