@@ -73,7 +73,7 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
 
     @override
     async def run(self, trace: TraceType) -> CheckResult:
-        """Run after ERROR on unresolved answer/context keys."""
+        """Return ERROR when answer/context keys do not resolve; else run the judge."""
         if early := error_if_unresolved_answer_or_context(
             trace,
             answer=self.answer,
