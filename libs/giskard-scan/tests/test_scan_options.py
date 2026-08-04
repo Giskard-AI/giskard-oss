@@ -1,5 +1,7 @@
 import inspect
 
+import pytest
+
 from giskard.scan.quality import quality_scan
 from giskard.scan.types import resolve_scan_options
 from giskard.scan.vulnerability import vulnerability_scan
@@ -64,3 +66,30 @@ def test_scan_entrypoints_expose_shared_explicit_kwargs():
     assert "commercial_use" in vulnerability_params
     assert "knowledge_base" not in vulnerability_params
     assert "commercial_use" not in quality_params
+
+
+def test_scan_entrypoints_require_keyword_only_options_after_languages():
+    """Shared options (and scan-specific ones) must not bind positionally.
+
+    Prevents legacy ``vulnerability_scan(target, desc, langs, "singleturn")``
+    from silently binding ``target_mode`` into ``max_scenarios``.
+    """
+    quality_params = inspect.signature(quality_scan).parameters
+    vulnerability_params = inspect.signature(vulnerability_scan).parameters
+
+    for name in SHARED_SCAN_PARAMETERS:
+        assert quality_params[name].kind == inspect.Parameter.KEYWORD_ONLY
+        assert vulnerability_params[name].kind == inspect.Parameter.KEYWORD_ONLY
+
+    assert quality_params["knowledge_base"].kind == inspect.Parameter.KEYWORD_ONLY
+    assert vulnerability_params["commercial_use"].kind == inspect.Parameter.KEYWORD_ONLY
+
+    target = object()
+    description = "desc"
+    languages = ["en"]
+
+    with pytest.raises(TypeError):
+        vulnerability_scan(target, description, languages, "singleturn")  # type: ignore[misc]
+
+    with pytest.raises(TypeError):
+        quality_scan(target, description, languages, ["doc"])  # type: ignore[misc]

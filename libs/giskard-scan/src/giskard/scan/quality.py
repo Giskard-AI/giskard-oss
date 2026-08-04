@@ -39,6 +39,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     target: Target[InputType, OutputType, TraceType],
     description: str,
     languages: list[str],
+    *,
     knowledge_base: KnowledgeBase | list[str] | None = None,
     max_scenarios: int | None = None,
     seed: int = 42,
