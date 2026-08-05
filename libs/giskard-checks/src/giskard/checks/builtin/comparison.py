@@ -155,7 +155,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         details: dict[str, Any],
     ) -> CheckResult:
         if not isinstance(actual_value, (list, set, tuple)):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=(
                     f"Expected a list, set, or tuple at key '{self.key}' when match is "
                     f"{self.match!r}, but got {type(actual_value).__name__}."
@@ -174,7 +174,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
                 matched_items.append(item)
 
         if any(result is None for result in comparison_results):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=self._unsupported_comparison_message(
                     actual_value, expected_value
                 ),
@@ -222,13 +222,13 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         }
 
         if isinstance(expected_value, NoMatch):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"No value found for expected value key '{self.expected_value_key}'.",
                 details=details,
             )
 
         if isinstance(actual_value, NoMatch):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"No value found for key '{self.key}', expected a value {self._comparison_message} {repr(self.expected_value)}.",
                 details=details,
             )
@@ -238,7 +238,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
 
         compare_result = self._try_compare(actual_value, expected_value)
         if compare_result is None:
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"Comparison not supported: {type(actual_value).__name__} does not support {self._operator_symbol} comparison with {type(expected_value).__name__}",
                 details=details,
             )

@@ -115,7 +115,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
 
     def _compile_engine(self, regorus: Any) -> Any:
         """Load policy and data into a regorus engine and cache it."""
-        engine = regorus.Engine()  # pyright: ignore[reportAttributeAccessIssue]
+        engine = regorus.Engine()
         engine.add_policy(_POLICY_FILENAME, self.policy)
         if self.data:
             engine.add_data(self.data)
@@ -171,7 +171,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
 
         if isinstance(raw_value, NoMatch):
             details["input"] = raw_value
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"No value found for key '{self.key}'.",
                 details=details,
             )
@@ -182,7 +182,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
             input_json = json.dumps(raw_value)
         except (TypeError, ValueError) as err:
             details["error"] = str(err)
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"Value at key '{self.key}' is not JSON serializable: {err}",
                 details=details,
             )

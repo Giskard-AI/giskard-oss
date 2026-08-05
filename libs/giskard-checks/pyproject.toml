@@ -1,6 +1,6 @@
 [project]
 name = "giskard-checks"
-version = "1.0.2b4"
+version = "1.0.2b5"
 description = "Add your description here"
 readme = "README.md"
 license = { text = "MIT" }
@@ -23,7 +23,7 @@ readability = [
     "textstat>=0.7.0",
 ]
 regorus = ["celine-regorus>=0.9.1"]
-all = ["giskard-checks[regorus]"] # Install all optional dependencies
+all = ["giskard-checks[readability,regorus]"] # Install all optional dependencies
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]
