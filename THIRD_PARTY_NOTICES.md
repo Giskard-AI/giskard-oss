@@ -29,6 +29,7 @@ Find a list of packages below
 |✔|click|
 |✔|colorama|
 |✔|cryptography|
+|✔|defusedxml|
 |✔|distro|
 |✔|docstring-parser|
 |✔|fastuuid|
@@ -49,6 +50,7 @@ Find a list of packages below
 |✔|importlib-metadata|
 |✔|jinja2|
 |✔|jiter|
+|✔|joblib|
 |✔|jsonpath-ng|
 |✔|jsonschema|
 |✔|jsonschema-specifications|
@@ -58,6 +60,7 @@ Find a list of packages below
 |✔|markupsafe|
 |✔|mdurl|
 |✔|multidict|
+|✔|nltk|
 |✔|numpy|
 |✔|openai|
 |✔|packaging|
@@ -70,6 +73,7 @@ Find a list of packages below
 |✔|pydantic-core|
 |✔|pydantic-settings|
 |✔|pygments|
+|✔|pyphen|
 |✔|python-dotenv|
 |✔|pyyaml|
 |✔|referencing|
@@ -77,8 +81,10 @@ Find a list of packages below
 |✔|requests|
 |✔|rich|
 |✔|rpds-py|
+|✔|setuptools|
 |✔|sniffio|
 |✔|tenacity|
+|✔|textstat|
 |✔|tiktoken|
 |✔|tokenizers|
 |✔|tqdm|
@@ -192,6 +198,13 @@ Find a list of packages below
 - HomePage:
 - Author: The Python Cryptographic Authority and individual contributors
 - License: Apache-2.0;; BSD-3-Clause
+- Compatible: True
+
+### defusedxml-0.7.1
+
+- HomePage: https://github.com/tiran/defusedxml
+- Author: Christian Heimes
+- License: Python Software Foundation License
 - Compatible: True
 
 ### distro-1.9.0
@@ -334,6 +347,13 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
+### joblib-1.5.3
+
+- HomePage:
+- Author: Gael Varoquaux
+- License: BSD-3-Clause
+- Compatible: True
+
 ### jsonpath-ng-1.8.0
 
 - HomePage: https://github.com/h2non/jsonpath-ng
@@ -397,7 +417,14 @@ Find a list of packages below
 - License: Apache License 2.0
 - Compatible: True
 
-### numpy-2.4.6
+### nltk-3.10.0
+
+- HomePage: https://www.nltk.org/
+- Author: NLTK Team
+- License: Apache Software License
+- Compatible: True
+
+### numpy-2.5.0
 
 - HomePage:
 - Author: Travis E. Oliphant et al.
@@ -481,6 +508,13 @@ Find a list of packages below
 - License: BSD-2-Clause
 - Compatible: True
 
+### pyphen-0.17.2
+
+- HomePage:
+- Author: Guillaume Ayoub
+- License: GNU General Public License v2;; GNU Lesser General Public License v2;; Mozilla Public License 1.1 _MPL 1.1_;; later _GPLv2__;; later _LGPLv2__
+- Compatible: True
+
 ### python-dotenv-1.2.2
 
 - HomePage:
@@ -530,6 +564,13 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
+### setuptools-83.0.0
+
+- HomePage:
+- Author: Python Packaging Authority
+- License: MIT
+- Compatible: True
+
 ### sniffio-1.3.1
 
 - HomePage:
@@ -542,6 +583,13 @@ Find a list of packages below
 - HomePage: https://github.com/jd/tenacity
 - Author: Julien Danjou
 - License: Apache Software License
+- Compatible: True
+
+### textstat-0.7.13
+
+- HomePage: https://github.com/textstat/textstat
+- Author: Shivam Bansal, Chaitanya Aggarwal
+- License: MIT
 - Compatible: True
 
 ### tiktoken-0.13.0

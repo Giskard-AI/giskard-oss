@@ -92,7 +92,11 @@ def _get_or_create_anonymous_id() -> str | None:
     config_path = Path.home() / ".giskard" / "id"
     if config_path.exists():
         try:
-            return config_path.read_text(encoding="utf-8").strip()
+            content = config_path.read_text(encoding="utf-8").strip()
+            if content:
+                return content
+            # Delete the empty/truncated file so the creation block below can recreate it and persist a new ID.
+            config_path.unlink(missing_ok=True)
         except OSError:
             # Unreadable path (permissions, race with deletion, etc.): mint ephemeral below.
             pass
