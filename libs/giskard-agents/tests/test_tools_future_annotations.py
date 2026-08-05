@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+import pytest
 from giskard.agents.context import RunContext
 from giskard.agents.tools import tool
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from decimal import Decimal
 
 
 class Point(BaseModel):
@@ -43,9 +49,15 @@ def test_run_context_is_not_exposed_to_the_model():
 async def test_run_context_is_injected():
     context = RunContext()
 
-    await count_tool.run({"increment": 2}, ctx=context)
+    result = await count_tool.run({"increment": 2}, ctx=context)
 
+    # Pre-fix, RunContext detection silently fails and `context` leaks into
+    # the model-facing schema as a required field. The resulting pydantic
+    # validation error is then swallowed by the default `catch` handler and
+    # returned as an ordinary (misleading) tool result, so pin the exact
+    # output rather than only the side effect.
     assert context.get("call_count") == 2
+    assert result == "2"
 
 
 def test_tool_with_a_model_annotation():
@@ -61,3 +73,18 @@ def test_tool_with_a_model_annotation():
         return f"{point.x},{point.y}"
 
     assert "point" in move.parameters_schema["properties"]
+
+
+def test_type_checking_only_annotation_raises_name_error_at_decoration_time():
+    with pytest.raises(NameError, match="Decimal"):
+
+        @tool
+        def price_tool(amount: Decimal) -> str:
+            """Format a price.
+
+            Parameters
+            ----------
+            amount : Decimal
+                The amount to format.
+            """
+            return str(amount)
