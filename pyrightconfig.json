@@ -5,7 +5,32 @@
       { "root": "libs/giskard-llm/src" },
       { "root": "libs/giskard-agents/src" },
       { "root": "libs/giskard-checks/src" },
-      { "root": "libs/giskard-scan/src" }
+      {
+        "root": "libs/giskard-scan/src/giskard/scan/integrations/garak",
+        "reportMissingImports": "none"
+      },
+      {
+        "root": "libs/giskard-scan/tests/integrations/garak",
+        "reportMissingImports": "none"
+      },
+      {
+        "root": "libs/giskard-scan/src/giskard/scan/integrations/lidar",
+        "reportMissingImports": "none"
+      },
+      {
+        "root": "libs/giskard-scan/tests/integrations/lidar",
+        "reportMissingImports": "none"
+      },
+      {
+        "root": "libs/giskard-scan/src/giskard/scan/integrations/deepteam",
+        "reportMissingImports": "none"
+      },
+      {
+        "root": "libs/giskard-scan/tests/integrations/deepteam",
+        "reportMissingImports": "none"
+      },
+      { "root": "libs/giskard-scan/src" },
+      { "root": "libs/giskard-scan/tests" }
     ],
     "failOnWarnings": false,
     "typeCheckingMode": "recommended",

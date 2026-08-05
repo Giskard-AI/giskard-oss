@@ -7,7 +7,11 @@ from giskard.core.utils import get_lib_version
 
 from .catalog import generate_suite
 from .generators.adversarial import AdversarialScenarioGenerator
-from .generators.base import LocalDatasetScenarioGenerator, ScenarioGenerator
+from .generators.base import (
+    DEFAULT_TARGET_MODE,
+    LocalDatasetScenarioGenerator,
+    ScenarioGenerator,
+)
 from .generators.crescendo import CrescendoAttackScenarioGenerator
 from .generators.gcg import GCGInjectionScenarioGenerator
 from .generators.goat import GOATAttackScenarioGenerator
@@ -21,6 +25,7 @@ from .generators.knowledge_base import (
     SycophancyScenarioGenerator,
 )
 from .generators.prompt_injection import PromptInjectionScenarioGenerator
+from .integrations import list_scan_items, third_party_scan
 from .quality import quality_scan, quality_suite_generator_registry
 from .registry import SuiteGeneratorRegistry
 from .types import ScanOptions
@@ -32,7 +37,9 @@ add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.scan")
 __version__ = get_lib_version("giskard-scan")
 
 __all__ = [
+    "DEFAULT_TARGET_MODE",
     "generate_suite",
+    "list_scan_items",
     "ScenarioGenerator",
     "LocalDatasetScenarioGenerator",
     "AdversarialScenarioGenerator",
@@ -53,6 +60,7 @@ __all__ = [
     "SuiteGeneratorRegistry",
     "quality_suite_generator_registry",
     "quality_scan",
+    "third_party_scan",
     "vulnerability_suite_generator_registry",
     "vulnerability_scan",
 ]

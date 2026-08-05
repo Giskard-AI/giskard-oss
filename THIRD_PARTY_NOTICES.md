@@ -179,7 +179,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### click-8.4.1
+### click-8.3.3
 
 - HomePage:
 - Author:
@@ -242,11 +242,11 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2026.6.0
+### fsspec-2025.3.0
 
 - HomePage:
 - Author:
-- License: BSD-3-Clause
+- License: BSD License
 - Compatible: True
 
 ### google-auth-2.55.0
@@ -312,7 +312,7 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### huggingface-hub-1.20.1
+### huggingface-hub-1.16.1
 
 - HomePage: https://github.com/huggingface/huggingface_hub
 - Author: Hugging Face, Inc.
@@ -424,7 +424,7 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### numpy-2.5.0
+### numpy-2.4.6
 
 - HomePage:
 - Author: Travis E. Oliphant et al.
@@ -599,7 +599,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### tokenizers-0.23.1
+### tokenizers-0.22.2
 
 - HomePage:
 - Author: Nicolas Patry
@@ -634,11 +634,11 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### websockets-16.0
+### websockets-15.0.1
 
 - HomePage:
 - Author: Aymeric Augustin
-- License: BSD-3-Clause
+- License: BSD License
 - Compatible: True
 
 ### yarl-1.24.2

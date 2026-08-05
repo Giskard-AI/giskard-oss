@@ -155,6 +155,7 @@ class CheckResult(BaseResult, frozen=True):
         *,
         message: str | None = None,
         details: dict[str, Any] | None = None,
+        metrics: list[Metric] | None = None,
     ) -> "CheckResult":
         """Construct a successful result.
 
@@ -165,6 +166,7 @@ class CheckResult(BaseResult, frozen=True):
             status=CheckStatus.PASS,
             message=message,
             details={} if details is None else details,
+            metrics=metrics or [],
         )
 
     @classmethod
@@ -173,12 +175,14 @@ class CheckResult(BaseResult, frozen=True):
         *,
         message: str | None = None,
         details: dict[str, Any] | None = None,
+        metrics: list[Metric] | None = None,
     ) -> "CheckResult":
         """Construct a failure result."""
         return cls(
             status=CheckStatus.FAIL,
             message=message,
             details={} if details is None else details,
+            metrics=metrics or [],
         )
 
     @classmethod
