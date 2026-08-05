@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 
@@ -45,6 +46,20 @@ else:
     httpxTimeout = Any
 
 _PROVIDER = "anthropic/chat"
+_PROVIDER_NAME = "anthropic"
+logger = logging.getLogger(__name__)
+
+KNOWN_COMPLETION_PARAMS = frozenset(
+    {
+        "max_tokens",
+        "temperature",
+        "timeout",
+        "tools",
+        "system",
+        "output_config",
+        "response_format",
+    }
+)
 
 
 @ToolDef.register_serializer(_PROVIDER)
@@ -249,6 +264,14 @@ class AnthropicChatTranslator:
         tools: Sequence[ToolDef] | None = None,
         **params: Any,
     ) -> "CompletionCreateParams":
+        unknown = set(params) - KNOWN_COMPLETION_PARAMS
+        if unknown:
+            logger.warning(
+                "%s provider: ignoring unknown completion params: %s",
+                _PROVIDER_NAME,
+                sorted(unknown),
+            )
+
         anthropic_params = AnthropicChatConfigParams(
             model=model,
             messages=messages,
@@ -312,10 +335,15 @@ class AnthropicChatTranslator:
             FINISH_REASON_MAP.get(raw.stop_reason, "stop") if raw.stop_reason else None
         )
 
+        # Prefer explanation, then category; bare "refusal" so is_refusal still fires.
         refusal_out: str | None = None
-        if raw.stop_reason == "refusal" and raw.stop_details is not None:
-            # stop_details.explanation is a beta Anthropic API attribute; use getattr for safety
-            refusal_out = getattr(raw.stop_details, "explanation", None)
+        if raw.stop_reason == "refusal":
+            details = raw.stop_details
+            refusal_out = (
+                (details.explanation or details.category)
+                if details is not None
+                else None
+            ) or "refusal"
 
         message = AssistantMessage(
             role="assistant",
