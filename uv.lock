@@ -968,6 +968,7 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "celine-regorus" },
+    { name = "textstat" },
 ]
 readability = [
     { name = "textstat" },
@@ -980,7 +981,7 @@ regorus = [
 requires-dist = [
     { name = "celine-regorus", marker = "extra == 'regorus'", specifier = ">=0.9.1" },
     { name = "giskard-agents", editable = "libs/giskard-agents" },
-    { name = "giskard-checks", extras = ["regorus"], marker = "extra == 'all'", editable = "libs/giskard-checks" },
+    { name = "giskard-checks", extras = ["readability", "regorus"], marker = "extra == 'all'", editable = "libs/giskard-checks" },
     { name = "giskard-core", editable = "libs/giskard-core" },
     { name = "jinja2", specifier = ">=3.1.6,<4" },
     { name = "jsonpath-ng", specifier = ">=1.7.0,<2" },
