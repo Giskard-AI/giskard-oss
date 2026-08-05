@@ -79,14 +79,14 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
         }
 
         if isinstance(value, NoMatch):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"No value found for key '{self.key}'.",
                 details=details,
             )
 
         if self.parse:
             if not isinstance(value, str):
-                return CheckResult.failure(
+                return CheckResult.error(
                     message=f"Value at key '{self.key}' is not a string: {value!r}",
                     details=details,
                 )

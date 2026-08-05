@@ -419,8 +419,8 @@ class TestEqualsEdgeCases:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert isinstance(result.details["actual_value"], NoMatch)
         assert (
             result.details["actual_value"].key
@@ -457,8 +457,8 @@ class TestEqualsEdgeCases:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert isinstance(result.details["actual_value"], NoMatch)
         assert result.details["actual_value"].key == "trace.last.outputs.missing"
         assert result.details["expected_value"] == "expected"
@@ -478,8 +478,8 @@ class TestEqualsEdgeCases:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert isinstance(result.details["actual_value"], NoMatch)
         assert (
             result.details["actual_value"].key
@@ -496,8 +496,8 @@ class TestEqualsEdgeCases:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert isinstance(result.details["actual_value"], NoMatch)
         assert result.details["actual_value"].key == "trace.interactions[-1].outputs"
 
@@ -512,14 +512,14 @@ class TestEqualsEdgeCases:
 
         result = await check.run(trace)
 
-        # When expected_value is a NoMatch, the check fails immediately
+        # When expected_value is a NoMatch, the check errors immediately
         assert isinstance(result.details["actual_value"], NoMatch)
         assert isinstance(result.details["expected_value"], NoMatch)
         assert (
             result.details["actual_value"].key == result.details["expected_value"].key
         )
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
 
     async def test_nomatch_equality_when_both_are_nomatch_different_keys(self):
         """Test equality check when both expected and actual are NoMatch with different keys."""
@@ -538,8 +538,8 @@ class TestEqualsEdgeCases:
         assert (
             result.details["actual_value"].key != result.details["expected_value"].key
         )
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
 
 
 class TestEqualsListExpressions:

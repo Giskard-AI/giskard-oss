@@ -118,7 +118,7 @@ async def test_regex_invalid_pattern() -> None:
         pattern=r"[invalid(",
     )
     result = await check.run(Trace())
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert "invalid regex pattern" in result.message.lower()
 
@@ -130,7 +130,7 @@ async def test_regex_unclosed_group() -> None:
         pattern=r"(unclosed",
     )
     result = await check.run(Trace())
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert "invalid regex pattern" in result.message.lower()
 
@@ -343,7 +343,7 @@ async def test_missing_pattern_in_trace() -> None:
         pattern_key="trace.last.inputs.nonexistent",
     )
     result = await check.run(Trace())
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert "no value found for pattern" in result.message.lower()
 
@@ -355,7 +355,7 @@ async def test_missing_text_in_trace() -> None:
         pattern="test",
     )
     result = await check.run(Trace())
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert "no value found for text" in result.message.lower()
 
