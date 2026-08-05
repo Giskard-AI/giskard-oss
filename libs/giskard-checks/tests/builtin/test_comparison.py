@@ -132,8 +132,8 @@ class TestLessThan:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert isinstance(result.details["actual_value"], NoMatch)
         assert result.message is not None
 
@@ -163,8 +163,8 @@ class TestLessThan:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.details["actual_value"] == "5"
         assert result.details["expected_value"] == 10
         assert result.message is not None
@@ -181,8 +181,8 @@ class TestLessThan:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "< comparison" in result.message
@@ -261,8 +261,8 @@ class TestGreaterThan:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "str" in result.message
@@ -281,8 +281,8 @@ class TestGreaterThan:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "> comparison" in result.message
@@ -378,8 +378,8 @@ class TestLessThanEquals:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "str" in result.message
@@ -398,8 +398,8 @@ class TestLessThanEquals:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "<= comparison" in result.message
@@ -495,8 +495,8 @@ class TestGreaterEquals:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "str" in result.message
@@ -515,8 +515,8 @@ class TestGreaterEquals:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert ">= comparison" in result.message
@@ -536,8 +536,8 @@ class TestComparisonEdgeCases:
         result = await check.run(trace)
 
         # None comparisons raise TypeError in Python
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
 
@@ -551,8 +551,8 @@ class TestComparisonEdgeCases:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
 
@@ -568,8 +568,8 @@ class TestComparisonEdgeCases:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "list" in result.message
@@ -627,8 +627,8 @@ class TestComparisonEdgeCases:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
 
@@ -824,8 +824,8 @@ class TestNotEquals:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert isinstance(result.details["actual_value"], NoMatch)
         assert result.message is not None
 
@@ -1067,8 +1067,8 @@ class TestComparisonMatchMode:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert isinstance(result.message, str)
         assert "Expected a list, set, or tuple" in result.message
 
@@ -1149,8 +1149,8 @@ class TestComparisonMatchMode:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert isinstance(result.message, str)
         assert "Comparison not supported" in result.message
 

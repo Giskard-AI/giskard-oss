@@ -42,7 +42,8 @@ Optional inline-or-path fields: type as `T | MISSING = MISSING` (and `JSONPathSt
 
 ### Failures and types
 
-- Missing matches become **`NoMatch`**. Check with `isinstance(x, NoMatch)` and return `CheckResult.failure` with a message that names the field/key.
+- Missing matches become **`NoMatch`**. Check with `isinstance(x, NoMatch)` and return `CheckResult.error` with a message that names the field/key (structural — the assertion could not be evaluated). The same applies to wrong type for the configured mode, unsupported comparison, and similar preconditions.
+- When the assertion runs and does not hold, return `CheckResult.failure`.
 - Some paths return a **list** (multiple matches or list-producing JSONPath). See `resolve` in `core/extraction.py` if the check must treat collections differently.
 
 ### Defaults
@@ -55,7 +56,7 @@ More detail: [reference.md](reference.md).
 
 1. **Kind string** — Pick a unique snake_case discriminator. Search the repo for `@Check.register("` to avoid duplicates.
 
-2. **Class** — Subclass `Check[...]` or `BaseLLMCheck[...]` from `..core.check` / `..judges.base`. Use Pydantic `Field` for config. For non-LLM checks, implement `async def run(self, trace: TraceType) -> CheckResult` (use `CheckResult.success` / `CheckResult.failure`; put extra data in `details=` when useful).
+2. **Class** — Subclass `Check[...]` or `BaseLLMCheck[...]` from `..core.check` / `..judges.base`. Use Pydantic `Field` for config. For non-LLM checks, implement `async def run(self, trace: TraceType) -> CheckResult` (use `CheckResult.success` / `CheckResult.failure` / `CheckResult.error`; put extra data in `details=` when useful).
 
 3. **Registration** — Decorate with `@Check.register("your_kind")` on the class definition.
 
