@@ -243,6 +243,25 @@ class TestAnyOf:
 
         assert result.failed
 
+    async def test_error_short_circuits(self):
+        """ERROR from an earlier arm is returned without running later arms."""
+        call_log: list[str] = []
+
+        async def _err(trace: Trace[Any, Any]) -> CheckResult:
+            call_log.append("first")
+            return CheckResult.error(message="boom")
+
+        async def _should_not_run(trace: Trace[Any, Any]) -> CheckResult:
+            call_log.append("second")
+            return CheckResult.success(message="second")
+
+        check = AnyOf(checks=[FnCheck(fn=_err), FnCheck(fn=_should_not_run)])
+        result = await check.run(Trace())
+
+        assert result.status == CS.ERROR
+        assert result.errored
+        assert "second" not in call_log
+
 
 # ---------------------------------------------------------------------------
 # Not
@@ -304,6 +323,40 @@ class TestNot:
         # Equals(99) fails → Not inverts to pass
         check = Not(check=Equals(expected_value=99, key="trace.last.outputs"))
         result = await check.run(trace)
+
+        assert result.passed
+
+    async def test_missing_key_not_inverted_to_pass(self):
+        """Not must not turn a missing-key Equals into a pass (#2637)."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="q", outputs="the answer")
+        )
+        inner = Equals(key="trace.last.metadata.nope", expected_value="x")
+        result = await Not(check=inner).run(trace)
+
+        assert result.status == CS.ERROR
+        assert result.errored
+        assert "No value found for key" in (result.message or "")
+
+    async def test_match_type_mismatch_not_inverted_to_pass(self):
+        """Not must not invert Equals match= type mismatches into a pass (#2637)."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="q", outputs="the answer")
+        )
+        inner = Equals(key="trace.last.outputs", expected_value="x", match="any")
+        result = await Not(check=inner).run(trace)
+
+        assert result.status == CS.ERROR
+        assert result.errored
+        assert "Expected a list, set, or tuple" in (result.message or "")
+
+    async def test_evaluable_failure_still_inverted(self):
+        """Evaluable assertion failure under Not still becomes a pass."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="q", outputs="the answer")
+        )
+        inner = Equals(key="trace.last.outputs", expected_value="other")
+        result = await Not(check=inner).run(trace)
 
         assert result.passed
 
