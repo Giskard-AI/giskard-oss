@@ -1439,19 +1439,19 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
-    { name = "celine-regorus" },
+    { name = "celine-regorus", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'linux' and sys_platform != 'win32')" },
     { name = "textstat" },
 ]
 readability = [
     { name = "textstat" },
 ]
 regorus = [
-    { name = "celine-regorus" },
+    { name = "celine-regorus", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'linux' and sys_platform != 'win32')" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "celine-regorus", marker = "extra == 'regorus'", specifier = ">=0.9.1" },
+    { name = "celine-regorus", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'regorus') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'regorus')", specifier = ">=0.9.1" },
     { name = "giskard-agents", editable = "libs/giskard-agents" },
     { name = "giskard-checks", extras = ["readability", "regorus"], marker = "extra == 'all'", editable = "libs/giskard-checks" },
     { name = "giskard-core", editable = "libs/giskard-core" },
@@ -3315,7 +3315,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "ptyprocess" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
