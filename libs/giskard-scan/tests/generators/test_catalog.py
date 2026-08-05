@@ -312,7 +312,9 @@ async def test_generate_suite_passes_target_mode_to_generators():
     assert tracker_b.seen_mode == "singleturn"
 
 
-async def test_generate_suite_target_mode_defaults_to_multiturn():
+async def test_generate_suite_target_mode_defaults_to_shared_default():
+    from giskard.scan import DEFAULT_TARGET_MODE
+
     tracker = _ModeTracker(name="z")
 
     await generate_suite(
@@ -320,7 +322,7 @@ async def test_generate_suite_target_mode_defaults_to_multiturn():
         languages=["en"],
         generators=[tracker],
     )
-    assert tracker.seen_mode == "multiturn"
+    assert tracker.seen_mode == DEFAULT_TARGET_MODE
 
 
 async def test_generate_suite_singleturn_passes_scenarios_through():

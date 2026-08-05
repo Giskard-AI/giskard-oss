@@ -167,7 +167,7 @@ async def test_context_priority_over_trace() -> None:
     result = await groundedness.run(Trace(interactions=[interaction]))
 
     assert result.status == CheckStatus.PASS
-    assert result.details["inputs"]["context"] == "['Direct context']"
+    assert result.details["inputs"]["context"] == "Direct context"
 
 
 async def test_empty_string_context_is_preserved() -> None:
@@ -200,7 +200,63 @@ async def test_empty_context() -> None:
     result = await groundedness.run(Trace())
 
     assert result.status == CheckStatus.FAIL
-    assert result.details["inputs"]["context"] == "[]"
+    assert result.details["inputs"]["context"] == ""
+
+
+async def test_list_context_is_joined_without_python_repr_artifacts() -> None:
+    """A list[str] context must reach the judge prompt as readable text.
+
+    Regression test for the bug where get_inputs() rendered a list context via
+    bare str(), producing the Python repr (e.g. "['doc 1', 'doc 2']") instead of
+    the documents themselves. Documents containing apostrophes are especially
+    revealing: str(repr) mixes quote styles and escapes the apostrophe, which
+    should never appear in the actual prompt text.
+    """
+    generator = MockGenerator(passed=True, reason=None)
+    groundedness = Groundedness(
+        generator=generator,
+        answer="The Eiffel Tower is in Paris, and it's a landmark.",
+        context=[
+            "Paris is the capital of France.",
+            "It's located in Europe.",
+        ],
+    )
+    result = await groundedness.run(Trace())
+
+    context_str = cast(str, result.details["inputs"]["context"])
+    assert context_str == "Paris is the capital of France.\nIt's located in Europe."
+    assert "[" not in context_str
+    assert "]" not in context_str
+    assert '\\"' not in context_str
+    assert "\\'" not in context_str
+
+
+async def test_list_answer_from_trace_is_joined_without_python_repr_artifacts() -> None:
+    """A list-valued answer extracted via answer_key must not leak Python repr."""
+    generator = MockGenerator(passed=True, reason=None)
+    groundedness = Groundedness(
+        generator=generator,
+        answer_key="trace.last.metadata.answer_parts",
+        context="Paris is the capital of France.",
+    )
+    interaction = Interaction(
+        inputs={"query": "Where is Paris?"},
+        outputs={"response": "unused"},
+        metadata={
+            "answer_parts": [
+                "Paris is the capital of France.",
+                "It's located in Europe.",
+            ]
+        },
+    )
+    result = await groundedness.run(Trace(interactions=[interaction]))
+
+    answer_str = cast(str, result.details["inputs"]["answer"])
+    assert answer_str == "Paris is the capital of France.\nIt's located in Europe."
+    assert "[" not in answer_str
+    assert "]" not in answer_str
+    assert '\\"' not in answer_str
+    assert "\\'" not in answer_str
 
 
 async def test_missing_answer_in_trace() -> None:
