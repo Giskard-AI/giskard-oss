@@ -6,7 +6,7 @@
 <h3 align="center" weight='300' >Modular, Lightweight, Dynamic and Async-first </h3>
 <div align="center">
 
-[![GitHub release](https://img.shields.io/github/v/release/Giskard-AI/giskard)](https://github.com/Giskard-AI/giskard/releases)
+[![GitHub release](https://img.shields.io/github/v/release/Giskard-AI/giskard-oss)](https://github.com/Giskard-AI/giskard-oss/releases)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/Giskard-AI/giskard/blob/main/LICENSE)
 [![Downloads](https://static.pepy.tech/badge/giskard/month)](https://pepy.tech/project/giskard)
 [![CI](https://github.com/Giskard-AI/giskard-oss/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Giskard-AI/giskard-oss/actions/workflows/ci.yml/badge.svg?branch=main)
@@ -23,7 +23,7 @@
 <br />
 
 > [!IMPORTANT]
-> **Giskard v3** is a fresh rewrite designed for dynamic, multi-turn testing of AI agents. This release drops heavy dependencies for better efficiency while introducing a more powerful AI vulnerability scanner and enhanced RAG evaluation capabilities. For now, the vulnerability scanner and RAG evaluation still rely on Giskard v2.
+> **Giskard v3** is a fresh rewrite designed for dynamic, multi-turn testing of AI agents. This release drops heavy dependencies for better efficiency while introducing a more powerful AI vulnerability scanner and enhanced RAG evaluation — both now shipping natively in `giskard-scan` (beta), with no dependency on v2. Only the legacy scan for **tabular/ML models** remains v2-only.
 > **Giskard v2 remains available but is no longer actively maintained.**
 > Follow progress → [Read the v3 Announcement](https://github.com/orgs/Giskard-AI/discussions/2250) · [Roadmap](https://github.com/Giskard-AI/giskard-oss/issues/2252)
 
@@ -54,8 +54,9 @@ Giskard is an open-source Python library for **testing and evaluating agentic sy
 | Status         | Package          | Description                                                                                                                                                              |
 | -------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | ✅ Beta        | `giskard-checks` | Testing & evaluation — scenario API, built-in checks, LLM-as-judge                                                                                                       |
-| ✅ Beta        | `giskard-scan`   | Agent vulnerability scanner — red teaming, prompt injection, data leakage (successor of [v2 Scan](https://legacy-docs.giskard.ai/en/stable/open_source/scan/index.html)) |
-| 📋 Planned     | `giskard-rag`    | RAG evaluation & synthetic data generation (successor of [v2 RAGET](https://legacy-docs.giskard.ai/en/stable/open_source/testset_generation/index.html))                 |
+| ✅ Beta        | `giskard-scan`   | Agent vulnerability scanner + RAG/quality evaluation — red teaming, prompt injection, jailbreaks & harmful content (`vulnerability_scan`, successor of [v2 Scan](https://legacy-docs.giskard.ai/en/stable/open_source/scan/index.html)), plus knowledge-base quality eval (`quality_scan`, successor of [v2 RAGET](https://legacy-docs.giskard.ai/en/stable/open_source/testset_generation/index.html)) |
+
+These build on three foundational libraries — `giskard-core` (shared utilities & telemetry), `giskard-llm` (provider-agnostic LLM routing), and `giskard-agents` (agent & workflow orchestration) — which are pulled in automatically and rarely used directly.
 
 ## Giskard Checks — create and apply evals for testing agents
 
@@ -160,7 +161,11 @@ Scan generators also need an LLM provider extra and API key (same as Checks judg
 
 ## Looking for Giskard v2?
 
-Giskard v2 included **Scan** (automatic vulnerability detection) and **RAGET** (RAG evaluation test set generation) for both ML models and LLM applications. These features are not available in v3.
+Giskard v2 included **Scan** (automatic vulnerability detection) and **RAGET** (RAG evaluation test set generation).
+
+For **LLM agents**, both are superseded in v3 by `giskard-scan`: use [`vulnerability_scan`](#giskard-scan--vulnerability-scanner-for-ai-agents) in place of the v2 LLM scan, and `quality_scan` (with `KnowledgeBase`) in place of RAGET.
+
+v3 works with ML models too — wrap one as a target and evaluate it with `giskard-checks` or `giskard-scan`. What the examples below cover is the **v2-only automatic tabular scan** — the detector suite that introspects a `giskard.Model` + `giskard.Dataset` to auto-detect performance, bias, and robustness issues — along with the `giskard.testing` ML test suite and the Giskard Hub. These are not planned for v3.
 
 ```sh
 pip install "giskard[llm]>2,<3"
