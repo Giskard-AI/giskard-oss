@@ -25,10 +25,10 @@ requires-python = ">=3.12"
 
 [project.optional-dependencies]
 # Native LLM providers
-openai = ["giskard-llm[openai]>=1.0.0b4,<2"]
-google = ["giskard-llm[google]>=1.0.0b4,<2"]
-anthropic = ["giskard-llm[anthropic]>=1.0.0b4,<2"]
-azure = ["giskard-llm[azure]>=1.0.0b4,<2"]
+openai = ["giskard-llm[openai]>=1.0.0b6,<2"]
+google = ["giskard-llm[google]>=1.0.0b6,<2"]
+anthropic = ["giskard-llm[anthropic]>=1.0.0b6,<2"]
+azure = ["giskard-llm[azure]>=1.0.0b6,<2"]
 
 # External LLM providers
 litellm = ["giskard-agents[litellm]>=1.0.2b4,<2"]
@@ -44,7 +44,7 @@ garak = ["giskard-scan[garak]>=1.0.0b2,<2"] # Heavy dep, not included by default
 deepteam = ["giskard-scan[deepteam]>=1.0.0b2,<2"] # Heavy dep, not included by default
 
 # Aggregated packages
-all-llms = ["giskard-llm[all]>=1.0.0b4,<2"] # Install all native LLM providers
+all-llms = ["giskard-llm[all]>=1.0.0b6,<2"] # Install all native LLM providers
 all-checks = ["giskard-checks[all]>=1.0.2b4,<2"] # Install all optional checks dependencies
 full = ["giskard[all-llms,all-checks,scan,litellm]"]
 
