@@ -1469,7 +1469,7 @@ provides-extras = ["readability", "regorus", "all"]
 
 [[package]]
 name = "giskard-core"
-version = "1.0.1b5"
+version = "1.0.1b6"
 source = { editable = "libs/giskard-core" }
 dependencies = [
     { name = "posthog" },
