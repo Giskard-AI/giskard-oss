@@ -1,3 +1,5 @@
+from typing import cast
+
 from giskard.checks import CheckStatus, Contradiction, Interaction, Trace
 
 from ..testing_utils import MockJudgeGenerator as MockGenerator
@@ -58,7 +60,7 @@ async def test_direct_answer_and_context_are_passed_to_judge() -> None:
 
     assert result.status == CheckStatus.PASS
     assert result.details["inputs"]["answer"] == "Direct answer"
-    assert result.details["inputs"]["context"] == "['Context 1', 'Context 2']"
+    assert result.details["inputs"]["context"] == "Context 1\nContext 2"
     assert len(generator.calls) == 1
 
 
@@ -129,7 +131,7 @@ async def test_custom_answer_and_context_keys() -> None:
 
     assert result.status == CheckStatus.PASS
     assert result.details["inputs"]["answer"] == "The Eiffel Tower is in Paris."
-    assert result.details["inputs"]["context"] == "['The Eiffel Tower is in Paris.']"
+    assert result.details["inputs"]["context"] == "The Eiffel Tower is in Paris."
 
 
 async def test_direct_values_take_priority_over_trace() -> None:
@@ -149,7 +151,65 @@ async def test_direct_values_take_priority_over_trace() -> None:
 
     assert result.status == CheckStatus.PASS
     assert result.details["inputs"]["answer"] == "Direct answer"
-    assert result.details["inputs"]["context"] == "['Direct context']"
+    assert result.details["inputs"]["context"] == "Direct context"
+
+
+async def test_list_context_is_joined_without_python_repr_artifacts() -> None:
+    """A list[str] context must reach the judge prompt as readable text.
+
+    Regression test for the bug where get_inputs() rendered a list context via
+    bare str(), producing the Python repr (e.g. "['doc 1', 'doc 2']") instead of
+    the documents themselves. Documents containing apostrophes are especially
+    revealing: str(repr) mixes quote styles and escapes the apostrophe, which
+    should never appear in the actual prompt text.
+    """
+    generator = MockGenerator(passed=True, reason=None)
+    contradiction = Contradiction(
+        generator=generator,
+        answer="The Eiffel Tower is in Paris, and it's a landmark.",
+        context=[
+            "Paris is the capital of France.",
+            "It's located in Europe.",
+        ],
+    )
+
+    result = await contradiction.run(Trace())
+
+    context_str = cast(str, result.details["inputs"]["context"])
+    assert context_str == "Paris is the capital of France.\nIt's located in Europe."
+    assert "[" not in context_str
+    assert "]" not in context_str
+    assert '\\"' not in context_str
+    assert "\\'" not in context_str
+
+
+async def test_list_answer_from_trace_is_joined_without_python_repr_artifacts() -> None:
+    """A list-valued answer extracted via answer_key must not leak Python repr."""
+    generator = MockGenerator(passed=True, reason=None)
+    contradiction = Contradiction(
+        generator=generator,
+        answer_key="trace.last.metadata.answer_parts",
+        context="Paris is the capital of France.",
+    )
+    interaction = Interaction(
+        inputs={"query": "Where is Paris?"},
+        outputs={"response": "unused"},
+        metadata={
+            "answer_parts": [
+                "Paris is the capital of France.",
+                "It's located in Europe.",
+            ]
+        },
+    )
+
+    result = await contradiction.run(Trace(interactions=[interaction]))
+
+    answer_str = cast(str, result.details["inputs"]["answer"])
+    assert answer_str == "Paris is the capital of France.\nIt's located in Europe."
+    assert "[" not in answer_str
+    assert "]" not in answer_str
+    assert '\\"' not in answer_str
+    assert "\\'" not in answer_str
 
 
 async def test_missing_trace_values_are_passed_to_judge_as_no_match() -> None:

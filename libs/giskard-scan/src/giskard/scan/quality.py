@@ -6,7 +6,7 @@ import warnings
 from giskard.checks import SuiteResult, Target, Trace
 
 from .catalog import generate_suite
-from .generators.base import TargetMode
+from .generators.base import DEFAULT_TARGET_MODE, TargetMode
 from .generators.knowledge_base import (
     HallucinationScenarioGenerator,
     KnowledgeBaseScenarioGenerator,
@@ -47,7 +47,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     parallel: bool = True,
     max_concurrency: int | None = None,
     return_exception: bool = False,
-    target_mode: TargetMode = "multiturn",
+    target_mode: TargetMode = DEFAULT_TARGET_MODE,
 ) -> SuiteResult:
     """Generate and run the standard quality scan suite.
 
@@ -91,7 +91,8 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     target_mode : {"singleturn", "multiturn"}, optional
         Whether the agent under test supports single-turn or multi-turn
         conversations. ``"singleturn"`` skips generators that are multi-turn by
-        design and caps turn budgets to 1 on others. Defaults to ``"multiturn"``.
+        design and caps turn budgets to 1 on others. Defaults to
+        :data:`~giskard.scan.generators.base.DEFAULT_TARGET_MODE`.
 
     Returns
     -------

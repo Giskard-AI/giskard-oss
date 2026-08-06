@@ -7,7 +7,7 @@ from pydantic.experimental.missing_sentinel import MISSING
 from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
-from .base import BaseLLMCheck
+from .base import BaseLLMCheck, format_prompt_text
 
 
 @Check.register("groundedness")
@@ -84,14 +84,14 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             Template variables with 'answer' and 'context' keys.
         """
         return {
-            "answer": str(
+            "answer": format_prompt_text(
                 provided_or_resolve(
                     trace,
                     key=self.answer_key,
                     value=self.answer,
                 )
             ),
-            "context": str(
+            "context": format_prompt_text(
                 provided_or_resolve(
                     trace,
                     key=self.context_key,
