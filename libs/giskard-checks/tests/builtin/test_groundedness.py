@@ -212,7 +212,7 @@ async def test_list_context_is_joined_without_python_repr_artifacts() -> None:
     revealing: str(repr) mixes quote styles and escapes the apostrophe, which
     should never appear in the actual prompt text.
     """
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(
         generator=generator,
         answer="The Eiffel Tower is in Paris, and it's a landmark.",
@@ -233,7 +233,7 @@ async def test_list_context_is_joined_without_python_repr_artifacts() -> None:
 
 async def test_list_answer_from_trace_is_joined_without_python_repr_artifacts() -> None:
     """A list-valued answer extracted via answer_key must not leak Python repr."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(
         generator=generator,
         answer_key="trace.last.metadata.answer_parts",
