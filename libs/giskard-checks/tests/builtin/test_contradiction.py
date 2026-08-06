@@ -49,7 +49,7 @@ async def test_run_returns_failure() -> None:
 
 
 async def test_direct_answer_and_context_are_passed_to_judge() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     contradiction = Contradiction(
         generator=generator,
         answer="Direct answer",
@@ -65,7 +65,7 @@ async def test_direct_answer_and_context_are_passed_to_judge() -> None:
 
 
 async def test_single_string_context_is_passed_to_judge() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     contradiction = Contradiction(
         generator=generator,
         answer="The Eiffel Tower is in Paris.",
@@ -96,7 +96,7 @@ async def test_prompt_tolerates_refusals_without_conflicting_factual_claims() ->
 
 
 async def test_answer_and_context_from_trace() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     contradiction = Contradiction(generator=generator)
     interaction = Interaction(
         inputs={"query": "Where is the Eiffel Tower?"},
@@ -107,7 +107,7 @@ async def test_answer_and_context_from_trace() -> None:
     result = await contradiction.run(Trace(interactions=[interaction]))
 
     assert result.status == CheckStatus.PASS
-    assert result.details["reason"] is None
+    assert result.details["reason"] == "Mock reason."
     assert result.details["inputs"]["answer"] == str(
         {"response": "The Eiffel Tower is in Paris."}
     )
@@ -115,7 +115,7 @@ async def test_answer_and_context_from_trace() -> None:
 
 
 async def test_custom_answer_and_context_keys() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     contradiction = Contradiction(
         generator=generator,
         answer_key="trace.interactions[0].outputs.response",
@@ -135,7 +135,7 @@ async def test_custom_answer_and_context_keys() -> None:
 
 
 async def test_direct_values_take_priority_over_trace() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     contradiction = Contradiction(
         generator=generator,
         answer="Direct answer",
@@ -163,7 +163,7 @@ async def test_list_context_is_joined_without_python_repr_artifacts() -> None:
     revealing: str(repr) mixes quote styles and escapes the apostrophe, which
     should never appear in the actual prompt text.
     """
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     contradiction = Contradiction(
         generator=generator,
         answer="The Eiffel Tower is in Paris, and it's a landmark.",
@@ -185,7 +185,7 @@ async def test_list_context_is_joined_without_python_repr_artifacts() -> None:
 
 async def test_list_answer_from_trace_is_joined_without_python_repr_artifacts() -> None:
     """A list-valued answer extracted via answer_key must not leak Python repr."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     contradiction = Contradiction(
         generator=generator,
         answer_key="trace.last.metadata.answer_parts",
@@ -213,7 +213,7 @@ async def test_list_answer_from_trace_is_joined_without_python_repr_artifacts() 
 
 
 async def test_missing_trace_values_return_error_without_judge() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     contradiction = Contradiction(generator=generator)
 
     result = await contradiction.run(Trace())
@@ -226,7 +226,7 @@ async def test_missing_trace_values_return_error_without_judge() -> None:
 
 
 async def test_missing_context_returns_error_without_judge() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     contradiction = Contradiction(generator=generator)
     interaction = Interaction(
         inputs={"query": "Where is the Eiffel Tower?"},
@@ -245,7 +245,7 @@ async def test_missing_context_returns_error_without_judge() -> None:
 async def test_not_does_not_invert_missing_context_error() -> None:
     from giskard.checks import Not
 
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     contradiction = Contradiction(generator=generator)
     interaction = Interaction(
         inputs={"query": "Where is the Eiffel Tower?"},

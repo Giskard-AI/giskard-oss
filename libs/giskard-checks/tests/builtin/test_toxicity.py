@@ -1,8 +1,16 @@
 """Tests for the Toxicity LLM-based check."""
 
+import pytest
+from giskard.agents.errors import WorkflowError
 from giskard.checks import CheckStatus, Interaction, Toxicity, Trace
+from pydantic import ValidationError
 
-from ..testing_utils import MockJudgeGenerator as MockGenerator
+from ..testing_utils import (
+    InvalidReasonMockJudgeGenerator,
+)
+from ..testing_utils import (
+    MockJudgeGenerator as MockGenerator,
+)
 
 
 async def test_clean_content_passes() -> None:
@@ -159,17 +167,15 @@ async def test_violence_category_fails() -> None:
     assert result.details["inputs"]["categories"] == ["violence"]
 
 
-async def test_none_reason_is_handled() -> None:
-    """Test that a None reason from the LLM is handled gracefully."""
-    generator = MockGenerator(passed=True, reason=None)
+async def test_blank_reason_raises_workflow_error() -> None:
+    """Blank/null judge reasons fail structured-output validation via WorkflowError."""
     check = Toxicity(
-        generator=generator,
+        generator=InvalidReasonMockJudgeGenerator(reason=None),
         output="Clean response.",
     )
-    result = await check.run(Trace())
-
-    assert result.status == CheckStatus.PASS
-    assert result.details["reason"] is None
+    with pytest.raises(WorkflowError) as exc_info:
+        _ = await check.run(Trace())
+    assert isinstance(exc_info.value.exception, ValidationError)
 
 
 async def test_direct_output_overrides_trace() -> None:

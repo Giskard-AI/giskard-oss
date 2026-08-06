@@ -79,7 +79,7 @@ class TestAnswerRelevanceBasic:
 
     async def test_llm_called_once(self):
         """Exactly one LLM call should be made per check run."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(
             generator=generator,
             question="What is 2 + 2?",
@@ -192,7 +192,7 @@ class TestAnswerRelevanceMultiTurn:
 
     async def test_history_in_inputs_is_full_trace(self):
         """Template inputs pass the full trace as history for the judge."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(generator=generator)
         trace = await Trace.from_interactions(
             Interaction(inputs="Turn 1 question", outputs="Turn 1 answer"),
@@ -213,7 +213,7 @@ class TestAnswerRelevanceMultiTurn:
 
     async def test_single_turn_history_is_the_trace(self):
         """With one interaction, history is the trace containing that turn."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(generator=generator)
         trace = await Trace.from_interactions(
             Interaction(inputs="Single question", outputs="Single answer"),
@@ -233,7 +233,7 @@ class TestAnswerRelevanceInputResolution:
 
     async def test_direct_question_and_answer_used(self):
         """Directly supplied question/answer take priority over trace."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(
             generator=generator,
             question="Direct question",
@@ -254,7 +254,7 @@ class TestAnswerRelevanceInputResolution:
 
     async def test_question_and_answer_extracted_from_trace(self):
         """When no direct values given, question/answer extracted from trace."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(generator=generator)
         trace = await Trace.from_interactions(
             Interaction(inputs="What is AI?", outputs="AI is artificial intelligence."),
@@ -271,7 +271,7 @@ class TestAnswerRelevanceInputResolution:
 
     async def test_custom_keys(self):
         """Custom JSONPath keys should resolve correctly."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(
             generator=generator,
             question_key="trace.interactions[0].inputs.query",
@@ -295,7 +295,7 @@ class TestAnswerRelevanceInputResolution:
 
     async def test_empty_trace_no_crash(self):
         """Empty trace should not raise — NoMatch values are stringified gracefully."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(generator=generator)
 
         result = await check.run(Trace())
@@ -315,7 +315,7 @@ class TestAnswerRelevanceDomainContext:
 
     async def test_domain_context_included_in_inputs(self):
         """Supplied domain context must appear in template inputs."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(
             generator=generator,
             question="What is Flask?",
@@ -336,7 +336,7 @@ class TestAnswerRelevanceDomainContext:
 
     async def test_no_domain_context_is_empty_string(self):
         """When no domain context is supplied, template input is empty string."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(
             generator=generator,
             question="What is Flask?",
