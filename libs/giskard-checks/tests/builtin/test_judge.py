@@ -202,7 +202,9 @@ async def _render_groundedness_answer(answer: str) -> str:
         context="Paris is the capital of France.",
     )
     await judge.run(Trace())
-    return generator.calls[0][0].content or ""
+    content = generator.calls[0][0].content or ""
+    assert isinstance(content, str)
+    return content
 
 
 async def test_bundled_judge_fences_untrusted_output() -> None:
