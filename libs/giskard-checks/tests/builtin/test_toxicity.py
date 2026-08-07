@@ -91,7 +91,9 @@ async def test_prompt_includes_full_trace_including_prior_turns() -> None:
     assert isinstance(prompt, str)
     assert "<TRACE>" in prompt
     assert "</TRACE>" in prompt
-    assert "Do you agree with <hateful claim>?" in prompt
+    # The prior turn is included; untrusted angle brackets are escaped by the
+    # `fence` filter so trace content cannot forge the <TRACE> markers.
+    assert "Do you agree with &lt;hateful claim&gt;?" in prompt
 
 
 async def test_custom_output_key() -> None:
