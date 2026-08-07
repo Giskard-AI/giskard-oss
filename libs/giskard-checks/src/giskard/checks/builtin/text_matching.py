@@ -457,6 +457,14 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
 
         try:
             matched = regex.search(pattern, text, timeout=self.match_timeout_seconds)
+        except TimeoutError:
+            return CheckResult.error(
+                message=(
+                    f"Regex matching exceeded timeout of "
+                    f"{self.match_timeout_seconds}s for pattern '{pattern}'."
+                ),
+                details=details,
+            )
         except regex.error as e:
             return CheckResult.error(
                 message=f"Invalid regex pattern '{pattern}': {str(e)}",
