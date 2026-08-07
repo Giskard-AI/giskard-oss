@@ -30,7 +30,7 @@ def _finalize_value(value: Any) -> Any:
     if isinstance(value, LLMFormattable):
         return value._repr_prompt_()
     if isinstance(value, BaseModel):
-        return json.dumps(value.model_dump(), indent=4)
+        return json.dumps(value.model_dump(mode="json"), indent=4)
     return value
 
 

@@ -24,7 +24,7 @@ For one-off or experimental logic, users can use `from_fn` / `FnCheck` without a
 
 ### Naming and typing (required)
 
-Any `Check` field named `key` or whose name ends with `_key` is a JSONPath into the trace. It **must** be annotated with `JSONPathStr`, or `JSONPathStr | None`, or `JSONPathStr | NotProvided` (from `..core.extraction` and `giskard.core`). Otherwise `tests/core/test_jsonpath_enforcement.py` fails.
+Any `Check` field named `key` or whose name ends with `_key` is a JSONPath into the trace. It **must** be annotated with `JSONPathStr`, or `JSONPathStr | None`, or `JSONPathStr | MISSING` (import `MISSING` from `pydantic.experimental.missing_sentinel`). Otherwise `tests/core/test_jsonpath_enforcement.py` fails.
 
 Inside the library, import from `..core.extraction` (module `giskard.checks.core.extraction`).
 
@@ -36,13 +36,14 @@ Inside the library, import from `..core.extraction` (module `giskard.checks.core
 ### Reading values
 
 - **`resolve(trace, key)`** — Use when the value always comes from the trace (e.g. comparison `key`).
-- **`provided_or_resolve(trace, key=..., value=...)`** — Use when the user may pass an inline value **or** fall back to a path (e.g. `answer` + `answer_key`). If `value` is provided (`provide_not_none` helps for optional fields), that wins; otherwise the path is evaluated.
+- **`provided_or_resolve(trace, key=..., value=...)`** — Use when the user may pass an inline value **or** fall back to a path (e.g. `answer` + `answer_key`). If `value is not MISSING`, that wins; otherwise the path is evaluated.
 
-Optional key fields that are only sometimes used: type as `JSONPathStr | None` or `JSONPathStr | NotProvided`, pass through `provide_not_none` when calling `provided_or_resolve`, and validate combinations with a `@model_validator` if only one of (inline, `*_key`) may be set (see `StringMatching` / `ComparisonCheck`).
+Optional inline-or-path fields: type as `T | MISSING = MISSING` (and `JSONPathStr | MISSING = MISSING` for optional `*_key` fields). Pass fields directly to `provided_or_resolve`; validate combinations with a `@model_validator` if only one of (inline, `*_key`) may be set (see `StringMatching` / `ComparisonCheck`). Do not use `None` to mean "extract from trace"—omit the field so it stays `MISSING`. Explicit `None` is only valid when comparing against or supplying `None` as a real value (e.g. `Equals(expected_value=None)`).
 
 ### Failures and types
 
-- Missing matches become **`NoMatch`**. Check with `isinstance(x, NoMatch)` and return `CheckResult.failure` with a message that names the field/key.
+- Missing matches become **`NoMatch`**. Check with `isinstance(x, NoMatch)` and return `CheckResult.error` with a message that names the field/key (structural — the assertion could not be evaluated). The same applies to wrong type for the configured mode, unsupported comparison, and similar preconditions.
+- When the assertion runs and does not hold, return `CheckResult.failure`.
 - Some paths return a **list** (multiple matches or list-producing JSONPath). See `resolve` in `core/extraction.py` if the check must treat collections differently.
 
 ### Defaults
@@ -55,7 +56,7 @@ More detail: [reference.md](reference.md).
 
 1. **Kind string** — Pick a unique snake_case discriminator. Search the repo for `@Check.register("` to avoid duplicates.
 
-2. **Class** — Subclass `Check[...]` or `BaseLLMCheck[...]` from `..core.check` / `..judges.base`. Use Pydantic `Field` for config. For non-LLM checks, implement `async def run(self, trace: TraceType) -> CheckResult` (use `CheckResult.success` / `CheckResult.failure`; put extra data in `details=` when useful).
+2. **Class** — Subclass `Check[...]` or `BaseLLMCheck[...]` from `..core.check` / `..judges.base`. Use Pydantic `Field` for config. For non-LLM checks, implement `async def run(self, trace: TraceType) -> CheckResult` (use `CheckResult.success` / `CheckResult.failure` / `CheckResult.error`; put extra data in `details=` when useful).
 
 3. **Registration** — Decorate with `@Check.register("your_kind")` on the class definition.
 

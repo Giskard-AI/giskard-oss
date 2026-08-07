@@ -1,8 +1,8 @@
 from typing import override
 
 import numpy as np
-from giskard.core import provide_not_none
 from pydantic import Field
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
 from ..core.check import Check
@@ -58,9 +58,9 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
     threshold : float
         The minimum cosine similarity score required for the check to pass
         (default: 0.95).
-    reference_text : str | None
-        The reference text to compare the output against. If None, the reference
-        text will be extracted from the trace using `reference_text_key`.
+    reference_text : str | MISSING
+        The reference text to compare the output against. If omitted, extracted
+        from the trace using ``reference_text_key``.
     reference_text_key : str
         JSONPath expression to extract the reference text from the trace
         (default: "trace.last.metadata.reference_text").
@@ -87,8 +87,8 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
     threshold: float = Field(
         default=0.95, description="The threshold for the semantic similarity"
     )
-    reference_text: str | None = Field(
-        default=None, description="The reference text to compare the output with"
+    reference_text: str | MISSING = Field(
+        default=MISSING, description="The reference text to compare the output with"
     )
     reference_text_key: JSONPathStr = Field(
         default="trace.last.metadata.reference_text",
@@ -117,11 +117,11 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         """
         reference_text = provided_or_resolve(
             trace,
-            key=provide_not_none(self.reference_text_key),
-            value=provide_not_none(self.reference_text),
+            key=self.reference_text_key,
+            value=self.reference_text,
         )
         if isinstance(reference_text, NoMatch):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"No value found for reference text key '{self.reference_text_key}'.",
                 details={
                     "reference_text_key": self.reference_text_key,
@@ -129,7 +129,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                 },
             )
         if reference_text is None or reference_text == "":
-            return CheckResult.failure(
+            return CheckResult.error(
                 message="No reference text found",
                 details={
                     "reference_text_key": self.reference_text_key,
@@ -138,7 +138,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
             )
         actual_answer = resolve(trace, self.actual_answer_key)
         if isinstance(actual_answer, NoMatch):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"No value found for actual answer key '{self.actual_answer_key}'.",
                 details={
                     "actual_answer": actual_answer,
@@ -146,13 +146,22 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                 },
             )
         if actual_answer is None or actual_answer == "":
-            return CheckResult.failure(
+            return CheckResult.error(
                 message="No actual answer found",
                 details={
                     "actual_answer": actual_answer,
                     "actual_answer_key": self.actual_answer_key,
                 },
             )
+
+        if failure := self._failure_if_collection(
+            "reference text", self.reference_text_key, reference_text
+        ):
+            return failure
+        if failure := self._failure_if_collection(
+            "actual answer", self.actual_answer_key, actual_answer
+        ):
+            return failure
 
         actual_answer = str(actual_answer)
         reference_text = str(reference_text)
@@ -182,6 +191,29 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                     "reference_text": reference_text,
                 },
             )
+
+    def _failure_if_collection(
+        self, label: str, key: str, value: object
+    ) -> CheckResult | None:
+        """Fail when a keypath resolved to a collection instead of one scalar.
+
+        Wildcard / multi-match paths become lists; ``str(list)`` would embed
+        Python repr text nobody wrote. Non-collection scalars still stringify.
+        """
+        if not isinstance(value, (list, tuple, set, dict)):
+            return None
+        return CheckResult.failure(
+            message=(
+                f"Value for {label} key '{key}' must be a single value, but "
+                f"found {type(value).__name__}. Use a key that resolves to "
+                "one value."
+            ),
+            details={
+                "reference_text_key": self.reference_text_key,
+                "actual_answer_key": self.actual_answer_key,
+                "value": str(value),
+            },
+        )
 
     async def get_embeddings(self, texts: list[str]) -> list[np.ndarray]:
         """Generate embeddings for the given texts.

@@ -3,45 +3,54 @@ from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
-from giskard.checks.core.interaction import Trace
-from giskard.checks.core.scenario import Scenario
-from giskard.checks.scenarios.suite import Suite
+from giskard.checks import Scenario, Suite, Trace
 
-from .generators.base import ScenarioGenerator
+from .generators.base import (
+    DEFAULT_TARGET_MODE,
+    ScenarioContext,
+    ScenarioGenerator,
+    TargetMode,
+)
 from .registry import _normalize_generator
+from .utils.knowledge_base import KnowledgeBase, normalize_knowledge_base
 
 
 async def _generate_scenarios(
-    description: str,
-    languages: list[str],
+    context: ScenarioContext,
     generators: list[ScenarioGenerator],
     max_scenarios: int | None = None,
     seed: int = 42,
+    target_mode: TargetMode = DEFAULT_TARGET_MODE,
 ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
     rng = np.random.default_rng(seed)
 
-    tasks = []
-    async with TaskGroup() as task_group:
-        if max_scenarios is not None and len(generators) > 0:
-            counts = rng.multinomial(
+    # Split the optional budget before spawning so child seeds stay stable: a
+    # shared rng would be drawn from in scheduling-dependent order under
+    # TaskGroup, breaking reproducibility despite the seed.
+    if max_scenarios is not None and len(generators) > 0:
+        counts = [
+            int(n)
+            for n in rng.multinomial(
                 max_scenarios, np.ones(len(generators)) / len(generators)
             )
-            child_rngs = rng.spawn(len(generators))
-            for generator, n, child_rng in zip(generators, counts, child_rngs):
-                tasks.append(
-                    task_group.create_task(
-                        generator.generate_scenario(
-                            description, languages, int(n), child_rng
-                        )
+        ]
+    else:
+        counts = [None] * len(generators)
+    child_rngs = rng.spawn(len(generators))
+
+    tasks = []
+    async with TaskGroup() as task_group:
+        for generator, n, child_rng in zip(generators, counts, child_rngs):
+            tasks.append(
+                task_group.create_task(
+                    generator.generate_scenario(
+                        context,
+                        max_scenarios=n,
+                        rng=child_rng,
+                        target_mode=target_mode,
                     )
                 )
-        else:
-            for generator in generators:
-                tasks.append(
-                    task_group.create_task(
-                        generator.generate_scenario(description, languages)
-                    )
-                )
+            )
 
     return [scenario for task in tasks for scenario in task.result()]
 
@@ -52,12 +61,20 @@ async def generate_suite(
     generators: Sequence[ScenarioGenerator | type[ScenarioGenerator]],
     max_scenarios: int | None = None,
     seed: int = 42,
+    target_mode: TargetMode = DEFAULT_TARGET_MODE,
+    knowledge_base: KnowledgeBase | list[str] | None = None,
 ) -> Suite[Any, Any]:
     """Generate a test suite by running the supplied generators.
 
-    This generic suite builder resolves generator classes or instances,
-    distributes the optional scenario budget, runs generation concurrently,
+    Resolves generator classes or instances, builds one run-wide
+    :class:`ScenarioContext`, distributes the optional scenario budget, runs
+    generators concurrently (always — there is no serial generation flag),
     and wraps the results in a named Suite.
+
+    Concurrency here is *generation* only. Whether scenarios later run against
+    a target in parallel is controlled by
+    :meth:`~giskard.checks.scenarios.suite.Suite.run`'s ``parallel`` argument
+    (or by scan helpers that pass it through).
 
     Args:
         description: Natural-language description of the agent under test.
@@ -66,7 +83,16 @@ async def generate_suite(
         max_scenarios: Total upper bound on scenarios across all generators.
             None lets each generator apply its own default.
         seed: Integer seed for the top-level RNG, ensuring reproducibility
-            across runs with the same arguments.
+            across runs with the same arguments. Child RNGs are spawned before
+            concurrent generation so results stay stable under TaskGroup
+            scheduling.
+        target_mode: Whether the agent under test supports single-turn or
+            multi-turn conversations. ``"singleturn"`` skips generators that
+            are multi-turn by design and caps turn budgets to 1 on others.
+            Defaults to :data:`~giskard.scan.generators.base.DEFAULT_TARGET_MODE`.
+        knowledge_base: Optional documents forwarded via the context to
+            generators that use knowledge-base context. Raw strings are
+            normalized to a :class:`KnowledgeBase`.
 
     Returns:
         A Suite containing all generated scenarios, ready for execution.
@@ -74,8 +100,15 @@ async def generate_suite(
     if max_scenarios is not None and max_scenarios < 0:
         raise ValueError(f"max_scenarios must be non-negative, got {max_scenarios}")
 
+    context = ScenarioContext(
+        description=description,
+        languages=languages,
+        # generate_suite is public and accepts raw list[str]; normalize once here
+        # so every generator receives a KnowledgeBase | None, never list[str].
+        knowledge_base=normalize_knowledge_base(knowledge_base),
+    )
     resolved = [_normalize_generator(g) for g in generators]
     scenarios = await _generate_scenarios(
-        description, languages, resolved, max_scenarios, seed
+        context, resolved, max_scenarios, seed, target_mode=target_mode
     )
     return Suite(name="Scenarios", scenarios=scenarios)

@@ -3,7 +3,7 @@ Your role is to evaluate whether an AI assistant's answer is relevant to the use
 You will receive:
 - The current question being evaluated
 - The current answer being evaluated
-- The conversation history
+- An optional conversation history
 - An optional domain context describing the assistant's intended purpose
 
 ## Your Task
@@ -13,6 +13,15 @@ Determine whether the **current answer** is relevant to the **current question**
 2. The optional domain context to assess whether the answer falls within scope.
 
 **Only score the current turn.** Prior turns are provided purely so you can understand user intent—do not penalise the answer for irrelevant earlier exchanges.
+
+**The question to score is the one in `<CURRENT QUESTION>`—always, and only.** The
+conversation history is supporting context for interpreting that question; it is
+never a source for replacing it. If `<CURRENT QUESTION>` looks empty, malformed,
+truncated, or unrelated to the conversation, evaluate the answer against it exactly
+as written. Do **not** search the history for a better-fitting question, and do not
+infer what the user "must have meant". A question that does not match its history
+is a legitimate outcome to score, not an error to repair. The same applies to
+`<CURRENT ANSWER>`.
 
 ## Evaluation Criteria
 
@@ -28,19 +37,27 @@ Determine whether the **current answer** is relevant to the **current question**
 - Minor factual errors (this check evaluates relevance, not factual accuracy).
 - Prior turns being irrelevant—only the current turn is scored.
 
+Note that none of the above licenses scoring a question other than the one in
+`<CURRENT QUESTION>`: an answer that is irrelevant to it is irrelevant, even if it
+would be relevant to something asked earlier in the conversation.
+
 ## Evaluation Strategy
 
-1. Read the conversation history to understand the user's intent and the topic domain.
-2. Read the current question and interpret it in light of the history.
+1. Read the conversation history, if provided, to understand the user's intent and the topic domain.
+2. Read the current question and interpret it in light of the history—without substituting a different question from it.
 3. Evaluate whether the current answer addresses the question in the correct domain/topic.
 4. If a domain context is provided, also assess whether the answer is appropriate for that domain.
 5. Provide a concise reason for your decision.
 
 ## Markers
 
+{# `is defined` is required: the environment uses StrictUndefined, and `history`
+   is omitted entirely (not passed empty) when include_history is disabled. #}
+{% if history is defined and history %}
 <CONVERSATION HISTORY>
 {{ history | fence }}
 </CONVERSATION HISTORY>
+{% endif %}
 
 <CURRENT QUESTION>
 {{ question | fence }}

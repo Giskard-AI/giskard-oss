@@ -13,8 +13,13 @@ help: ## Show this help message
 install: ## Install project dependencies
 	uv sync
 
+# Ruff formatting output changes between releases, so an unpinned install can turn
+# `make check` red on a tree nobody touched. Pinned for the same reason as
+# LICENSECHECK_VERSION below.
+RUFF_VERSION := 0.16.1
+
 install-tools: ## Install development tools
-	uv tool install ruff
+	uv tool install ruff==$(RUFF_VERSION)
 	uv tool install vermin
 	uv tool install basedpyright
 	uv tool install pre-commit --with pre-commit-uv
@@ -39,9 +44,9 @@ endif
 
 test-unit: ## Run unit tests only (excludes functional), optional PACKAGE=<name>
 ifdef PACKAGE
-	uv run pytest libs/$(PACKAGE) -m "not functional"
+	uv run --directory libs/$(PACKAGE) pytest tests src -m "not functional"
 else
-	$(foreach lib,$(LIBS),uv run pytest libs/$(lib) -m "not functional" &&) true
+	$(foreach lib,$(LIBS),uv run --directory libs/$(lib) pytest tests src -m "not functional" &&) true
 endif
 
 test-functional: ## Run functional tests only (requires API keys), optional PACKAGE=<name> PROVIDER=<name>
@@ -61,6 +66,21 @@ install-no-providers: ## Install giskard-llm without provider SDKs (for no_provi
 install-minimal: ## Install with test group only (no provider SDKs, all packages)
 	uv sync --only-group test
 
+install-garak-test: ## Install garak optional extra for scan integration tests
+	uv sync --group garak-test
+
+install-deepteam-test: ## Install deepteam optional extra for scan integration tests
+	uv sync --group deepteam-test
+
+# Private package — not in pyproject/uv.lock so public CI/release never fetch it.
+LIDAR_GIT ?= git+https://github.com/Giskard-AI/lidar.git@v0.2.7
+
+install-lidar-test: ## Install lidar private dependency for scan integration tests
+	uv pip install "$(LIDAR_GIT)"
+
+test-lidar: install-lidar-test ## Run lidar integration tests
+	uv run pytest libs/giskard-scan/tests/integrations/lidar -v
+
 test-unit-minimal: ## Run unit tests on minimal deps (no provider SDKs), optional PACKAGE=<name>
 ifdef PACKAGE
 	uv run pytest libs/$(PACKAGE) -m "not functional"
@@ -70,6 +90,12 @@ endif
 
 test-no-providers: ## Run tests that verify behavior when provider SDKs are missing
 	uv run pytest libs/giskard-llm -m "no_providers"
+
+test-garak: ## Run garak integration tests (requires: make install-garak-test)
+	uv run pytest libs/giskard-scan/tests/integrations/garak
+
+test-deepteam: ## Run deepteam integration tests (requires: make install-deepteam-test)
+	uv run pytest libs/giskard-scan/tests/integrations/deepteam
 
 test-package-conflict: ## Test package conflict with giskard legacy package installed
 	@echo "Testing package conflict..."
@@ -109,17 +135,57 @@ typecheck: ## Run type checking with basedpyright
 security: ## Check for security vulnerabilities
 	uv run pip-audit --skip-editable
 
-generate-licenses: ## Generate licenses
-	uv tool run licensecheck --license MIT \
-		--format markdown --file THIRD_PARTY_NOTICES.md \
-		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-scan
+# Run licensecheck INSIDE the synced project env (uv run --with, not uvx): it reads
+# each package's version from the installed env via importlib, so output is pinned to
+# uv.lock instead of whatever PyPI resolves to at runtime. Pinned for reproducibility.
+LICENSECHECK_VERSION := 2026.0.8
+LICENSECHECK := uv run --with licensecheck==$(LICENSECHECK_VERSION) licensecheck --license MIT
+# Scan scope for the default license/notices gate. Keep this aligned with what
+# `pip install giskard[full]` actually pulls: optional scan extras `garak` and
+# `deepteam` are intentionally omitted here. Their transitive trees are large
+# (and a frequent CVE/audit surface), and we do not ship those deps by default.
+# Upstream projects (for when this choice is revisited):
+#   garak    — https://github.com/NVIDIA/garak
+#   deepteam — https://github.com/confident-ai/deepteam
+# To include them later: `LICENSECHECK_EXTRAS := full garak deepteam` (space-
+# separated; --extras is nargs, so a comma-separated value is one literal name
+# and silently scans nothing), after installing those extras into the env.
+LICENSECHECK_EXTRAS := full
+# Permissive licenses that licensecheck cannot parse, so it falls back to UNKNOWN and
+# fails them: datetime/zope-interface are ZPL-2.1 (BSD-style), mistralai and
+# sentencepiece are Apache-2.0 but publish no license metadata. Historically
+# reached via the garak tree when that extra was in scope; kept so a future
+# re-enable of garak/deepteam does not trip the gate on metadata gaps alone.
+# These are detection gaps, not license conflicts -- do not read this as suppressing a
+# genuine copyleft warning.
+LICENSECHECK_IGNORE := datetime zope-interface mistralai sentencepiece
+# Skip the workspace libs themselves (LIBS) so the notices list only third-party packages.
+LICENSECHECK_FLAGS := --extras $(LICENSECHECK_EXTRAS) --skip-dependencies $(LIBS) \
+	--ignore-packages $(LICENSECHECK_IGNORE)
+# licensecheck markdown output is not byte-stable (trailing whitespace, blank-line
+# runs), so canonicalize it before writing/diffing: strip trailing whitespace and
+# collapse consecutive blank lines.
+NORMALIZE := sed -e 's/[[:space:]]*$$//' | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}'
+
+generate-notices: ## Generate THIRD_PARTY_NOTICES.md
+	$(LICENSECHECK) $(LICENSECHECK_FLAGS) \
+		--format markdown --hide-output-parameters SIZE --file /dev/stdout \
+		| $(NORMALIZE) > THIRD_PARTY_NOTICES.md
 
 check-licenses: ## Check for licenses
-	uv tool run licensecheck --license MIT \
-		--show-only-failing --zero \
-		--skip-dependencies giskard-agents giskard-checks giskard-core giskard-scan
+	$(LICENSECHECK) $(LICENSECHECK_FLAGS) --show-only-failing --zero
 
-check: lint check-format check-compat typecheck security check-licenses ## Run all checks
+check-notices: ## Check that THIRD_PARTY_NOTICES.md is up to date (run make generate-notices if this fails)
+	@TMPFILE=$$(mktemp); trap 'rm -f "$$TMPFILE"' EXIT; \
+	$(LICENSECHECK) $(LICENSECHECK_FLAGS) \
+		--format markdown --hide-output-parameters SIZE --file /dev/stdout \
+		| $(NORMALIZE) > $$TMPFILE && \
+	if ! diff $$TMPFILE THIRD_PARTY_NOTICES.md; then \
+		echo "THIRD_PARTY_NOTICES.md is out of date. Run: make generate-notices"; \
+		exit 1; \
+	fi
+
+check: lint check-format check-compat typecheck security check-licenses check-notices ## Run all checks
 
 clean: ## Clean up build artifacts and caches
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

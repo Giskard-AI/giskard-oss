@@ -5,8 +5,8 @@ from contextlib import contextmanager, nullcontext
 from typing import Any, Generic, Self, TypeVar
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
-from giskard.core.utils import NOT_PROVIDED, NotProvided
 from pydantic import BaseModel, Field
+from pydantic.experimental.missing_sentinel import MISSING
 from rich.console import RenderableType
 from rich.progress import (
     BarColumn,
@@ -111,7 +111,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         Suite identifier.
     scenarios : list[Scenario]
         List of scenarios to execute.
-    target : Any | NotProvided
+    target : Target | MISSING
         Optional suite-level target SUT.
 
     Examples
@@ -134,8 +134,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     scenarios: list[Scenario[InputType, OutputType, Trace[Any, Any]]] = Field(
         default_factory=list, description="Scenarios in the suite"
     )
-    target: Target[InputType, OutputType, Trace[Any, Any]] | NotProvided = Field(
-        default=NOT_PROVIDED,
+    target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = Field(
+        default=MISSING,
         description="Suite-level target SUT that will override any scenario-level target.",
     )
 
@@ -160,9 +160,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
     async def run(
         self,
-        target: Target[InputType, OutputType, Trace[Any, Any]] | NotProvided = (
-            NOT_PROVIDED
-        ),
+        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),
         return_exception: bool = False,
         parallel: bool = False,
         max_concurrency: int | None = None,
@@ -172,17 +170,24 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
 
         Parameters
         ----------
-        target : Any | NotProvided
+        target : Target | MISSING, optional
             Override target for all scenarios in the suite. If provided, this
             overrides both the suite-level target and any scenario-level targets.
         return_exception : bool
             If True, return results even when exceptions occur instead of raising.
         parallel : bool
-            If True, run all scenarios concurrently while preserving result order.
+            If True, run scenarios concurrently against the target while
+            preserving result order. Defaults to ``False`` (serial execution).
+            This controls *suite execution*, not scenario generation
+            (``generate_suite`` always runs generators concurrently).
+            Scan helpers such as ``quality_scan`` / ``vulnerability_scan``
+            pass ``parallel=True`` by default.
         max_concurrency : int | None
             Max concurrent scenarios when ``parallel=True`` (positive int).
             ``None`` (default) is unbounded: all scenarios start at once, so the
-            provider's rate limits become the effective cap.
+            provider's rate limits become the effective cap. When
+            ``parallel=False``, a valid value has no effect on scheduling, but
+            invalid values are still rejected.
         verbose : bool
             If True (default), display a progress bar showing which scenario is
             currently running. Set to False for non-interactive environments.
@@ -203,11 +208,16 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         result_v2 = await suite.run(target=my_sut_v2)
         ```
         """
-        target = target if not isinstance(target, NotProvided) else self.target
-        has_target = not isinstance(target, NotProvided)
+        target = target if target is not MISSING else self.target
+        has_target = target is not MISSING
 
-        if parallel and max_concurrency is not None and max_concurrency < 1:
-            raise ValueError("max_concurrency must be greater than 0")
+        if max_concurrency is not None:
+            if not isinstance(max_concurrency, int) or isinstance(
+                max_concurrency, bool
+            ):
+                raise TypeError("max_concurrency must be None or a positive integer")
+            if max_concurrency < 1:
+                raise ValueError("max_concurrency must be greater than 0")
 
         with telemetry_run_context():
             telemetry_tag("giskard_component", "suite")
@@ -236,6 +246,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             suite_result = SuiteResult(
                 results=results,
                 duration_ms=int((end_time - start_time) * 1000),
+                suite=self,
             )
 
             telemetry_capture(
@@ -315,3 +326,9 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
                 raise exc_group.exceptions[0]
             raise
         return [task.result() for task in tasks]
+
+
+# `SuiteResult.suite` is a forward reference to `Suite`, which is only imported
+# under `TYPE_CHECKING` in result.py to avoid a circular import. Rebuild the model
+# here, where `Suite` exists at runtime, so Pydantic can resolve the annotation.
+SuiteResult.model_rebuild()

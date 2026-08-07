@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from typing import Any, cast, override
 
 import pytest
+from giskard.agents.errors import WorkflowError
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import (
     AnswerRelevance,
@@ -29,7 +30,7 @@ class MockGenerator(BaseGenerator):
     """Mock generator that returns predictable pass/fail and reason."""
 
     passed: bool
-    reason: str | None
+    reason: str
     calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
 
     @override
@@ -48,6 +49,35 @@ class MockGenerator(BaseGenerator):
                         content=json.dumps(
                             {"passed": self.passed, "reason": self.reason}
                         ),
+                    ),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ],
+            model="mock",
+        )
+
+
+class BlankReasonMockGenerator(BaseGenerator):
+    """Mock generator that returns passed=true with a blank/null reason for validation tests."""
+
+    reason: str | None = None
+    calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
+
+    @override
+    async def _call_model(
+        self,
+        messages: Sequence[ChatMessage],
+        params: GenerationParams,
+        metadata: dict[str, Any] | None = None,
+    ) -> CompletionResponse:
+        self.calls.append(messages)
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(
+                        role="assistant",
+                        content=json.dumps({"passed": True, "reason": self.reason}),
                     ),
                     finish_reason="stop",
                     index=0,
@@ -127,7 +157,7 @@ async def test_run_returns_failure() -> None:
 
 
 async def test_run_handle_template_reference() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Template rendered")
     judge = LLMJudge(
         generator=generator,
         prompt="Evaluate the answer: {{ trace.interactions[-1].outputs.response }}",
@@ -141,7 +171,8 @@ async def test_run_handle_template_reference() -> None:
     )
 
     assert result.status == CheckStatus.PASS
-    assert result.details["reason"] is None
+    assert result.details["reason"] == "Template rendered"
+    assert result.message == "Template rendered"
 
     assert len(generator.calls) == 1
     assert generator.calls[0] == [UserMessage(content="Evaluate the answer: Hello")]
@@ -155,7 +186,7 @@ async def test_run_handle_template_reference() -> None:
         )
     )
     assert result.status == CheckStatus.PASS
-    assert result.details["reason"] is None
+    assert result.details["reason"] == "Template rendered"
     assert isinstance(roundtrip_judge.generator, MockGenerator)
     assert len(roundtrip_judge.generator.calls) == 2
     assert roundtrip_judge.generator.calls[-1] == [
@@ -164,7 +195,7 @@ async def test_run_handle_template_reference() -> None:
 
 
 async def _render_groundedness_answer(answer: str) -> str:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="unused")
     judge = Groundedness(
         generator=generator,
         answer=answer,
@@ -190,7 +221,7 @@ async def test_bundled_judge_fences_untrusted_output() -> None:
 
 
 async def _render_conformity_output(output: str) -> str:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="unused")
     conformity = Conformity(generator=generator, rule="The response must be polite.")
     interaction = Interaction(inputs="Hi", outputs=output)
     await conformity.run(Trace(interactions=[interaction]))
@@ -212,7 +243,7 @@ async def test_conformity_fences_untrusted_output() -> None:
 
 
 async def _render_answer_relevance_answer(answer: str) -> str:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="unused")
     check = AnswerRelevance(
         generator=generator,
         question="What is the capital of France?",
@@ -236,8 +267,22 @@ async def test_answer_relevance_fences_untrusted_answer() -> None:
     assert malicious.count("<CURRENT ANSWER>") == baseline.count("<CURRENT ANSWER>")
 
 
+@pytest.mark.parametrize(
+    "reason", [None, "", "   "], ids=["null", "empty", "whitespace"]
+)
+async def test_blank_reason_raises_workflow_error(reason: str | None) -> None:
+    """Blank or missing reasons fail structured-output validation via WorkflowError."""
+    generator = BlankReasonMockGenerator(reason=reason)
+    judge = LLMJudge(generator=generator, prompt="Evaluate.")
+
+    with pytest.raises(WorkflowError) as exc_info:
+        _ = await judge.run(Trace())
+
+    assert isinstance(exc_info.value.exception, ValidationError)
+
+
 async def test_validate_no_prompt_or_path() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="unused")
 
     with pytest.raises(
         ValidationError, match="Either 'prompt' or 'prompt_path' must be provided"
@@ -246,7 +291,7 @@ async def test_validate_no_prompt_or_path() -> None:
 
 
 async def test_validate_both_prompt_or_path() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="unused")
 
     with pytest.raises(
         ValidationError,

@@ -153,7 +153,7 @@ async def test_missing_keyword_in_trace() -> None:
         keyword_key="trace.last.inputs.nonexistent",
     )
     result = await check.run(Trace())
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for keyword key 'trace.last.inputs.nonexistent'."
@@ -170,7 +170,7 @@ async def test_missing_text_in_trace() -> None:
         keyword="test",
     )
     result = await check.run(Trace())
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for text key 'trace.last.outputs.nonexistent'" in result.message

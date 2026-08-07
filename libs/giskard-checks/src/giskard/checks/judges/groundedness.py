@@ -1,13 +1,15 @@
 from typing import override
 
-from giskard.agents.workflow import TemplateReference
-from giskard.core import provide_not_none
+from giskard.agents import TemplateReference
 from pydantic import Field
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
-from .base import BaseLLMCheck
+from ..core.result import CheckResult
+from ._inputs import error_if_unresolved_answer_or_context
+from .base import BaseLLMCheck, format_prompt_text
 
 
 @Check.register("groundedness")
@@ -21,15 +23,17 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
 
     Attributes
     ----------
-    answer : str | None
-        The answer text to evaluate for groundedness.
+    answer : str | MISSING
+        The answer text to evaluate for groundedness. If omitted, extracted from
+        the trace using ``answer_key``.
     answer_key : str
         JSONPath expression to extract the answer from the trace
         (default: "trace.last.outputs").
 
         Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
-    context : list[str] | None
-        List of context documents that should support the answer.
+    context : str | list[str] | MISSING
+        Context documents that should support the answer. If omitted, extracted
+        from the trace using ``context_key``.
     context_key : str
         JSONPath expression to extract the context from the trace
         (default: "trace.last.metadata.context").
@@ -40,7 +44,7 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
 
     Examples
     --------
-    >>> from giskard.agents.generators import Generator
+    >>> from giskard.agents import Generator
     >>> check = Groundedness(
     ...     answer="The Eiffel Tower is in Paris.",
     ...     context=["Paris is the capital of France.", "It's located in Europe."],
@@ -48,15 +52,15 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     ... )
     """
 
-    answer: str | None = Field(
-        default=None, description="Input source for the answer to evaluate"
+    answer: str | MISSING = Field(
+        default=MISSING, description="Input source for the answer to evaluate"
     )
     answer_key: JSONPathStr = Field(
         default="trace.last.outputs",
         description="Key to extract the answer from the trace",
     )
-    context: str | list[str] | None = Field(
-        default=None, description="Input source for the reference context"
+    context: str | list[str] | MISSING = Field(
+        default=MISSING, description="Input source for the reference context"
     )
     context_key: JSONPathStr = Field(
         default="trace.last.metadata.context",
@@ -66,6 +70,19 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     @override
     def get_prompt(self) -> TemplateReference:
         return TemplateReference(template_name="giskard.checks::judges/groundedness.j2")
+
+    @override
+    async def run(self, trace: TraceType) -> CheckResult:
+        """Return ERROR when answer/context keys do not resolve; else run the judge."""
+        if early := error_if_unresolved_answer_or_context(
+            trace,
+            answer=self.answer,
+            answer_key=self.answer_key,
+            context=self.context,
+            context_key=self.context_key,
+        ):
+            return early
+        return await super().run(trace)
 
     @override
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
@@ -82,18 +99,18 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             Template variables with 'answer' and 'context' keys.
         """
         return {
-            "answer": str(
+            "answer": format_prompt_text(
                 provided_or_resolve(
                     trace,
                     key=self.answer_key,
-                    value=provide_not_none(self.answer),
+                    value=self.answer,
                 )
             ),
-            "context": str(
+            "context": format_prompt_text(
                 provided_or_resolve(
                     trace,
                     key=self.context_key,
-                    value=provide_not_none(self.context),
+                    value=self.context,
                 )
             ),
         }

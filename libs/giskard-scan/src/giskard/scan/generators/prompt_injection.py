@@ -1,14 +1,14 @@
 from pydantic import Field
 
-from .base import DatasetScenarioGenerator
+from .base import LocalDatasetScenarioGenerator
 
 
-class PromptInjectionScenarioGenerator(DatasetScenarioGenerator):
+class PromptInjectionScenarioGenerator(LocalDatasetScenarioGenerator):
     """Dataset-backed generator for prompt-injection test scenarios.
 
     Loads scenarios from the bundled ``prompt_injection.jsonl`` dataset and
     tags them as OWASP LLM Top-10 2025 – LLM01 (prompt injection) threats.
-    Sampling behaviour is inherited from DatasetScenarioGenerator.
+    Sampling behaviour is inherited from LocalDatasetScenarioGenerator.
     """
 
     dataset_name: str = "prompt_injection"

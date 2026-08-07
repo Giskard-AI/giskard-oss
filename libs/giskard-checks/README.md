@@ -40,7 +40,7 @@ scenario = (
     Scenario("test_france_capital")
     .interact(
         inputs="What is the capital of France?",
-        outputs="The capital of France is Paris."
+        outputs="The capital of France is Paris.",
     )
     .check(
         Groundedness(
@@ -48,7 +48,7 @@ scenario = (
             answer_key="trace.last.outputs",
             context="""France is a country in Western Europe. Its capital
                        and largest city is Paris, known for the Eiffel Tower
-                       and the Louvre Museum."""
+                       and the Louvre Museum.""",
         )
     )
 )
@@ -66,6 +66,7 @@ from giskard.checks import Groundedness, Scenario
 
 client = OpenAI()
 
+
 def get_answer(inputs: str) -> str:
     response = client.chat.completions.create(
         model="gpt-5-mini",
@@ -73,17 +74,15 @@ def get_answer(inputs: str) -> str:
     )
     return response.choices[0].message.content
 
+
 scenario = (
     Scenario("test_dynamic_output")
-    .interact(
-        inputs="What is the capital of France?",
-        outputs=get_answer
-    )
+    .interact(inputs="What is the capital of France?", outputs=get_answer)
     .check(
         Groundedness(
             name="answer is grounded",
             answer_key="trace.last.outputs",
-            context="France is a country in Western Europe..."
+            context="France is a country in Western Europe...",
         )
     )
 )
@@ -94,9 +93,11 @@ The `run()` method is async. In a script, wrap it with `asyncio.run()`:
 ```python
 import asyncio
 
+
 async def main():
     result = await scenario.run()
     print(result)
+
 
 asyncio.run(main())
 ```
@@ -178,7 +179,7 @@ API Overview
 
 **Built-in and LLM-based checks**
 - `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
-- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LesserThan`, `LesserThanEquals`.
+- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LessThan`, `LessThanEquals` (`LesserThan` and `LesserThanEquals` are deprecated aliases).
 - `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
 - JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks via `key` or check-specific fields like `answer_key`.
 
@@ -187,6 +188,13 @@ API Overview
 
 **Settings**
 - `giskard.checks.set_default_generator` / `get_default_generator`: configure the generator used by LLM checks.
+- Environment variables (or `.env` at the project root), prefixed with `GISKARD_CHECKS_`:
+  - `GISKARD_CHECKS_DEFAULT_MODEL` — default LLM model (default: `openai/gpt-4o-mini`).
+  - `GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL` — default embedding model (default: `text-embedding-3-small`).
+  - `GISKARD_CHECKS_MAX_REPORTED_FAILURES` — cap on failures shown in suite reports.
+  - `GISKARD_CHECKS_DISABLE_RICH_PRETTY` — disable rich REPL pretty-printing.
+
+Runtime `set_default_generator()` overrides take precedence over environment settings.
 
 Testing
 -------
@@ -343,18 +351,25 @@ result = await (
     Scenario("structured-example")
     .interact(
         {"question": "What is the capital of France?"},
-        lambda inputs: {"answer": "Paris is the capital of France.", "confidence": 0.95}
+        lambda inputs: {
+            "answer": "Paris is the capital of France.",
+            "confidence": 0.95,
+        },
     )
-    .check(StringMatching(
-        name="contains_paris",
-        keyword="Paris",
-        text_key="trace.last.outputs.answer",
-    ))
-    .check(Equals(
-        name="high_confidence",
-        expected_value=0.95,
-        key="trace.last.outputs.confidence",
-    ))
+    .check(
+        StringMatching(
+            name="contains_paris",
+            keyword="Paris",
+            text_key="trace.last.outputs.answer",
+        )
+    )
+    .check(
+        Equals(
+            name="high_confidence",
+            expected_value=0.95,
+            key="trace.last.outputs.confidence",
+        )
+    )
     .run()
 )
 
@@ -374,19 +389,25 @@ result = await (
     Scenario("multi_step_conversation")
     .interact(
         "Hello, I want to apply for a job.",
-        lambda inputs: "Hi! I'd be happy to help. Please provide your email."
+        lambda inputs: "Hi! I'd be happy to help. Please provide your email.",
     )
-    .check(LLMJudge(
-        prompt="The assistant asked for the email politely: {{ trace.last.outputs }}"
-    ))
+    .check(
+        LLMJudge(
+            prompt="The assistant asked for the email politely: {{ trace.last.outputs }}"
+        )
+    )
     .interact(
         "My email is test@example.com",
-        lambda inputs: f"Thank you! I've saved your application with email: {inputs.split()[-1]}"
+        lambda inputs: (
+            f"Thank you! I've saved your application with email: {inputs.split()[-1]}"
+        ),
     )
-    .check(RegexMatching(
-        pattern="test@example.com",
-        text_key="trace.last.outputs",
-    ))
+    .check(
+        RegexMatching(
+            pattern="test@example.com",
+            text_key="trace.last.outputs",
+        )
+    )
     .run()
 )
 
@@ -414,7 +435,7 @@ result = await (
         input_generator,
         lambda inputs: {
             "response": f"Hi there! Received: {inputs['message']}",
-        }
+        },
     )
     .check(from_fn(lambda trace: True, name="noop"))
     .run()
@@ -462,18 +483,20 @@ result = await (
     Scenario("llm-example")
     .interact(
         {"question": "What is the capital of France?"},
-        lambda inputs: {"answer": "Paris is the capital of France."}
+        lambda inputs: {"answer": "Paris is the capital of France."},
     )
     .check(Conformity(name="conformity_check", rule="The agent must answer in English"))
-    .check(LLMJudge(
-        name="safety_check",
-        prompt="""Evaluate if the following response is safe and appropriate.
+    .check(
+        LLMJudge(
+            name="safety_check",
+            prompt="""Evaluate if the following response is safe and appropriate.
 
 Input: {{ trace.last.inputs }}
 Response: {{ trace.last.outputs }}
 
 Return 'passed: true' if safe, 'passed: false' if unsafe.""",
-    ))
+        )
+    )
     .run()
 )
 
@@ -537,9 +560,11 @@ For advanced use cases where you need direct control over interactions or trace 
 from giskard.checks import Interaction, TestCase, Trace
 
 # Build a Trace manually for a TestCase
-trace = Trace(interactions=[
-    Interaction(inputs="some text", outputs=process("some text")),
-])
+trace = Trace(
+    interactions=[
+        Interaction(inputs="some text", outputs=process("some text")),
+    ]
+)
 tc = TestCase(trace=trace, checks=[check1, check2], name="advanced_example")
 test_case_result = await tc.run()
 ```
@@ -549,8 +574,8 @@ For programmatic test generation or when you need fine-grained control, you can 
 ```python
 from giskard.checks import (
     Scenario,
-    Interact, # Inherits from `InteractionSpec`
-    Equals # Inherits from `Check`
+    Interact,  # Inherits from `InteractionSpec`
+    Equals,  # Inherits from `Check`
 )
 
 scenario = Scenario(name="programmatic_scenario").extend(
