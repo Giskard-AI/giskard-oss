@@ -38,6 +38,10 @@ class ScenarioContext(BaseModel):
 
 TargetMode = Literal["singleturn", "multiturn"]
 
+# Shared product default for generate_suite, vulnerability/quality scans, and
+# third-party adapters (garak / deepteam). Flip here to change all of them.
+DEFAULT_TARGET_MODE: TargetMode = "multiturn"
+
 
 class ScenarioGenerator(BaseModel):
     """Abstract base class for all scenario generators.
@@ -59,7 +63,7 @@ class ScenarioGenerator(BaseModel):
         context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
-        target_mode: TargetMode = "multiturn",
+        target_mode: TargetMode = DEFAULT_TARGET_MODE,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Generate a list of test scenarios for the described agent.
 
@@ -73,8 +77,9 @@ class ScenarioGenerator(BaseModel):
                 independent child RNG spawned from a shared parent via
                 ``rng.spawn()``.
             target_mode: Desired conversation mode for generated scenarios.
-                ``"singleturn"`` generates single-turn test cases. ``"multiturn"``
-                (default) generates multi-turn test cases.
+                ``"singleturn"`` generates single-turn test cases.
+                ``"multiturn"`` generates multi-turn test cases. Defaults to
+                :data:`DEFAULT_TARGET_MODE`.
 
         Returns:
             A list of :class:`~giskard.checks.core.scenario.Scenario` objects
@@ -180,7 +185,7 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
         context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
-        target_mode: TargetMode = "multiturn",
+        target_mode: TargetMode = DEFAULT_TARGET_MODE,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Load and optionally subsample scenarios from the bundled dataset.
 
@@ -193,8 +198,8 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
                 ``np.random.default_rng()`` is created if ``None``.
             target_mode: Desired conversation mode for generated scenarios.
                 ``"singleturn"`` caps each interaction generator to a single
-                step; ``"multiturn"`` (default) keeps the dataset's own turn
-                budgets.
+                step; ``"multiturn"`` keeps the dataset's own turn budgets.
+                Defaults to :data:`DEFAULT_TARGET_MODE`.
 
         Returns:
             A list of annotated :class:`~giskard.checks.core.scenario.Scenario`
