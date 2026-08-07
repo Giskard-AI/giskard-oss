@@ -87,8 +87,8 @@ async def test_no_match_on_key_fails() -> None:
 
     result = await check.run(trace)
 
-    assert result.status == CheckStatus.FAIL
-    assert result.failed
+    assert result.status == CheckStatus.ERROR
+    assert result.errored
     assert result.message is not None
     assert "No value found" in result.message
 

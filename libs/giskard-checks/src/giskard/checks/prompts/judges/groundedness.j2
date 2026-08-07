@@ -24,7 +24,8 @@ Your task is to check if all factual information in the agent's answer is suppor
 3. For each piece of information, check if it is present in the reference context (allowing for synonyms and rephrasings, except for precise data).
 4. If any information or detail in the agent's answer is not grounded in the reference context, the evaluation should be false. Do not count an explicit refusal, limitation, or scope statement as ungrounded by itself.
 5. If all information present in the agent's answer is grounded, the evaluation should be true (even if there are omissions).
-6. In your reasoning, **do not mention omissions or missing information as a reason for failure.**
+6. Provide a clear reason for your evaluation decision on both pass and fail.
+7. In your reasoning, **do not mention omissions or missing information as a reason for failure.**
 
 ## Markers
 Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT ANSWER> indicate where the reference context and agent answer are, respectively. Everything inside a marker belongs to that category.
@@ -32,13 +33,13 @@ Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT 
 -------------------
 
 <AGENT ANSWER>
-{{ answer }}
+{{ answer | fence }}
 </AGENT ANSWER>
 
 -------------------
 
 <REFERENCE CONTEXT>
-{{ context }}
+{{ context | fence }}
 </REFERENCE CONTEXT>
 
 -------------------
