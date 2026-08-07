@@ -55,21 +55,21 @@ would be relevant to something asked earlier in the conversation.
    is omitted entirely (not passed empty) when include_history is disabled. #}
 {% if history is defined and history %}
 <CONVERSATION HISTORY>
-{{ history }}
+{{ history | fence }}
 </CONVERSATION HISTORY>
 {% endif %}
 
 <CURRENT QUESTION>
-{{ question }}
+{{ question | fence }}
 </CURRENT QUESTION>
 
 <CURRENT ANSWER>
-{{ answer }}
+{{ answer | fence }}
 </CURRENT ANSWER>
 
 {% if context %}
 <DOMAIN CONTEXT>
-{{ context }}
+{{ context | fence }}
 </DOMAIN CONTEXT>
 {% endif %}
 
