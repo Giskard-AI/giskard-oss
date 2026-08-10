@@ -10,26 +10,42 @@ Tests cover:
 - Custom key paths
 - Domain context forwarded to template inputs
 - Full trace passed as template ``history`` (conversation context for the judge)
-- Empty trace handled gracefully (NoMatch when resolving last turn)
+- Unresolved ``question_key``/``answer_key`` return ERROR without invoking the judge,
+  so a broken key can no longer be silently rescued by the judge inferring the real
+  question from conversation history
+- ``Not(...)`` leaves those ERRORs uninverted
+- ``include_history=False`` omits ``history`` from the template inputs
 """
 
 from typing import Any
 
 from giskard.checks import AnswerRelevance, CheckResult, CheckStatus, Interaction, Trace
-from giskard.checks.core.extraction import NoMatch
 
 from ..testing_utils import MockJudgeGenerator as MockGenerator
 
 _EXPECTED_INPUT_KEYS = frozenset({"question", "answer", "history", "context"})
+# ``history`` is omitted from template inputs when include_history=False.
+_EXPECTED_INPUT_KEYS_NO_HISTORY = _EXPECTED_INPUT_KEYS - {"history"}
 
 
-def _assert_answer_relevance_inputs(result: CheckResult) -> dict[str, Any]:
+def _assert_answer_relevance_inputs(
+    result: CheckResult, *, include_history: bool = True
+) -> dict[str, Any]:
     """Assert every AnswerRelevance run records full template inputs."""
     assert "inputs" in result.details
     inputs = result.details["inputs"]
     assert isinstance(inputs, dict)
-    assert set(inputs.keys()) == _EXPECTED_INPUT_KEYS
+    expected = (
+        _EXPECTED_INPUT_KEYS if include_history else _EXPECTED_INPUT_KEYS_NO_HISTORY
+    )
+    assert set(inputs.keys()) == expected
     return inputs
+
+
+def _rendered_prompt(generator: MockGenerator) -> str:
+    """Return the single judge prompt that was rendered and sent."""
+    assert len(generator.calls) == 1
+    return "\n".join(str(message.content) for message in generator.calls[0])
 
 
 class TestAnswerRelevanceBasic:
@@ -79,7 +95,7 @@ class TestAnswerRelevanceBasic:
 
     async def test_llm_called_once(self):
         """Exactly one LLM call should be made per check run."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(
             generator=generator,
             question="What is 2 + 2?",
@@ -192,7 +208,7 @@ class TestAnswerRelevanceMultiTurn:
 
     async def test_history_in_inputs_is_full_trace(self):
         """Template inputs pass the full trace as history for the judge."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(generator=generator)
         trace = await Trace.from_interactions(
             Interaction(inputs="Turn 1 question", outputs="Turn 1 answer"),
@@ -213,7 +229,7 @@ class TestAnswerRelevanceMultiTurn:
 
     async def test_single_turn_history_is_the_trace(self):
         """With one interaction, history is the trace containing that turn."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(generator=generator)
         trace = await Trace.from_interactions(
             Interaction(inputs="Single question", outputs="Single answer"),
@@ -233,7 +249,7 @@ class TestAnswerRelevanceInputResolution:
 
     async def test_direct_question_and_answer_used(self):
         """Directly supplied question/answer take priority over trace."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(
             generator=generator,
             question="Direct question",
@@ -254,7 +270,7 @@ class TestAnswerRelevanceInputResolution:
 
     async def test_question_and_answer_extracted_from_trace(self):
         """When no direct values given, question/answer extracted from trace."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(generator=generator)
         trace = await Trace.from_interactions(
             Interaction(inputs="What is AI?", outputs="AI is artificial intelligence."),
@@ -271,7 +287,7 @@ class TestAnswerRelevanceInputResolution:
 
     async def test_custom_keys(self):
         """Custom JSONPath keys should resolve correctly."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(
             generator=generator,
             question_key="trace.interactions[0].inputs.query",
@@ -293,21 +309,230 @@ class TestAnswerRelevanceInputResolution:
         assert inputs["history"] == trace
         assert inputs["context"] == ""
 
-    async def test_empty_trace_no_crash(self):
-        """Empty trace should not raise — NoMatch values are stringified gracefully."""
-        generator = MockGenerator(passed=True, reason=None)
+    async def test_empty_trace_returns_error_without_judge(self):
+        """Empty trace resolves neither key, so the check errors without judging.
+
+        Previously this passed: both keys resolved to ``NoMatch``, were stringified
+        into the prompt, and the judge returned PASS anyway.
+        """
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(generator=generator)
+
+        result = await check.run(Trace())
+
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
+        assert "question key" in (result.message or "")
+        assert "trace.last.inputs" in (result.message or "")
+        assert len(generator.calls) == 0
+
+
+class TestAnswerRelevanceUnresolvedKeys:
+    """Unresolved question/answer keys return ERROR without invoking the judge.
+
+    Regression guard for the history leak: ``history`` is the full trace, so before
+    this fix a broken ``question_key`` still left the real question visible to the
+    judge inside ``<CONVERSATION HISTORY>``. The judge inferred it and returned PASS,
+    making the check green regardless of the configured key. Erroring before the
+    judge runs removes that path entirely.
+    """
+
+    async def test_broken_question_key_errors_without_judge(self):
+        """A question_key matching nothing errors instead of passing via history."""
+        generator = MockGenerator(passed=True, reason="Judge must not run.")
+        check = AnswerRelevance(
+            generator=generator,
+            question_key="trace.last.metadata.does_not_exist",
+        )
+        trace = await Trace.from_interactions(
+            Interaction(inputs="What is the best language?", outputs="Python"),
+            Interaction(inputs="What's Python?", outputs="A snake."),
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
+        assert "question key" in (result.message or "")
+        assert "trace.last.metadata.does_not_exist" in (result.message or "")
+        assert len(generator.calls) == 0
+
+    async def test_broken_answer_key_errors_without_judge(self):
+        """Same guard for a misconfigured answer_key."""
+        generator = MockGenerator(passed=True, reason="Judge must not run.")
+        check = AnswerRelevance(
+            generator=generator,
+            answer_key="trace.last.metadata.does_not_exist",
+        )
+        trace = await Trace.from_interactions(
+            Interaction(inputs="What is the best language?", outputs="Python"),
+            Interaction(inputs="What's Python?", outputs="A snake."),
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
+        assert "answer key" in (result.message or "")
+        assert "trace.last.metadata.does_not_exist" in (result.message or "")
+        assert len(generator.calls) == 0
+
+    async def test_question_key_reported_before_answer_key(self):
+        """When both keys miss, the question key is reported first."""
+        generator = MockGenerator(passed=True, reason="Judge must not run.")
+        check = AnswerRelevance(
+            generator=generator,
+            question_key="trace.last.metadata.no_question",
+            answer_key="trace.last.metadata.no_answer",
+        )
+        trace = await Trace.from_interactions(
+            Interaction(inputs="What's Python?", outputs="A snake.")
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.ERROR
+        assert "question key" in (result.message or "")
+        assert "trace.last.metadata.no_question" in (result.message or "")
+        assert len(generator.calls) == 0
+
+    async def test_directly_provided_values_bypass_broken_keys(self):
+        """Direct question/answer take priority, so their keys are never resolved."""
+        generator = MockGenerator(passed=True, reason="Relevant.")
+        check = AnswerRelevance(
+            generator=generator,
+            question="Direct question",
+            answer="Direct answer",
+            question_key="trace.last.metadata.does_not_exist",
+            answer_key="trace.last.metadata.also_missing",
+        )
 
         result = await check.run(Trace())
 
         assert result.passed
         inputs = _assert_answer_relevance_inputs(result)
-        assert isinstance(inputs["question"], NoMatch)
-        assert inputs["question"].key == "trace.last.inputs"
-        assert isinstance(inputs["answer"], NoMatch)
-        assert inputs["answer"].key == "trace.last.outputs"
-        assert inputs["history"] == Trace()
-        assert inputs["context"] == ""
+        assert inputs["question"] == "Direct question"
+        assert inputs["answer"] == "Direct answer"
+
+    async def test_not_does_not_invert_unresolved_key_error(self):
+        """``Not(...)`` must leave the ERROR uninverted, not launder it into PASS."""
+        from giskard.checks import Not
+
+        generator = MockGenerator(passed=True, reason="Judge must not run.")
+        check = AnswerRelevance(
+            generator=generator,
+            question_key="trace.last.metadata.does_not_exist",
+        )
+        trace = await Trace.from_interactions(
+            Interaction(inputs="What's Python?", outputs="A snake.")
+        )
+
+        result = await Not(check=check).run(trace)
+
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
+        assert len(generator.calls) == 0
+
+
+class TestAnswerRelevanceIncludeHistory:
+    """``include_history`` controls whether history reaches the judge."""
+
+    async def test_history_included_by_default(self):
+        """History defaults to the full trace and is rendered into the prompt."""
+        generator = MockGenerator(passed=True, reason="Mock reason.")
+        check = AnswerRelevance(generator=generator)
+        trace = await Trace.from_interactions(
+            Interaction(inputs="Turn 1 question", outputs="Turn 1 answer"),
+            Interaction(inputs="Turn 2 question", outputs="Turn 2 answer"),
+        )
+
+        result = await check.run(trace)
+
+        assert result.passed
+        inputs = _assert_answer_relevance_inputs(result)
+        assert inputs["history"] == trace
+        prompt = _rendered_prompt(generator)
+        assert "<CONVERSATION HISTORY>" in prompt
+        assert "Turn 1 question" in prompt
+
+    async def test_include_history_false_omits_history_input(self):
+        """Disabling history drops the key from template inputs entirely."""
+        generator = MockGenerator(passed=True, reason="Mock reason.")
+        check = AnswerRelevance(generator=generator, include_history=False)
+        trace = await Trace.from_interactions(
+            Interaction(inputs="Turn 1 question", outputs="Turn 1 answer"),
+            Interaction(inputs="Turn 2 question", outputs="Turn 2 answer"),
+        )
+
+        result = await check.run(trace)
+
+        assert result.passed
+        inputs = _assert_answer_relevance_inputs(result, include_history=False)
+        assert "history" not in inputs
+        assert inputs["question"] == "Turn 2 question"
+        assert inputs["answer"] == "Turn 2 answer"
+
+    async def test_include_history_false_drops_prompt_section(self):
+        """The rendered prompt omits the history section and prior-turn text."""
+        generator = MockGenerator(passed=True, reason="Mock reason.")
+        check = AnswerRelevance(generator=generator, include_history=False)
+        trace = await Trace.from_interactions(
+            Interaction(inputs="Turn 1 question", outputs="Turn 1 answer"),
+            Interaction(inputs="Turn 2 question", outputs="Turn 2 answer"),
+        )
+
+        result = await check.run(trace)
+
+        assert result.passed
+        prompt = _rendered_prompt(generator)
+        assert "<CONVERSATION HISTORY>" not in prompt
+        assert "Turn 1 question" not in prompt
+        # The current turn still reaches the judge through question/answer.
+        assert "Turn 2 question" in prompt
+        assert "Turn 2 answer" in prompt
+
+    async def test_include_history_false_still_errors_on_broken_key(self):
+        """The unresolved-key guard is independent of the history flag."""
+        generator = MockGenerator(passed=True, reason="Judge must not run.")
+        check = AnswerRelevance(
+            generator=generator,
+            include_history=False,
+            question_key="trace.last.metadata.does_not_exist",
+        )
+        trace = await Trace.from_interactions(
+            Interaction(inputs="What's Python?", outputs="A snake.")
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.ERROR
+        assert len(generator.calls) == 0
+
+
+class TestAnswerRelevancePromptGuardrails:
+    """The prompt frames history as supporting context, never a question source."""
+
+    async def test_prompt_forbids_substituting_question_from_history(self):
+        """The rendered prompt instructs the judge to score <CURRENT QUESTION> only.
+
+        This is the second layer of the fix: the ERROR guard catches keys that
+        resolve to nothing, but a key pointing at a valid-but-wrong field yields a
+        real value and passes the guard. Only the prompt stops the judge from
+        quietly grading against a question it found in history instead.
+        """
+        generator = MockGenerator(passed=True, reason="Mock reason.")
+        check = AnswerRelevance(generator=generator)
+        trace = await Trace.from_interactions(
+            Interaction(inputs="What's Python?", outputs="A snake.")
+        )
+
+        result = await check.run(trace)
+
+        assert result.passed
+        prompt = _rendered_prompt(generator)
+        assert "<CURRENT QUESTION>" in prompt
+        assert "never a source for replacing it" in prompt
+        assert "Do **not** search the history for a better-fitting question" in prompt
 
 
 class TestAnswerRelevanceDomainContext:
@@ -315,7 +540,7 @@ class TestAnswerRelevanceDomainContext:
 
     async def test_domain_context_included_in_inputs(self):
         """Supplied domain context must appear in template inputs."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(
             generator=generator,
             question="What is Flask?",
@@ -336,7 +561,7 @@ class TestAnswerRelevanceDomainContext:
 
     async def test_no_domain_context_is_empty_string(self):
         """When no domain context is supplied, template input is empty string."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="Mock reason.")
         check = AnswerRelevance(
             generator=generator,
             question="What is Flask?",

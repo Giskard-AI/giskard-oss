@@ -1,4 +1,3 @@
-import os
 from collections import defaultdict
 from collections.abc import Mapping
 from enum import Enum
@@ -16,6 +15,7 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
+from ..settings import get_settings
 from .interaction import Trace
 from .protocols import RichConsoleProtocol, RichProtocol
 
@@ -46,7 +46,6 @@ STATUS_MAPPING = {
     },
 }
 
-MAX_REPORTED_FAILURES_ENV_VAR = "GISKARD_CHECKS_MAX_REPORTED_FAILURES"
 STATUS_SUMMARY_ORDER: tuple[tuple[str, str], ...] = (
     ("error", "errored"),
     ("fail", "failed"),
@@ -81,23 +80,6 @@ def _pluralize(count: int, word: str, plural: str | None = None) -> str:
     if plural is None:
         plural = word + "s"
     return f"{count} {plural}"
-
-
-def _max_reported_failures_from_env() -> int | None:
-    """Return failure cap from env, or ``None`` for unlimited reporting."""
-    raw_value = os.getenv(MAX_REPORTED_FAILURES_ENV_VAR)
-    if raw_value is None:
-        return None
-
-    try:
-        value = int(raw_value)
-    except ValueError:
-        return None
-
-    if value < 0:
-        return None
-
-    return value
 
 
 class CheckStatus(str, Enum):
@@ -173,6 +155,7 @@ class CheckResult(BaseResult, frozen=True):
         *,
         message: str | None = None,
         details: dict[str, Any] | None = None,
+        metrics: list[Metric] | None = None,
     ) -> "CheckResult":
         """Construct a successful result.
 
@@ -183,6 +166,7 @@ class CheckResult(BaseResult, frozen=True):
             status=CheckStatus.PASS,
             message=message,
             details={} if details is None else details,
+            metrics=metrics or [],
         )
 
     @classmethod
@@ -191,12 +175,14 @@ class CheckResult(BaseResult, frozen=True):
         *,
         message: str | None = None,
         details: dict[str, Any] | None = None,
+        metrics: list[Metric] | None = None,
     ) -> "CheckResult":
         """Construct a failure result."""
         return cls(
             status=CheckStatus.FAIL,
             message=message,
             details={} if details is None else details,
+            metrics=metrics or [],
         )
 
     @classmethod
@@ -369,6 +355,8 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
         yield Rule(status["title"], style=f"{status['color']} bold")
 
         for step in self.steps:
+            if step.error is not None:
+                yield step.error.rich_line(status["color"])
             for result in step.results:
                 yield from result.__rich_console__(console, options)
 
@@ -396,6 +384,28 @@ class TestCaseStatus(str, Enum):
     SKIP = "skip"
 
 
+class TestCaseError(BaseModel, frozen=True):
+    """Captures why a test case failed to execute."""
+
+    message: str
+    exception_type: str
+    traceback: str | None = None
+    phase: str | None = None
+
+    def summary(self) -> str:
+        """One-line description: ``<ExceptionType>[ during <phase>]: <message>``."""
+        phase = f" during {self.phase}" if self.phase else ""
+        return f"{self.exception_type}{phase}: {self.message}"
+
+    def rich_line(self, color: str) -> str:
+        """Rich-markup row rendering this error under a step, in the given color."""
+        return (
+            f"[{color} bold]Test case[/{color} bold]\t"
+            f"[{color}]ERROR[/{color}]\t"
+            f"{self.summary()}"
+        )
+
+
 class TestCaseResult(BaseResult, frozen=True):
     """Immutable summary of a test case execution with full run history.
 
@@ -410,6 +420,9 @@ class TestCaseResult(BaseResult, frozen=True):
         this step added before its checks ran. ``None`` when the step added no
         interactions (e.g. skipped). Consumers (such as the Giskard Hub upload
         flow) use this to attribute check results to a specific interaction.
+    error : TestCaseError | None
+        Execution error that prevented the test case from running normally,
+        such as an input-generation failure.
     status : TestCaseStatus
         Aggregated outcome of the test case derived from its results.
     passed : bool
@@ -431,11 +444,19 @@ class TestCaseResult(BaseResult, frozen=True):
             "interacts before checks ran; None when no interactions were added."
         ),
     )
+    error: TestCaseError | None = Field(
+        default=None,
+        description=(
+            "Execution error that prevented this test case from running normally."
+        ),
+    )
 
     @computed_field
     @property
     def status(self) -> TestCaseStatus:
         """The status of the test case."""
+        if self.error is not None:
+            return TestCaseStatus.ERROR
         if not self.results:
             return TestCaseStatus.PASS
 
@@ -484,6 +505,8 @@ class TestCaseResult(BaseResult, frozen=True):
             the check name/kind and the failure reason.
         """
         failure_messages: list[str] = []
+        if self.error is not None:
+            failure_messages.append(f"Test case ERRORED: {self.error.summary()}")
         for result in self.results:
             if result.failed or result.errored:
                 check_name: str = result.details.get(
@@ -522,11 +545,15 @@ class TestCaseResult(BaseResult, frozen=True):
         status = STATUS_MAPPING[self.status]
         yield Rule(status["title"], style=f"{status['color']} bold")
 
+        if self.error is not None:
+            yield self.error.rich_line(status["color"])
+
         for result in self.results:
             yield from result.__rich_console__(console, options)
 
         status_counts = {
-            "error": sum(1 for r in self.results if r.errored),
+            "error": sum(1 for r in self.results if r.errored)
+            + (1 if self.error is not None else 0),
             "fail": sum(1 for r in self.results if r.failed),
             "skip": sum(1 for r in self.results if r.skipped),
             "pass": sum(1 for r in self.results if r.passed),
@@ -710,7 +737,7 @@ def _suite_report_renderables(
     failures_and_errors = result.failures_and_errors
 
     if failures_and_errors:
-        max_reported_failures = _max_reported_failures_from_env()
+        max_reported_failures = get_settings().max_reported_failures
         reported_failures = failures_and_errors[:max_reported_failures]
         n_hidden = len(failures_and_errors) - len(reported_failures)
 

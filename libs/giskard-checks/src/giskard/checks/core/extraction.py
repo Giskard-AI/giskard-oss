@@ -4,6 +4,7 @@ from jsonpath_ng import (
     Child,
     DatumInContext,
     Descendants,
+    Fields,
     Intersect,
     JSONPath,
     Slice,
@@ -64,7 +65,10 @@ class NoMatch(BaseModel):
 
 
 def _is_list_expression(expression: JSONPath) -> bool:
-    if isinstance(expression, Child | Descendants):
+    if isinstance(expression, Descendants):
+        return True
+
+    if isinstance(expression, Child):
         return _is_list_expression(expression.right) or _is_list_expression(
             expression.left
         )
@@ -74,6 +78,9 @@ def _is_list_expression(expression: JSONPath) -> bool:
 
     if isinstance(expression, Slice | Union | Intersect):
         return True
+
+    if isinstance(expression, Fields):
+        return len(expression.fields) > 1 or "*" in expression.fields
 
     return False
 

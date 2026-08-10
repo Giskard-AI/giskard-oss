@@ -6,7 +6,7 @@ import numpy as np
 from giskard.checks import LLMGenerator, LLMJudge, Scenario, Trace
 from pydantic import BaseModel, Field
 
-from .base import ScenarioContext, ScenarioGenerator, TargetMode
+from .base import DEFAULT_TARGET_MODE, ScenarioContext, ScenarioGenerator, TargetMode
 
 DEFAULT_GOAT_MAX_TURNS = 10
 """Default number of attacker turns"""
@@ -134,7 +134,7 @@ class GOATAttackScenarioGenerator(ScenarioGenerator):
         context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
-        target_mode: TargetMode = "multiturn",
+        target_mode: TargetMode = DEFAULT_TARGET_MODE,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Generate GOAT attack scenarios for the described agent.
 
@@ -177,6 +177,7 @@ class GOATAttackScenarioGenerator(ScenarioGenerator):
         assignments = list(DEFAULT_GOAT_OBJECTIVES.items())
         selected_assignments: list[tuple[str, str]]
         rng = rng or np.random.default_rng()
+        languages = languages or ["en"]
 
         if max_scenarios is None or max_scenarios >= len(assignments):
             selected_assignments = assignments

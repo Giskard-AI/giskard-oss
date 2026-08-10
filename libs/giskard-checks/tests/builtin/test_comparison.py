@@ -7,6 +7,7 @@ Tests cover different types (numbers, strings) and various comparison scenarios:
 """
 
 import warnings
+from typing import Any
 
 import pytest
 from giskard.checks import (
@@ -131,8 +132,8 @@ class TestLessThan:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert isinstance(result.details["actual_value"], NoMatch)
         assert result.message is not None
 
@@ -162,8 +163,8 @@ class TestLessThan:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.details["actual_value"] == "5"
         assert result.details["expected_value"] == 10
         assert result.message is not None
@@ -180,8 +181,8 @@ class TestLessThan:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "< comparison" in result.message
@@ -260,8 +261,8 @@ class TestGreaterThan:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "str" in result.message
@@ -280,8 +281,8 @@ class TestGreaterThan:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "> comparison" in result.message
@@ -377,8 +378,8 @@ class TestLessThanEquals:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "str" in result.message
@@ -397,8 +398,8 @@ class TestLessThanEquals:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "<= comparison" in result.message
@@ -494,8 +495,8 @@ class TestGreaterEquals:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "str" in result.message
@@ -514,8 +515,8 @@ class TestGreaterEquals:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert ">= comparison" in result.message
@@ -535,8 +536,8 @@ class TestComparisonEdgeCases:
         result = await check.run(trace)
 
         # None comparisons raise TypeError in Python
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
 
@@ -550,8 +551,8 @@ class TestComparisonEdgeCases:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
 
@@ -567,8 +568,8 @@ class TestComparisonEdgeCases:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert "list" in result.message
@@ -626,8 +627,8 @@ class TestComparisonEdgeCases:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert result.message is not None
         assert "Comparison not supported" in result.message
 
@@ -823,8 +824,8 @@ class TestNotEquals:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.FAIL
-        assert result.failed
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
         assert isinstance(result.details["actual_value"], NoMatch)
         assert result.message is not None
 
@@ -942,6 +943,266 @@ class TestComparisonSentinelDefault:
                 expected_value=42,
                 expected_value_key="trace.last.metadata.expected",
             )
+
+
+class TestComparisonMatchMode:
+    """Test collection match modes (any, all, none) on ComparisonCheck."""
+
+    @staticmethod
+    async def _tool_calls_trace(
+        tool_calls: list[dict[str, object]] | None = None,
+    ) -> Trace[Any, Any]:
+        if tool_calls is None:
+            tool_calls = [
+                {"name": "search", "args": {}},
+                {"name": "summarize", "args": {}},
+            ]
+        return await Trace.from_interactions(
+            Interaction(
+                inputs="test",
+                outputs="result",
+                metadata={"tool_calls": tool_calls},
+            )
+        )
+
+    async def test_equals_match_any_with_wildcard_path(self):
+        """match='any' checks whether any list item equals the expected scalar."""
+        trace = await self._tool_calls_trace()
+        check = Equals(
+            expected_value="search",
+            key="trace.last.metadata.tool_calls[*].name",
+            match="any",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+        assert result.details["actual_value"] == ["search", "summarize"]
+
+    async def test_equals_match_any_fails_when_none_match(self):
+        trace = await self._tool_calls_trace()
+        check = Equals(
+            expected_value="delete",
+            key="trace.last.metadata.tool_calls[*].name",
+            match="any",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert isinstance(result.message, str)
+        assert "none matched" in result.message
+
+    async def test_equals_match_all_passes_when_all_match(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs="ok"),
+            Interaction(inputs="test", outputs="ok"),
+        )
+        check = Equals(
+            expected_value="ok",
+            key="trace.interactions[*].outputs",
+            match="all",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+
+    async def test_equals_match_all_fails_when_one_differs(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs="ok"),
+            Interaction(inputs="test", outputs="nope"),
+        )
+        check = Equals(
+            expected_value="ok",
+            key="trace.interactions[*].outputs",
+            match="all",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert isinstance(result.message, str)
+        assert "Expected all values equal to 'ok'" in result.message
+
+    async def test_equals_match_none_passes_when_no_item_matches(self):
+        trace = await self._tool_calls_trace()
+        check = Equals(
+            expected_value="delete",
+            key="trace.last.metadata.tool_calls[*].name",
+            match="none",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+
+    async def test_equals_match_none_fails_when_item_matches(self):
+        trace = await self._tool_calls_trace()
+        check = Equals(
+            expected_value="search",
+            key="trace.last.metadata.tool_calls[*].name",
+            match="none",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert isinstance(result.message, str)
+        assert "found matches" in result.message
+
+    async def test_match_any_fails_on_scalar_value(self):
+        trace = await Trace.from_interactions(Interaction(inputs="test", outputs="ok"))
+        check = Equals(
+            expected_value="ok",
+            key="trace.last.outputs",
+            match="any",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
+        assert isinstance(result.message, str)
+        assert "Expected a list, set, or tuple" in result.message
+
+    async def test_match_any_fails_on_empty_collection(self):
+        trace = await self._tool_calls_trace(tool_calls=[])
+        check = Equals(
+            expected_value="search",
+            key="trace.last.metadata.tool_calls[*].name",
+            match="any",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert isinstance(result.message, str)
+        assert "none matched" in result.message
+
+    @pytest.mark.parametrize(
+        ("match", "expect_pass"),
+        [("all", True), ("none", True)],
+        ids=["all", "none"],
+    )
+    async def test_empty_collection_match_modes(self, match, expect_pass):
+        trace = await self._tool_calls_trace(tool_calls=[])
+        check = Equals(
+            expected_value="search",
+            key="trace.last.metadata.tool_calls[*].name",
+            match=match,
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS if expect_pass else CheckStatus.FAIL
+        assert result.passed if expect_pass else result.failed
+
+    async def test_match_any_works_with_tuple(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs=(1, 2, 3)),
+        )
+        check = GreaterThan(
+            expected_value=2,
+            key="trace.last.outputs",
+            match="any",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+
+    async def test_match_any_works_with_set(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs={1, 2, 3}),
+        )
+        check = GreaterThan(
+            expected_value=2,
+            key="trace.last.outputs",
+            match="any",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+
+    @pytest.mark.parametrize("match", ["any", "all", "none"])
+    async def test_partial_unsupported_comparison_fails(self, match):
+        """Unsupported comparisons on any item fail instead of being ignored."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs=[5, "abc"]),
+        )
+        check = GreaterThan(
+            expected_value=3,
+            key="trace.last.outputs",
+            match=match,
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
+        assert isinstance(result.message, str)
+        assert "Comparison not supported" in result.message
+
+    async def test_match_any_passes_when_supported_items_match(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs=[5, 1]),
+        )
+        check = GreaterThan(
+            expected_value=3,
+            key="trace.last.outputs",
+            match="any",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
+
+    async def test_default_match_preserves_scalar_comparison(self):
+        """Without match mode, wildcard paths still compare the full list."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs="message 1"),
+        )
+        check = Equals(
+            expected_value="message 1",
+            key="trace.interactions[*].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.failed
+        assert isinstance(result.message, str)
+        assert (
+            "Expected value equal to 'message 1' but got ['message 1']"
+            in result.message
+        )
+
+    async def test_default_match_fixes_wildcard_with_match_any(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs="message 1"),
+        )
+        check = Equals(
+            expected_value="message 1",
+            key="trace.interactions[*].outputs",
+            match="any",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.passed
 
 
 class TestLessThanBackwardCompat:
