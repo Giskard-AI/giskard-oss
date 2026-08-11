@@ -239,6 +239,30 @@ def test_from_google_safety_maps_to_refusal():
     assert out.choices[0].message.refusal == "SAFETY"
 
 
+@pytest.mark.parametrize("reason", ["IMAGE_SAFETY", "RECITATION", "IMAGE_RECITATION"])
+def test_from_google_content_blocks_map_to_refusal(reason: str):
+    """Every reason Gemini uses to block content maps to ``refusal``.
+
+    ``IMAGE_SAFETY`` is the image-modality counterpart of ``SAFETY``, and the
+    two ``RECITATION`` reasons block output that reproduces protected content.
+    All three were absent from ``REFUSAL_REASONS``, so they fell through to the
+    default ``stop`` and a blocked generation was reported as a normal one.
+    """
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "blocked"}]},
+                    "finish_reason": reason,
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].finish_reason == "refusal"
+    assert out.choices[0].message.refusal == reason
+
+
 def test_from_google_refusal_uses_finish_message_when_present():
     """When Gemini supplies a ``finish_message``, it becomes the refusal text.
 
