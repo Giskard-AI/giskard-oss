@@ -29,6 +29,14 @@ from .fn import FnCheck, from_fn
 from .json_valid import JsonValid
 from .nlp_metrics import Readability
 from .rego_policy import RegoPolicy
+from .retrieval import (
+    MRR,
+    AveragePrecision,
+    HitRateAtK,
+    NDCGAtK,
+    PrecisionAtK,
+    RecallAtK,
+)
 from .semantic_similarity import SemanticSimilarity
 from .text_matching import RegexMatching, StringMatching
 
@@ -38,6 +46,12 @@ __all__ = [
     "Not",
     "from_fn",
     "FnCheck",
+    "RecallAtK",
+    "PrecisionAtK",
+    "HitRateAtK",
+    "MRR",
+    "NDCGAtK",
+    "AveragePrecision",
     "JsonValid",
     "Readability",
     "RegoPolicy",
