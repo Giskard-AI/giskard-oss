@@ -152,7 +152,17 @@ class ScenarioRunner:
         for step in steps:
             try:
                 for interaction in step.interacts:
-                    trace = await trace.with_interaction(interaction)
+                    generator = interaction.generate(trace)
+                    try:
+                        generated = await anext(generator)
+                        while True:
+                            # Keep runner-owned progress if a later yield fails.
+                            trace = await trace.with_interaction(generated)
+                            generated = await generator.asend(trace)
+                    except StopAsyncIteration:
+                        pass
+                    finally:
+                        await generator.aclose()
             except Exception as e:
                 if not return_exception:
                     raise

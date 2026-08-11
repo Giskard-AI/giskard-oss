@@ -815,6 +815,11 @@ class TestScenarioErrorHandling:
         assert step.error.phase == "input_generation"
         assert step.error.traceback is not None
         assert "Generator error" in step.error.traceback
+        assert step.last_interaction_index == 0
+
+        assert len(result.final_trace.interactions) == 1
+        assert result.final_trace.interactions[0].inputs == "test"
+        assert result.final_trace.interactions[0].outputs == "result"
 
         assert len(step.results) == 1
         assert step.results[0].skipped
