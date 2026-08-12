@@ -14,10 +14,8 @@ from ..judges import (
 # Import comparison checks (staying in builtin)
 from .comparison import (
     Equals,
-    GreaterEquals,
     GreaterThan,
-    LesserThan,
-    LesserThanEquals,
+    GreaterThanEquals,
     LessThan,
     LessThanEquals,
     NotEquals,
@@ -47,10 +45,8 @@ __all__ = [
     "NotEquals",
     "LessThan",
     "LessThanEquals",
-    "LesserThan",
     "GreaterThan",
-    "LesserThanEquals",
-    "GreaterEquals",
+    "GreaterThanEquals",
     "AnswerRelevance",
     "Groundedness",
     "Conformity",
