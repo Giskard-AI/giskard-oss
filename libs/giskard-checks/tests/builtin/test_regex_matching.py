@@ -172,7 +172,7 @@ async def test_regex_exact_whitespace() -> None:
 async def test_regex_with_trace_extraction() -> None:
     """Test regex matching with pattern from trace."""
     check = RegexMatching(
-        text_key="trace.last.outputs.response",
+        key="trace.last.outputs.response",
         pattern_key="trace.last.inputs.expected_pattern",
     )
     interaction = Interaction(
@@ -187,7 +187,7 @@ async def test_regex_with_trace_extraction() -> None:
 async def test_regex_extract_both_from_trace() -> None:
     """Test extracting both text and pattern from trace."""
     check = RegexMatching(
-        text_key="trace.last.outputs.answer",
+        key="trace.last.outputs.answer",
         pattern_key="trace.last.inputs.pattern",
     )
     interaction = Interaction(
@@ -351,7 +351,7 @@ async def test_missing_pattern_in_trace() -> None:
 async def test_missing_text_in_trace() -> None:
     """Test error handling when text cannot be extracted from trace."""
     check = RegexMatching(
-        text_key="trace.last.outputs.nonexistent",
+        key="trace.last.outputs.nonexistent",
         pattern="test",
     )
     result = await check.run(Trace())

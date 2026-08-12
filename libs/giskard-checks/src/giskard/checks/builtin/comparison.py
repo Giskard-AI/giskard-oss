@@ -36,7 +36,8 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     """
 
     key: JSONPathStr = Field(
-        ..., description="The key to extract the actual value from the trace"
+        default="trace.last.outputs",
+        description="The key to extract the actual value from the trace",
     )
     expected_value: ExpectedType | MISSING = Field(
         default=MISSING,
@@ -276,6 +277,7 @@ class LessThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrigh
         The expected value to compare against the extracted values
     key : str
         The key to extract the actual value from the trace
+        (default: "trace.last.outputs")
     """
 
     @override
@@ -319,6 +321,7 @@ class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyr
         The expected value to compare against the extracted values
     key : str
         The key to extract the actual value from the trace
+        (default: "trace.last.outputs")
     """
 
     @override
@@ -362,6 +365,7 @@ class LessThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # 
         The expected value to compare against the extracted values
     key : str
         The key to extract the actual value from the trace
+        (default: "trace.last.outputs")
     """
 
     @override
@@ -405,6 +409,7 @@ class GreaterThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType]( 
         The expected value to compare against the extracted values
     key : str
         The key to extract the actual value from the trace
+        (default: "trace.last.outputs")
     """
 
     @override
@@ -448,6 +453,7 @@ class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright:
         The expected value to compare against the extracted values
     key : str
         The key to extract the actual value from the trace
+        (default: "trace.last.outputs")
     """
 
     @override
@@ -491,6 +497,7 @@ class NotEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrig
         The expected value to compare against the extracted values
     key : str
         The key to extract the actual value from the trace
+        (default: "trace.last.outputs")
     """
 
     @override
