@@ -121,6 +121,12 @@ class Discriminated(BaseModel):
                 f"aliases must be a sequence of strings, got the string {aliases!r}; "
                 f"pass [{aliases!r}] instead."
             )
+        for alias in aliases:
+            if not isinstance(alias, str):
+                raise TypeError(
+                    f"aliases must be a sequence of strings, got {alias!r} "
+                    f"of type {type(alias).__name__}."
+                )
 
         def decorator(subclass: type[T]) -> type[T]:
             _REGISTRY.register_subclass(cls, subclass, kind, aliases)

@@ -130,6 +130,12 @@ def test_alias_as_bare_string_is_rejected():
         Animal.register("weasel", aliases="stoat")
 
 
+def test_alias_non_string_element_is_rejected():
+    """Non-string alias elements must not become registry keys."""
+    with pytest.raises(TypeError, match="aliases must be a sequence of strings"):
+        Animal.register("weasel", aliases=[123])  # type: ignore[list-item]
+
+
 T = TypeVar("T")
 
 
