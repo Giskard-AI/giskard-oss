@@ -1,4 +1,3 @@
-import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Literal, Self, override
 
@@ -297,26 +296,6 @@ class LessThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrigh
         return "<"
 
 
-@Check.register("lesser_than")
-class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
-    LessThan[InputType, OutputType, TraceType, ExpectedType]
-):
-    """Deprecated alias for :class:`LessThan`.
-
-    .. deprecated::
-        Use :class:`LessThan` instead. This alias remains for backward
-        compatibility with serialized checks using ``kind="lesser_than"``.
-    """
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        warnings.warn(
-            "LesserThan is deprecated; use LessThan instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(*args, **kwargs)
-
-
 @Check.register("greater_than")
 class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
@@ -403,28 +382,8 @@ class LessThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # 
         return "<="
 
 
-@Check.register("lesser_than_equals")
-class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
-    LessThanEquals[InputType, OutputType, TraceType, ExpectedType]
-):
-    """Deprecated alias for :class:`LessThanEquals`.
-
-    .. deprecated::
-        Use :class:`LessThanEquals` instead. This alias remains for backward
-        compatibility with serialized checks using ``kind="lesser_than_equals"``.
-    """
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        warnings.warn(
-            "LesserThanEquals is deprecated; use LessThanEquals instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(*args, **kwargs)
-
-
 @Check.register("greater_than_equals")
-class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+class GreaterThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values are greater than or equal to an expected value.

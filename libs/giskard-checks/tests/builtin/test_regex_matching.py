@@ -368,5 +368,7 @@ async def test_regex_redos_bounded_by_timeout() -> None:
         pattern="(x+)+$",
         match_timeout_seconds=0.5,
     )
-    with pytest.raises(TimeoutError):
-        _ = await check.run(Trace())
+    result = await check.run(Trace())
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "timeout" in result.message.lower()
