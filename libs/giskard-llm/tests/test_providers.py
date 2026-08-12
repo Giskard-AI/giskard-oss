@@ -17,6 +17,7 @@ from giskard.llm.providers.base import (
 )
 from giskard.llm.providers.google import GoogleProvider
 from giskard.llm.providers.openai import OpenAIProvider
+from giskard.llm.providers.orcarouter import OrcaRouterProvider
 from giskard.llm.types import (
     ResponseFunctionToolCall,
     ResponseOutputMessage,
@@ -331,6 +332,45 @@ def test_azure_ai_provider_forwards_transport_config(monkeypatch):
     assert kwargs["timeout"] == 12
     assert kwargs["http_client"] is http_client
     assert kwargs["default_headers"] == default_headers
+
+
+def test_orcarouter_provider_forwards_transport_config(monkeypatch):
+    http_client = object()
+    default_headers = {"x-orca": "1"}
+    monkeypatch.delenv("ORCAROUTER_API_KEY", raising=False)
+
+    with patch("giskard.llm.providers.openai._import_openai") as mock_import:
+        sdk = MagicMock()
+        mock_import.return_value = sdk
+
+        OrcaRouterProvider(
+            api_key="k",
+            base_url="https://api.orcarouter.ai/v1",
+            timeout=12,
+            http_client=cast("AsyncClient", http_client),
+            default_headers=default_headers,
+        )
+
+    kwargs = sdk.AsyncOpenAI.call_args.kwargs
+    assert kwargs["api_key"] == "k"
+    assert kwargs["base_url"] == "https://api.orcarouter.ai/v1"
+    assert kwargs["timeout"] == 12
+    assert kwargs["http_client"] is http_client
+    assert kwargs["default_headers"] == default_headers
+
+
+def test_orcarouter_provider_defaults_endpoint_and_env_key(monkeypatch):
+    monkeypatch.setenv("ORCAROUTER_API_KEY", "env-key")
+
+    with patch("giskard.llm.providers.openai._import_openai") as mock_import:
+        sdk = MagicMock()
+        mock_import.return_value = sdk
+
+        OrcaRouterProvider()
+
+    kwargs = sdk.AsyncOpenAI.call_args.kwargs
+    assert kwargs["api_key"] == "env-key"
+    assert kwargs["base_url"] == "https://api.orcarouter.ai/v1"
 
 
 def test_anthropic_provider_forwards_transport_config():

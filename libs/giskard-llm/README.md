@@ -68,6 +68,7 @@ response = await client.acompletion(
 | `anthropic/` | `anthropic` | `ANTHROPIC_API_KEY` | yes | no | `merge_system`, `timeout`, `http_client`, `default_headers` |
 | `azure/` | `openai` | `AZURE_API_KEY`, `AZURE_API_BASE` | yes | yes | `api_version`, `base_url`, `http_client`, `default_headers` |
 | `azure_ai/` | `openai` | `AZURE_AI_API_KEY`, `AZURE_AI_ENDPOINT` | yes | model-dependent | `base_url`, `http_client`, `default_headers` |
+| `orcarouter/` | `openai` | `ORCAROUTER_API_KEY` | yes | yes | `base_url`, `timeout`, `http_client`, `default_headers` |
 
 
 ## Azure Foundry OpenAI v1
