@@ -12,6 +12,25 @@ from ..core.check import Check
 from ..core.result import CheckResult, TestCaseResult
 from ..core.testcase import TestCase
 
+_CHECK_PARAM_EXCLUDES = {
+    "kind",
+    "name",
+    "description",
+    "generator",
+    "embedding_model",
+    "checks",
+    "check",
+}
+
+
+def _check_params(check: Check) -> dict[str, object]:
+    params = check.model_dump(
+        mode="json",
+        exclude=_CHECK_PARAM_EXCLUDES,
+        exclude_none=True,
+    )
+    return {key: value for key, value in params.items() if value not in ({}, [])}
+
 
 async def _run_check[
     InputType,
@@ -32,6 +51,7 @@ async def _run_check[
             raise e
         res = CheckResult.error(
             message=f"Check '{check.name or check.kind}' failed with error: {str(e)}",
+            check_name=check.name or check.kind,
             details={
                 "traceback": traceback.format_exc(),
                 "exception_type": type(e).__name__,
@@ -41,13 +61,14 @@ async def _run_check[
     # Update the result with the duration in details for observability
     return res.model_copy(
         update={
+            "check_name": res.check_name or check.name or check.kind,
             "details": {
                 **(res.details or {}),
                 "duration_ms": int((time.perf_counter() - check_start_time) * 1000),
                 "check_kind": check.kind,
-                "check_name": check.name,
                 "check_description": check.description,
-            }
+                "check_params": _check_params(check),
+            },
         }
     )
 

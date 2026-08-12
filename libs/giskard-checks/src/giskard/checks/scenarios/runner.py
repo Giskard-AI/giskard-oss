@@ -81,6 +81,7 @@ def _skipped_check_results_for_step[InputType, OutputType, TraceType: Trace[Any,
     return [
         CheckResult.skip(
             message=message,
+            check_name=check.name or check.kind,
             details={
                 "check_kind": check.kind,
                 "check_name": check.name,

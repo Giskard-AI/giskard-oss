@@ -1,3 +1,4 @@
+import json
 from collections import defaultdict
 from collections.abc import Mapping
 from enum import Enum
@@ -7,7 +8,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 if TYPE_CHECKING:
     from giskard.checks.scenarios.suite import Suite
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.markdown import Markdown
 from rich.panel import Panel
@@ -82,6 +83,16 @@ def _pluralize(count: int, word: str, plural: str | None = None) -> str:
     return f"{count} {plural}"
 
 
+def _format_check_params(params: Any) -> str:
+    if not isinstance(params, Mapping) or not params:
+        return ""
+
+    return "\n".join(
+        f"{key}: {json.dumps(value, ensure_ascii=False, default=str)}"
+        for key, value in params.items()
+    )
+
+
 class CheckStatus(str, Enum):
     """Outcome categories for a check execution."""
 
@@ -126,6 +137,8 @@ class CheckResult(BaseResult, frozen=True):
         Outcome status of the check.
     message : str or None
         Optional short message to surface to users (e.g., success/failure reason).
+    check_name : str or None
+        Direct display name for the check.
     metrics : list[Metric]
         Auxiliary metrics captured by the check.
     details : dict[str, Any]
@@ -145,8 +158,29 @@ class CheckResult(BaseResult, frozen=True):
 
     status: CheckStatus = Field(..., description="Check status")
     message: str | None = Field(default=None, description="Check message")
+    check_name: str | None = Field(default=None, description="Check name")
     metrics: list[Metric] = Field(default_factory=list, description="Check metric")
     details: dict[str, Any] = Field(default_factory=dict, description="Check details")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _promote_legacy_check_name(cls, data: Any) -> Any:
+        """Promote legacy details-based names into the first-class field."""
+        if not isinstance(data, dict):
+            return data
+        if data.get("check_name"):
+            return data
+
+        details = data.get("details")
+        if not isinstance(details, dict):
+            return data
+
+        for key in ("check_name", "check_kind", "name"):
+            value = details.get(key)
+            if value:
+                return {**data, "check_name": value}
+
+        return data
 
     # Convenience constructors
     @classmethod
@@ -154,6 +188,7 @@ class CheckResult(BaseResult, frozen=True):
         cls,
         *,
         message: str | None = None,
+        check_name: str | None = None,
         details: dict[str, Any] | None = None,
         metrics: list[Metric] | None = None,
     ) -> "CheckResult":
@@ -165,6 +200,7 @@ class CheckResult(BaseResult, frozen=True):
         return cls(
             status=CheckStatus.PASS,
             message=message,
+            check_name=check_name,
             details={} if details is None else details,
             metrics=metrics or [],
         )
@@ -174,6 +210,7 @@ class CheckResult(BaseResult, frozen=True):
         cls,
         *,
         message: str | None = None,
+        check_name: str | None = None,
         details: dict[str, Any] | None = None,
         metrics: list[Metric] | None = None,
     ) -> "CheckResult":
@@ -181,6 +218,7 @@ class CheckResult(BaseResult, frozen=True):
         return cls(
             status=CheckStatus.FAIL,
             message=message,
+            check_name=check_name,
             details={} if details is None else details,
             metrics=metrics or [],
         )
@@ -190,12 +228,14 @@ class CheckResult(BaseResult, frozen=True):
         cls,
         *,
         message: str | None = None,
+        check_name: str | None = None,
         details: dict[str, Any] | None = None,
     ) -> "CheckResult":
         """Construct a skipped result (e.g., precondition not met)."""
         return cls(
             status=CheckStatus.SKIP,
             message=message,
+            check_name=check_name,
             details={} if details is None else details,
         )
 
@@ -204,12 +244,14 @@ class CheckResult(BaseResult, frozen=True):
         cls,
         *,
         message: str | None = None,
+        check_name: str | None = None,
         details: dict[str, Any] | None = None,
     ) -> "CheckResult":
         """Construct an error result from an exception or unexpected condition."""
         return cls(
             status=CheckStatus.ERROR,
             message=message,
+            check_name=check_name,
             details={} if details is None else details,
         )
 
@@ -233,18 +275,29 @@ class CheckResult(BaseResult, frozen=True):
         """Return True if `status` is `SKIP`."""
         return self.status == CheckStatus.SKIP
 
+    @property
+    def check_label(self) -> str:
+        return self.check_name or "Unnamed check"
+
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         status = STATUS_MAPPING[self.status]
 
-        name = self.details.get("check_name", "[dim italic]Unnamed check[/dim italic]")
+        name = self.check_label
 
         if self.status == CheckStatus.FAIL or self.status == CheckStatus.ERROR:
             details = (
                 self.message
                 or "[dim italic]No specific error message provided[/dim italic]"
             )
+            params = _format_check_params(
+                self.details.get("check_params")
+                if isinstance(self.details, Mapping)
+                else None
+            )
+            if params:
+                details = f"{details}\n{params}"
         else:
             details = ""
 
@@ -509,11 +562,16 @@ class TestCaseResult(BaseResult, frozen=True):
             failure_messages.append(f"Test case ERRORED: {self.error.summary()}")
         for result in self.results:
             if result.failed or result.errored:
-                check_name: str = result.details.get(
-                    "check_name"
-                ) or result.details.get("check_kind", "Unknown check")
+                check_name = result.check_label
                 status = "ERRORED" if result.errored else "FAILED"
                 message = result.message or "No specific error message provided"
+                params = _format_check_params(
+                    result.details.get("check_params")
+                    if isinstance(result.details, Mapping)
+                    else None
+                )
+                if params:
+                    message = f"{message}\n{params}"
                 failure_messages.append(f"{check_name} {status}: {message}")
         return failure_messages
 

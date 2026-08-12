@@ -4,10 +4,9 @@ from contextlib import nullcontext
 from typing import Any
 
 import pytest
-from giskard.checks import Equals, Scenario, Suite
+from giskard.checks import CheckResult, Equals, Scenario, Suite
 from giskard.checks.core.interaction import Trace
 from giskard.checks.core.result import (
-    CheckResult,
     GroupedSuiteResult,
     GroupStats,
     ScenarioResult,
@@ -42,6 +41,20 @@ def sut3():
 @pytest.fixture
 def identity_sut():
     return lambda inputs: inputs
+
+
+def test_check_result_console_uses_direct_check_name():
+    result = CheckResult.failure(
+        message="boom",
+        check_name="MyCheck",
+    )
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "MyCheck" in output
+    assert "Unnamed check" not in output
 
 
 def failed_scenario(name: str) -> ScenarioResult[Trace[Any, Any]]:
@@ -330,11 +343,11 @@ async def test_suite_parallel_runs_concurrently():
     suite.append(Scenario("c").interact("c"))
 
     serial_start = time.perf_counter()
-    await suite.run()
+    await suite.run(verbose=False)
     serial_duration = time.perf_counter() - serial_start
 
     parallel_start = time.perf_counter()
-    await suite.run(parallel=True)
+    await suite.run(parallel=True, verbose=False)
     parallel_duration = time.perf_counter() - parallel_start
 
     assert parallel_duration < serial_duration

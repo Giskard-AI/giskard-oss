@@ -10,12 +10,15 @@ import pytest
 from giskard.checks import (
     Check,
     CheckResult,
+    CheckStatus,
     Equals,
     Interact,
     Interaction,
     TestCase,
+    TestCaseResult,
     Trace,
 )
+from rich.console import Console
 
 # Test Classes
 
@@ -233,6 +236,75 @@ class TestTestCaseResult:
         assert len(failures) == 1
         assert "FAILED" in failures[0]
         assert "wrong" in failures[0] or "output" in failures[0]
+
+    async def test_failure_report_uses_kind_and_check_params_for_unnamed_check(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="input", outputs="output")
+        )
+        check = Equals(expected_value="wrong", key="trace.interactions[-1].outputs")
+        test_case = TestCase(
+            name="unnamed_check_report",
+            trace=trace,
+            checks=[check],
+        )
+
+        result = await test_case.run()
+        check_result = result.results[0]
+
+        assert check_result.check_name == "equals"
+        assert check_result.details["check_kind"] == "equals"
+        assert check_result.details["check_params"] == {
+            "key": "trace.interactions[-1].outputs",
+            "expected_value": "wrong",
+            "normalization_form": "NFKC",
+        }
+
+        failures = result.format_failures()
+        assert failures == [
+            "equals FAILED: Expected value equal to 'wrong' but got 'output'\n"
+            'key: "trace.interactions[-1].outputs"\n'
+            'expected_value: "wrong"\n'
+            'normalization_form: "NFKC"'
+        ]
+
+    async def test_console_report_uses_kind_and_check_params_for_unnamed_check(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="input", outputs="output")
+        )
+        test_case = TestCase(
+            name="unnamed_check_console_report",
+            trace=trace,
+            checks=[Equals(expected_value="wrong", key="trace.interactions[-1].outputs")],
+        )
+        result = await test_case.run()
+
+        console = Console(record=True, force_terminal=False, no_color=True, width=120)
+        result.print_report(console)
+        report = console.export_text()
+
+        assert "None" not in report
+        assert "equals" in report
+        assert 'expected_value: "wrong"' in report
+
+    def test_failure_formatting_handles_non_dict_details(self):
+        result = CheckResult.model_construct(
+            status=CheckStatus.FAIL,
+            message="failed",
+            metrics=[],
+            details=None,
+        )
+
+        assert result.check_label == "Unnamed check"
+
+        test_case_result = TestCaseResult(results=[result], duration_ms=1)
+        assert test_case_result.format_failures() == [
+            "Unnamed check FAILED: failed"
+        ]
+
+        console = Console(record=True, force_terminal=False, no_color=True, width=120)
+        result.print_report(console)
+
+        assert "Unnamed check" in console.export_text()
 
     async def test_testcase_result_format_failures_with_errors(self):
         """Test format_failures() with error results."""

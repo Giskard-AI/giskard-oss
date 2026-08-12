@@ -24,12 +24,8 @@ def _to_json(value: Any) -> str:
 
 def _check_label(result: CheckResult, fallback: str) -> str:
     if isinstance(result.details, dict):
-        return str(
-            result.details.get("check_name")
-            or result.details.get("check_kind")
-            or result.details.get("name")
-            or fallback
-        )
+        label = result.check_label
+        return fallback if label == "Unnamed check" else label
     return fallback
 
 
