@@ -185,7 +185,10 @@ check-notices: ## Check that THIRD_PARTY_NOTICES.md is up to date (run make gene
 		exit 1; \
 	fi
 
-check: lint check-format check-compat typecheck security check-licenses check-notices ## Run all checks
+check-extra-pins: ## Assert root pyproject lower bounds match workspace member versions
+	uv run python tools/check_extra_pins.py
+
+check: lint check-format check-compat typecheck security check-licenses check-notices check-extra-pins ## Run all checks
 
 clean: ## Clean up build artifacts and caches
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
