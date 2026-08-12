@@ -6,19 +6,15 @@ Tests cover different types (numbers, strings) and various comparison scenarios:
 - TypeError handling (missing methods and incompatible types)
 """
 
-import warnings
 from typing import Any
 
 import pytest
 from giskard.checks import (
-    Check,
     CheckStatus,
     Equals,
     GreaterThan,
     GreaterThanEquals,
     Interaction,
-    LesserThan,
-    LesserThanEquals,
     LessThan,
     LessThanEquals,
     NotEquals,
@@ -30,7 +26,7 @@ from giskard.checks.core.extraction import NoMatch
 class TestLessThan:
     """Test LessThan check."""
 
-    async def test_number_lesser_than_success(self):
+    async def test_number_less_than_success(self):
         """Test that 5 < 10 passes."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LessThan(
@@ -45,7 +41,7 @@ class TestLessThan:
         assert result.details["actual_value"] == 5
         assert result.details["expected_value"] == 10
 
-    async def test_number_lesser_than_failure(self):
+    async def test_number_less_than_failure(self):
         """Test that 10 < 5 fails."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = LessThan(
@@ -62,7 +58,7 @@ class TestLessThan:
         assert isinstance(result.message, str)
         assert "Expected value less than 5 but got 10" in result.message
 
-    async def test_number_lesser_than_equal_fails(self):
+    async def test_number_less_than_equal_fails(self):
         """Test that 5 < 5 fails (equal values)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LessThan(
@@ -77,7 +73,7 @@ class TestLessThan:
         assert result.details["actual_value"] == 5
         assert result.details["expected_value"] == 5
 
-    async def test_float_lesser_than_success(self):
+    async def test_float_less_than_success(self):
         """Test that 3.14 < 5.0 passes."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
         check = LessThan(
@@ -90,7 +86,7 @@ class TestLessThan:
         assert result.status == CheckStatus.PASS
         assert result.passed
 
-    async def test_string_lesser_than_success(self):
+    async def test_string_less_than_success(self):
         """Test that 'apple' < 'banana' passes."""
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="apple")
@@ -105,7 +101,7 @@ class TestLessThan:
         assert result.status == CheckStatus.PASS
         assert result.passed
 
-    async def test_string_lesser_than_failure(self):
+    async def test_string_less_than_failure(self):
         """Test that 'banana' < 'apple' fails."""
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="banana")
@@ -291,7 +287,7 @@ class TestGreaterThan:
 class TestLessThanEquals:
     """Test LessThanEquals check."""
 
-    async def test_number_lesser_than_equals_success_less(self):
+    async def test_number_less_than_equals_success_less(self):
         """Test that 5 <= 10 passes (less than case)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LessThanEquals(
@@ -306,7 +302,7 @@ class TestLessThanEquals:
         assert result.details["actual_value"] == 5
         assert result.details["expected_value"] == 10
 
-    async def test_number_lesser_than_equals_success_equal(self):
+    async def test_number_less_than_equals_success_equal(self):
         """Test that 5 <= 5 passes (equal case)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LessThanEquals(
@@ -321,7 +317,7 @@ class TestLessThanEquals:
         assert result.details["actual_value"] == 5
         assert result.details["expected_value"] == 5
 
-    async def test_number_lesser_than_equals_failure(self):
+    async def test_number_less_than_equals_failure(self):
         """Test that 10 <= 5 fails."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = LessThanEquals(
@@ -338,7 +334,7 @@ class TestLessThanEquals:
         assert isinstance(result.message, str)
         assert "Expected value less than or equal to 5 but got 10" in result.message
 
-    async def test_string_lesser_than_equals_success(self):
+    async def test_string_less_than_equals_success(self):
         """Test that 'apple' <= 'banana' passes."""
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="apple")
@@ -353,7 +349,7 @@ class TestLessThanEquals:
         assert result.status == CheckStatus.PASS
         assert result.passed
 
-    async def test_string_lesser_than_equals_equal(self):
+    async def test_string_less_than_equals_equal(self):
         """Test that 'apple' <= 'apple' passes."""
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="apple")
@@ -533,7 +529,7 @@ class TestGreaterThanEquals:
 class TestComparisonEdgeCases:
     """Test edge cases for comparison checks."""
 
-    async def test_none_value_lesser_than(self):
+    async def test_none_value_less_than(self):
         """Test LessThan with None values."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = LessThan(
@@ -1213,37 +1209,13 @@ class TestComparisonMatchMode:
         assert result.passed
 
 
-class TestLessThanBackwardCompat:
-    """Backward compatibility for deprecated LesserThan names and kind strings."""
+class TestLessThanSerialisation:
+    """Serialised ``kind`` strings for the less-than comparison checks."""
 
     def test_less_than_serialises_with_new_kind(self):
         check = LessThan(expected_value=10, key="trace.last.outputs")
         assert check.model_dump()["kind"] == "less_than"
 
-    def test_lesser_than_serialises_with_legacy_kind(self):
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always", DeprecationWarning)
-            check = LesserThan(expected_value=10, key="trace.last.outputs")
-        assert len(caught) == 1
-        assert "LesserThan is deprecated" in str(caught[0].message)
-        assert check.model_dump()["kind"] == "lesser_than"
-
-    def test_lesser_than_kind_deserialises(self):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            original = LesserThan(expected_value=10, key="trace.last.outputs")
-        restored = Check.model_validate(original.model_dump())
-        assert isinstance(restored, LesserThan)
-        assert restored.kind == "lesser_than"
-
     def test_less_than_equals_serialises_with_new_kind(self):
         check = LessThanEquals(expected_value=10, key="trace.last.outputs")
         assert check.model_dump()["kind"] == "less_than_equals"
-
-    def test_lesser_than_equals_kind_deserialises(self):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            original = LesserThanEquals(expected_value=10, key="trace.last.outputs")
-        restored = Check.model_validate(original.model_dump())
-        assert isinstance(restored, LesserThanEquals)
-        assert restored.kind == "lesser_than_equals"
