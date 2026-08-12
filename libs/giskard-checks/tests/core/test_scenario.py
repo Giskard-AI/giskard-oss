@@ -369,6 +369,47 @@ class TestScenarioNormalCases:
         assert result.final_trace.interactions[0] == interaction1
         assert result.errored
 
+    async def test_skipped_step_without_checks_reports_skip_not_pass(self):
+        """A checkless step that never ran must report SKIP, never PASS."""
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+
+        result = await (
+            Scenario("skipped_checkless_step")
+            .add_interaction(MockInteractionSpec(interactions=[interaction1]))
+            .check(MockCheck(result=CheckResult.failure(message="Check 1 failed")))
+            .add_interaction(MockInteractionSpec(interactions=[interaction2]))
+            .run()
+        )
+
+        assert len(result.steps) == 2
+        assert result.steps[0].failed
+        # The second step carries no checks and never ran.
+        assert result.steps[1].skipped
+        assert not result.steps[1].passed
+        assert len(result.steps[1].results) == 1
+        assert result.steps[1].results[0].skipped
+        assert result.failed
+
+    async def test_skipped_step_without_checks_after_error_reports_skip(self):
+        """Same as above when the preceding step errored rather than failed."""
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+
+        result = await (
+            Scenario("skipped_checkless_step_after_error")
+            .add_interaction(MockInteractionSpec(interactions=[interaction1]))
+            .check(MockCheck(result=CheckResult.error(message="Check 1 errored")))
+            .add_interaction(MockInteractionSpec(interactions=[interaction2]))
+            .run()
+        )
+
+        assert len(result.steps) == 2
+        assert result.steps[0].errored
+        assert result.steps[1].skipped
+        assert not result.steps[1].passed
+        assert result.errored
+
     async def test_trace_accumulation_across_components(self):
         """Test that trace accumulates interactions across components."""
         interaction1 = Interaction(inputs="1", outputs="2")

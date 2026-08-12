@@ -78,6 +78,12 @@ def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
 def _skipped_check_results_for_step[InputType, OutputType, TraceType: Trace[Any, Any]](
     step: Step[InputType, OutputType, TraceType], message: str
 ) -> list[CheckResult]:
+    # A step carrying no checks still has to yield one SKIP result: an empty
+    # result list would make TestCaseResult.status report PASS, turning a step
+    # that never ran into a green one.
+    if not step.checks:
+        return [CheckResult.skip(message=message)]
+
     return [
         CheckResult.skip(
             message=message,
