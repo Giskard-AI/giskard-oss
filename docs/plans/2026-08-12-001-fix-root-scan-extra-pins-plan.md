@@ -125,3 +125,11 @@ Version bumps of workspace members have been applied without matching root-extra
 - U1 and U2 complete; drift smoke proved.
 - Abandoned experimental check variants removed from the tree.
 - Conventional commit(s); PR references #2731.
+
+## Review
+
+Implemented on `cursor/fix-root-scan-extra-pins-6e35` as PR #2737.
+
+- U1: root `scan` / `garak` / `deepteam` → `>=1.0.0b4,<2`.
+- U2: `tools/check_extra_pins.py` + `make check-extra-pins` in `check`.
+- Verification: intentional `b2` drift fails; restored tree + full `make check` pass.

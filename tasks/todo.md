@@ -12,10 +12,12 @@
 - [x] Pin bump in root `pyproject.toml`
 - [x] Check script + Makefile wiring
 - [x] Drift smoke (pass / fail / restore)
-- [ ] Full `make check` green
-- [ ] PR title ends with 🤖🤖🤖🤖
+- [x] Full `make check` green
+- [x] PR title ends with 🤖🤖🤖🤖
 
 ## Review / results
 
 - Drift smoke confirmed: stale `b2` on `scan` fails with expected/found message.
 - basedpyright initially flagged untyped `dict` on the helper; fixed with `dict[str, Any]` and removed `from __future__ import annotations` per repo Python rules.
+- `make check` passed end-to-end (lint, format, vermin, basedpyright, pip-audit, licenses, notices, check-extra-pins).
+- PR: https://github.com/Giskard-AI/giskard-oss/pull/2737
