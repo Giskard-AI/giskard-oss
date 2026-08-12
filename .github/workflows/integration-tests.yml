@@ -7,6 +7,7 @@ on:
       - "libs/giskard-agents/**"
       - "libs/giskard-llm/**"
       - "libs/giskard-core/**"
+      - "libs/giskard-scan/**"
       - ".github/workflows/integration-tests.yml"
       - "pyproject.toml"
       - "uv.lock"
