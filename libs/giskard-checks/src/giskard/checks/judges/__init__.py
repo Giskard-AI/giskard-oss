@@ -3,6 +3,7 @@
 from .answer_relevance import AnswerRelevance
 from .base import BaseLLMCheck, LLMCheckResult
 from .conformity import Conformity
+from .context_relevance import ContextRelevance
 from .contradiction import Contradiction
 from .groundedness import Groundedness
 from .judge import LLMJudge
@@ -13,6 +14,7 @@ __all__ = [
     "BaseLLMCheck",
     "LLMCheckResult",
     "Conformity",
+    "ContextRelevance",
     "Contradiction",
     "Groundedness",
     "LLMJudge",
