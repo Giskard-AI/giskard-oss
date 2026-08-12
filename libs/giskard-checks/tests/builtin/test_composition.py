@@ -116,6 +116,38 @@ class TestAllOf:
         assert result.status == CS.ERROR
         assert result.errored
 
+    async def test_skip_then_fail_returns_failure(self):
+        """A skipped check does not mask a later failure."""
+        check = AllOf(checks=[_skip_fn_check("skipped"), _failing_fn_check("boom")])
+        result = await check.run(Trace())
+
+        assert result.failed
+        assert "boom" in (result.message or "")
+
+    async def test_skip_then_pass_returns_success(self):
+        """A skipped check does not prevent an overall pass."""
+        check = AllOf(checks=[_skip_fn_check("skipped"), _passing_fn_check("ok")])
+        result = await check.run(Trace())
+
+        assert result.passed
+        assert "ok" in (result.message or "")
+
+    async def test_all_skipped_returns_skip(self):
+        """When every check is skipped, the result is a skip."""
+        check = AllOf(checks=[_skip_fn_check("a"), _skip_fn_check("b")])
+        result = await check.run(Trace())
+
+        assert result.status == CS.SKIP
+        assert result.skipped
+
+    async def test_skip_then_error_returns_error(self):
+        """An erroring check after a skip still short-circuits."""
+        check = AllOf(checks=[_skip_fn_check("skipped"), _error_fn_check("boom")])
+        result = await check.run(Trace())
+
+        assert result.status == CS.ERROR
+        assert result.errored
+
     async def test_single_check_pass(self):
         """Single passing check returns success."""
         check = AllOf(checks=[_passing_fn_check("only")])
