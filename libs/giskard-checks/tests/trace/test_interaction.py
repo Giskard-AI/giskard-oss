@@ -76,6 +76,36 @@ class TestInteraction:
         assert str(exc_info.value.__cause__) == "Generator error"
         assert cleanup_events == ["closed"]
 
+    async def test_nested_generation_error_is_raised_once(self):
+        """A spec driving another spec keeps one wrapper and the richest trace."""
+
+        class InnerSpec(InteractionSpec[str, str, Trace[str, str]]):
+            @override
+            async def generate(
+                self, trace: Trace[str, str]
+            ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+                yield Interaction(inputs="inner", outputs="result")
+                raise RuntimeError("Generator error")
+
+        class OuterSpec(InteractionSpec[str, str, Trace[str, str]]):
+            @override
+            async def generate(
+                self, trace: Trace[str, str]
+            ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+                trace = yield Interaction(inputs="outer", outputs="result")
+                _ = await trace.with_interaction(InnerSpec())
+
+        with pytest.raises(InteractionGenerationError) as exc_info:
+            await Trace[str, str]().with_interaction(OuterSpec())
+
+        # The wrapper is raised once, so the root cause stays one hop away and
+        # the inner spec's progress is not discarded by an outer re-wrap.
+        assert isinstance(exc_info.value.__cause__, RuntimeError)
+        assert [item.inputs for item in exc_info.value.partial_trace.interactions] == [
+            "outer",
+            "inner",
+        ]
+
     async def test_interaction_with_inputs_generator(self):
         def inputs_generator(
             trace: Trace[int, int],

@@ -113,6 +113,48 @@ class ChainedGeneratorErrorComponent(InteractionSpec[str, str, Trace[str, str]])
             raise RuntimeError("Generator error") from root
 
 
+@InteractionSpec.register("implicit_context_error_component")
+class ImplicitContextErrorComponent(InteractionSpec[str, str, Trace[str, str]]):
+    """Component whose generator raises without explicit `from` chaining."""
+
+    @override
+    async def generate(
+        self, trace: Trace[str, str]
+    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+        """Yield an interaction then raise, chaining the cause implicitly."""
+        yield Interaction(inputs="test", outputs="result", metadata={})
+        try:
+            raise KeyError("root cause")
+        except KeyError:
+            raise RuntimeError("Generator error")
+
+
+@InteractionSpec.register("failing_interaction_component")
+class FailingInteractionComponent(InteractionSpec[str, str, Trace[str, str]]):
+    """Component whose generator raises before yielding anything."""
+
+    @override
+    async def generate(
+        self, trace: Trace[str, str]
+    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+        """Raise before producing any interaction."""
+        raise RuntimeError("Generator error")
+        yield  # pragma: no cover - makes this an async generator
+
+
+@InteractionSpec.register("nested_generator_error_component")
+class NestedGeneratorErrorComponent(InteractionSpec[str, str, Trace[str, str]]):
+    """Component that delegates to another spec through the trace."""
+
+    @override
+    async def generate(
+        self, trace: Trace[str, str]
+    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+        """Yield an interaction then drive a failing spec via the trace."""
+        trace = yield Interaction(inputs="outer", outputs="result", metadata={})
+        _ = await trace.with_interaction(GeneratorErrorComponent())
+
+
 # Test Classes
 
 
@@ -822,6 +864,57 @@ class TestScenarioErrorHandling:
         # runner unwraps it without flattening the generator's own cause chain.
         assert isinstance(exc_info.value.__cause__, KeyError)
         assert not isinstance(exc_info.value, InteractionGenerationError)
+
+    async def test_generator_exception_keeps_implicit_context(self):
+        """Test that an implicitly chained generator error keeps its context."""
+        builder = Scenario("implicit_context_exception").add_interaction(
+            ImplicitContextErrorComponent()
+        )
+
+        with pytest.raises(RuntimeError, match="Generator error") as exc_info:
+            _ = await builder.run()
+
+        # Unwrapping must not suppress the context Python set implicitly when the
+        # generator raised inside an `except` block without an explicit `from`.
+        assert exc_info.value.__cause__ is None
+        assert isinstance(exc_info.value.__context__, KeyError)
+        assert not exc_info.value.__suppress_context__
+
+    async def test_nested_generator_exception_is_not_double_wrapped(self):
+        """Test that a spec driving another spec reports the original error."""
+        builder = Scenario("nested_generator_exception").add_interaction(
+            NestedGeneratorErrorComponent()
+        )
+
+        with pytest.raises(RuntimeError, match="Generator error") as exc_info:
+            _ = await builder.run()
+
+        assert not isinstance(exc_info.value, InteractionGenerationError)
+
+        result = await builder.run(return_exception=True)
+
+        # The nested spec's progress is preserved alongside the outer spec's.
+        step = result.steps[0]
+        assert step.error is not None
+        assert step.error.exception_type == "RuntimeError"
+        assert [
+            interaction.inputs for interaction in result.final_trace.interactions
+        ] == ["outer", "test"]
+        assert step.last_interaction_index == 1
+
+    async def test_generator_exception_before_first_yield(self):
+        """Test that a generator failing before any yield leaves an empty trace."""
+        builder = Scenario("no_yield_exception").add_interaction(
+            FailingInteractionComponent()
+        )
+
+        result = await builder.run(return_exception=True)
+
+        step = result.steps[0]
+        assert step.error is not None
+        assert step.error.phase == "input_generation"
+        assert result.final_trace.interactions == []
+        assert step.last_interaction_index is None
 
     async def test_generator_exception_returned_as_test_case_error(self):
         """Test input generation exceptions become test case errors when requested."""

@@ -181,9 +181,17 @@ class ScenarioRunner:
                 if not return_exception:
                     if error is caught:
                         raise
-                    # Keep the generator error's own cause chain, and suppress the
-                    # InteractionGenerationError wrapper from the reported context.
-                    raise error from error.__cause__
+                    # Hide the InteractionGenerationError wrapper without losing
+                    # how the generator error was chained. Capture the original
+                    # links first: `raise` below re-points __context__ at the
+                    # wrapper we are unwrapping.
+                    context = error.__context__
+                    suppress_context = error.__suppress_context__
+                    try:
+                        raise error
+                    finally:
+                        error.__context__ = context
+                        error.__suppress_context__ = suppress_context
 
                 step_result = TestCaseResult(
                     results=_skipped_check_results_for_step(

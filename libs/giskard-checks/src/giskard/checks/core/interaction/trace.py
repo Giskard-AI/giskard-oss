@@ -162,6 +162,11 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
                 trace = await trace.with_interaction(await generator.asend(trace))
         except StopAsyncIteration:
             return trace
+        except InteractionGenerationError:
+            # A nested spec already wrapped this failure. Its partial trace was
+            # built from ours, so it holds strictly more progress; re-wrapping
+            # would bury the root cause one level deeper and drop that progress.
+            raise
         except Exception as error:
             raise InteractionGenerationError(trace) from error
         finally:
