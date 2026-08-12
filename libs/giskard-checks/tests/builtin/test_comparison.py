@@ -10,7 +10,6 @@ from typing import Any
 
 import pytest
 from giskard.checks import (
-    Check,
     CheckStatus,
     Equals,
     GreaterEquals,
@@ -1212,36 +1211,3 @@ class TestLessThanSerialisation:
     def test_less_than_equals_serialises_with_new_kind(self):
         check = LessThanEquals(expected_value=10, key="trace.last.outputs")
         assert check.model_dump()["kind"] == "less_than_equals"
-
-    @pytest.mark.parametrize(
-        ("legacy_kind", "canonical_kind", "expected_type"),
-        [
-            ("lesser_than", "less_than", LessThan),
-            ("lesser_than_equals", "less_than_equals", LessThanEquals),
-        ],
-    )
-    def test_legacy_lesser_than_kinds_migrate_on_round_trip(
-        self,
-        legacy_kind: str,
-        canonical_kind: str,
-        expected_type: type[Check[Any, Any, Any]],
-    ):
-        """Legacy payloads deserialise, then re-serialise under the canonical kind."""
-        restored = Check.model_validate(
-            {"kind": legacy_kind, "expected_value": 10, "key": "trace.last.outputs"}
-        )
-
-        assert isinstance(restored, expected_type)
-        assert restored.model_dump()["kind"] == canonical_kind
-
-    async def test_legacy_kind_check_still_runs(self):
-        """A check loaded from a legacy payload behaves like the canonical one."""
-        trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
-        check = Check.model_validate(
-            {"kind": "lesser_than", "expected_value": 10, "key": "trace.last.outputs"}
-        )
-
-        result = await check.run(trace)
-
-        assert result.status == CheckStatus.PASS
-        assert result.passed

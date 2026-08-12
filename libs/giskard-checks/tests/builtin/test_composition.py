@@ -424,27 +424,6 @@ class TestSerialization:
         result = await restored.run(trace)
         assert result.passed
 
-    async def test_all_of_deserialises_legacy_lesser_than_kind(self):
-        """Nested checks using the legacy lesser_than kind still load and migrate."""
-        trace = await Trace.from_interactions(Interaction(inputs="q", outputs=3))
-        data = {
-            "kind": "all_of",
-            "checks": [
-                {
-                    "kind": "lesser_than",
-                    "expected_value": 10,
-                    "key": "trace.last.outputs",
-                }
-            ],
-        }
-
-        restored = AllOf.model_validate(data)
-
-        assert isinstance(restored.checks[0], LessThan)
-        assert restored.checks[0].model_dump()["kind"] == "less_than"
-        result = await restored.run(trace)
-        assert result.passed
-
     async def test_any_of_serialises(self):
         """AnyOf round-trips through model_dump."""
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))

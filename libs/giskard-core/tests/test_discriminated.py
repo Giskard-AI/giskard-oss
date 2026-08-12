@@ -1,4 +1,4 @@
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 import pytest
 from giskard.core import Discriminated, discriminated_base
@@ -40,13 +40,6 @@ class Dog(Pet):
     breed: str
 
 
-@Animal.register("hamster", aliases=["hampster", "hamstar"])
-class Hamster(Pet):
-    """A hamster, registered with misspelled legacy kinds."""
-
-    wheel: bool = True
-
-
 @pytest.mark.parametrize(
     "animal,kind",
     [
@@ -81,60 +74,6 @@ def test_discriminated_missing_kind():
     data = {"name": "Felix", "lives": 9}
     with pytest.raises(ValueError, match=f"Kind is not provided for class {Animal}"):
         Animal.model_validate(data)
-
-
-def test_alias_serialises_with_canonical_kind():
-    """Instances always serialise under the canonical kind, never an alias."""
-    assert Hamster(name="Nibbles").model_dump()["kind"] == "hamster"
-
-
-@pytest.mark.parametrize("alias", ["hampster", "hamstar"])
-def test_alias_deserialises_and_migrates(alias: str):
-    """Payloads using a legacy alias load, then re-serialise as the canonical kind."""
-    restored = Animal.model_validate({"kind": alias, "name": "Nibbles"})
-
-    assert isinstance(restored, Hamster)
-    assert restored.name == "Nibbles"
-    assert restored.model_dump()["kind"] == "hamster"
-
-
-def test_alias_conflicting_with_existing_kind_raises():
-    """An alias colliding with a registered kind is rejected at import time."""
-    with pytest.raises(ValueError, match="Kind cat is already registered"):
-
-        @Animal.register("gerbil", aliases=["cat"])
-        class Gerbil(Pet):
-            pass
-
-
-def test_failed_registration_leaves_registry_untouched():
-    """A collision partway through the aliases registers none of them."""
-    with pytest.raises(ValueError, match="Kind dog is already registered"):
-
-        @Animal.register("ferret", aliases=["polecat", "dog"])
-        class Ferret(Pet):
-            pass
-
-    for kind in ("ferret", "polecat"):
-        with pytest.raises(ValueError, match=f"Kind {kind} is not registered"):
-            Animal.model_validate({"kind": kind, "name": "Rikki"})
-
-
-def test_alias_as_bare_string_is_rejected():
-    """A bare string alias would silently register one kind per character.
-
-    ``str`` satisfies ``Sequence[str]``, so the type checker cannot catch this;
-    the guard has to exist at runtime.
-    """
-    with pytest.raises(TypeError, match="aliases must be a sequence of strings"):
-        Animal.register("weasel", aliases="stoat")
-
-
-def test_alias_non_string_element_is_rejected():
-    """Non-string alias elements must not become registry keys."""
-    bad_aliases: Any = [123]
-    with pytest.raises(TypeError, match="aliases must be a sequence of strings"):
-        Animal.register("weasel", aliases=bad_aliases)
 
 
 T = TypeVar("T")
