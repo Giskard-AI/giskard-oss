@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 from giskard.checks import (
+    Check,
     CheckStatus,
     Equals,
     GreaterThan,
