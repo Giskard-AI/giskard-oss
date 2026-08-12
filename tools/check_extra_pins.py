@@ -8,11 +8,10 @@ Aggregator requirements that do not name a workspace member (for example
 ``giskard[full]``) are skipped.
 """
 
-from __future__ import annotations
-
 import sys
 import tomllib
 from pathlib import Path
+from typing import Any
 
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.specifiers import SpecifierSet
@@ -29,7 +28,7 @@ def _member_versions() -> dict[str, str]:
         project = data.get("project") or {}
         name = project.get("name")
         version = project.get("version")
-        if not name or not version:
+        if not isinstance(name, str) or not isinstance(version, str):
             raise SystemExit(
                 f"missing project.name/version in {path.relative_to(REPO_ROOT)}"
             )
@@ -46,16 +45,22 @@ def _lower_bound(specifiers: SpecifierSet) -> str | None:
     return lowers[0]
 
 
-def _iter_root_requirements(data: dict) -> list[tuple[str, str]]:
+def _iter_root_requirements(data: dict[str, Any]) -> list[tuple[str, str]]:
     """Return (location, requirement_string) pairs from root project deps."""
     project = data.get("project") or {}
+    if not isinstance(project, dict):
+        raise SystemExit("root pyproject.toml: project table missing or invalid")
     entries: list[tuple[str, str]] = []
     for req in project.get("dependencies") or []:
-        entries.append(("project.dependencies", req))
+        if isinstance(req, str):
+            entries.append(("project.dependencies", req))
     optional = project.get("optional-dependencies") or {}
+    if not isinstance(optional, dict):
+        raise SystemExit("root pyproject.toml: optional-dependencies invalid")
     for extra, reqs in optional.items():
         for req in reqs or []:
-            entries.append((f"project.optional-dependencies.{extra}", req))
+            if isinstance(req, str):
+                entries.append((f"project.optional-dependencies.{extra}", req))
     return entries
 
 
