@@ -7,6 +7,7 @@ updated Trace objects via the async generator protocol.
 
 import time
 import traceback
+from collections.abc import AsyncGenerator
 from typing import Any, cast
 
 from giskard.core import (
@@ -18,7 +19,8 @@ from pydantic.experimental.missing_sentinel import MISSING
 
 from .._telemetry_props import scenario_shape_properties
 from ..core import Trace
-from ..core.interaction import Interact
+from ..core.interaction import Interact, InteractionSpec
+from ..core.interaction.interaction import Interaction
 from ..core.result import CheckResult, ScenarioResult, TestCaseError, TestCaseResult
 from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
@@ -73,6 +75,61 @@ def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
     effective_target = run_target if run_target is not MISSING else scenario.target
     inferred = _infer_trace_type(effective_target)
     return cast(type[TraceType], inferred if inferred is not None else Trace)
+
+
+def _tag_interaction_with_step_index[InputType, OutputType](
+    interaction: Interaction[InputType, OutputType],
+    *,
+    step_index: int,
+) -> Interaction[InputType, OutputType]:
+    return interaction.model_copy(
+        update={
+            "metadata": {
+                **interaction.metadata,
+                "step_index": step_index,
+            }
+        }
+    )
+
+
+class _StepIndexedInteractionSpec[InputType, OutputType, TraceType: Trace[Any, Any]]:
+    def __init__(
+        self,
+        interact: InteractionSpec[InputType, OutputType, TraceType],
+        *,
+        step_index: int,
+    ) -> None:
+        self._interact = interact
+        self._step_index = step_index
+
+    async def generate(
+        self, trace: TraceType
+    ) -> AsyncGenerator[Interaction[InputType, OutputType], TraceType]:
+        generator = self._interact.generate(trace)
+
+        try:
+            interaction = await anext(generator)
+            while True:
+                trace = yield _tag_interaction_with_step_index(
+                    interaction,
+                    step_index=self._step_index,
+                )
+                interaction = await generator.asend(trace)
+        except StopAsyncIteration:
+            return
+        finally:
+            await generator.aclose()
+
+
+def _bind_step_index[InputType, OutputType, TraceType: Trace[Any, Any]](
+    step: Step[InputType, OutputType, TraceType],
+    *,
+    step_index: int,
+) -> list[_StepIndexedInteractionSpec[InputType, OutputType, TraceType]]:
+    return [
+        _StepIndexedInteractionSpec(interact, step_index=step_index)
+        for interact in step.interacts
+    ]
 
 
 def _skipped_check_results_for_step[InputType, OutputType, TraceType: Trace[Any, Any]](
@@ -149,10 +206,11 @@ class ScenarioRunner:
             properties=shape_props,
         )
 
-        for step in steps:
+        for step_index, step in enumerate(steps):
             try:
-                for interaction in step.interacts:
-                    trace = await trace.with_interaction(interaction)
+                trace = await trace.with_interactions(
+                    *_bind_step_index(step, step_index=step_index)
+                )
             except Exception as e:
                 if not return_exception:
                     raise
