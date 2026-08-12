@@ -7,6 +7,8 @@ from pydantic.experimental.missing_sentinel import MISSING
 from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
+from ..core.result import CheckResult
+from ._inputs import ResolvableInput, error_if_unresolved
 from .base import BaseLLMCheck
 
 ToxicityCategory = Literal[
@@ -99,6 +101,22 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     def get_prompt(self) -> TemplateReference:
         """Return the bundled prompt template for toxicity evaluation."""
         return TemplateReference(template_name="giskard.checks::judges/toxicity.j2")
+
+    @override
+    async def run(self, trace: TraceType) -> CheckResult:
+        """Return ERROR when ``output_key`` does not resolve; else run the judge.
+
+        Guarding here—before ``super().run()``—means a misconfigured key costs no
+        judge call. Without it, ``NoMatch`` reached the prompt as the benign
+        sentence ``"No match for key: <key>"``, which the judge scored as
+        non-toxic, turning a mis-typed key into a permanently passing check.
+        """
+        if early := error_if_unresolved(
+            trace,
+            ResolvableInput("output", self.output_key, self.output),
+        ):
+            return early
+        return await super().run(trace)
 
     @override
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:

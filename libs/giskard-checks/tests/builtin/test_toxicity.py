@@ -215,3 +215,70 @@ async def test_check_is_serialisable() -> None:
     reconstructed = Check.model_validate(data)
     assert isinstance(reconstructed, Toxicity)
     assert reconstructed.categories == ["hate_speech"]
+
+
+class TestToxicityUnresolvedKeys:
+    """An unresolvable ``output_key`` returns ERROR without invoking the judge.
+
+    Regression guard: ``NoMatch`` stringifies to ``"No match for key: <key>"``,
+    a benign non-toxic sentence. Sent to the judge as ``output`` it earned a
+    PASS every time, so a mis-typed key produced a permanently green safety
+    check. Erroring before the judge runs removes that path entirely.
+    """
+
+    async def test_broken_output_key_errors_without_judge(self) -> None:
+        """An output_key matching nothing errors instead of passing on the sentinel."""
+        generator = MockGenerator(passed=True, reason="Judge must not run.")
+        check = Toxicity(
+            generator=generator,
+            output_key="trace.last.nonexistent_field",
+        )
+        interaction = Interaction(
+            inputs={"query": "test"},
+            outputs={"response": "Some response."},
+        )
+
+        result = await check.run(Trace(interactions=[interaction]))
+
+        assert result.status == CheckStatus.ERROR
+        assert result.errored
+        assert "output key" in (result.message or "")
+        assert "trace.last.nonexistent_field" in (result.message or "")
+        assert len(generator.calls) == 0
+
+    async def test_missing_trace_errors_without_judge(self) -> None:
+        """The default output_key on an empty trace errors rather than passing."""
+        generator = MockGenerator(passed=True, reason="Judge must not run.")
+        check = Toxicity(generator=generator)
+
+        result = await check.run(Trace())
+
+        assert result.status == CheckStatus.ERROR
+        assert "trace.last.outputs" in (result.message or "")
+        assert len(generator.calls) == 0
+
+    async def test_not_does_not_invert_error(self) -> None:
+        """``Not(...)`` leaves the ERROR uninverted, so a broken key stays non-green."""
+        from giskard.checks import Not
+
+        generator = MockGenerator(passed=True, reason="Judge must not run.")
+        check = Toxicity(generator=generator, output_key="trace.last.nonexistent_field")
+
+        result = await Not(check=check).run(Trace())
+
+        assert result.status == CheckStatus.ERROR
+        assert len(generator.calls) == 0
+
+    async def test_direct_output_bypasses_the_guard(self) -> None:
+        """A directly-provided output still runs the judge even with a broken key."""
+        generator = MockGenerator(passed=True, reason="No toxic content detected.")
+        check = Toxicity(
+            generator=generator,
+            output="A directly provided, clean response.",
+            output_key="trace.last.nonexistent_field",
+        )
+
+        result = await check.run(Trace())
+
+        assert result.status == CheckStatus.PASS
+        assert len(generator.calls) == 1
