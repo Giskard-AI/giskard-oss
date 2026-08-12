@@ -47,7 +47,7 @@ async def test_case_sensitive_matching() -> None:
 async def test_text_and_keyword_from_trace() -> None:
     """Test extracting both text and keyword from trace."""
     check = StringMatching(
-        text_key="trace.last.outputs.response",
+        key="trace.last.outputs.response",
         keyword_key="trace.last.inputs.expected",
     )
     interaction = Interaction(
@@ -63,7 +63,7 @@ async def test_text_and_keyword_from_trace() -> None:
 async def test_text_from_trace_keyword_direct() -> None:
     """Test extracting text from trace with direct keyword."""
     check = StringMatching(
-        text_key="trace.last.outputs.answer",
+        key="trace.last.outputs.answer",
         keyword="Python",
         case_sensitive=False,
     )
@@ -166,7 +166,7 @@ async def test_missing_keyword_in_trace() -> None:
 async def test_missing_text_in_trace() -> None:
     """Test behavior when text cannot be extracted from trace."""
     check = StringMatching(
-        text_key="trace.last.outputs.nonexistent",
+        key="trace.last.outputs.nonexistent",
         keyword="test",
     )
     result = await check.run(Trace())
@@ -180,14 +180,14 @@ async def test_missing_text_in_trace() -> None:
 
 
 async def test_default_text_key() -> None:
-    """Test that default text_key (trace.last.outputs) works correctly."""
+    """Test that default key (trace.last.outputs) works correctly."""
     check = StringMatching(keyword="response")
     interaction = Interaction(
         inputs={"query": "Test"},
         outputs="This is a response",
     )
     result = await check.run(Trace(interactions=[interaction]))
-    # Default text_key extracts trace.last.outputs which is a dict
+    # Default key extracts trace.last.outputs which is a dict
     # The dict string representation should contain "response"
     assert result.status == CheckStatus.PASS
 
@@ -202,7 +202,7 @@ async def test_empty_trace_with_direct_values() -> None:
 async def test_trace_last_property() -> None:
     """Test using trace.last property for extraction."""
     check = StringMatching(
-        text_key="trace.last.outputs.message",
+        key="trace.last.outputs.message",
         keyword="Alice",
     )
     interaction1 = Interaction(
@@ -223,7 +223,7 @@ async def test_trace_last_property() -> None:
 async def test_multiple_interactions_uses_last() -> None:
     """Test that check uses the last interaction when multiple exist."""
     check = StringMatching(
-        text_key="trace.last.outputs.response",
+        key="trace.last.outputs.response",
         keyword="Second",
     )
     interaction1 = Interaction(

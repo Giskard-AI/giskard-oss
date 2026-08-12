@@ -60,13 +60,13 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         (default: 0.95).
     reference_text : str | MISSING
         The reference text to compare the output against. If omitted, extracted
-        from the trace using ``reference_text_key``.
-    reference_text_key : str
+        from the trace using ``reference_key``.
+    reference_key : str
         JSONPath expression to extract the reference text from the trace
         (default: "trace.last.metadata.reference_text").
 
         Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
-    actual_answer_key : str
+    key : str
         JSONPath expression to extract the actual answer from the trace
         (default: "trace.last.outputs").
 
@@ -90,11 +90,11 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
     reference_text: str | MISSING = Field(
         default=MISSING, description="The reference text to compare the output with"
     )
-    reference_text_key: JSONPathStr = Field(
+    reference_key: JSONPathStr = Field(
         default="trace.last.metadata.reference_text",
         description="The key to extract the reference text from the trace",
     )
-    actual_answer_key: JSONPathStr = Field(
+    key: JSONPathStr = Field(
         default="trace.last.outputs",
         description="The key to extract the actual answer from the trace",
     )
@@ -117,14 +117,14 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         """
         reference_text = provided_or_resolve(
             trace,
-            key=self.reference_text_key,
+            key=self.reference_key,
             value=self.reference_text,
         )
         if isinstance(reference_text, NoMatch):
             return CheckResult.error(
-                message=f"No value found for reference text key '{self.reference_text_key}'.",
+                message=f"No value found for reference text key '{self.reference_key}'.",
                 details={
-                    "reference_text_key": self.reference_text_key,
+                    "reference_key": self.reference_key,
                     "reference_text": reference_text,
                 },
             )
@@ -132,17 +132,17 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
             return CheckResult.error(
                 message="No reference text found",
                 details={
-                    "reference_text_key": self.reference_text_key,
+                    "reference_key": self.reference_key,
                     "reference_text": reference_text,
                 },
             )
-        actual_answer = resolve(trace, self.actual_answer_key)
+        actual_answer = resolve(trace, self.key)
         if isinstance(actual_answer, NoMatch):
             return CheckResult.error(
-                message=f"No value found for actual answer key '{self.actual_answer_key}'.",
+                message=f"No value found for actual answer key '{self.key}'.",
                 details={
                     "actual_answer": actual_answer,
-                    "actual_answer_key": self.actual_answer_key,
+                    "key": self.key,
                 },
             )
         if actual_answer is None or actual_answer == "":
@@ -150,16 +150,16 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                 message="No actual answer found",
                 details={
                     "actual_answer": actual_answer,
-                    "actual_answer_key": self.actual_answer_key,
+                    "key": self.key,
                 },
             )
 
         if failure := self._failure_if_collection(
-            "reference text", self.reference_text_key, reference_text
+            "reference text", self.reference_key, reference_text
         ):
             return failure
         if failure := self._failure_if_collection(
-            "actual answer", self.actual_answer_key, actual_answer
+            "actual answer", self.key, actual_answer
         ):
             return failure
 
@@ -209,8 +209,8 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                 "one value."
             ),
             details={
-                "reference_text_key": self.reference_text_key,
-                "actual_answer_key": self.actual_answer_key,
+                "reference_key": self.reference_key,
+                "key": self.key,
                 "value": str(value),
             },
         )

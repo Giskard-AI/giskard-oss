@@ -34,8 +34,8 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
     ----------
     text : str | MISSING
         The text string to search within. If omitted, extracted from
-        trace using ``text_key``.
-    text_key : JSONPathStr
+        trace using ``key``.
+    key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
     """
@@ -44,7 +44,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
         default=MISSING,
         description="The text string to search within.",
     )
-    text_key: JSONPathStr = Field(
+    key: JSONPathStr = Field(
         default="trace.last.outputs",
         description="JSONPath expression to extract text from trace.",
     )
@@ -75,7 +75,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
             Either (text, target, details) on success, or (None, None, error_result) on failure.
         """
         # Extract text and target
-        text = provided_or_resolve(trace, key=self.text_key, value=self.text)
+        text = provided_or_resolve(trace, key=self.key, value=self.text)
         target = provided_or_resolve(
             trace,
             key=target_key,
@@ -111,7 +111,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
                 None,
                 None,
                 CheckResult.error(
-                    message=f"No value found for text key '{self.text_key}'.",
+                    message=f"No value found for text key '{self.key}'.",
                     details=details,
                 ),
             )
@@ -156,8 +156,8 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
     ----------
     text : str | MISSING
         The text string to search within. If omitted, extracted from
-        trace using ``text_key``.
-    text_key : JSONPathStr
+        trace using ``key``.
+    key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
     keyword : str | MISSING
@@ -191,13 +191,13 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
 
         check = StringMatching(
             keyword="Paris",
-            text_key="trace.last.outputs.response"
+            key="trace.last.outputs.response"
         )
 
     Extract both from trace::
 
         check = StringMatching(
-            text_key="trace.last.outputs.answer",
+            key="trace.last.outputs.answer",
             keyword_key="trace.last.inputs.expected_keyword"
         )
     """
@@ -335,8 +335,8 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     ----------
     text : str | MISSING
         The text string to search within. If omitted, extracted from
-        trace using ``text_key``.
-    text_key : JSONPathStr
+        trace using ``key``.
+    key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
     pattern : str | MISSING
@@ -380,7 +380,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     Extract from trace:
 
         check = RegexMatching(
-            text_key="trace.last.outputs.response",
+            key="trace.last.outputs.response",
             pattern_key="trace.last.inputs.expected_pattern"
         )
 

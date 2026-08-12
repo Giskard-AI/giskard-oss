@@ -360,7 +360,7 @@ result = await (
         StringMatching(
             name="contains_paris",
             keyword="Paris",
-            text_key="trace.last.outputs.answer",
+            key="trace.last.outputs.answer",
         )
     )
     .check(
@@ -405,7 +405,7 @@ result = await (
     .check(
         RegexMatching(
             pattern="test@example.com",
-            text_key="trace.last.outputs",
+            key="trace.last.outputs",
         )
     )
     .run()
