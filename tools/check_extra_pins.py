@@ -15,10 +15,15 @@ from typing import Any
 
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.specifiers import SpecifierSet
+from packaging.utils import canonicalize_name
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ROOT_PYPROJECT = REPO_ROOT / "pyproject.toml"
 LIBS_DIR = REPO_ROOT / "libs"
+
+
+def _canonical_name(name: str) -> str:
+    return str(canonicalize_name(name))
 
 
 def _member_versions() -> dict[str, str]:
@@ -32,7 +37,7 @@ def _member_versions() -> dict[str, str]:
             raise SystemExit(
                 f"missing project.name/version in {path.relative_to(REPO_ROOT)}"
             )
-        versions[name] = version
+        versions[_canonical_name(name)] = version
     if not versions:
         raise SystemExit(f"no workspace members found under {LIBS_DIR}")
     return versions
@@ -64,9 +69,8 @@ def _iter_root_requirements(data: dict[str, Any]) -> list[tuple[str, str]]:
     return entries
 
 
-def main() -> int:
-    data = tomllib.loads(ROOT_PYPROJECT.read_text(encoding="utf-8"))
-    members = _member_versions()
+def collect_mismatches(data: dict[str, Any], members: dict[str, str]) -> list[str]:
+    """Return human-readable mismatch lines for root pins vs member versions."""
     mismatches: list[str] = []
 
     for location, req_str in _iter_root_requirements(data):
@@ -76,7 +80,7 @@ def main() -> int:
             mismatches.append(f"{location}: invalid requirement {req_str!r}: {exc}")
             continue
 
-        expected = members.get(req.name)
+        expected = members.get(_canonical_name(req.name))
         if expected is None:
             continue
 
@@ -92,6 +96,14 @@ def main() -> int:
                 f"{location}: {req.name} lower bound is {found!r}, "
                 f"expected {expected!r} (from libs member version)"
             )
+
+    return mismatches
+
+
+def main() -> int:
+    data = tomllib.loads(ROOT_PYPROJECT.read_text(encoding="utf-8"))
+    members = _member_versions()
+    mismatches = collect_mismatches(data, members)
 
     if mismatches:
         print(
