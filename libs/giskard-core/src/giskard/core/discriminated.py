@@ -57,10 +57,11 @@ class _Registry(Generic[T]):
             )
 
         registered = self._subclasses[actual_base_cls]
+        kinds = (kind, *aliases)
 
         # Validate every kind before writing any, so a collision partway through
         # the aliases cannot leave the registry half-populated.
-        for registered_kind in (kind, *aliases):
+        for registered_kind in kinds:
             if registered_kind in registered:
                 raise ValueError(
                     f"Kind {registered_kind} is already registered for {base_cls}"
@@ -70,7 +71,7 @@ class _Registry(Generic[T]):
         # accepted when deserialising but never used when serialising.
         self._kinds[subclass] = kind
 
-        for registered_kind in (kind, *aliases):
+        for registered_kind in kinds:
             registered[registered_kind] = subclass
 
 
@@ -160,8 +161,8 @@ class Discriminated(BaseModel):
             if not isinstance(kind, str):
                 raise ValueError(f"Kind is expected to be a string, got {type(kind)}")
 
-            registered = _REGISTRY._subclasses.get(origin, {})
-            if kind not in registered:
+            registered = _REGISTRY._subclasses.get(origin)
+            if registered is None or kind not in registered:
                 raise ValueError(f"Kind {kind} is not registered for class {origin}")
 
             return registered[kind].model_validate(value)

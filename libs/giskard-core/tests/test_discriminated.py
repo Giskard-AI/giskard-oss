@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 import pytest
 from giskard.core import Discriminated, discriminated_base
@@ -132,8 +132,9 @@ def test_alias_as_bare_string_is_rejected():
 
 def test_alias_non_string_element_is_rejected():
     """Non-string alias elements must not become registry keys."""
+    bad_aliases: Any = [123]
     with pytest.raises(TypeError, match="aliases must be a sequence of strings"):
-        Animal.register("weasel", aliases=[123])  # type: ignore[list-item]
+        Animal.register("weasel", aliases=bad_aliases)
 
 
 T = TypeVar("T")
