@@ -5,7 +5,6 @@ import pytest
 from giskard.agents.embeddings.base import BaseEmbeddingModel, EmbeddingParams
 from giskard.agents.embeddings.giskard_llm_embedding_model import (
     GiskardLLMEmbeddingModel,
-    LitellmEmbeddingModel,
 )
 from giskard.llm import EmbeddingData, EmbeddingResponse
 
@@ -174,22 +173,6 @@ def test_embedding_model_serialization() -> None:
     assert deserialized_model.model == "test-model"
     assert deserialized_model.params.dimensions == 768
     assert deserialized_model.kind == "giskard_llm"
-
-
-def test_legacy_litellm_kind_deserializes_to_giskard_llm_model() -> None:
-    """Legacy serialized models with kind ``litellm`` still deserialize."""
-    model = LitellmEmbeddingModel(
-        model="test-model",
-        params=EmbeddingParams(dimensions=768),
-    )
-
-    json_str = model.model_dump_json()
-    deserialized_model = BaseEmbeddingModel.model_validate_json(json_str)
-
-    assert isinstance(deserialized_model, LitellmEmbeddingModel)
-    assert deserialized_model.model == "test-model"
-    assert deserialized_model.params.dimensions == 768
-    assert deserialized_model.kind == "litellm"
 
 
 def test_embedding_params_defaults() -> None:

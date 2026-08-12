@@ -1,5 +1,5 @@
 from .base import BaseEmbeddingModel
-from .giskard_llm_embedding_model import GiskardLLMEmbeddingModel, LitellmEmbeddingModel
+from .giskard_llm_embedding_model import GiskardLLMEmbeddingModel
 from .litellm_embedding_model import LiteLLMEmbeddingModel
 
 EmbeddingModel = GiskardLLMEmbeddingModel
@@ -7,7 +7,6 @@ EmbeddingModel = GiskardLLMEmbeddingModel
 __all__ = [
     "BaseEmbeddingModel",
     "GiskardLLMEmbeddingModel",
-    "LitellmEmbeddingModel",
     "LiteLLMEmbeddingModel",
     "EmbeddingModel",
 ]

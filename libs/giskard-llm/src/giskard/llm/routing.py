@@ -78,6 +78,9 @@ def _create_provider(provider_type: str, **kwargs: Any) -> Provider:
 
 def _probe_provider_sdk(provider_type: str) -> bool:
     """Return whether the provider module's SDK import helpers succeed."""
+    if provider_type not in _PROVIDER_REGISTRY:
+        return False
+
     module_path, _ = _PROVIDER_REGISTRY[provider_type]
     try:
         module = importlib.import_module(module_path)

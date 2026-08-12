@@ -7,7 +7,6 @@ from .embeddings import (
     EmbeddingModel,
     GiskardLLMEmbeddingModel,
     LiteLLMEmbeddingModel,
-    LitellmEmbeddingModel,
 )
 from .errors import Error, ModelRefusalError, WorkflowError
 from .generators import BaseGenerator, Generator
@@ -48,7 +47,6 @@ __all__ = [
     "BaseEmbeddingModel",
     "EmbeddingModel",
     "GiskardLLMEmbeddingModel",
-    "LitellmEmbeddingModel",
     "LiteLLMEmbeddingModel",
     "StepType",
 ]

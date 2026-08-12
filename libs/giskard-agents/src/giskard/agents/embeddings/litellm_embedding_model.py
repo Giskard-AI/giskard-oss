@@ -1,6 +1,6 @@
 """Optional LiteLLM-package embedding model.
 
-Install the optional dependency with::
+Install the optional dependency with:
 
     pip install giskard-agents[litellm]
 
