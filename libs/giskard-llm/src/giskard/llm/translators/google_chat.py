@@ -278,6 +278,9 @@ REFUSAL_REASONS = frozenset(
         "PROHIBITED_CONTENT",
         "SPII",
         "IMAGE_PROHIBITED_CONTENT",
+        "IMAGE_SAFETY",
+        "RECITATION",
+        "IMAGE_RECITATION",
     }
 )
 
