@@ -25,6 +25,7 @@ from .builtin import (
     RegoPolicy,
     SemanticSimilarity,
     StringMatching,
+    XSSOutputCheck,
     from_fn,
 )
 from .core import (
@@ -135,6 +136,7 @@ __all__ = [
     "Toxicity",
     "StringMatching",
     "RegexMatching",
+    "XSSOutputCheck",
     # Exceptions
     "InputGenerationException",
     # LLM-based generators
