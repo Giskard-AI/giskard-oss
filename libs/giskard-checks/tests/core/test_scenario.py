@@ -13,6 +13,7 @@ from giskard.checks import (
     Equals,
     Interact,
     Interaction,
+    InteractionGenerationError,
     InteractionSpec,
     Scenario,
     Step,
@@ -94,6 +95,22 @@ class GeneratorErrorComponent(InteractionSpec[str, str, Trace[str, str]]):
         """Yield an interaction then raise an error on next iteration."""
         yield Interaction(inputs="test", outputs="result", metadata={})
         raise RuntimeError("Generator error")
+
+
+@InteractionSpec.register("chained_generator_error_component")
+class ChainedGeneratorErrorComponent(InteractionSpec[str, str, Trace[str, str]]):
+    """Component whose generator raises an error chained to a root cause."""
+
+    @override
+    async def generate(
+        self, trace: Trace[str, str]
+    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+        """Yield an interaction then raise a chained error on next iteration."""
+        yield Interaction(inputs="test", outputs="result", metadata={})
+        try:
+            raise KeyError("root cause")
+        except KeyError as root:
+            raise RuntimeError("Generator error") from root
 
 
 # Test Classes
@@ -791,6 +808,20 @@ class TestScenarioErrorHandling:
                 .check(check)
                 .run()
             )
+
+    async def test_generator_exception_keeps_its_own_cause(self):
+        """Test that a chained generator error reaches the caller unwrapped."""
+        builder = Scenario("chained_generator_exception").add_interaction(
+            ChainedGeneratorErrorComponent()
+        )
+
+        with pytest.raises(RuntimeError, match="Generator error") as exc_info:
+            _ = await builder.run()
+
+        # The trace wraps generator failures to hand back partial progress; the
+        # runner unwraps it without flattening the generator's own cause chain.
+        assert isinstance(exc_info.value.__cause__, KeyError)
+        assert not isinstance(exc_info.value, InteractionGenerationError)
 
     async def test_generator_exception_returned_as_test_case_error(self):
         """Test input generation exceptions become test case errors when requested."""

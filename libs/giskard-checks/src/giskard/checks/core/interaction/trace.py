@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.rule import Rule
 
+from ..exceptions import InteractionGenerationError
 from ..protocols import InteractionGenerator
 from ..types import Target
 from .interaction import Interaction
@@ -96,6 +97,25 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
         *interactions: Interaction[InputType, OutputType]
         | InteractionGenerator[Interaction[InputType, OutputType], Self],
     ) -> Self:
+        """Return a trace extended with every given interaction, in order.
+
+        Parameters
+        ----------
+        *interactions : Interaction or InteractionGenerator
+            Concrete interactions to append and specifications to generate from.
+
+        Returns
+        -------
+        Self
+            Trace containing every successfully generated interaction.
+
+        Raises
+        ------
+        InteractionGenerationError
+            If generation fails, with the progress made by this call and every
+            preceding one in `partial_trace`, and the original error chained as
+            its cause.
+        """
         trace = self
 
         for interaction in interactions:
@@ -110,6 +130,24 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
             | InteractionGenerator[Interaction[InputType, OutputType], Self]
         ),
     ) -> Self:
+        """Return a trace extended with one interaction or generated sequence.
+
+        Parameters
+        ----------
+        interaction : Interaction or InteractionGenerator
+            Concrete interaction to append or specification that generates interactions.
+
+        Returns
+        -------
+        Self
+            Trace containing every successfully generated interaction.
+
+        Raises
+        ------
+        InteractionGenerationError
+            If generation fails, with the completed progress in `partial_trace` and
+            the original error chained as its cause.
+        """
         if isinstance(interaction, Interaction):
             return self.model_copy(
                 update={"interactions": self.interactions + [interaction]}
@@ -124,6 +162,8 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
                 trace = await trace.with_interaction(await generator.asend(trace))
         except StopAsyncIteration:
             return trace
+        except Exception as error:
+            raise InteractionGenerationError(trace) from error
         finally:
             if generator is not None:
                 await generator.aclose()

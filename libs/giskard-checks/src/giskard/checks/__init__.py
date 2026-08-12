@@ -36,6 +36,7 @@ from .core import (
     InputGenerationException,
     Interact,
     Interaction,
+    InteractionGenerationError,
     InteractionSpec,
     Metric,
     Scenario,
@@ -137,6 +138,7 @@ __all__ = [
     "RegexMatching",
     # Exceptions
     "InputGenerationException",
+    "InteractionGenerationError",
     # LLM-based generators
     "BaseLLMGenerator",
     "LLMGenerator",
