@@ -10,6 +10,7 @@ from giskard.checks import (
     Check,
     CheckStatus,
     Conformity,
+    Contradiction,
     Groundedness,
     Interaction,
     LLMJudge,
