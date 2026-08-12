@@ -1,35 +1,11 @@
 """Result models for checks, test cases, scenarios and suites.
 
-Tri-state convention
---------------------
-``CheckStatus`` (and its ``ScenarioStatus`` / ``TestCaseStatus`` siblings) has
-four states: ``PASS``, ``FAIL``, ``ERROR`` and ``SKIP``. ``ERROR`` and ``SKIP``
-mean *no verdict was reached* -- the check could not be evaluated, or was not
-evaluated at all.
-
-The rule every consumer must follow:
-
-    **ERROR and SKIP are never coerced into pass or fail. Only an explicit
-    verdict is.**
-
-Concretely, when consuming a ``CheckResult`` / ``ScenarioResult`` /
-``TestCaseResult``:
-
-* Never treat ``not result.passed`` as "failed" -- it is also true for ERROR
-  and SKIP. Branch on ``result.status`` or on the explicit ``failed`` /
-  ``errored`` / ``skipped`` properties.
-* Never produce ``PASS`` (or ``FAIL``) for something that was not evaluated.
-  Emit ``SKIP`` when the evaluation was intentionally not performed and
-  ``ERROR`` when it could not be performed.
-* Aggregations must keep the states distinct: exclude SKIP from pass-rate
-  denominators (return ``None`` rather than a fabricated rate when nothing was
-  evaluated), and let ERROR dominate FAIL, which dominates SKIP, which
-  dominates PASS.
-* Exporters and reports must serialize the four states separately; a SKIP or
-  ERROR must never be written out as a pass.
-
-Adding a fifth state later stays safe only as long as consumers branch on
-explicit statuses instead of on the negation of ``passed``.
+``CheckStatus`` has four states: ``PASS``, ``FAIL``, ``ERROR`` and ``SKIP``.
+ERROR and SKIP mean *no verdict was reached* and are never coerced into pass or
+fail: branch on ``status`` (or the explicit ``failed`` / ``errored`` /
+``skipped`` properties) rather than on ``not passed``, keep the four states
+distinct in aggregations and exports, and exclude SKIP from pass-rate
+denominators.
 """
 
 from collections import defaultdict
@@ -88,6 +64,9 @@ STATUS_SUMMARY_ORDER: tuple[tuple[str, str], ...] = (
 )
 
 
+STATUS_PAST_TENSE: Mapping[str, str] = dict(STATUS_SUMMARY_ORDER)
+
+
 def format_status_count_parts(counts: Mapping[str, int]) -> list[str]:
     """Build Rich markup fragments for non-zero status counts in summary order."""
     return [
@@ -123,14 +102,6 @@ class CheckStatus(str, Enum):
     FAIL = "fail"
     ERROR = "error"
     SKIP = "skip"
-
-
-_CHECK_STATUS_LABELS: Mapping[CheckStatus, str] = {
-    CheckStatus.PASS: "PASSED",
-    CheckStatus.FAIL: "FAILED",
-    CheckStatus.ERROR: "ERRORED",
-    CheckStatus.SKIP: "SKIPPED",
-}
 
 
 class Metric(BaseModel):
@@ -558,7 +529,7 @@ class TestCaseResult(BaseResult, frozen=True):
             check_name: str = result.details.get("check_name") or result.details.get(
                 "check_kind", "Unknown check"
             )
-            status = _CHECK_STATUS_LABELS[result.status]
+            status = STATUS_PAST_TENSE[result.status.value].upper()
             message = result.message or "No specific error message provided"
             failure_messages.append(f"{check_name} {status}: {message}")
         return failure_messages
