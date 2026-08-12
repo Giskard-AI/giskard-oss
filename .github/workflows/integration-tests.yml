@@ -69,11 +69,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Python version coverage lives in Main CI unit tests; integration only needs one.
         python-version: ["3.12"]
         backend:
-          # One job per install layout (giskard-llm vs litellm). The old "both"
-          # cell re-ran the union of these suites without adding coverage.
           - name: giskard-llm
             extras: "giskard-agents[google]"
             pytest_mark: "functional and google"
@@ -86,13 +83,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-          # Deliberate opt-in: this job installs and executes fork-authored
-          # code (make install, pytest) with live provider API keys in scope.
-          # Compensating controls: the `ci` environment requires a reviewer to
-          # approve each run before secrets are injected (server-enforced,
-          # per-run), the authorize job requires a fresh `labeled` event for
-          # external contributors, and the immutable head.sha pin keeps the
-          # reviewed commit identical to the executed one.
+          # This job deliberately runs untrusted fork code with live API keys
+          # in scope. Three controls limit the risk. The CI environment
+          # requires reviewer approval for each run. The authorize job
+          # requires a fresh labeled event for external contributors. The
+          # head.sha pin stops the code from changing after approval.
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
@@ -121,10 +116,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # One cell per distinct provider class or routing path. Drop `gemini`
-        # only — it maps to the same GoogleProvider as `google`. Keep `bare`
-        # (no-configure path), `azure_ai` (AzureAIProvider), and
-        # `azure_foundry_v1` (Foundry base URL + Responses API).
         include:
           - { python-version: "3.12", provider: openai, extras: openai }
           - { python-version: "3.12", provider: bare, extras: openai }
@@ -146,7 +137,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-          # Deliberate opt-in — see test-agents-functional for the full
+          # Deliberate opt-in. See test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -186,7 +177,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-          # Deliberate opt-in — see test-agents-functional for the full
+          # Deliberate opt-in. See test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -213,7 +204,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-          # Deliberate opt-in — see test-agents-functional for the full
+          # Deliberate opt-in. See test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
