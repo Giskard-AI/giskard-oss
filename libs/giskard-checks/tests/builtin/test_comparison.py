@@ -1,4 +1,4 @@
-"""Unit tests for comparison checks (LessThan, GreaterThan, LessThanEquals, GreaterEquals).
+"""Unit tests for comparison checks (LessThan, GreaterThan, LessThanEquals, GreaterThanEquals).
 
 Tests cover different types (numbers, strings) and various comparison scenarios:
 - Success cases (e.g., 5 < 10 should pass for LessThan)
@@ -10,10 +10,11 @@ from typing import Any
 
 import pytest
 from giskard.checks import (
+    Check,
     CheckStatus,
     Equals,
-    GreaterEquals,
     GreaterThan,
+    GreaterThanEquals,
     Interaction,
     LessThan,
     LessThanEquals,
@@ -401,13 +402,13 @@ class TestLessThanEquals:
         assert "<= comparison" in result.message
 
 
-class TestGreaterEquals:
-    """Test GreaterEquals check."""
+class TestGreaterThanEquals:
+    """Test GreaterThanEquals check."""
 
     async def test_number_greater_equals_success_greater(self):
         """Test that 10 >= 5 passes (greater than case)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
-        check = GreaterEquals(
+        check = GreaterThanEquals(
             expected_value=5,
             key="trace.interactions[-1].outputs",
         )
@@ -422,7 +423,7 @@ class TestGreaterEquals:
     async def test_number_greater_equals_success_equal(self):
         """Test that 5 >= 5 passes (equal case)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
-        check = GreaterEquals(
+        check = GreaterThanEquals(
             expected_value=5,
             key="trace.interactions[-1].outputs",
         )
@@ -437,7 +438,7 @@ class TestGreaterEquals:
     async def test_number_greater_equals_failure(self):
         """Test that 5 >= 10 fails."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
-        check = GreaterEquals(
+        check = GreaterThanEquals(
             expected_value=10,
             key="trace.interactions[-1].outputs",
         )
@@ -456,7 +457,7 @@ class TestGreaterEquals:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="banana")
         )
-        check = GreaterEquals(
+        check = GreaterThanEquals(
             expected_value="apple",
             key="trace.interactions[-1].outputs",
         )
@@ -471,7 +472,7 @@ class TestGreaterEquals:
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs="apple")
         )
-        check = GreaterEquals(
+        check = GreaterThanEquals(
             expected_value="apple",
             key="trace.interactions[-1].outputs",
         )
@@ -482,9 +483,9 @@ class TestGreaterEquals:
         assert result.passed
 
     async def test_typeerror_incompatible_types(self):
-        """Test GreaterEquals with incompatible types (string vs int)."""
+        """Test GreaterThanEquals with incompatible types (string vs int)."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="10"))
-        check = GreaterEquals(
+        check = GreaterThanEquals(
             expected_value=5,
             key="trace.interactions[-1].outputs",
         )
@@ -500,11 +501,11 @@ class TestGreaterEquals:
         assert ">= comparison" in result.message
 
     async def test_typeerror_missing_method(self):
-        """Test GreaterEquals with object that doesn't implement __ge__."""
+        """Test GreaterThanEquals with object that doesn't implement __ge__."""
         trace = await Trace.from_interactions(
             Interaction(inputs="test", outputs=object())
         )
-        check = GreaterEquals(
+        check = GreaterThanEquals(
             expected_value=10,
             key="trace.interactions[-1].outputs",
         )
@@ -516,6 +517,14 @@ class TestGreaterEquals:
         assert result.message is not None
         assert "Comparison not supported" in result.message
         assert ">= comparison" in result.message
+
+    def test_serialises_with_greater_than_equals_kind(self):
+        """Serialized kind remains greater_than_equals and round-trips."""
+        check = GreaterThanEquals(expected_value=10, key="trace.last.outputs")
+        assert check.model_dump()["kind"] == "greater_than_equals"
+        restored = Check.model_validate(check.model_dump())
+        assert isinstance(restored, GreaterThanEquals)
+        assert restored.kind == "greater_than_equals"
 
 
 class TestComparisonEdgeCases:
@@ -911,7 +920,7 @@ class TestComparisonSentinelDefault:
 
     @pytest.mark.parametrize(
         "check_cls",
-        [Equals, GreaterThan, LessThan, GreaterEquals, LessThanEquals, NotEquals],
+        [Equals, GreaterThan, LessThan, GreaterThanEquals, LessThanEquals, NotEquals],
     )
     def test_omitting_both_raises(self, check_cls):
         """Omitting both expected_value and expected_value_key must raise ValueError."""

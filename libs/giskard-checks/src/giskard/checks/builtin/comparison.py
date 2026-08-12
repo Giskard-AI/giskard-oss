@@ -383,7 +383,7 @@ class LessThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # 
 
 
 @Check.register("greater_than_equals")
-class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+class GreaterThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values are greater than or equal to an expected value.
