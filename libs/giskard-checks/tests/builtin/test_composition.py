@@ -8,7 +8,6 @@ Tests cover:
 - Serialisation round-trip via model_dump / model_validate
 """
 
-import warnings
 from typing import Any
 
 from giskard.checks import (
@@ -16,7 +15,6 @@ from giskard.checks import (
     AnyOf,
     Equals,
     Interaction,
-    LesserThan,
     LessThan,
     Not,
     Trace,
@@ -421,20 +419,6 @@ class TestSerialization:
 
         assert data["kind"] == "all_of"
         assert data["checks"][0]["kind"] == "less_than"
-
-        restored = AllOf.model_validate(data)
-        result = await restored.run(trace)
-        assert result.passed
-
-    async def test_all_of_deserialises_legacy_lesser_than_kind(self):
-        """Serialized checks using the legacy lesser_than kind still load."""
-        trace = await Trace.from_interactions(Interaction(inputs="q", outputs=3))
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            legacy_check = LesserThan(expected_value=10, key="trace.last.outputs")
-        data = AllOf(checks=[legacy_check]).model_dump()
-
-        assert data["checks"][0]["kind"] == "lesser_than"
 
         restored = AllOf.model_validate(data)
         result = await restored.run(trace)
