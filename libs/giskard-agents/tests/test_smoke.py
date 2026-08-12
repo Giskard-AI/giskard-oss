@@ -22,8 +22,13 @@ def test_core_public_api_is_accessible():
     for name in [
         "Generator",
         "ChatWorkflow",
+        "set_default_prompts_path",
     ]:
         assert hasattr(m, name), f"giskard.agents missing attribute: {name}"
+
+    assert not hasattr(m, "set_prompts_path")
+    assert "set_prompts_path" not in m.__all__
+    assert "set_default_prompts_path" in m.__all__
 
 
 @pytest.mark.skipif(
