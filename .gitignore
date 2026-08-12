@@ -183,6 +183,9 @@ local/
 *.local
 .claude/settings.local.json
 
+# Stale v2 package tree at repo root (namespace lives under libs/*/src/giskard)
+/giskard/
+
 # Agent tooling state (generated, machine-local)
 .deepeval/
 .superpowers/
