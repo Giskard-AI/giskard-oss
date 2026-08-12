@@ -1,5 +1,5 @@
 import sys
-from collections import defaultdict
+from collections.abc import Sequence
 from typing import Any, Callable, Generic, TypeVar
 
 from pydantic import (
@@ -18,7 +18,6 @@ class _Registry(Generic[T]):
     def __init__(self):
         self._subclasses: dict[type, dict[str, type]] = {}
         self._kinds: dict[type[T], str] = {}
-        self._reverse_kinds: dict[type[T], dict[str, type[T]]] = defaultdict(dict)
 
     def register_base(self, base_cls: type[T]):
         if not issubclass(base_cls, Discriminated):
@@ -40,7 +39,13 @@ class _Registry(Generic[T]):
 
         return None
 
-    def register_subclass(self, base_cls: type[T], subclass: type[T], kind: str):
+    def register_subclass(
+        self,
+        base_cls: type[T],
+        subclass: type[T],
+        kind: str,
+        aliases: Sequence[str] = (),
+    ):
         if not issubclass(subclass, base_cls):
             raise ValueError(f"Class {subclass} is not a subclass of {base_cls}")
 
@@ -51,12 +56,22 @@ class _Registry(Generic[T]):
                 f"Class {base_cls} is not registered with @discriminated_base"
             )
 
-        if kind in self._subclasses[actual_base_cls]:
-            raise ValueError(f"Kind {kind} is already registered for {base_cls}")
+        registered = self._subclasses[actual_base_cls]
 
-        self._subclasses[actual_base_cls][kind] = subclass
+        # Validate every kind before writing any, so a collision partway through
+        # the aliases cannot leave the registry half-populated.
+        for registered_kind in (kind, *aliases):
+            if registered_kind in registered:
+                raise ValueError(
+                    f"Kind {registered_kind} is already registered for {base_cls}"
+                )
+
+        # Only the canonical kind is mapped back from the class, so aliases are
+        # accepted when deserialising but never used when serialising.
         self._kinds[subclass] = kind
-        self._reverse_kinds[actual_base_cls][kind] = subclass
+
+        for registered_kind in (kind, *aliases):
+            registered[registered_kind] = subclass
 
 
 _REGISTRY = _Registry()
@@ -81,9 +96,34 @@ class Discriminated(BaseModel):
         return None
 
     @classmethod
-    def register(cls, kind: str) -> Callable[[type[T]], type[T]]:
+    def register(
+        cls, kind: str, *, aliases: Sequence[str] = ()
+    ) -> Callable[[type[T]], type[T]]:
+        """Register a subclass under a discriminator kind.
+
+        Parameters
+        ----------
+        kind : str
+            The canonical discriminator. This is the value written to the
+            ``kind`` field when the subclass is serialised.
+        aliases : Sequence[str]
+            Additional discriminators accepted when deserialising, typically
+            legacy names kept for backward compatibility. Payloads using an
+            alias load as this subclass but are re-serialised under ``kind``.
+
+        Examples
+        --------
+        >>> @Check.register("less_than", aliases=["lesser_than"])
+        ... class LessThan(Check): ...
+        """
+        if isinstance(aliases, str):
+            raise TypeError(
+                f"aliases must be a sequence of strings, got the string {aliases!r}; "
+                f"pass [{aliases!r}] instead."
+            )
+
         def decorator(subclass: type[T]) -> type[T]:
-            _REGISTRY.register_subclass(cls, subclass, kind)
+            _REGISTRY.register_subclass(cls, subclass, kind, aliases)
             return subclass
 
         return decorator
@@ -114,10 +154,11 @@ class Discriminated(BaseModel):
             if not isinstance(kind, str):
                 raise ValueError(f"Kind is expected to be a string, got {type(kind)}")
 
-            if kind not in _REGISTRY._reverse_kinds[origin]:
+            registered = _REGISTRY._subclasses.get(origin, {})
+            if kind not in registered:
                 raise ValueError(f"Kind {kind} is not registered for class {origin}")
 
-            return _REGISTRY._reverse_kinds[origin][kind].model_validate(value)
+            return registered[kind].model_validate(value)
 
         return core_schema.no_info_plain_validator_function(validate_discriminated)
 
