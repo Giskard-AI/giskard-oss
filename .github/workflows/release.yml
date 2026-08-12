@@ -15,7 +15,7 @@ on:
           - giskard-checks
           - giskard-scan
       bump_type:
-        description: 'Version bump type'
+        description: 'Version bump type (stacks with release_type; keep none for a plain pre-release)'
         required: true
         type: choice
         options:
@@ -23,15 +23,16 @@ on:
           - minor
           - patch
           - none
-        default: patch
+        default: none
       release_type:
-        description: 'Release type'
+        description: 'Release type (stable promotes a pre-release to its final version)'
         required: true
         type: choice
         options:
           - alpha
           - beta
           - rc
+          - stable
           - none
         default: none
       dry_run:
