@@ -14,7 +14,7 @@ class GiskardLLMEmbeddingModel(BaseEmbeddingModel):
     async def _embed(
         self, texts: list[str], params: EmbeddingParams | None = None
     ) -> list[np.ndarray]:
-        params_ = self.params.model_dump()
+        params_ = self.params.model_dump() if self.params is not None else {}
 
         if params is not None:
             params_.update(params.model_dump(exclude_unset=True))
@@ -26,13 +26,3 @@ class GiskardLLMEmbeddingModel(BaseEmbeddingModel):
         )
         embeddings = [np.array(elt.embedding) for elt in result.data]
         return embeddings
-
-
-@BaseEmbeddingModel.register("litellm")
-class LitellmEmbeddingModel(GiskardLLMEmbeddingModel):
-    """Deprecated alias for serialized models with ``kind: litellm``.
-
-    Previously this kind referred to giskard-llm embeddings before
-    :class:`GiskardLLMEmbeddingModel` was introduced. New models should use
-    ``kind: giskard_llm``.
-    """

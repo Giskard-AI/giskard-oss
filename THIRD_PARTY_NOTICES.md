@@ -81,6 +81,7 @@ Find a list of packages below
 |✔|requests|
 |✔|rich|
 |✔|rpds-py|
+|✔|setuptools|
 |✔|sniffio|
 |✔|tenacity|
 |✔|textstat|
@@ -563,7 +564,6 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-<<<<<<< HEAD
 ### setuptools-83.0.0
 
 - HomePage:
@@ -571,8 +571,6 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-=======
->>>>>>> 813950251 (feat(checks): auto-fallback default generator to LiteLLM)
 ### sniffio-1.3.1
 
 - HomePage:

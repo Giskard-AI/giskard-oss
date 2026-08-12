@@ -63,6 +63,19 @@ _FOUNDRY_HOST_SUFFIX = ".services.ai.azure.com"
 _DEFAULT_API_VERSION = "2024-10-21"
 
 
+def _import_openai() -> Any:
+    """Import the openai SDK (required for Azure AI Foundry).
+
+    Azure AI Foundry uses the same openai SDK as the OpenAI provider.
+    """
+    try:
+        import openai
+
+        return openai
+    except ImportError as exc:
+        raise ProviderNotAvailableError(PROVIDER, "openai", extra="azure") from exc
+
+
 def _normalize_azure_ai_endpoint(base_url: str | None) -> str | None:
     """Normalize Foundry endpoint URLs for ``AsyncAzureOpenAI``.
 
