@@ -249,3 +249,19 @@ async def test_not_does_not_invert_unresolved_output_key_error() -> None:
 
     assert result.status == CheckStatus.ERROR
     assert len(generator.calls) == 0
+
+
+async def test_directly_provided_output_bypasses_broken_key() -> None:
+    """A direct ``output`` takes priority, so ``output_key`` is never resolved."""
+    generator = MockGenerator(passed=True, reason="Clean.")
+    check = Toxicity(
+        generator=generator,
+        output="Directly provided text.",
+        output_key="trace.last.metadata.does_not_exist",
+    )
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["inputs"]["output"] == "Directly provided text."
+    assert len(generator.calls) == 1
