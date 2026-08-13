@@ -133,12 +133,26 @@ class TestAllOf:
         assert "ok" in (result.message or "")
 
     async def test_all_skipped_returns_skip(self):
-        """When every check is skipped, the result is a skip."""
+        """When every check is skipped, the result is a skip with composed details."""
         check = AllOf(checks=[_skip_fn_check("a"), _skip_fn_check("b")])
         result = await check.run(Trace())
 
         assert result.status == CS.SKIP
         assert result.skipped
+        assert result.message == "All checks were skipped. Details: a; b"
+
+    async def test_all_skipped_without_messages(self):
+        """All-skipped with empty inner messages omits the Details suffix."""
+
+        async def _skip_no_msg(trace: Trace[Any, Any]) -> CheckResult:
+            return CheckResult.skip()
+
+        check = AllOf(checks=[FnCheck(fn=_skip_no_msg), FnCheck(fn=_skip_no_msg)])
+        result = await check.run(Trace())
+
+        assert result.status == CS.SKIP
+        assert result.skipped
+        assert result.message == "All checks were skipped."
 
     async def test_skip_then_error_returns_error(self):
         """An erroring check after a skip still short-circuits."""
