@@ -245,6 +245,9 @@ class GoogleProvider:
                 if "API_KEY_INVALID" in str(e):
                     raise AuthenticationError(status or 401, str(e), PROVIDER) from e
                 raise BadRequestError(status or 400, str(e), PROVIDER) from e
+            # Must precede APIConnectionError: APITimeoutError subclasses it.
+            if isinstance(e, ix.APITimeoutError):
+                raise LLMTimeoutError(408, str(e), PROVIDER) from e
             if isinstance(e, ix.APIConnectionError):
                 raise LLMError(0, str(e), PROVIDER) from e
             if isinstance(e, ix.APIError):
