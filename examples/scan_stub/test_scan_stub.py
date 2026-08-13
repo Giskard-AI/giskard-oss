@@ -42,7 +42,7 @@ async def test_run_static_scenario_as_scan_stub(
             return_exception: bool = False,
         ) -> SuiteResult:
             _ = parallel, max_concurrency, return_exception
-            scenario_result = await scenario.run(target=target)  # pyright: ignore[reportArgumentType]
+            scenario_result = await scenario.run(target=target)
             return SuiteResult(
                 results=[scenario_result],
                 duration_ms=scenario_result.duration_ms,
