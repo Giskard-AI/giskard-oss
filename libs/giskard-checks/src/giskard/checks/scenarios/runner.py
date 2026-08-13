@@ -17,7 +17,7 @@ from giskard.core import (
 from pydantic.experimental.missing_sentinel import MISSING
 
 from .._telemetry_props import scenario_shape_properties
-from ..core import Trace
+from ..core import InteractionGenerationError, Trace
 from ..core.interaction import Interact
 from ..core.result import CheckResult, ScenarioResult, TestCaseError, TestCaseResult
 from ..core.scenario import Scenario, Step
@@ -129,6 +129,22 @@ class ScenarioRunner:
         target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
         return_exception: bool = False,
     ) -> ScenarioResult[TraceType]:
+        """Execute one scenario attempt with a fresh trace.
+
+        Parameters
+        ----------
+        scenario : Scenario
+            Scenario whose steps should be executed.
+        target : Target or MISSING
+            Optional run-specific target overriding the scenario target.
+        return_exception : bool
+            Whether input-generation errors should be recorded instead of raised.
+
+        Returns
+        -------
+        ScenarioResult
+            Result containing the trace and every materialized step result.
+        """
         start_time = time.perf_counter()
         telemetry_tag("giskard_component", "scenario_runner")
         telemetry_tag("giskard_operation", "scenario_run")
@@ -153,9 +169,29 @@ class ScenarioRunner:
             try:
                 for interaction in step.interacts:
                     trace = await trace.with_interaction(interaction)
-            except Exception as e:
+            except Exception as caught:
+                error = caught
+                if isinstance(caught, InteractionGenerationError):
+                    trace = cast(TraceType, caught.partial_trace)
+                    # Report the error that stopped the generator, not the wrapper
+                    # the trace raised to hand back its partial progress.
+                    if caught.__cause__ is not None:
+                        error = caught.__cause__
+
                 if not return_exception:
-                    raise
+                    if error is caught:
+                        raise
+                    # Hide the InteractionGenerationError wrapper without losing
+                    # how the generator error was chained. Capture the original
+                    # links first: `raise` below re-points __context__ at the
+                    # wrapper we are unwrapping.
+                    context = error.__context__
+                    suppress_context = error.__suppress_context__
+                    try:
+                        raise error
+                    finally:
+                        error.__context__ = context
+                        error.__suppress_context__ = suppress_context
 
                 step_result = TestCaseResult(
                     results=_skipped_check_results_for_step(
@@ -167,9 +203,9 @@ class ScenarioRunner:
                         len(trace.interactions) - 1 if trace.interactions else None
                     ),
                     error=TestCaseError(
-                        message=str(e),
-                        exception_type=type(e).__name__,
-                        traceback=traceback.format_exc(),
+                        message=str(error),
+                        exception_type=type(error).__name__,
+                        traceback="".join(traceback.format_exception(error)),
                         phase="input_generation",
                     ),
                 )

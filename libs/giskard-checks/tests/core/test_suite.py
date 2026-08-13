@@ -638,6 +638,56 @@ def test_group_stats_pass_rate_excludes_skipped_from_denominator():
     assert stats.pass_rate == pytest.approx(2 / 3)
 
 
+def test_suite_pass_rate_none_when_empty():
+    from giskard.checks.core.result import SuiteResult
+    from giskard.checks.scenarios.suite import Suite
+
+    suite_result = SuiteResult(results=[], duration_ms=0, suite=Suite(name="test"))
+    assert suite_result.pass_rate is None
+
+
+def test_suite_pass_rate_none_when_all_skipped():
+    from giskard.checks.core.interaction.trace import Trace
+    from giskard.checks.core.result import (
+        CheckResult,
+        ScenarioResult,
+        SuiteResult,
+        TestCaseResult,
+    )
+    from giskard.checks.scenarios.suite import Suite
+
+    skipped_scenario = ScenarioResult(
+        scenario_name="t_skip",
+        steps=[
+            TestCaseResult(
+                results=[CheckResult.skip(message="precondition not met")],
+                duration_ms=0,
+            )
+        ],
+        duration_ms=0,
+        final_trace=Trace(interactions=[]),
+    )
+    suite_result = SuiteResult(
+        results=[skipped_scenario],
+        duration_ms=0,
+        suite=Suite(name="test"),
+    )
+    assert suite_result.skipped_count == 1
+    assert suite_result.pass_rate is None
+
+
+def test_suite_result_rich_console_renders_em_dash_when_pass_rate_none():
+    result = SuiteResult(results=[], duration_ms=0)
+    assert result.pass_rate is None
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "Pass Rate:" in output
+    assert "—" in output
+
+
 def test_suite_group_by_skipped_scenario_counted_separately():
     from giskard.checks.core.interaction.trace import Trace
     from giskard.checks.core.result import (

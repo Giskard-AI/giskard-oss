@@ -132,7 +132,11 @@ suite.append(scenario2)
 
 # Run the suite
 results = await suite.run()
-print(f"Aggregated pass rate: {results.pass_rate * 100}%")
+# `pass_rate` is None when nothing was evaluated (empty or fully skipped suite)
+if results.pass_rate is None:
+    print("Aggregated pass rate: n/a")
+else:
+    print(f"Aggregated pass rate: {results.pass_rate * 100}%")
 ```
 
 Why this library?
