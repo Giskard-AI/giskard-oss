@@ -95,11 +95,14 @@ install-lidar-test: ## Install lidar private dependency for scan integration tes
 test-lidar: install-lidar-test ## Run lidar integration tests
 	uv run pytest libs/giskard-scan/tests/integrations/lidar -v
 
-# Minimal-deps twin of test-unit (ci.yml runs them as a matched pair), so it must cover
-# the same scope: pass `tests src` explicitly rather than relying on each lib's
-# testpaths, which omits src doctests for giskard-core/llm/agents.
+# Deliberately NOT pytest-each-lib: this runs under `make install-minimal` (no provider
+# SDKs), so it must collect LESS than test-unit, not the same. Passing `tests src` would
+# pull in src doctests that need optional extras -- giskard-checks' RegoPolicy docstring
+# needs regorus, and giskard-llm's tests/test_smoke.py calls find_spec("google.genai") at
+# import time. Staying at the repo root also leaves each lib's testpaths/addopts
+# unapplied, which is what keeps those src trees out of collection here.
 test-unit-minimal: ## Run unit tests on minimal deps (no provider SDKs), optional PACKAGE=<name>
-	$(call pytest-each-lib,tests src -m "not functional")
+	$(foreach lib,$(TEST_LIBS),uv run pytest libs/$(lib) -m "not functional" &&) true
 
 test-no-providers: ## Run tests that verify behavior when provider SDKs are missing
 	uv run pytest libs/giskard-llm -m "no_providers"
