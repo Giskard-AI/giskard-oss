@@ -676,6 +676,18 @@ def test_suite_pass_rate_none_when_all_skipped():
     assert suite_result.pass_rate is None
 
 
+def test_suite_result_rich_console_renders_em_dash_when_pass_rate_none():
+    result = SuiteResult(results=[], duration_ms=0)
+    assert result.pass_rate is None
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "Pass Rate:" in output
+    assert "—" in output
+
+
 def test_suite_group_by_skipped_scenario_counted_separately():
     from giskard.checks.core.interaction.trace import Trace
     from giskard.checks.core.result import (
