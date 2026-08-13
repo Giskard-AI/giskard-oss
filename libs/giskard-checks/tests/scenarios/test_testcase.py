@@ -14,6 +14,7 @@ from giskard.checks import (
     Interact,
     Interaction,
     TestCase,
+    TestCaseResult,
     Trace,
 )
 
@@ -280,6 +281,62 @@ class TestTestCaseResult:
 
         failures = result.format_failures()
         assert len(failures) == 0
+
+    async def test_testcase_result_format_failures_reports_skipped(self):
+        """A skipped check is reported: SKIP reaches no verdict, so it must be explained."""
+        result = TestCaseResult(
+            results=[
+                CheckResult.skip(
+                    message="precondition not met",
+                    details={"check_name": "skipped_check"},
+                )
+            ],
+            duration_ms=0,
+        )
+
+        assert result.skipped
+        failures = result.format_failures()
+        assert len(failures) == 1
+        assert "SKIPPED" in failures[0]
+        assert "skipped_check" in failures[0]
+        assert "precondition not met" in failures[0]
+
+    async def test_testcase_result_assert_passed_explains_skip(self):
+        """assert_passed() on a fully skipped test case must not raise a blank message."""
+        result = TestCaseResult(
+            results=[
+                CheckResult.skip(
+                    message="precondition not met",
+                    details={"check_name": "skipped_check"},
+                )
+            ],
+            duration_ms=0,
+        )
+
+        with pytest.raises(AssertionError) as exc_info:
+            result.assert_passed()
+
+        error_message = str(exc_info.value)
+        assert "SKIPPED" in error_message
+        assert "precondition not met" in error_message
+
+    async def test_testcase_result_format_failures_reports_error_result(self):
+        """An ERROR check result is reported with the ERRORED label."""
+        result = TestCaseResult(
+            results=[
+                CheckResult.error(
+                    message="key could not be resolved",
+                    details={"check_name": "erroring_check"},
+                )
+            ],
+            duration_ms=0,
+        )
+
+        assert result.errored
+        failures = result.format_failures()
+        assert len(failures) == 1
+        assert "ERRORED" in failures[0]
+        assert "erroring_check" in failures[0]
 
     async def test_testcase_result_assert_passed_success(self):
         """Test assert_passed() when test case passes."""
