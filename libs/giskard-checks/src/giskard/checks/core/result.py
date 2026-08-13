@@ -604,8 +604,9 @@ class SuiteResult(BaseResult, frozen=True):
         Number of scenarios that errored.
     skipped_count : int
         Number of scenarios that were skipped.
-    pass_rate : float
-        Fraction of non-skipped scenarios that passed (1.0 when all scenarios are skipped).
+    pass_rate : float | None
+        Fraction of non-skipped scenarios that passed; None when there are no
+        non-skipped scenarios.
     """
 
     results: list[ScenarioResult[Any]] = Field(
@@ -646,11 +647,14 @@ class SuiteResult(BaseResult, frozen=True):
 
     @computed_field
     @property
-    def pass_rate(self) -> float:
-        """The pass rate of the suite (passed scenarios / (total scenarios - skipped scenarios))."""
+    def pass_rate(self) -> float | None:
+        """The pass rate of the suite (passed scenarios / (total scenarios - skipped scenarios)).
+
+        None when no scenario was evaluated (empty suite or all scenarios skipped).
+        """
         denominator = len(self.results) - self.skipped_count
         if denominator == 0:
-            return 1.0
+            return None
         return self.passed_count / denominator
 
     @property
@@ -799,7 +803,8 @@ def _suite_report_renderables(
         )
     )
     summary = ", ".join(count_parts)
-    yield f"Summary: {summary} | Pass Rate: [default bold]{result.pass_rate:.1%}[/default bold] | Total Duration: {result.duration_ms}ms"
+    pass_rate = f"{result.pass_rate:.1%}" if result.pass_rate is not None else "—"
+    yield f"Summary: {summary} | Pass Rate: [default bold]{pass_rate}[/default bold] | Total Duration: {result.duration_ms}ms"
 
 
 def _parse_tag(tag: str) -> tuple[str, str]:
