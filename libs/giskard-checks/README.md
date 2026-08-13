@@ -132,7 +132,11 @@ suite.append(scenario2)
 
 # Run the suite
 results = await suite.run()
-print(f"Aggregated pass rate: {results.pass_rate * 100}%")
+# `pass_rate` is None when nothing was evaluated (empty or fully skipped suite)
+if results.pass_rate is None:
+    print("Aggregated pass rate: n/a")
+else:
+    print(f"Aggregated pass rate: {results.pass_rate * 100}%")
 ```
 
 Why this library?
@@ -179,7 +183,7 @@ API Overview
 
 **Built-in and LLM-based checks**
 - `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
-- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LessThan`, `LessThanEquals` (`LesserThan` and `LesserThanEquals` are deprecated aliases).
+- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterThanEquals`, `LessThan`, `LessThanEquals`.
 - `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
 - JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks via `key` or check-specific fields like `answer_key`.
 
