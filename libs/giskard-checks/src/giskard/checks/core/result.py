@@ -1,3 +1,14 @@
+"""Result models for checks, test cases, scenarios and suites.
+
+``CheckStatus`` has four states: ``PASS``, ``FAIL``, ``ERROR`` and ``SKIP``.
+ERROR and SKIP mean *no verdict was reached*: branch on ``status`` (or the
+explicit ``failed`` / ``errored`` / ``skipped`` properties) rather than on
+``not passed``, keep the four states distinct in exports, and exclude SKIP
+from pass-rate denominators. Rollups still use priority (ERROR > FAIL >
+all-SKIP > PASS), so a mix of PASS and SKIP remains PASS — only an all-SKIP
+collection becomes SKIP.
+"""
+
 from collections import defaultdict
 from collections.abc import Mapping
 from enum import Enum
@@ -52,6 +63,9 @@ STATUS_SUMMARY_ORDER: tuple[tuple[str, str], ...] = (
     ("skip", "skipped"),
     ("pass", "passed"),
 )
+
+
+STATUS_PAST_TENSE: Mapping[str, str] = dict(STATUS_SUMMARY_ORDER)
 
 
 def format_status_count_parts(counts: Mapping[str, int]) -> list[str]:
@@ -496,25 +510,31 @@ class TestCaseResult(BaseResult, frozen=True):
         return [result for result in self.results if result.failed or result.errored]
 
     def format_failures(self) -> list[str]:
-        """Format failed check results into a list of readable error messages.
+        """Format non-passing check results into readable messages (FAIL, ERROR, and SKIP).
 
         Returns
         -------
         list[str]
-            List of formatted error messages for failed checks. Each message includes
-            the check name/kind and the failure reason.
+            List of formatted messages for every check that did not reach a PASS
+            verdict, including skipped checks. Each message includes the check
+            name/kind, its status and the reason. This is the diagnostic
+            superset used by ``assert_passed``; ``failures_and_errors``
+            intentionally excludes SKIP.
         """
         failure_messages: list[str] = []
         if self.error is not None:
             failure_messages.append(f"Test case ERRORED: {self.error.summary()}")
         for result in self.results:
-            if result.failed or result.errored:
-                check_name: str = result.details.get(
-                    "check_name"
-                ) or result.details.get("check_kind", "Unknown check")
-                status = "ERRORED" if result.errored else "FAILED"
-                message = result.message or "No specific error message provided"
-                failure_messages.append(f"{check_name} {status}: {message}")
+            # SKIP is reported too: a skipped check reached no verdict, so
+            # omitting it would render a non-passing test case as unexplained.
+            if result.passed:
+                continue
+            check_name: str = result.details.get("check_name") or result.details.get(
+                "check_kind", "Unknown check"
+            )
+            status = STATUS_PAST_TENSE[result.status.value].upper()
+            message = result.message or "No specific error message provided"
+            failure_messages.append(f"{check_name} {status}: {message}")
         return failure_messages
 
     def assert_passed(self) -> None:
