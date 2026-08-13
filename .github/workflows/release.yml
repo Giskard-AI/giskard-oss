@@ -15,7 +15,7 @@ on:
           - giskard-checks
           - giskard-scan
       bump_type:
-        description: 'Version bump type'
+        description: 'Bump the release number, e.g. 1.2.3 -> 2.0.0 / 1.3.0 / 1.2.4. Combine with alpha/beta/rc below to open a new pre-release line (1.2.3 + minor + rc -> 1.3.0rc1). Leave as none to only move the pre-release, or when release_type is stable.'
         required: true
         type: choice
         options:
@@ -23,15 +23,16 @@ on:
           - minor
           - patch
           - none
-        default: patch
+        default: none
       release_type:
-        description: 'Release type'
+        description: 'alpha/beta/rc starts or advances a pre-release (1.2.3rc1 -> 1.2.3rc2). stable drops the suffix to publish the final version (1.2.3rc2 -> 1.2.3) and requires bump_type=none. Leave as none to publish a plain version bump.'
         required: true
         type: choice
         options:
           - alpha
           - beta
           - rc
+          - stable
           - none
         default: none
       dry_run:
@@ -82,14 +83,14 @@ jobs:
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: false
           python-version: "3.12"

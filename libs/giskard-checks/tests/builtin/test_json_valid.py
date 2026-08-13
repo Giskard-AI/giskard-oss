@@ -182,8 +182,8 @@ async def test_missing_key_fails() -> None:
 
     result = await check.run(trace)
 
-    assert result.status == CheckStatus.FAIL
-    assert result.failed
+    assert result.status == CheckStatus.ERROR
+    assert result.errored
     assert isinstance(result.details["value"], NoMatch)
     assert result.message == "No value found for key 'trace.last.outputs.missing'."
 
@@ -258,7 +258,7 @@ async def test_parse_true_rejects_non_string() -> None:
 
     result = await check.run(trace)
 
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert "is not a string" in result.message
 

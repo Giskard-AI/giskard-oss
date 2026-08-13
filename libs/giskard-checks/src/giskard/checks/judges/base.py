@@ -2,7 +2,7 @@ from typing import Any, override
 
 from giskard.agents import ChatWorkflow, MessageTemplate, TemplateReference
 from giskard.llm.types import ChatMessage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..core import Trace
 from ..core.check import Check
@@ -13,10 +13,36 @@ from ..core.result import CheckResult
 class LLMCheckResult(BaseModel):
     """Default result model for LLM-based checks."""
 
-    reason: str | None = Field(
-        default=None, description="Optional explanation for the result"
+    reason: str = Field(
+        ...,
+        min_length=1,
+        description="Explanation for the pass or fail verdict",
     )
     passed: bool = Field(..., description="Whether the check passed or failed")
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def _strip_reason(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+
+def format_prompt_text(value: Any) -> str:
+    """Render a resolved trace/input value as plain text for an LLM prompt.
+
+    Judge inputs such as ``context`` accept ``str | list[str]``, and
+    JSONPath resolution can also return a list for ``answer`` (multi-match
+    paths, or a single match whose value is already a list). A bare
+    ``str(value)`` on a list renders Python's ``repr`` -- brackets, comma
+    separators, and quoted (sometimes escaped) items -- which leaks
+    implementation syntax into the prompt. Join list values into a single
+    newline-separated block instead. Any other value (a plain string,
+    ``NoMatch``, or arbitrary trace payload) is stringified as before.
+    """
+    if isinstance(value, list):
+        return "\n".join(str(item) for item in value)
+    return str(value)
 
 
 class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
@@ -148,7 +174,7 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         if isinstance(output_value, LLMCheckResult):
             if output_value.passed:
                 return CheckResult.success(
-                    message=output_value.reason or "Check passed",
+                    message=output_value.reason,
                     details={
                         "reason": output_value.reason,
                         "inputs": template_inputs,
@@ -156,7 +182,7 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
                 )
             else:
                 return CheckResult.failure(
-                    message=output_value.reason or "Check failed",
+                    message=output_value.reason,
                     details={
                         "reason": output_value.reason,
                         "inputs": template_inputs,

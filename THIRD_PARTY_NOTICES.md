@@ -29,6 +29,7 @@ Find a list of packages below
 |✔|click|
 |✔|colorama|
 |✔|cryptography|
+|✔|defusedxml|
 |✔|distro|
 |✔|docstring-parser|
 |✔|fastuuid|
@@ -49,6 +50,7 @@ Find a list of packages below
 |✔|importlib-metadata|
 |✔|jinja2|
 |✔|jiter|
+|✔|joblib|
 |✔|jsonpath-ng|
 |✔|jsonschema|
 |✔|jsonschema-specifications|
@@ -58,6 +60,7 @@ Find a list of packages below
 |✔|markupsafe|
 |✔|mdurl|
 |✔|multidict|
+|✔|nltk|
 |✔|numpy|
 |✔|openai|
 |✔|packaging|
@@ -70,6 +73,7 @@ Find a list of packages below
 |✔|pydantic-core|
 |✔|pydantic-settings|
 |✔|pygments|
+|✔|pyphen|
 |✔|python-dotenv|
 |✔|pyyaml|
 |✔|referencing|
@@ -77,8 +81,10 @@ Find a list of packages below
 |✔|requests|
 |✔|rich|
 |✔|rpds-py|
+|✔|setuptools|
 |✔|sniffio|
 |✔|tenacity|
+|✔|textstat|
 |✔|tiktoken|
 |✔|tokenizers|
 |✔|tqdm|
@@ -96,7 +102,7 @@ Find a list of packages below
 - License: Python Software Foundation License
 - Compatible: True
 
-### aiohttp-3.14.1
+### aiohttp-3.14.3
 
 - HomePage:
 - Author:
@@ -173,7 +179,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### click-8.4.1
+### click-8.3.3
 
 - HomePage:
 - Author:
@@ -187,11 +193,18 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### cryptography-49.0.0
+### cryptography-50.0.0
 
 - HomePage:
 - Author: The Python Cryptographic Authority and individual contributors
 - License: Apache-2.0;; BSD-3-Clause
+- Compatible: True
+
+### defusedxml-0.7.1
+
+- HomePage: https://github.com/tiran/defusedxml
+- Author: Christian Heimes
+- License: Python Software Foundation License
 - Compatible: True
 
 ### distro-1.9.0
@@ -229,11 +242,11 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2026.6.0
+### fsspec-2025.3.0
 
 - HomePage:
 - Author:
-- License: BSD-3-Clause
+- License: BSD License
 - Compatible: True
 
 ### google-auth-2.55.0
@@ -299,7 +312,7 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### huggingface-hub-1.20.1
+### huggingface-hub-1.16.1
 
 - HomePage: https://github.com/huggingface/huggingface_hub
 - Author: Hugging Face, Inc.
@@ -332,6 +345,13 @@ Find a list of packages below
 - HomePage: https://github.com/pydantic/jiter/
 - Author: Samuel Colvin
 - License: MIT
+- Compatible: True
+
+### joblib-1.5.3
+
+- HomePage:
+- Author: Gael Varoquaux
+- License: BSD-3-Clause
 - Compatible: True
 
 ### jsonpath-ng-1.8.0
@@ -397,7 +417,14 @@ Find a list of packages below
 - License: Apache License 2.0
 - Compatible: True
 
-### numpy-2.5.0
+### nltk-3.10.0
+
+- HomePage: https://www.nltk.org/
+- Author: NLTK Team
+- License: Apache Software License
+- Compatible: True
+
+### numpy-2.4.6
 
 - HomePage:
 - Author: Travis E. Oliphant et al.
@@ -481,6 +508,13 @@ Find a list of packages below
 - License: BSD-2-Clause
 - Compatible: True
 
+### pyphen-0.17.2
+
+- HomePage:
+- Author: Guillaume Ayoub
+- License: GNU General Public License v2;; GNU Lesser General Public License v2;; Mozilla Public License 1.1 _MPL 1.1_;; later _GPLv2__;; later _LGPLv2__
+- Compatible: True
+
 ### python-dotenv-1.2.2
 
 - HomePage:
@@ -530,6 +564,13 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
+### setuptools-83.0.0
+
+- HomePage:
+- Author: Python Packaging Authority
+- License: MIT
+- Compatible: True
+
 ### sniffio-1.3.1
 
 - HomePage:
@@ -544,6 +585,13 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
+### textstat-0.7.13
+
+- HomePage: https://github.com/textstat/textstat
+- Author: Shivam Bansal, Chaitanya Aggarwal
+- License: MIT
+- Compatible: True
+
 ### tiktoken-0.13.0
 
 - HomePage:
@@ -551,7 +599,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### tokenizers-0.23.1
+### tokenizers-0.22.2
 
 - HomePage:
 - Author: Nicolas Patry
@@ -586,11 +634,11 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### websockets-16.0
+### websockets-15.0.1
 
 - HomePage:
 - Author: Aymeric Augustin
-- License: BSD-3-Clause
+- License: BSD License
 - Compatible: True
 
 ### yarl-1.24.2

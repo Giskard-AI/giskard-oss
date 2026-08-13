@@ -227,6 +227,11 @@ class GoogleResponseParams(_BaseModel):
             and issubclass(v["response_format"], BaseModel)
         ):
             v["response_mime_type"] = "application/json"
+            v["response_format"] = {
+                "type": "text",
+                "mime_type": "application/json",
+                "schema": v["response_format"].model_json_schema(),
+            }
 
         return v
 

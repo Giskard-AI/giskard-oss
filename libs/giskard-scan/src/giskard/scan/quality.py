@@ -6,7 +6,7 @@ import warnings
 from giskard.checks import SuiteResult, Target, Trace
 
 from .catalog import generate_suite
-from .generators.base import TargetMode
+from .generators.base import DEFAULT_TARGET_MODE, TargetMode
 from .generators.knowledge_base import (
     HallucinationScenarioGenerator,
     KnowledgeBaseScenarioGenerator,
@@ -16,6 +16,7 @@ from .generators.knowledge_base import (
     SycophancyScenarioGenerator,
 )
 from .registry import SuiteGeneratorRegistry
+from .types import resolve_scan_options
 from .utils.knowledge_base import KnowledgeBase, normalize_knowledge_base
 from .utils.recommendation import generate_quality_recommendation
 
@@ -38,6 +39,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     target: Target[InputType, OutputType, TraceType],
     description: str,
     languages: list[str],
+    *,
     knowledge_base: KnowledgeBase | list[str] | None = None,
     max_scenarios: int | None = None,
     seed: int = 42,
@@ -45,39 +47,67 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     parallel: bool = True,
     max_concurrency: int | None = None,
     return_exception: bool = False,
-    target_mode: TargetMode = "multiturn",
+    target_mode: TargetMode = DEFAULT_TARGET_MODE,
 ) -> SuiteResult:
     """Generate and run the standard quality scan suite.
 
-    Builds a suite from the quality scenario generator registry, runs it
-    against the target, prints the grouped report with a recommendation, and
-    returns the suite result.
+    Builds a suite from the quality scenario generator registry, runs it against
+    the target, prints the grouped report with a recommendation, and returns
+    the suite result.
 
-    Args:
-        target: Agent or provider target to evaluate.
-        description: Natural-language description of the agent under test.
-        languages: BCP-47 language codes the agent is expected to handle.
-        knowledge_base: Documents used by knowledge-base quality generators.
-            Raw strings are converted to a :class:`KnowledgeBase`.
-        max_scenarios: Total upper bound on scenarios across all quality
-            generators. ``None`` lets each generator apply its own default.
-        seed: Integer seed used for reproducible scenario generation.
-        group_by: Result annotation key used to group the printed report.
-            ``None`` prints the ungrouped report.
-        parallel: When ``True``, run scenarios concurrently (default).
-        max_concurrency: Cap on concurrent scenarios when ``parallel=True``.
-            ``None`` runs all scenarios at once.
-        return_exception: When ``True``, a scenario whose input generation fails
-            is recorded as an errored result and the scan continues. When
-            ``False`` (default), the failure propagates and aborts the scan.
-        target_mode: Whether the agent under test supports single-turn or
-            multi-turn conversations. ``"singleturn"`` skips generators that
-            are multi-turn by design and caps turn budgets to 1 on others.
-            Defaults to ``"multiturn"``.
+    Parameters
+    ----------
+    target : Target
+        Agent or provider target to evaluate.
+    description : str
+        Natural-language description of the agent under test.
+    languages : list of str
+        BCP-47 language codes the agent is expected to handle.
+    knowledge_base : KnowledgeBase, list of str, or None, optional
+        Documents used by knowledge-base quality generators. Raw strings are
+        converted to a :class:`~giskard.scan.utils.knowledge_base.KnowledgeBase`.
+    max_scenarios : int, optional
+        Total upper bound on scenarios across all quality generators. ``None``
+        lets each generator apply its own default.
+    seed : int, optional
+        Integer seed used for reproducible scenario generation. Defaults to ``42``.
+    group_by : str, optional
+        Result annotation key used to group the printed report. ``None`` prints
+        the ungrouped report. Defaults to ``"component"``.
+    parallel : bool, optional
+        When ``True`` (default), run generated scenarios concurrently against
+        the target. Pass ``False`` for serial execution. This is suite
+        *execution*; scenario *generation* always runs generators concurrently
+        via :func:`~giskard.scan.catalog.generate_suite`.
+    max_concurrency : int, optional
+        Cap on concurrent scenarios when ``parallel=True``. ``None`` runs all
+        scenarios at once (provider rate limits become the effective cap).
+        When ``parallel=False``, a valid value has no effect on scheduling,
+        but invalid values are still rejected.
+    return_exception : bool, optional
+        When ``True``, a scenario whose input generation fails is recorded as an
+        errored result and the scan continues. When ``False`` (default), the
+        failure propagates and aborts the scan.
+    target_mode : {"singleturn", "multiturn"}, optional
+        Whether the agent under test supports single-turn or multi-turn
+        conversations. ``"singleturn"`` skips generators that are multi-turn by
+        design and caps turn budgets to 1 on others. Defaults to
+        :data:`~giskard.scan.generators.base.DEFAULT_TARGET_MODE`.
 
-    Returns:
+    Returns
+    -------
+    SuiteResult
         The completed suite result with a generated quality recommendation.
     """
+    opts = resolve_scan_options(
+        max_scenarios=max_scenarios,
+        seed=seed,
+        group_by=group_by,
+        parallel=parallel,
+        max_concurrency=max_concurrency,
+        return_exception=return_exception,
+    )
+
     knowledge_base = normalize_knowledge_base(
         _warn_if_missing_knowledge_base(knowledge_base)
     )
@@ -86,17 +116,17 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         description=description,
         languages=languages,
         generators=quality_suite_generator_registry.generators(),
-        max_scenarios=max_scenarios,
-        seed=seed,
+        max_scenarios=opts["max_scenarios"],
+        seed=opts["seed"],
         target_mode=target_mode,
         knowledge_base=knowledge_base,
     )
 
     result: SuiteResult = await suite.run(
         target,
-        parallel=parallel,
-        max_concurrency=max_concurrency,
-        return_exception=return_exception,
+        parallel=opts["parallel"],
+        max_concurrency=opts["max_concurrency"],
+        return_exception=opts["return_exception"],
     )
     try:
         recommendation = await generate_quality_recommendation(result)
@@ -104,7 +134,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         logger.exception("Quality recommendation generation failed")
         recommendation = ""
     quality_result = result.model_copy(update={"recommendation": recommendation})
-    quality_result.print_report(group_by=group_by)
+    quality_result.print_report(group_by=opts["group_by"])
     return quality_result
 
 

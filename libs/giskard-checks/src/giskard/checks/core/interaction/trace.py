@@ -1,10 +1,12 @@
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from pydantic import BaseModel, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.rule import Rule
 
+from ..exceptions import InteractionGenerationError
 from ..protocols import InteractionGenerator
+from ..types import Target
 from .interaction import Interaction
 
 
@@ -95,6 +97,25 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
         *interactions: Interaction[InputType, OutputType]
         | InteractionGenerator[Interaction[InputType, OutputType], Self],
     ) -> Self:
+        """Return a trace extended with every given interaction, in order.
+
+        Parameters
+        ----------
+        *interactions : Interaction or InteractionGenerator
+            Concrete interactions to append and specifications to generate from.
+
+        Returns
+        -------
+        Self
+            Trace containing every successfully generated interaction.
+
+        Raises
+        ------
+        InteractionGenerationError
+            If generation fails, with the progress made by this call and every
+            preceding one in `partial_trace`, and the original error chained as
+            its cause.
+        """
         trace = self
 
         for interaction in interactions:
@@ -109,6 +130,24 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
             | InteractionGenerator[Interaction[InputType, OutputType], Self]
         ),
     ) -> Self:
+        """Return a trace extended with one interaction or generated sequence.
+
+        Parameters
+        ----------
+        interaction : Interaction or InteractionGenerator
+            Concrete interaction to append or specification that generates interactions.
+
+        Returns
+        -------
+        Self
+            Trace containing every successfully generated interaction.
+
+        Raises
+        ------
+        InteractionGenerationError
+            If generation fails, with the completed progress in `partial_trace` and
+            the original error chained as its cause.
+        """
         if isinstance(interaction, Interaction):
             return self.model_copy(
                 update={"interactions": self.interactions + [interaction]}
@@ -123,6 +162,13 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
                 trace = await trace.with_interaction(await generator.asend(trace))
         except StopAsyncIteration:
             return trace
+        except InteractionGenerationError:
+            # A nested spec already wrapped this failure. Its partial trace was
+            # built from ours, so it holds strictly more progress; re-wrapping
+            # would bury the root cause one level deeper and drop that progress.
+            raise
+        except Exception as error:
+            raise InteractionGenerationError(trace) from error
         finally:
             if generator is not None:
                 await generator.aclose()
@@ -135,3 +181,17 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
         for idx, interaction in enumerate(self.interactions):
             yield Rule(f"Interaction {idx + 1}", style="bold")
             yield from interaction.__rich_console__(console, options)
+
+    @classmethod
+    def for_target[In, Out, Tr: Trace](  # pyright: ignore[reportMissingTypeArgument]
+        cls, target: Target[In, Out, Tr]
+    ) -> Tr:
+        # Local import: utils.inference imports Trace, so a module-level import
+        # here would create a circular import at load time.
+        from ...utils.inference import _infer_trace_type
+
+        target_type = _infer_trace_type(target)
+        if target_type is None:
+            return cast(Tr, cls())
+
+        return target_type()
