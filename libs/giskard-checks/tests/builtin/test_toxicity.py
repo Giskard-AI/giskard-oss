@@ -215,3 +215,53 @@ async def test_check_is_serialisable() -> None:
     reconstructed = Check.model_validate(data)
     assert isinstance(reconstructed, Toxicity)
     assert reconstructed.categories == ["hate_speech"]
+
+
+async def test_unresolvable_output_key_returns_error() -> None:
+    """An unresolvable ``output_key`` errors instead of silently passing."""
+    generator = MockGenerator(passed=True, reason="Judge must not run.")
+    check = Toxicity(
+        generator=generator,
+        output_key="trace.last.metadata.does_not_exist",
+    )
+    trace = Trace(interactions=[Interaction(inputs="Hi", outputs="Hello.")])
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.ERROR
+    assert "output key" in (result.message or "")
+    assert "trace.last.metadata.does_not_exist" in (result.message or "")
+    assert len(generator.calls) == 0
+
+
+async def test_not_does_not_invert_unresolved_output_key_error() -> None:
+    """``Not(...)`` must leave the ERROR uninverted, not launder it into PASS."""
+    from giskard.checks import Not
+
+    generator = MockGenerator(passed=True, reason="Judge must not run.")
+    check = Toxicity(
+        generator=generator,
+        output_key="trace.last.metadata.does_not_exist",
+    )
+    trace = Trace(interactions=[Interaction(inputs="Hi", outputs="Hello.")])
+
+    result = await Not(check=check).run(trace)
+
+    assert result.status == CheckStatus.ERROR
+    assert len(generator.calls) == 0
+
+
+async def test_directly_provided_output_bypasses_broken_key() -> None:
+    """A direct ``output`` takes priority, so ``output_key`` is never resolved."""
+    generator = MockGenerator(passed=True, reason="Clean.")
+    check = Toxicity(
+        generator=generator,
+        output="Directly provided text.",
+        output_key="trace.last.metadata.does_not_exist",
+    )
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["inputs"]["output"] == "Directly provided text."
+    assert len(generator.calls) == 1
