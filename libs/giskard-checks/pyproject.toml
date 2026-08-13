@@ -31,9 +31,7 @@ addopts = "--doctest-modules"
 asyncio_mode = "auto"
 pythonpath = ["src"]
 markers = [
-    "integration: integration tests that are skipped unless --run-integration is provided",
-    "uses_ambient_env: opt out of the GISKARD_* environment isolation fixture",
-]
+    "integration: integration tests that are skipped unless --run-integration is provided",]
 
 [tool.ruff.lint]
 select = ["E", "W", "I", "F"]
