@@ -3,15 +3,6 @@ name: Integration Tests
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] guarded by authorize job, label gate for external PRs, and immutable head.sha checkout
     types: [opened, synchronize, reopened, labeled]
-    paths:
-      - "libs/giskard-agents/**"
-      - "libs/giskard-llm/**"
-      - "libs/giskard-core/**"
-      - "libs/giskard-scan/**"
-      - ".github/workflows/integration-tests.yml"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "Makefile"
   workflow_dispatch:
 
 permissions: {}
@@ -24,6 +15,10 @@ jobs:
   authorize:
     name: authorize
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read # list changed files
+    outputs:
+      relevant: ${{ steps.changes.outputs.relevant }}
     steps:
       - name: Check authorization
         env:
@@ -59,8 +54,32 @@ jobs:
           echo "::error::External contributors require a maintainer to add the 'safe for build' label."
           exit 1
 
+      # Path filtering lives here rather than in the `paths:` trigger: a
+      # required check that never starts stays "Waiting" forever, whereas a
+      # job skipped by `if:` reports as neutral and unblocks the PR.
+      - name: Detect relevant changes
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [[ "$EVENT_NAME" != "pull_request_target" ]]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename')
+          if grep -qE '^(libs/giskard-(agents|llm|core|scan)/|\.github/workflows/integration-tests\.yml$|pyproject\.toml$|uv\.lock$|Makefile$)' <<<"$files"; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+            echo "No integration-relevant paths changed — skipping test jobs."
+          fi
+
   test-agents-functional:
     needs: authorize
+    if: needs.authorize.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
@@ -110,6 +129,7 @@ jobs:
 
   test-llm-functional:
     needs: authorize
+    if: needs.authorize.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     environment: ci
     timeout-minutes: 30
@@ -162,6 +182,7 @@ jobs:
 
   test-scan-garak:
     needs: authorize
+    if: needs.authorize.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
@@ -189,6 +210,7 @@ jobs:
 
   test-scan-deepteam:
     needs: authorize
+    if: needs.authorize.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
