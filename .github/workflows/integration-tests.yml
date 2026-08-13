@@ -65,16 +65,25 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
         run: |
+          # Non-PR events (push, manual dispatch) always run the full suite
           if [[ "$EVENT_NAME" != "pull_request_target" ]]; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+
+          # For PRs, run only when at least one relevant path changed
           files=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename')
-          if grep -qE '^(libs/giskard-(agents|llm|core|scan)/|\.github/workflows/integration-tests\.yml$|pyproject\.toml$|uv\.lock$|Makefile$)' <<<"$files"; then
+          if grep -qE \
+              -e '^libs/giskard-(agents|llm|core|scan)/' \
+              -e '^\.github/workflows/integration-tests\.yml$' \
+              -e '^pyproject\.toml$' \
+              -e '^uv\.lock$' \
+              -e '^Makefile$' \
+              <<<"$files"; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
             echo "relevant=false" >> "$GITHUB_OUTPUT"
-            echo "No integration-relevant paths changed — skipping test jobs."
+            echo "No integration-relevant paths changed. Skipping test jobs."
           fi
 
   test-agents-functional:
