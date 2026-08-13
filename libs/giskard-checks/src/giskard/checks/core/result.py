@@ -1,11 +1,12 @@
 """Result models for checks, test cases, scenarios and suites.
 
 ``CheckStatus`` has four states: ``PASS``, ``FAIL``, ``ERROR`` and ``SKIP``.
-ERROR and SKIP mean *no verdict was reached* and are never coerced into pass or
-fail: branch on ``status`` (or the explicit ``failed`` / ``errored`` /
-``skipped`` properties) rather than on ``not passed``, keep the four states
-distinct in aggregations and exports, and exclude SKIP from pass-rate
-denominators.
+ERROR and SKIP mean *no verdict was reached*: branch on ``status`` (or the
+explicit ``failed`` / ``errored`` / ``skipped`` properties) rather than on
+``not passed``, keep the four states distinct in exports, and exclude SKIP
+from pass-rate denominators. Rollups still use priority (ERROR > FAIL >
+all-SKIP > PASS), so a mix of PASS and SKIP remains PASS — only an all-SKIP
+collection becomes SKIP.
 """
 
 from collections import defaultdict
@@ -509,14 +510,16 @@ class TestCaseResult(BaseResult, frozen=True):
         return [result for result in self.results if result.failed or result.errored]
 
     def format_failures(self) -> list[str]:
-        """Format failed check results into a list of readable error messages.
+        """Format non-passing check results into readable messages (FAIL, ERROR, and SKIP).
 
         Returns
         -------
         list[str]
             List of formatted messages for every check that did not reach a PASS
             verdict, including skipped checks. Each message includes the check
-            name/kind, its status and the reason.
+            name/kind, its status and the reason. This is the diagnostic
+            superset used by ``assert_passed``; ``failures_and_errors``
+            intentionally excludes SKIP.
         """
         failure_messages: list[str] = []
         if self.error is not None:

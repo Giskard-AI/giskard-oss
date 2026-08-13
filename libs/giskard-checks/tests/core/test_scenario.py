@@ -389,6 +389,11 @@ class TestScenarioNormalCases:
         assert not result.steps[1].passed
         assert len(result.steps[1].results) == 1
         assert result.steps[1].results[0].skipped
+        assert result.steps[1].results[0].details.get("check_name") == "step"
+        failures = result.steps[1].format_failures()
+        assert len(failures) == 1
+        assert "step SKIPPED:" in failures[0]
+        assert "Unknown check" not in failures[0]
         assert result.failed
 
     async def test_skipped_step_without_checks_after_error_reports_skip(self):
@@ -408,6 +413,7 @@ class TestScenarioNormalCases:
         assert result.steps[0].errored
         assert result.steps[1].skipped
         assert not result.steps[1].passed
+        assert result.steps[1].results[0].details.get("check_name") == "step"
         assert result.errored
 
     async def test_trace_accumulation_across_components(self):
