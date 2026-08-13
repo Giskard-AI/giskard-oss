@@ -503,6 +503,23 @@ class TestCaseResult(BaseResult, frozen=True):
         """True when all checks were skipped in the final run."""
         return self.status == TestCaseStatus.SKIP
 
+    @computed_field
+    @property
+    def skipped_check_count(self) -> int:
+        """Number of checks that reached no verdict because they were skipped."""
+        return sum(1 for r in self.results if r.skipped)
+
+    @computed_field
+    @property
+    def partially_skipped(self) -> bool:
+        """True when the test case passed but some of its checks were skipped.
+
+        The status stays PASS (a verdict was reached on everything that ran),
+        but the skipped checks are surfaced so a mostly-skipped green is
+        visible rather than silent.
+        """
+        return self.status == TestCaseStatus.PASS and self.skipped_check_count > 0
+
     @property
     def failures_and_errors(self) -> list[CheckResult]:
         """Return a list of check results that failed or errored."""
@@ -560,7 +577,10 @@ class TestCaseResult(BaseResult, frozen=True):
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         status = STATUS_MAPPING[self.status]
-        yield Rule(status["title"], style=f"{status['color']} bold")
+        title = status["title"]
+        if self.partially_skipped:
+            title += f" ⚠️ ({_pluralize(self.skipped_check_count, 'check')} skipped)"
+        yield Rule(title, style=f"{status['color']} bold")
 
         if self.error is not None:
             yield self.error.rich_line(status["color"])

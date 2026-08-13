@@ -4,6 +4,7 @@ Tests cover normal cases, edge cases, error handling, and max_runs functionality
 for test case execution.
 """
 
+import io
 from typing import override
 
 import pytest
@@ -17,6 +18,7 @@ from giskard.checks import (
     TestCaseResult,
     Trace,
 )
+from rich.console import Console
 
 # Test Classes
 
@@ -300,6 +302,35 @@ class TestTestCaseResult:
         assert "SKIPPED" in failures[0]
         assert "skipped_check" in failures[0]
         assert "precondition not met" in failures[0]
+
+    async def test_testcase_result_partially_skipped_passes_with_warning(self):
+        """SKIP + PASS stays PASS, but the skipped count is surfaced."""
+        result = TestCaseResult(
+            results=[
+                CheckResult.skip(
+                    message="precondition not met",
+                    details={"check_name": "skipped_check"},
+                ),
+                CheckResult.success(details={"check_name": "passing_check"}),
+            ],
+            duration_ms=0,
+        )
+
+        assert result.passed
+        assert result.partially_skipped
+        assert result.skipped_check_count == 1
+
+        buffer = io.StringIO()
+        Console(file=buffer, width=200).print(result)
+        assert "1 check skipped" in buffer.getvalue()
+
+        # Serialized, so downstream reports and exports can render it.
+        assert result.model_dump()["partially_skipped"] is True
+
+        # A fully passing test case carries no warning.
+        clean = TestCaseResult(results=[CheckResult.success()], duration_ms=0)
+        assert not clean.partially_skipped
+        assert clean.skipped_check_count == 0
 
     async def test_testcase_result_assert_passed_explains_skip(self):
         """assert_passed() on a fully skipped test case must not raise a blank message."""
