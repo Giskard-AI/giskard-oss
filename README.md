@@ -92,7 +92,6 @@ import asyncio
 from giskard.checks import Scenario, Groundedness
 
 
-
 def get_answer(inputs: str) -> str:
     return "Paris"  # replace with your model / agent
 
