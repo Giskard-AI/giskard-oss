@@ -1,7 +1,7 @@
 from typing import Any, override
 
 from giskard.agents import TemplateReference
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
@@ -36,11 +36,12 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         JSONPath expression to extract the question from the trace
         (default: ``"trace.last.inputs"``).
     answer : str | MISSING
-        The answer to evaluate. When provided, takes priority over ``answer_key``.
-        If omitted, extracted from the trace using ``answer_key``.
-    answer_key : JSONPathStr
+        The answer to evaluate. When provided, takes priority over ``target_key``.
+        If omitted, extracted from the trace using ``target_key``.
+    target_key : JSONPathStr
         JSONPath expression to extract the answer from the trace
-        (default: ``"trace.last.outputs"``).
+        (default: ``"trace.last.outputs"``). Also accepts the legacy
+        ``answer_key`` on input.
     context : str | MISSING
         Optional domain context that describes the chatbot's purpose or scope
         (e.g., ``"This is a chatbot that answers questions about programming languages"``).
@@ -53,7 +54,7 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
 
     Notes
     -----
-    When ``question_key`` or ``answer_key`` matches nothing in the trace, the check
+    When ``question_key`` or ``target_key`` matches nothing in the trace, the check
     returns ``CheckStatus.ERROR`` without invoking the judge. History is supporting
     context only: the judge is instructed to score the resolved question/answer and
     never to substitute a question inferred from history, so a misconfigured key
@@ -80,11 +81,15 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
     )
     answer: str | MISSING = Field(
         default=MISSING,
-        description="The answer to evaluate. Takes priority over answer_key.",
+        description="The answer to evaluate. Takes priority over target_key.",
     )
-    answer_key: JSONPathStr = Field(
+    target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        description="JSONPath to extract the answer from the trace.",
+        validation_alias=AliasChoices("target_key", "answer_key"),
+        description=(
+            "JSONPath to extract the answer from the trace. Also accepts the "
+            "legacy 'answer_key' on input; always serialized as 'target_key'."
+        ),
     )
     context: str | MISSING = Field(
         default=MISSING,
@@ -118,7 +123,7 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         if early := error_if_unresolved(
             trace,
             ResolvableInput("question", self.question_key, self.question),
-            ResolvableInput("answer", self.answer_key, self.answer),
+            ResolvableInput("answer", self.target_key, self.answer, "target_key"),
         ):
             return early
         return await super().run(trace)
@@ -145,7 +150,7 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         )
         answer = provided_or_resolve(
             trace,
-            key=self.answer_key,
+            key=self.target_key,
             value=self.answer,
         )
 

@@ -1,7 +1,7 @@
 from typing import override
 
 from giskard.agents import TemplateReference
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
@@ -18,18 +18,32 @@ class Contradiction[InputType, OutputType, TraceType: Trace](  # pyright: ignore
 ):
     """LLM-based check that fails only on clear contradictions with context.
 
-    The check uses the same ``answer``/``answer_key`` and
+    The check uses the same ``answer``/``target_key`` and
     ``context``/``context_key`` inputs as the groundedness judge, but applies a
     permissive criterion: omissions and unsupported additions are tolerated
     unless they directly conflict with the reference context.
+
+    Attributes
+    ----------
+    answer : str | MISSING
+        The answer text to evaluate. If omitted, extracted from the trace using
+        ``target_key``.
+    target_key : JSONPathStr
+        JSONPath expression to extract the answer from the trace
+        (default: ``"trace.last.outputs"``). Also accepts the legacy
+        ``answer_key`` on input.
     """
 
     answer: str | MISSING = Field(
         default=MISSING, description="Input source for the answer to evaluate"
     )
-    answer_key: JSONPathStr = Field(
+    target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        description="Key to extract the answer from the trace",
+        validation_alias=AliasChoices("target_key", "answer_key"),
+        description=(
+            "Key to extract the answer from the trace. Also accepts the legacy "
+            "'answer_key' on input; always serialized as 'target_key'."
+        ),
     )
     context: str | list[str] | MISSING = Field(
         default=MISSING, description="Input source for the reference context"
@@ -51,7 +65,7 @@ class Contradiction[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         if early := error_if_unresolved_answer_or_context(
             trace,
             answer=self.answer,
-            answer_key=self.answer_key,
+            answer_key=self.target_key,
             context=self.context,
             context_key=self.context_key,
         ):
@@ -62,7 +76,7 @@ class Contradiction[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
         return {
             "answer": format_prompt_text(
-                provided_or_resolve(trace, key=self.answer_key, value=self.answer)
+                provided_or_resolve(trace, key=self.target_key, value=self.answer)
             ),
             "context": format_prompt_text(
                 provided_or_resolve(trace, key=self.context_key, value=self.context)

@@ -54,7 +54,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         scenario = (
             Scenario("multi_step_test")
             .interact("Hello", lambda inputs: "Hi")
-            .check(Equals(expected_value="Hi", key="trace.last.outputs"))
+            .check(Equals(expected_value="Hi", target_key="trace.last.outputs"))
         )
         result = await scenario.run()
 
@@ -67,7 +67,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             steps=[
                 Step(
                     interacts=[Interact(inputs="Hello", outputs="Hi")],
-                    checks=[Equals(expected_value="Hi", key="trace.last.outputs")],
+                    checks=[Equals(expected_value="Hi", target_key="trace.last.outputs")],
                 ),
             ],
         )

@@ -183,8 +183,8 @@ class TestAllOf:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AllOf(
             checks=[
-                LessThan(expected_value=10, key="trace.last.outputs"),
-                Equals(expected_value=5, key="trace.last.outputs"),
+                LessThan(expected_value=10, target_key="trace.last.outputs"),
+                Equals(expected_value=5, target_key="trace.last.outputs"),
             ]
         )
         result = await check.run(trace)
@@ -196,8 +196,8 @@ class TestAllOf:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AllOf(
             checks=[
-                LessThan(expected_value=10, key="trace.last.outputs"),
-                Equals(expected_value=99, key="trace.last.outputs"),  # will fail
+                LessThan(expected_value=10, target_key="trace.last.outputs"),
+                Equals(expected_value=99, target_key="trace.last.outputs"),  # will fail
             ]
         )
         result = await check.run(trace)
@@ -266,8 +266,8 @@ class TestAnyOf:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AnyOf(
             checks=[
-                Equals(expected_value=99, key="trace.last.outputs"),  # fail
-                Equals(expected_value=5, key="trace.last.outputs"),  # pass
+                Equals(expected_value=99, target_key="trace.last.outputs"),  # fail
+                Equals(expected_value=5, target_key="trace.last.outputs"),  # pass
             ]
         )
         result = await check.run(trace)
@@ -279,8 +279,8 @@ class TestAnyOf:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AnyOf(
             checks=[
-                Equals(expected_value=99, key="trace.last.outputs"),
-                Equals(expected_value=100, key="trace.last.outputs"),
+                Equals(expected_value=99, target_key="trace.last.outputs"),
+                Equals(expected_value=100, target_key="trace.last.outputs"),
             ]
         )
         result = await check.run(trace)
@@ -365,7 +365,7 @@ class TestNot:
         """Not works with a real built-in check."""
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         # Equals(99) fails → Not inverts to pass
-        check = Not(check=Equals(expected_value=99, key="trace.last.outputs"))
+        check = Not(check=Equals(expected_value=99, target_key="trace.last.outputs"))
         result = await check.run(trace)
 
         assert result.passed
@@ -375,7 +375,7 @@ class TestNot:
         trace = await Trace.from_interactions(
             Interaction(inputs="q", outputs="the answer")
         )
-        inner = Equals(key="trace.last.metadata.nope", expected_value="x")
+        inner = Equals(target_key="trace.last.metadata.nope", expected_value="x")
         result = await Not(check=inner).run(trace)
 
         assert result.status == CS.ERROR
@@ -387,7 +387,7 @@ class TestNot:
         trace = await Trace.from_interactions(
             Interaction(inputs="q", outputs="the answer")
         )
-        inner = Equals(key="trace.last.outputs", expected_value="x", match="any")
+        inner = Equals(target_key="trace.last.outputs", expected_value="x", match="any")
         result = await Not(check=inner).run(trace)
 
         assert result.status == CS.ERROR
@@ -399,7 +399,7 @@ class TestNot:
         trace = await Trace.from_interactions(
             Interaction(inputs="q", outputs="the answer")
         )
-        inner = Equals(key="trace.last.outputs", expected_value="other")
+        inner = Equals(target_key="trace.last.outputs", expected_value="other")
         result = await Not(check=inner).run(trace)
 
         assert result.passed
@@ -460,7 +460,9 @@ class TestSerialization:
     async def test_all_of_serialises(self):
         """AllOf round-trips through model_dump."""
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=3))
-        check = AllOf(checks=[LessThan(expected_value=10, key="trace.last.outputs")])
+        check = AllOf(
+            checks=[LessThan(expected_value=10, target_key="trace.last.outputs")]
+        )
         data = check.model_dump()
 
         assert data["kind"] == "all_of"
@@ -475,8 +477,8 @@ class TestSerialization:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AnyOf(
             checks=[
-                Equals(expected_value=99, key="trace.last.outputs"),
-                Equals(expected_value=5, key="trace.last.outputs"),
+                Equals(expected_value=99, target_key="trace.last.outputs"),
+                Equals(expected_value=5, target_key="trace.last.outputs"),
             ]
         )
         data = check.model_dump()
@@ -490,7 +492,7 @@ class TestSerialization:
     async def test_not_serialises(self):
         """Not round-trips through model_dump."""
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
-        check = Not(check=Equals(expected_value=99, key="trace.last.outputs"))
+        check = Not(check=Equals(expected_value=99, target_key="trace.last.outputs"))
         data = check.model_dump()
 
         assert data["kind"] == "not"
@@ -505,8 +507,8 @@ class TestSerialization:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AllOf(
             checks=[
-                Not(check=Equals(expected_value=99, key="trace.last.outputs")),
-                LessThan(expected_value=10, key="trace.last.outputs"),
+                Not(check=Equals(expected_value=99, target_key="trace.last.outputs")),
+                LessThan(expected_value=10, target_key="trace.last.outputs"),
             ]
         )
         data = check.model_dump()

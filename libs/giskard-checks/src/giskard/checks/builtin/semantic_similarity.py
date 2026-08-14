@@ -1,7 +1,7 @@
 from typing import override
 
 import numpy as np
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
@@ -66,9 +66,10 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         (default: "trace.last.metadata.reference_text").
 
         Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
-    actual_answer_key : str
+    target_key : str
         JSONPath expression to extract the actual answer from the trace
-        (default: "trace.last.outputs").
+        (default: "trace.last.outputs"). Also accepts ``answer_key`` and the
+        legacy ``actual_answer_key`` on input.
 
         Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
     embedding_model : BaseEmbeddingModel
@@ -88,15 +89,21 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         default=0.95, description="The threshold for the semantic similarity"
     )
     reference_text: str | MISSING = Field(
-        default=MISSING, description="The reference text to compare the output with"
+        default=MISSING,
+        description="The reference text to compare the output with",
     )
     reference_text_key: JSONPathStr = Field(
         default="trace.last.metadata.reference_text",
         description="The key to extract the reference text from the trace",
     )
-    actual_answer_key: JSONPathStr = Field(
+    target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        description="The key to extract the actual answer from the trace",
+        validation_alias=AliasChoices("target_key", "answer_key", "actual_answer_key"),
+        description=(
+            "The key to extract the actual answer from the trace. Also accepts "
+            "'answer_key' and the legacy 'actual_answer_key' on input; always "
+            "serialized as 'target_key'."
+        ),
     )
 
     @override
@@ -115,34 +122,34 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         CheckResult
             The result of the check evaluation.
         """
-        reference_text = provided_or_resolve(
+        reference = provided_or_resolve(
             trace,
             key=self.reference_text_key,
             value=self.reference_text,
         )
-        if isinstance(reference_text, NoMatch):
+        if isinstance(reference, NoMatch):
             return CheckResult.error(
                 message=f"No value found for reference text key '{self.reference_text_key}'.",
                 details={
                     "reference_text_key": self.reference_text_key,
-                    "reference_text": reference_text,
+                    "reference_text": reference,
                 },
             )
-        if reference_text is None or reference_text == "":
+        if reference is None or reference == "":
             return CheckResult.error(
                 message="No reference text found",
                 details={
                     "reference_text_key": self.reference_text_key,
-                    "reference_text": reference_text,
+                    "reference_text": reference,
                 },
             )
-        actual_answer = resolve(trace, self.actual_answer_key)
+        actual_answer = resolve(trace, self.target_key)
         if isinstance(actual_answer, NoMatch):
             return CheckResult.error(
-                message=f"No value found for actual answer key '{self.actual_answer_key}'.",
+                message=f"No value found for actual answer key '{self.target_key}'.",
                 details={
                     "actual_answer": actual_answer,
-                    "actual_answer_key": self.actual_answer_key,
+                    "target_key": self.target_key,
                 },
             )
         if actual_answer is None or actual_answer == "":
@@ -150,23 +157,23 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                 message="No actual answer found",
                 details={
                     "actual_answer": actual_answer,
-                    "actual_answer_key": self.actual_answer_key,
+                    "target_key": self.target_key,
                 },
             )
 
         if failure := self._failure_if_collection(
-            "reference text", self.reference_text_key, reference_text
+            "reference text", self.reference_text_key, reference
         ):
             return failure
         if failure := self._failure_if_collection(
-            "actual answer", self.actual_answer_key, actual_answer
+            "actual answer", self.target_key, actual_answer
         ):
             return failure
 
         actual_answer = str(actual_answer)
-        reference_text = str(reference_text)
+        reference = str(reference)
 
-        emb_a, emb_b = await self.get_embeddings([actual_answer, reference_text])
+        emb_a, emb_b = await self.get_embeddings([actual_answer, reference])
         similarity = cosine_similarity(emb_a, emb_b)
 
         passed = similarity >= self.threshold
@@ -178,7 +185,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                     "similarity": similarity,
                     "threshold": self.threshold,
                     "actual_answer": actual_answer,
-                    "reference_text": reference_text,
+                    "reference_text": reference,
                 },
             )
         else:
@@ -188,7 +195,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                     "similarity": similarity,
                     "threshold": self.threshold,
                     "actual_answer": actual_answer,
-                    "reference_text": reference_text,
+                    "reference_text": reference,
                 },
             )
 
@@ -210,7 +217,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
             ),
             details={
                 "reference_text_key": self.reference_text_key,
-                "actual_answer_key": self.actual_answer_key,
+                "target_key": self.target_key,
                 "value": str(value),
             },
         )
