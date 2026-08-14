@@ -70,7 +70,7 @@ async def test_suite_target_precedence(sut1, sut2):
     scenario = (
         Scenario("test", target=sut1)
         .interact("hello")
-        .check(Equals(expected_value="SUT2: hello", key="trace.last.outputs"))
+        .check(Equals(expected_value="SUT2: hello", target_key="trace.last.outputs"))
     )
 
     # Suite with a different target
@@ -88,7 +88,7 @@ async def test_suite_run_target_precedence(sut1, sut2, sut3):
     scenario = (
         Scenario("test", target=sut1)
         .interact("hello")
-        .check(Equals(expected_value="SUT3: hello", key="trace.last.outputs"))
+        .check(Equals(expected_value="SUT3: hello", target_key="trace.last.outputs"))
     )
 
     suite = Suite(name="my_suite", target=sut2)
@@ -106,13 +106,13 @@ async def test_suite_mixed_targets(sut1, sut2):
     scenario1 = (
         Scenario("s1", target=sut1)
         .interact("hello")
-        .check(Equals(expected_value="SUT1: hello", key="trace.last.outputs"))
+        .check(Equals(expected_value="SUT1: hello", target_key="trace.last.outputs"))
     )
 
     scenario2 = (
         Scenario("s2", target=sut2)
         .interact("world")
-        .check(Equals(expected_value="SUT2: world", key="trace.last.outputs"))
+        .check(Equals(expected_value="SUT2: world", target_key="trace.last.outputs"))
     )
 
     # Suite with NO target
@@ -133,7 +133,7 @@ async def test_suite_result_aggregation():
     scenario2 = (
         Scenario("s2")
         .interact("b", "c")
-        .check(Equals(expected_value="b", key="trace.last.outputs"))
+        .check(Equals(expected_value="b", target_key="trace.last.outputs"))
     )
 
     suite = Suite(name="agg_suite")
@@ -377,12 +377,12 @@ async def test_suite_continues_after_input_generation_error_with_return_exceptio
     failing = (
         Scenario("failing_input_generation")
         .interact("boom")
-        .check(Equals(expected_value="boom", key="trace.last.outputs"))
+        .check(Equals(expected_value="boom", target_key="trace.last.outputs"))
     )
     passing = (
         Scenario("passing_after_error")
         .interact("ok")
-        .check(Equals(expected_value="ok", key="trace.last.outputs"))
+        .check(Equals(expected_value="ok", target_key="trace.last.outputs"))
     )
     suite = Suite(name="input_generation_errors", target=target)
     suite.append(failing).append(passing)
@@ -589,7 +589,7 @@ async def test_suite_progress_records_each_scenario_outcome(monkeypatch):
     failing = (
         Scenario("s2")
         .interact("b", "c")
-        .check(Equals(expected_value="b", key="trace.last.outputs"))
+        .check(Equals(expected_value="b", target_key="trace.last.outputs"))
     )
     suite = Suite(name="record_suite")
     suite.append(passing).append(failing)
@@ -745,12 +745,12 @@ async def test_suite_group_by_returns_grouped_suite_result(identity_sut):
     suite.append(
         Scenario("t1", tags=["Category:Hallucination"])
         .interact("hi")
-        .check(Equals(expected_value="hi", key="trace.last.outputs"))
+        .check(Equals(expected_value="hi", target_key="trace.last.outputs"))
     )
     suite.append(
         Scenario("t2", tags=["Category:Adversarial"])
         .interact("hi")
-        .check(Equals(expected_value="WRONG", key="trace.last.outputs"))
+        .check(Equals(expected_value="WRONG", target_key="trace.last.outputs"))
     )
     suite.append(Scenario("t3").interact("hi"))  # untagged, no checks
 
