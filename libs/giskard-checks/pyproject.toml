@@ -1,7 +1,7 @@
 [project]
 name = "giskard-checks"
 version = "1.0.2b6"
-description = "Add your description here"
+description = "Scenario-based evaluations and LLM-as-judge checks for agentic systems"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
@@ -32,6 +32,7 @@ asyncio_mode = "auto"
 pythonpath = ["src"]
 markers = [
     "integration: integration tests that are skipped unless --run-integration is provided",
+    "uses_ambient_env: opt out of the GISKARD_* environment isolation fixture",
 ]
 
 [tool.ruff.lint]
