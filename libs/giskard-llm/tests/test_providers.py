@@ -568,6 +568,26 @@ def test_google_map_error_completeness():
         provider._map_error(Exception("Connection timed out"))
 
 
+def _interactions_errors_or_skip() -> Any:
+    """Resolve the Interactions error module the way production does, or skip.
+
+    ``_map_error`` reaches this hierarchy through
+    ``_import_interactions_errors()``, which returns ``None`` when the private
+    ``google.genai._interactions`` module is absent (it was removed in
+    google-genai 2.9.0) and makes ``_map_error`` skip the block entirely. Going
+    through the same helper keeps these tests in step with production instead of
+    failing on an import the library itself tolerates.
+    """
+    from giskard.llm.providers.google import _import_interactions_errors
+
+    ix = _import_interactions_errors()
+    if ix is None:
+        pytest.skip(
+            "google.genai._interactions unavailable; _map_error skips this path"
+        )
+    return ix
+
+
 @pytest.mark.google
 def test_google_interactions_timeout_maps_to_timeout_error():
     """An Interactions API timeout must map to ``LLMTimeoutError``, so it retries.
@@ -581,8 +601,8 @@ def test_google_interactions_timeout_maps_to_timeout_error():
     an ``LLMError``, so mapping a timeout to the base class still satisfies it.
     """
     from giskard.llm.retry import should_retry
-    from google.genai import _interactions as ix
 
+    ix = _interactions_errors_or_skip()
     provider = _make_google_provider()
 
     with pytest.raises(LLMTimeoutError) as excinfo:
@@ -594,8 +614,7 @@ def test_google_interactions_timeout_maps_to_timeout_error():
 @pytest.mark.google
 def test_google_interactions_connection_error_is_not_a_timeout():
     """A plain connection error stays a non-retryable ``LLMError``."""
-    from google.genai import _interactions as ix
-
+    ix = _interactions_errors_or_skip()
     provider = _make_google_provider()
 
     with pytest.raises(LLMError) as excinfo:
