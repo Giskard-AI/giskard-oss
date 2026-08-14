@@ -38,7 +38,10 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--doctest-modules --ignore=src/giskard/scan/integrations/garak --ignore=src/giskard/scan/integrations/lidar --ignore=src/giskard/scan/integrations/deepteam"
+# Optional-extra src trees are excluded by conftest.py's collect_ignore_glob, not by
+# relative --ignore flags here: pytest resolves those against the invocation CWD, so they
+# silently missed whenever pytest ran from the repo root. See conftest.py.
+addopts = "--doctest-modules"
 asyncio_mode = "auto"
 pythonpath = ["src"]
 markers = [
