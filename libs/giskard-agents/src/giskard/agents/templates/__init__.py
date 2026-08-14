@@ -1,4 +1,4 @@
-from .environment import LLMFormattable
+from .environment import LLMFormattable, Trusted
 from .message import MessageTemplate
 from .prompts_manager import (
     PromptsManager,
@@ -10,6 +10,7 @@ from .prompts_manager import (
 
 __all__ = [
     "LLMFormattable",
+    "Trusted",
     "MessageTemplate",
     "PromptsManager",
     "set_default_prompts_path",
