@@ -129,7 +129,7 @@ async def test_readability_without_thresholds_reports_metric(
 
 
 async def test_readability_fails_when_key_is_missing(fake_textstat: None) -> None:
-    check = Readability(key="trace.last.outputs.answer")
+    check = Readability(target_key="trace.last.outputs.answer")
     trace = Trace(interactions=[Interaction(inputs="Prompt", outputs="Simple text.")])
 
     result = await check.run(trace)

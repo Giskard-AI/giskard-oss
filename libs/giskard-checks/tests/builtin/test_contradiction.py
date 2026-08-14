@@ -118,7 +118,7 @@ async def test_custom_answer_and_context_keys() -> None:
     generator = MockGenerator(passed=True, reason="Mock reason.")
     contradiction = Contradiction(
         generator=generator,
-        answer_key="trace.interactions[0].outputs.response",
+        target_key="trace.interactions[0].outputs.response",
         context_key="trace.interactions[0].metadata.documents",
     )
     interaction = Interaction(
@@ -188,7 +188,7 @@ async def test_list_answer_from_trace_is_joined_without_python_repr_artifacts() 
     generator = MockGenerator(passed=True, reason="Mock reason.")
     contradiction = Contradiction(
         generator=generator,
-        answer_key="trace.last.metadata.answer_parts",
+        target_key="trace.last.metadata.answer_parts",
         context="Paris is the capital of France.",
     )
     interaction = Interaction(

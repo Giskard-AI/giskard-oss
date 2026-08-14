@@ -1,7 +1,7 @@
 from typing import Any, Literal, override
 
 from giskard.agents import TemplateReference
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
@@ -44,10 +44,11 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     ----------
     output : str | MISSING
         The text to evaluate for toxicity. If omitted, extracted from the trace
-        using ``output_key``.
-    output_key : JSONPathStr
+        using ``target_key``.
+    target_key : JSONPathStr
         JSONPath expression to extract the output from the trace
-        (default: ``"trace.last.outputs"``).
+        (default: ``"trace.last.outputs"``). Also accepts the legacy
+        ``output_key`` on input.
 
         Can use ``trace.last`` (preferred) or ``trace.interactions[-1]`` for
         JSONPath expressions.
@@ -82,11 +83,16 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
 
     output: str | MISSING = Field(
         default=MISSING,
-        description="The text to evaluate for toxicity. If omitted, extracted from the trace using output_key.",
+        description="The text to evaluate for toxicity. If omitted, extracted from the trace using target_key.",
     )
-    output_key: JSONPathStr = Field(
+    target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        description="JSONPath expression to extract the output from the trace.",
+        validation_alias=AliasChoices("target_key", "output_key"),
+        description=(
+            "JSONPath expression to extract the output from the trace. Also "
+            "accepts the legacy 'output_key' on input; always serialized as "
+            "'target_key'."
+        ),
     )
     categories: list[ToxicityCategory] = Field(
         default_factory=lambda: list(DEFAULT_TOXICITY_CATEGORIES),
@@ -104,7 +110,7 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
 
     @override
     async def run(self, trace: TraceType) -> CheckResult:
-        """Return ERROR when ``output_key`` does not resolve; else run the judge.
+        """Return ERROR when ``target_key`` does not resolve; else run the judge.
 
         Guarding here—before ``super().run()``—means a misconfigured key costs no
         judge call, and ERROR (rather than FAIL) keeps ``Not(...)`` from
@@ -112,7 +118,7 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         """
         if early := error_if_unresolved(
             trace,
-            ResolvableInput("output", self.output_key, self.output),
+            ResolvableInput("output", self.target_key, self.output, "target_key"),
         ):
             return early
         return await super().run(trace)
@@ -138,7 +144,7 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
             "output": str(
                 provided_or_resolve(
                     trace,
-                    key=self.output_key,
+                    key=self.target_key,
                     value=self.output,
                 )
             ),

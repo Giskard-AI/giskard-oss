@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Self, override
 
 import regex
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
@@ -34,73 +34,82 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
     ----------
     text : str | MISSING
         The text string to search within. If omitted, extracted from
-        trace using ``text_key``.
-    text_key : JSONPathStr
+        trace using ``target_key``.
+    target_key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
+        Also accepts the legacy ``text_key`` on input.
     """
 
     text: str | MISSING = Field(
         default=MISSING,
         description="The text string to search within.",
     )
-    text_key: JSONPathStr = Field(
+    target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        description="JSONPath expression to extract text from trace.",
+        validation_alias=AliasChoices("target_key", "text_key"),
+        description=(
+            "JSONPath expression to extract text from trace. Also accepts the "
+            "legacy 'text_key' on input; always serialized as 'target_key'."
+        ),
     )
 
     def _extract_and_validate(
         self,
         trace: TraceType,
-        target_value: str | MISSING,
-        target_key: JSONPathStr | MISSING,
-        target_name: str,
+        matcher_value: str | MISSING,
+        matcher_key: JSONPathStr | MISSING,
+        matcher_name: str,
     ) -> tuple[str, str, dict[str, Any]] | tuple[None, None, CheckResult]:
-        """Extract and validate text and target from trace or direct values.
+        """Extract and validate the text and the matcher it is checked against.
+
+        The matcher parameters are deliberately *not* named ``target_*``: on
+        this check ``target_key`` is the field naming the subject text, so
+        reusing that word for the keyword/pattern side would invert its meaning.
 
         Parameters
         ----------
         trace : TraceType
             The trace to extract values from.
-        target_value : str | MISSING
-            Direct target value (keyword/pattern).
-        target_key : JSONPathStr | MISSING
-            JSONPath key to extract target from trace.
-        target_name : str
-            Name of the target parameter (for error messages).
+        matcher_value : str | MISSING
+            Direct matcher value (keyword/pattern).
+        matcher_key : JSONPathStr | MISSING
+            JSONPath key to extract the matcher from the trace.
+        matcher_name : str
+            Name of the matcher parameter (for error messages).
 
         Returns
         -------
         tuple[str, str, dict] | tuple[None, None, CheckResult]
-            Either (text, target, details) on success, or (None, None, error_result) on failure.
+            Either (text, matcher, details) on success, or (None, None, error_result) on failure.
         """
-        # Extract text and target
-        text = provided_or_resolve(trace, key=self.text_key, value=self.text)
-        target = provided_or_resolve(
+        # Extract text and matcher
+        text = provided_or_resolve(trace, key=self.target_key, value=self.text)
+        matcher = provided_or_resolve(
             trace,
-            key=target_key,
-            value=target_value,
+            key=matcher_key,
+            value=matcher_value,
         )
 
-        details = {"text": text, target_name: target}
+        details = {"text": text, matcher_name: matcher}
 
-        # Validate target
-        if isinstance(target, NoMatch):
+        # Validate matcher
+        if isinstance(matcher, NoMatch):
             return (
                 None,
                 None,
                 CheckResult.error(
-                    message=f"No value found for {target_name} key '{target_key}'.",
+                    message=f"No value found for {matcher_name} key '{matcher_key}'.",
                     details=details,
                 ),
             )
 
-        if not isinstance(target, str):
+        if not isinstance(matcher, str):
             return (
                 None,
                 None,
                 CheckResult.error(
-                    message=f"Value for {target_name} is not a string, expected string but got {type(target).__name__}.",
+                    message=f"Value for {matcher_name} is not a string, expected string but got {type(matcher).__name__}.",
                     details=details,
                 ),
             )
@@ -111,7 +120,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
                 None,
                 None,
                 CheckResult.error(
-                    message=f"No value found for text key '{self.text_key}'.",
+                    message=f"No value found for text key '{self.target_key}'.",
                     details=details,
                 ),
             )
@@ -126,7 +135,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
                 ),
             )
 
-        return text, target, details
+        return text, matcher, details
 
     @abstractmethod
     async def run(self, trace: TraceType) -> CheckResult:
@@ -156,10 +165,11 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
     ----------
     text : str | MISSING
         The text string to search within. If omitted, extracted from
-        trace using ``text_key``.
-    text_key : JSONPathStr
+        trace using ``target_key``.
+    target_key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
+        Also accepts the legacy ``text_key`` on input.
     keyword : str | MISSING
         The keyword to search for within the text. If omitted, must provide
         ``keyword_key`` to extract from trace.
@@ -191,13 +201,13 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
 
         check = StringMatching(
             keyword="Paris",
-            text_key="trace.last.outputs.response"
+            target_key="trace.last.outputs.response"
         )
 
     Extract both from trace::
 
         check = StringMatching(
-            text_key="trace.last.outputs.answer",
+            target_key="trace.last.outputs.answer",
             keyword_key="trace.last.inputs.expected_keyword"
         )
     """
@@ -335,10 +345,11 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     ----------
     text : str | MISSING
         The text string to search within. If omitted, extracted from
-        trace using ``text_key``.
-    text_key : JSONPathStr
+        trace using ``target_key``.
+    target_key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
+        Also accepts the legacy ``text_key`` on input.
     pattern : str | MISSING
         The regex pattern to search for. Either this or ``pattern_key`` must be provided.
     pattern_key : JSONPathStr | MISSING
@@ -380,7 +391,7 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     Extract from trace:
 
         check = RegexMatching(
-            text_key="trace.last.outputs.response",
+            target_key="trace.last.outputs.response",
             pattern_key="trace.last.inputs.expected_pattern"
         )
 

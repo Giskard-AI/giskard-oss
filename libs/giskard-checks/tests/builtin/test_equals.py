@@ -20,7 +20,7 @@ class TestEqualsString:
         )
         check = Equals(
             expected_value="hello",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -37,7 +37,7 @@ class TestEqualsString:
         )
         check = Equals(
             expected_value="world",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -54,7 +54,7 @@ class TestEqualsString:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="123"))
         check = Equals(
             expected_value=123,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -71,7 +71,7 @@ class TestEqualsString:
         )
         check = Equals(
             expected_value=True,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -90,7 +90,7 @@ class TestEqualsNumber:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=42))
         check = Equals(
             expected_value=42,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -105,7 +105,7 @@ class TestEqualsNumber:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
         check = Equals(
             expected_value=3.14,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -120,7 +120,7 @@ class TestEqualsNumber:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=42))
         check = Equals(
             expected_value=100,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -135,7 +135,7 @@ class TestEqualsNumber:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
         check = Equals(
             expected_value=2.71,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -150,7 +150,7 @@ class TestEqualsNumber:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=1))
         check = Equals(
             expected_value=1.0,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -165,7 +165,7 @@ class TestEqualsNumber:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="1"))
         check = Equals(
             expected_value=1,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -180,7 +180,7 @@ class TestEqualsNumber:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="1.0"))
         check = Equals(
             expected_value=1.0,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -199,7 +199,7 @@ class TestEqualsBool:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
         check = Equals(
             expected_value=True,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -214,7 +214,7 @@ class TestEqualsBool:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=False))
         check = Equals(
             expected_value=False,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -229,7 +229,7 @@ class TestEqualsBool:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
         check = Equals(
             expected_value=False,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -246,7 +246,7 @@ class TestEqualsBool:
         )
         check = Equals(
             expected_value=True,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -263,7 +263,7 @@ class TestEqualsBool:
         )
         check = Equals(
             expected_value=False,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -282,7 +282,7 @@ class TestEqualsBool:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=1))
         check = Equals(
             expected_value=True,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -301,7 +301,7 @@ class TestEqualsBool:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=0))
         check = Equals(
             expected_value=False,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -318,7 +318,7 @@ class TestEqualsBool:
         )
         check = Equals(
             expected_value=1,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -333,7 +333,7 @@ class TestEqualsBool:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="1"))
         check = Equals(
             expected_value=True,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -357,7 +357,7 @@ class TestEqualsEdgeCases:
         )
         check = Equals(
             expected_value="success",
-            key="trace.interactions[-1].outputs.result",
+            target_key="trace.interactions[-1].outputs.result",
         )
 
         result = await check.run(trace)
@@ -377,7 +377,7 @@ class TestEqualsEdgeCases:
         )
         check = Equals(
             expected_value=200,
-            key="trace.interactions[-1].outputs.code",
+            target_key="trace.interactions[-1].outputs.code",
         )
 
         result = await check.run(trace)
@@ -397,7 +397,7 @@ class TestEqualsEdgeCases:
         )
         check = Equals(
             expected_value=True,
-            key="trace.interactions[-1].outputs.valid",
+            target_key="trace.interactions[-1].outputs.valid",
         )
 
         result = await check.run(trace)
@@ -414,7 +414,7 @@ class TestEqualsEdgeCases:
         )
         check = Equals(
             expected_value="expected",
-            key="trace.interactions[-1].outputs.missing",
+            target_key="trace.interactions[-1].outputs.missing",
         )
 
         result = await check.run(trace)
@@ -435,7 +435,7 @@ class TestEqualsEdgeCases:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = Equals(
             expected_value=None,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -452,7 +452,7 @@ class TestEqualsEdgeCases:
         )
         check = Equals(
             expected_value="expected",
-            key="trace.last.outputs.missing",
+            target_key="trace.last.outputs.missing",
         )
 
         result = await check.run(trace)
@@ -473,7 +473,7 @@ class TestEqualsEdgeCases:
         )
         check = Equals(
             expected_value="expected",
-            key="trace.interactions[-1].outputs.level1.level2.missing",
+            target_key="trace.interactions[-1].outputs.level1.level2.missing",
         )
 
         result = await check.run(trace)
@@ -491,7 +491,7 @@ class TestEqualsEdgeCases:
         trace = Trace()
         check = Equals(
             expected_value="expected",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -507,7 +507,7 @@ class TestEqualsEdgeCases:
         expected_nomatch = NoMatch(key="trace.interactions[-1].outputs")
         check = Equals(
             expected_value=expected_nomatch,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -527,7 +527,7 @@ class TestEqualsEdgeCases:
         expected_nomatch = NoMatch(key="different.key")
         check = Equals(
             expected_value=expected_nomatch,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -553,7 +553,7 @@ class TestEqualsListExpressions:
         )
         check = Equals(
             expected_value=["message 1", "Message 2"],
-            key="trace.interactions[*].outputs",
+            target_key="trace.interactions[*].outputs",
         )
 
         result = await check.run(trace)
@@ -571,7 +571,7 @@ class TestEqualsListExpressions:
         )
         check = Equals(
             expected_value=["message 1"],
-            key="trace.interactions[*].outputs",
+            target_key="trace.interactions[*].outputs",
         )
 
         result = await check.run(trace)
@@ -589,7 +589,7 @@ class TestEqualsListExpressions:
         )
         check = Equals(
             expected_value="message 1",
-            key="trace.interactions[*].outputs",
+            target_key="trace.interactions[*].outputs",
         )
 
         result = await check.run(trace)
@@ -613,7 +613,7 @@ class TestEqualsListExpressions:
         )
         check = Equals(
             expected_value="Message 2",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -632,7 +632,7 @@ class TestEqualsListExpressions:
         )
         check = Equals(
             expected_value=["Message 2"],
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -657,7 +657,7 @@ class TestEqualsListExpressions:
         )
         check = Equals(
             expected_value="Wrong message",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -680,7 +680,7 @@ class TestEqualsListExpressions:
         )
         check = Equals(
             expected_value=["wrong", "list"],
-            key="trace.interactions[*].outputs",
+            target_key="trace.interactions[*].outputs",
         )
 
         result = await check.run(trace)
@@ -721,7 +721,7 @@ class TestEqualsUnicodeNormalization:
         )
         check = Equals(
             expected_value=text_nfd,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -740,7 +740,7 @@ class TestEqualsUnicodeNormalization:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=text))
         check = Equals(
             expected_value=text,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -770,7 +770,7 @@ class TestEqualsUnicodeNormalization:
         )
         check = Equals(
             expected_value=[text_nfd],  # Expected list with NFD form
-            key="trace.interactions[-1].outputs.messages[*].content",
+            target_key="trace.interactions[-1].outputs.messages[*].content",
         )
 
         result = await check.run(trace)
@@ -794,7 +794,7 @@ class TestEqualsUnicodeNormalization:
         )
         check = Equals(
             expected_value=[text],
-            key="trace.interactions[-1].outputs.messages[*].content",
+            target_key="trace.interactions[-1].outputs.messages[*].content",
         )
 
         result = await check.run(trace)
@@ -828,7 +828,7 @@ class TestEqualsUnicodeNormalization:
             expected_value=[
                 {"content": text_nfd}
             ],  # Expected list with dict containing NFD form
-            key="trace.interactions[-1].outputs.messages[*]",
+            target_key="trace.interactions[-1].outputs.messages[*]",
         )
 
         result = await check.run(trace)
@@ -854,7 +854,7 @@ class TestEqualsUnicodeNormalization:
         )
         check = Equals(
             expected_value=[{"content": text}],
-            key="trace.interactions[-1].outputs.messages[*]",
+            target_key="trace.interactions[-1].outputs.messages[*]",
         )
 
         result = await check.run(trace)

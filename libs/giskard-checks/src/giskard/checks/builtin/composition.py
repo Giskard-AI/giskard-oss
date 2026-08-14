@@ -27,8 +27,8 @@ class AllOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     --------
     >>> from giskard.checks import AllOf, LessThan, Equals
     >>> check = AllOf(checks=[
-    ...     LessThan(expected_value=10, key="trace.last.outputs"),
-    ...     Equals(expected_value=5, key="trace.last.outputs"),
+    ...     LessThan(expected_value=10, target_key="trace.last.outputs"),
+    ...     Equals(expected_value=5, target_key="trace.last.outputs"),
     ... ])
     """
 
@@ -106,8 +106,8 @@ class AnyOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     --------
     >>> from giskard.checks import AnyOf, StringMatching
     >>> check = AnyOf(checks=[
-    ...     StringMatching(keyword="yes", text_key="trace.last.outputs"),
-    ...     StringMatching(keyword="approved", text_key="trace.last.outputs"),
+    ...     StringMatching(keyword="yes", target_key="trace.last.outputs"),
+    ...     StringMatching(keyword="approved", target_key="trace.last.outputs"),
     ... ])
     """
 
@@ -178,7 +178,7 @@ class Not[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMis
     Examples
     --------
     >>> from giskard.checks import Not, StringMatching
-    >>> check = Not(check=StringMatching(keyword="forbidden", text_key="trace.last.outputs"))
+    >>> check = Not(check=StringMatching(keyword="forbidden", target_key="trace.last.outputs"))
     """
 
     check: Check[InputType, OutputType, TraceType] = Field(

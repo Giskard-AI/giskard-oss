@@ -45,7 +45,7 @@ scenario = (
     .check(
         Groundedness(
             name="answer is grounded",
-            answer_key="trace.last.outputs",
+            target_key="trace.last.outputs",
             context="""France is a country in Western Europe. Its capital
                        and largest city is Paris, known for the Eiffel Tower
                        and the Louvre Museum.""",
@@ -81,7 +81,7 @@ scenario = (
     .check(
         Groundedness(
             name="answer is grounded",
-            answer_key="trace.last.outputs",
+            target_key="trace.last.outputs",
             context="France is a country in Western Europe...",
         )
     )
@@ -114,12 +114,12 @@ from giskard.checks import Equals, Scenario, Suite
 scenario1 = (
     Scenario("s1")
     .interact("hello")
-    .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+    .check(Equals(expected_value="Echo: hello", target_key="trace.last.outputs"))
 )
 scenario2 = (
     Scenario("s2")
     .interact("world")
-    .check(Equals(expected_value="Echo: world", key="trace.last.outputs"))
+    .check(Equals(expected_value="Echo: world", target_key="trace.last.outputs"))
 )
 
 # Create a suite with a shared target
@@ -185,7 +185,7 @@ API Overview
 - `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
 - `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterThanEquals`, `LessThan`, `LessThanEquals`.
 - `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
-- JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks via `key` or check-specific fields like `answer_key`.
+- JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks. The value under test is always selected by `target_key`; other selectors are named after their static sibling (e.g. `context_key`, `expected_value_key`). Each check still accepts its former spelling (`key`, `text_key`, `answer_key`, ...) on input, but always serializes as `target_key`.
 
 **Testing utilities**
 - `giskard.checks.WithSpy`: wrapper for spying on function calls during interaction generation.
@@ -212,7 +212,7 @@ Usage Notes
 - Define custom checks with a unique `KIND` via `@Check.register("kind")`.
 - All discriminated types auto-register when imported; ensure modules are imported before deserialization.
 - Prefer `model_dump()` / `model_validate()` for serialization.
-- Attach extra metadata in `CheckResult.details`; JSONPath helpers (`key=...`) resolve against the entire trace.
+- Attach extra metadata in `CheckResult.details`; JSONPath helpers (`target_key=...`) resolve against the entire trace.
 
 Serialization
 -------------
@@ -364,14 +364,14 @@ result = await (
         StringMatching(
             name="contains_paris",
             keyword="Paris",
-            text_key="trace.last.outputs.answer",
+            target_key="trace.last.outputs.answer",
         )
     )
     .check(
         Equals(
             name="high_confidence",
             expected_value=0.95,
-            key="trace.last.outputs.confidence",
+            target_key="trace.last.outputs.confidence",
         )
     )
     .run()
@@ -409,7 +409,7 @@ result = await (
     .check(
         RegexMatching(
             pattern="test@example.com",
-            text_key="trace.last.outputs",
+            target_key="trace.last.outputs",
         )
     )
     .run()
@@ -584,7 +584,7 @@ from giskard.checks import (
 
 scenario = Scenario(name="programmatic_scenario").extend(
     Interact(inputs="Hello", outputs=lambda inputs: "Hi"),
-    Equals(expected_value="Hi", key="trace.last.outputs"),
+    Equals(expected_value="Hi", target_key="trace.last.outputs"),
 )
 
 result = await scenario.run()

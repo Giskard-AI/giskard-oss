@@ -34,11 +34,11 @@ class _DeterministicQualityGenerator(ScenarioGenerator):
         scenarios = [
             Scenario("passes")
             .interact("accurate")
-            .check(Equals(expected_value="accurate", key="trace.last.outputs"))
+            .check(Equals(expected_value="accurate", target_key="trace.last.outputs"))
             .with_tags(["quality:accuracy", "component:retrieval"]),
             Scenario("fails")
             .interact("concise")
-            .check(Equals(expected_value="verbose", key="trace.last.outputs"))
+            .check(Equals(expected_value="verbose", target_key="trace.last.outputs"))
             .with_tags(["quality:conciseness", "component:llm"]),
         ]
         return scenarios if max_scenarios is None else scenarios[:max_scenarios]
