@@ -9,9 +9,11 @@ from .result import (
     GroupStats,
     Metric,
     ScenarioResult,
+    ScenarioStatus,
     SuiteResult,
     TestCaseError,
     TestCaseResult,
+    TestCaseStatus,
 )
 from .scenario import Scenario, Step
 from .testcase import TestCase
@@ -32,9 +34,11 @@ __all__ = [
     "GroupStats",
     "Metric",
     "ScenarioResult",
+    "ScenarioStatus",
     "SuiteResult",
     "TestCaseError",
     "TestCaseResult",
+    "TestCaseStatus",
     "TestCase",
     "InputGenerationException",
     "InteractionGenerationError",
