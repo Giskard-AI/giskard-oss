@@ -106,8 +106,8 @@ class AnyOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     --------
     >>> from giskard.checks import AnyOf, StringMatching
     >>> check = AnyOf(checks=[
-    ...     StringMatching(keyword="yes", key="trace.last.outputs"),
-    ...     StringMatching(keyword="approved", key="trace.last.outputs"),
+    ...     StringMatching(keyword="yes", text_key="trace.last.outputs"),
+    ...     StringMatching(keyword="approved", text_key="trace.last.outputs"),
     ... ])
     """
 
@@ -178,7 +178,7 @@ class Not[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMis
     Examples
     --------
     >>> from giskard.checks import Not, StringMatching
-    >>> check = Not(check=StringMatching(keyword="forbidden", key="trace.last.outputs"))
+    >>> check = Not(check=StringMatching(keyword="forbidden", text_key="trace.last.outputs"))
     """
 
     check: Check[InputType, OutputType, TraceType] = Field(
