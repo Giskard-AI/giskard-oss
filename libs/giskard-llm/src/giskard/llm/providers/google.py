@@ -35,6 +35,8 @@ Error mapping (Interactions API ``google.genai._interactions``):
     - ``RateLimitError`` -> ``RateLimitError``
     - ``InternalServerError`` -> ``ServerError``
     - ``APIStatusError`` (other) -> ``BadRequestError``
+    - ``APITimeoutError`` -> ``LLMTimeoutError`` (checked before
+      ``APIConnectionError``, which it subclasses)
     - ``APIConnectionError`` -> ``LLMError``
 
 Supported features:
