@@ -7,7 +7,10 @@ import re
 import sys
 from pathlib import Path
 
-_FENCE_RE = re.compile(r"```(?:python|py)\n(.*?)```", re.DOTALL)
+_FENCE_RE = re.compile(
+    r"^```[ \t]*(?:python|py)[ \t]*\n(.*?)^```[ \t]*$",
+    re.DOTALL | re.IGNORECASE | re.MULTILINE,
+)
 _FORBIDDEN_CALLS = frozenset({"CheckResult.success", "CheckResult.failure"})
 
 
@@ -31,7 +34,9 @@ def _check_source(source: str, location: str) -> list[str]:
             continue
         if node.args:
             first = node.args[0]
-            if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            if isinstance(first, ast.JoinedStr) or (
+                isinstance(first, ast.Constant) and isinstance(first.value, str)
+            ):
                 errors.append(
                     f"{location}:{node.lineno}: positional CheckResult.{func.attr}(str) "
                     "is forbidden; use message="
