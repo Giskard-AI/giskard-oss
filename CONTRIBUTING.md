@@ -72,6 +72,9 @@ See also [`.cursor/rules/documentation.mdc`](.cursor/rules/documentation.mdc) fo
 
 ### Public examples
 
-Keep `examples/` and in-repo README Python fences runnable and importable. When you change a public API shown in documentation, update the matching example and run `make test-examples`.
+Keep `examples/` and in-repo README Python fences runnable and importable. See
+the [examples guide](examples/README.md) for the current coverage. When you
+change a public API shown in documentation, update the matching example and run
+`make test-examples`.
 
 **This guide was heavily inspired by the awesome [Hugging Face guide to contributing](https://github.com/huggingface/transformers/blob/main/CONTRIBUTING.md).**
