@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from examples.lint_readme_snippets import lint_markdown
+from tools.lint_readme_snippets import lint_markdown
 
 
 def test_lint_markdown_checks_spaced_python_fences(tmp_path: Path) -> None:
