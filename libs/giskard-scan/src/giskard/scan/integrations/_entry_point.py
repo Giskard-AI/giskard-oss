@@ -10,7 +10,7 @@ from typing import Any, Literal, overload
 
 from giskard.checks import SuiteResult, Target, Trace
 
-from ..generators.base import DEFAULT_TARGET_MODE
+from ..generators.base import DEFAULT_TARGET_MODE, TargetMode
 
 
 @overload
@@ -21,7 +21,7 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
     description: str,
     languages: list[str] | None = None,
     probes: list[str] | Literal["all"] | None = None,
-    target_mode: str = DEFAULT_TARGET_MODE,
+    target_mode: TargetMode = DEFAULT_TARGET_MODE,
 ) -> SuiteResult: ...
 
 
@@ -34,7 +34,7 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
     languages: list[str] | None = None,
     probes: list[str] | None = None,
     tags: list[str] | None = None,
-    target_mode: str = DEFAULT_TARGET_MODE,
+    target_mode: TargetMode = DEFAULT_TARGET_MODE,
 ) -> SuiteResult: ...
 
 
@@ -48,7 +48,7 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
     vulnerabilities: list[str] | None = None,
     attacks: list[str] | None = None,
     attacks_per_vulnerability_type: int = 1,
-    target_mode: str = DEFAULT_TARGET_MODE,
+    target_mode: TargetMode = DEFAULT_TARGET_MODE,
 ) -> SuiteResult: ...
 
 

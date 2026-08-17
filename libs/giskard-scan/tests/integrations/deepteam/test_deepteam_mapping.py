@@ -56,6 +56,16 @@ async def test_error_field_maps_to_error():
     assert _check(scenario).status == "error"
 
 
+async def test_missing_score_maps_to_skip_not_failure():
+    """No score means no verdict: it must not be reported as a vulnerability hit."""
+    cb = ScanTargetCallback(target=lambda x: x)
+    scenario = await _adapter._testcase_to_scenario(_TC(score=None, reason=None), cb)
+    check = _check(scenario)
+    assert check.status == "skip"
+    assert not scenario.failed
+    assert scenario.skipped
+
+
 async def test_details_carry_attack_method_and_risk_category():
     cb = ScanTargetCallback(target=lambda x: x)
     scenario = await _adapter._testcase_to_scenario(

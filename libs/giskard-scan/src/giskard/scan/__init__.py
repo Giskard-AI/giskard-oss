@@ -11,6 +11,7 @@ from .generators.base import (
     DEFAULT_TARGET_MODE,
     LocalDatasetScenarioGenerator,
     ScenarioGenerator,
+    TargetMode,
 )
 from .generators.crescendo import CrescendoAttackScenarioGenerator
 from .generators.gcg import GCGInjectionScenarioGenerator
@@ -25,7 +26,7 @@ from .generators.knowledge_base import (
     SycophancyScenarioGenerator,
 )
 from .generators.prompt_injection import PromptInjectionScenarioGenerator
-from .integrations import list_scan_items, third_party_scan
+from .integrations import ScanTool, list_scan_items, third_party_scan
 from .quality import quality_scan, quality_suite_generator_registry
 from .registry import SuiteGeneratorRegistry
 from .types import ScanOptions
@@ -38,7 +39,9 @@ __version__ = get_lib_version("giskard-scan")
 
 __all__ = [
     "DEFAULT_TARGET_MODE",
+    "TargetMode",
     "generate_suite",
+    "ScanTool",
     "list_scan_items",
     "ScenarioGenerator",
     "LocalDatasetScenarioGenerator",
