@@ -75,8 +75,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
         Fully qualified boolean rule path (e.g. ``data.giskard.allow``).
     target_key : str, optional
         JSONPath into the trace for the OPA input document
-        (default: ``trace.last.outputs``). Also accepts ``input_key`` and the
-        legacy ``key`` on input.
+        (default: ``trace.last.outputs``).
     data : dict, optional
         Static data document merged via ``engine.add_data``
         (default: empty dict).

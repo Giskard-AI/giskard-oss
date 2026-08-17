@@ -38,7 +38,6 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
     target_key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
-        Also accepts the legacy ``text_key`` on input.
     """
 
     text: str | MISSING = Field(
@@ -165,7 +164,6 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
     target_key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
-        Also accepts the legacy ``text_key`` on input.
     keyword : str | MISSING
         The keyword to search for within the text. If omitted, must provide
         ``keyword_key`` to extract from trace.
@@ -345,7 +343,6 @@ class RegexMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignore
     target_key : JSONPathStr
         JSONPath expression to extract the text from the trace. Defaults to
         "trace.last.outputs" which extracts the last interaction's outputs.
-        Also accepts the legacy ``text_key`` on input.
     pattern : str | MISSING
         The regex pattern to search for. Either this or ``pattern_key`` must be provided.
     pattern_key : JSONPathStr | MISSING

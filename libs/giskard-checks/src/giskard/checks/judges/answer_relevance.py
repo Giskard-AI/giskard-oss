@@ -40,8 +40,7 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         If omitted, extracted from the trace using ``target_key``.
     target_key : JSONPathStr
         JSONPath expression to extract the answer from the trace
-        (default: ``"trace.last.outputs"``). Also accepts the legacy
-        ``answer_key`` on input.
+        (default: ``"trace.last.outputs"``).
     context : str | MISSING
         Optional domain context that describes the chatbot's purpose or scope
         (e.g., ``"This is a chatbot that answers questions about programming languages"``).

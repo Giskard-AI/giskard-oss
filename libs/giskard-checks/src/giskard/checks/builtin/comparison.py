@@ -282,8 +282,7 @@ class LessThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrigh
     target_key : JSONPathStr
         JSONPath expression to extract the actual value from the trace.
         Defaults to "trace.last.outputs" which extracts the last
-        interaction's outputs. Also accepts ``actual_key`` and the legacy
-        ``key`` on input.
+        interaction's outputs.
     """
 
     @override
@@ -328,8 +327,7 @@ class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyr
     target_key : JSONPathStr
         JSONPath expression to extract the actual value from the trace.
         Defaults to "trace.last.outputs" which extracts the last
-        interaction's outputs. Also accepts ``actual_key`` and the legacy
-        ``key`` on input.
+        interaction's outputs.
     """
 
     @override
@@ -374,8 +372,7 @@ class LessThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # 
     target_key : JSONPathStr
         JSONPath expression to extract the actual value from the trace.
         Defaults to "trace.last.outputs" which extracts the last
-        interaction's outputs. Also accepts ``actual_key`` and the legacy
-        ``key`` on input.
+        interaction's outputs.
     """
 
     @override
@@ -420,8 +417,7 @@ class GreaterThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType]( 
     target_key : JSONPathStr
         JSONPath expression to extract the actual value from the trace.
         Defaults to "trace.last.outputs" which extracts the last
-        interaction's outputs. Also accepts ``actual_key`` and the legacy
-        ``key`` on input.
+        interaction's outputs.
     """
 
     @override
@@ -466,8 +462,7 @@ class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright:
     target_key : JSONPathStr
         JSONPath expression to extract the actual value from the trace.
         Defaults to "trace.last.outputs" which extracts the last
-        interaction's outputs. Also accepts ``actual_key`` and the legacy
-        ``key`` on input.
+        interaction's outputs.
     """
 
     @override
@@ -512,8 +507,7 @@ class NotEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrig
     target_key : JSONPathStr
         JSONPath expression to extract the actual value from the trace.
         Defaults to "trace.last.outputs" which extracts the last
-        interaction's outputs. Also accepts ``actual_key`` and the legacy
-        ``key`` on input.
+        interaction's outputs.
     """
 
     @override

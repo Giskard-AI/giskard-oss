@@ -68,8 +68,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
     target_key : str
         JSONPath expression to extract the actual answer from the trace
-        (default: "trace.last.outputs"). Also accepts ``answer_key`` and the
-        legacy ``actual_answer_key`` on input.
+        (default: "trace.last.outputs").
 
         Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
     embedding_model : BaseEmbeddingModel

@@ -30,8 +30,7 @@ class Contradiction[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         ``target_key``.
     target_key : JSONPathStr
         JSONPath expression to extract the answer from the trace
-        (default: ``"trace.last.outputs"``). Also accepts the legacy
-        ``answer_key`` on input.
+        (default: ``"trace.last.outputs"``).
     """
 
     answer: str | MISSING = Field(

@@ -47,8 +47,7 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         using ``target_key``.
     target_key : JSONPathStr
         JSONPath expression to extract the output from the trace
-        (default: ``"trace.last.outputs"``). Also accepts the legacy
-        ``output_key`` on input.
+        (default: ``"trace.last.outputs"``).
 
         Can use ``trace.last`` (preferred) or ``trace.interactions[-1]`` for
         JSONPath expressions.

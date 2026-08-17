@@ -28,8 +28,7 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         the trace using ``target_key``.
     target_key : str
         JSONPath expression to extract the answer from the trace
-        (default: "trace.last.outputs"). Also accepts the legacy ``answer_key``
-        on input.
+        (default: "trace.last.outputs").
 
         Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
     context : str | list[str] | MISSING
