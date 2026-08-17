@@ -521,7 +521,7 @@ class TestGreaterThanEquals:
 
     def test_serialises_with_greater_than_equals_kind(self):
         """Serialized kind remains greater_than_equals and round-trips."""
-        check = GreaterThanEquals(expected_value=10, target_key="trace.last.outputs")
+        check = GreaterThanEquals(expected_value=10)
         assert check.model_dump()["kind"] == "greater_than_equals"
         restored = Check.model_validate(check.model_dump())
         assert isinstance(restored, GreaterThanEquals)
@@ -712,10 +712,7 @@ class TestNotEquals:
     async def test_float_not_equals_success(self):
         """Test that 3.14 != 5.0 passes."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
-        check = NotEquals(
-            expected_value=5.0,
-            target_key="trace.interactions[-1].outputs",
-        )
+        check = NotEquals(expected_value=5.0)
 
         result = await check.run(trace)
 

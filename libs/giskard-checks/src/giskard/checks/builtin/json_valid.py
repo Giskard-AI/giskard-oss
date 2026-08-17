@@ -34,9 +34,9 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
         default="trace.last.outputs",
         validation_alias=AliasChoices("target_key", "value_key", "key"),
         description=(
-            "JSONPath expression to extract the value to validate. Also accepts "
-            "'value_key' and the legacy 'key' on input; always serialized as "
-            "'target_key'."
+            "JSONPath expression to extract the value to validate. The canonical "
+            "'target_key' also accepts the input aliases 'value_key' and 'key'; "
+            "always serialized as 'target_key'."
         ),
     )
     parse: bool = Field(

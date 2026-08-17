@@ -41,8 +41,9 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         description=(
             "JSONPath expression to extract the actual value from the trace. "
             "Defaults to 'trace.last.outputs' which extracts the last "
-            "interaction's outputs. Also accepts 'actual_key' and the legacy "
-            "'key' on input; always serialized as 'target_key'."
+            "interaction's outputs. The canonical 'target_key' also accepts "
+            "the input aliases 'actual_key' and 'key'; always serialized as "
+            "'target_key'."
         ),
     )
     expected_value: ExpectedType | MISSING = Field(
