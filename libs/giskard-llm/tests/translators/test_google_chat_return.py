@@ -55,6 +55,63 @@ def test_from_google_assistant_text():
     assert ch.finish_reason == "stop"
 
 
+def test_from_google_thinking_tokens_counted_in_output():
+    """thoughts_token_count is generated output, so it belongs in output_tokens.
+
+    google-genai defines total_token_count as prompt + candidates + tool_use_prompt +
+    thoughts, so input_tokens + output_tokens must equal total_tokens even when the model
+    thinks. prompt=10, candidates=5, thoughts=20 -> total=35.
+    """
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Answer."}]},
+                    "finish_reason": "STOP",
+                }
+            ],
+            "usage_metadata": {
+                "prompt_token_count": 10,
+                "candidates_token_count": 5,
+                "thoughts_token_count": 20,
+                "total_token_count": 35,
+            },
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.usage is not None
+    assert out.usage.input_tokens == 10
+    assert out.usage.output_tokens == 25
+    assert out.usage.total_tokens == 35
+    assert out.usage.input_tokens + out.usage.output_tokens == out.usage.total_tokens
+
+
+def test_from_google_tool_use_prompt_tokens_counted_in_input():
+    """Tool-use prompt tokens are input, and total falls back to their sum."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Answer."}]},
+                    "finish_reason": "STOP",
+                }
+            ],
+            "usage_metadata": {
+                "prompt_token_count": 10,
+                "tool_use_prompt_token_count": 7,
+                "candidates_token_count": 5,
+                "thoughts_token_count": 20,
+            },
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.usage is not None
+    assert out.usage.input_tokens == 17
+    assert out.usage.output_tokens == 25
+    assert out.usage.total_tokens == 42
+    assert out.usage.input_tokens + out.usage.output_tokens == out.usage.total_tokens
+
+
 def test_from_google_multiple_text_parts_joined():
     """Multiple `text` parts are joined with newlines, matching multi-part model output."""
     raw = _raw(
