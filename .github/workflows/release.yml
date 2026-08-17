@@ -155,7 +155,15 @@ jobs:
 
           NEW_VERSION=$(uv version --short)
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "tag=$PACKAGE/v$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          # The meta package is tagged vX.Y.Z, continuing the scheme used up to
+          # v2.19.2, so downstream packagers that scrape tags keep matching it.
+          # Workspace members are namespaced to keep their version lines distinct.
+          if [ "$PACKAGE" = "giskard" ]; then
+            echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "tag=$PACKAGE/v$NEW_VERSION" >> $GITHUB_OUTPUT
+          fi
 
       - name: Update lockfile
         run: uv lock
