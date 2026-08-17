@@ -72,7 +72,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     seed : int, optional
         Integer seed used for reproducible scenario generation. Defaults to ``42``.
     group_by : str, optional
-        Result annotation key used to group the printed report. ``None`` prints
+        Result tag key used to group the printed report. ``None`` prints
         the ungrouped report. Defaults to ``"component"``.
     parallel : bool, optional
         When ``True`` (default), run generated scenarios concurrently against
