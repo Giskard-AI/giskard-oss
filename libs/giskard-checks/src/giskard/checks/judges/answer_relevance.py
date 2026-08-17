@@ -1,7 +1,7 @@
 from typing import Any, override
 
 from giskard.agents import TemplateReference
-from pydantic import AliasChoices, Field
+from pydantic import Field
 from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
@@ -85,11 +85,7 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
     )
     target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        validation_alias=AliasChoices("target_key", "answer_key"),
-        description=(
-            "JSONPath to extract the answer from the trace. Also accepts the "
-            "legacy 'answer_key' on input; always serialized as 'target_key'."
-        ),
+        description=("JSONPath to extract the answer from the trace."),
     )
     context: str | MISSING = Field(
         default=MISSING,

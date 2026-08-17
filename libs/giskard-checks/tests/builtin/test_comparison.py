@@ -923,7 +923,7 @@ class TestComparisonSentinelDefault:
     def test_omitting_both_raises(self, check_cls):
         """Omitting both expected_value and expected_value_key must raise ValueError."""
         with pytest.raises(ValueError, match="expected_value"):
-            check_cls(key="trace.last.outputs")
+            check_cls(target_key="trace.last.outputs")
 
     def test_explicit_none_is_valid(self):
         """explicit expected_value=None must be accepted (compares against None)."""
@@ -1238,8 +1238,7 @@ class TestDefaultKey:
         check = check_cls(expected_value=5)
         assert check.target_key == "trace.last.outputs"
 
-    def test_explicit_key_still_overrides_default(self):
-        # The legacy ``key`` spelling still populates the canonical field.
+    def test_explicit_target_key_overrides_default(self):
         check = Equals(expected_value=5, target_key="trace.last.inputs")
         assert check.target_key == "trace.last.inputs"
 

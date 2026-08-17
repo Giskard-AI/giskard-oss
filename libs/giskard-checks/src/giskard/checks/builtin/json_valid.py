@@ -6,7 +6,7 @@ from typing import Any, override
 from jsonschema import SchemaError, validate
 from jsonschema import ValidationError as JsonSchemaValidationError
 from jsonschema.validators import validator_for
-from pydantic import AliasChoices, ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 from referencing.exceptions import Unresolvable
 
 from ..core import Trace
@@ -32,12 +32,7 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
 
     target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        validation_alias=AliasChoices("target_key", "value_key", "key"),
-        description=(
-            "JSONPath expression to extract the value to validate. The canonical "
-            "'target_key' also accepts the input aliases 'value_key' and 'key'; "
-            "always serialized as 'target_key'."
-        ),
+        description="JSONPath expression to extract the value to validate.",
     )
     parse: bool = Field(
         default=True,

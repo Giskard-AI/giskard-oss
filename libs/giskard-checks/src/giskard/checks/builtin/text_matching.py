@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Self, override
 
 import regex
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import Field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
@@ -47,11 +47,7 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
     )
     target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        validation_alias=AliasChoices("target_key", "text_key"),
-        description=(
-            "JSONPath expression to extract text from trace. Also accepts the "
-            "legacy 'text_key' on input; always serialized as 'target_key'."
-        ),
+        description=("JSONPath expression to extract text from trace."),
     )
 
     def _extract_and_validate(

@@ -4,7 +4,7 @@ import importlib
 import json
 from typing import Any, Self, override
 
-from pydantic import AliasChoices, Field, PrivateAttr, model_validator
+from pydantic import Field, PrivateAttr, model_validator
 
 from ..core import Trace
 from ..core.check import Check
@@ -105,12 +105,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
     )
     target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        validation_alias=AliasChoices("target_key", "input_key", "key"),
-        description=(
-            "JSONPath expression to extract the OPA input document. Also accepts "
-            "'input_key' and the legacy 'key' on input; always serialized as "
-            "'target_key'."
-        ),
+        description=("JSONPath expression to extract the OPA input document."),
     )
     data: dict[str, Any] = Field(
         default_factory=dict,

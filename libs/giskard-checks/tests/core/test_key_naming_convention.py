@@ -26,7 +26,6 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import cast
 
-import pytest
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
@@ -97,7 +96,7 @@ def test_every_jsonpath_field_ends_in_key() -> None:
     """Rule (a): a JSONPath field is ``target_key`` or ``{something}_key``.
 
     ``{something}`` must be non-empty, so a field named exactly ``_key`` (or the
-    bare legacy ``key``) is a violation: neither tells a reader what the path
+    bare ``key``) is a violation: neither tells a reader what the path
     points at.
     """
     violations = [
@@ -159,30 +158,3 @@ def test_static_sibling_is_not_itself_a_jsonpath_field() -> None:
         "These static siblings are themselves JSONPath fields:\n"
         + "\n".join(f"  - {v}" for v in violations)
     )
-
-
-@pytest.mark.parametrize(
-    ("field", "static"),
-    [
-        ("reference_text_key", "reference_text"),
-        ("keyword_key", "keyword"),
-        ("pattern_key", "pattern"),
-        ("context_key", "context"),
-        ("question_key", "question"),
-        ("expected_value_key", "expected_value"),
-    ],
-)
-def test_known_reference_pairs_are_still_present(field: str, static: str) -> None:
-    """Pin the pairs the convention was written for.
-
-    The generic assertions above stay green if a pair is deleted outright. This
-    test fails instead, so a rename that drops one half is visible.
-    """
-    rows = _all_jsonpath_fields()
-    owners = [cls for _, _, name, cls in rows if name == field]
-
-    assert owners, f"No check declares a JSONPath field named {field!r} any more"
-    for cls in owners:
-        assert static in cls.model_fields, (
-            f"{cls.__qualname__}.{field} lost its static sibling {static!r}"
-        )

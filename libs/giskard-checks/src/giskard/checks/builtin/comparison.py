@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Literal, Self, override
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import Field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
@@ -37,13 +37,10 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
 
     target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        validation_alias=AliasChoices("target_key", "actual_key", "key"),
         description=(
             "JSONPath expression to extract the actual value from the trace. "
             "Defaults to 'trace.last.outputs' which extracts the last "
-            "interaction's outputs. The canonical 'target_key' also accepts "
-            "the input aliases 'actual_key' and 'key'; always serialized as "
-            "'target_key'."
+            "interaction's outputs."
         ),
     )
     expected_value: ExpectedType | MISSING = Field(

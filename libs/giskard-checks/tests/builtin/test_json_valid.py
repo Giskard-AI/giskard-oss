@@ -220,8 +220,7 @@ def test_json_valid_serialization_roundtrip() -> None:
     assert data["schema"] == {"type": "object"}
     assert data["parse"] is False
     assert isinstance(restored, JsonValid)
-    # ``key`` is a read-only alias; the dump and the restored model both use
-    # the canonical ``target_key``.
+    # The dump and restored model preserve the canonical ``target_key``.
     assert data["target_key"] == "trace.last.outputs.response"
     assert "key" not in data
     assert restored.target_key == "trace.last.outputs.response"

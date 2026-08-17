@@ -23,16 +23,10 @@ class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     field would fall back to that field's default and the check would run
     green while evaluating the wrong value.
 
-    ``populate_by_name=True`` is required for fields carrying a
-    ``validation_alias`` (notably ``target_key``, which accepts each check's
-    legacy and domain spellings): without it, declaring aliases would make the
-    canonical field name unusable as a python keyword argument.
     """
 
     # Rationale and the subclass rule: see ``Discriminated`` in giskard-core.
-    model_config: ClassVar[ConfigDict] = ConfigDict(
-        extra="forbid", populate_by_name=True
-    )
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, description="Check name")
     description: str | None = Field(default=None, description="Check description")

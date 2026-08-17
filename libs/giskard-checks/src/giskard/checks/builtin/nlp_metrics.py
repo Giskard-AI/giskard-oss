@@ -3,7 +3,7 @@
 from importlib import import_module
 from typing import Literal, Self, override
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import Field, model_validator
 
 from ..core import Trace
 from ..core.check import Check
@@ -70,12 +70,7 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
 
     target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        validation_alias=AliasChoices("target_key", "text_key", "key"),
-        description=(
-            "JSONPath expression to extract the text to evaluate. Also accepts "
-            "'text_key' and the legacy 'key' on input; always serialized as "
-            "'target_key'."
-        ),
+        description=("JSONPath expression to extract the text to evaluate."),
     )
     metric: ReadabilityMetric = Field(
         default="flesch_reading_ease",

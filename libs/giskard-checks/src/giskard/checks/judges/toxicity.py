@@ -1,7 +1,7 @@
 from typing import Any, Literal, override
 
 from giskard.agents import TemplateReference
-from pydantic import AliasChoices, Field
+from pydantic import Field
 from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
@@ -87,12 +87,7 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     )
     target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        validation_alias=AliasChoices("target_key", "output_key"),
-        description=(
-            "JSONPath expression to extract the output from the trace. Also "
-            "accepts the legacy 'output_key' on input; always serialized as "
-            "'target_key'."
-        ),
+        description=("JSONPath expression to extract the output from the trace."),
     )
     categories: list[ToxicityCategory] = Field(
         default_factory=lambda: list(DEFAULT_TOXICITY_CATEGORIES),

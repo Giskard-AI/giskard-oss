@@ -1,7 +1,7 @@
 from typing import override
 
 import numpy as np
-from pydantic import AliasChoices, Field
+from pydantic import Field
 from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
@@ -98,12 +98,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
     )
     target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        validation_alias=AliasChoices("target_key", "answer_key", "actual_answer_key"),
-        description=(
-            "The key to extract the actual answer from the trace. Also accepts "
-            "'answer_key' and the legacy 'actual_answer_key' on input; always "
-            "serialized as 'target_key'."
-        ),
+        description=("The key to extract the actual answer from the trace."),
     )
 
     @override
