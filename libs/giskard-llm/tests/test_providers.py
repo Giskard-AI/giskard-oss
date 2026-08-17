@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from giskard.llm.errors import BadRequestError, LLMError, RateLimitError
+from giskard.llm.errors import (
+    BadRequestError,
+    LLMError,
+    LLMTimeoutError,
+    RateLimitError,
+)
 from giskard.llm.providers.anthropic import AnthropicProvider
 from giskard.llm.providers.azure_ai import AzureAIProvider
 from giskard.llm.providers.azure_openai import AzureOpenAIProvider
@@ -561,6 +566,61 @@ def test_google_map_error_completeness():
     # Timeout heuristic (non-SDK exceptions with "timed out" in message)
     with pytest.raises(LLMError):
         provider._map_error(Exception("Connection timed out"))
+
+
+def _interactions_errors_or_skip() -> Any:
+    """Resolve the Interactions error module the way production does, or skip.
+
+    ``_map_error`` reaches this hierarchy through
+    ``_import_interactions_errors()``, which returns ``None`` when the private
+    ``google.genai._interactions`` module is absent (it was removed in
+    google-genai 2.9.0) and makes ``_map_error`` skip the block entirely. Going
+    through the same helper keeps these tests in step with production instead of
+    failing on an import the library itself tolerates.
+    """
+    from giskard.llm.providers.google import _import_interactions_errors
+
+    ix = _import_interactions_errors()
+    if ix is None:
+        pytest.skip(
+            "google.genai._interactions unavailable; _map_error skips this path"
+        )
+    return ix
+
+
+@pytest.mark.google
+def test_google_interactions_timeout_maps_to_timeout_error():
+    """An Interactions API timeout must map to ``LLMTimeoutError``, so it retries.
+
+    ``APITimeoutError`` subclasses ``APIConnectionError``, so it was caught by
+    the connection branch and returned as a plain ``LLMError`` with status 0.
+    ``should_retry`` only retries ``LLMTimeoutError``, so Gemini timeouts were
+    never retried while the OpenAI and Anthropic providers retried theirs.
+
+    The completeness test above cannot catch this: ``LLMTimeoutError`` is itself
+    an ``LLMError``, so mapping a timeout to the base class still satisfies it.
+    """
+    from giskard.llm.retry import should_retry
+
+    ix = _interactions_errors_or_skip()
+    provider = _make_google_provider()
+
+    with pytest.raises(LLMTimeoutError) as excinfo:
+        provider._map_error(_make_httpx_sdk_exc(ix.APITimeoutError))
+
+    assert should_retry(excinfo.value)
+
+
+@pytest.mark.google
+def test_google_interactions_connection_error_is_not_a_timeout():
+    """A plain connection error stays a non-retryable ``LLMError``."""
+    ix = _interactions_errors_or_skip()
+    provider = _make_google_provider()
+
+    with pytest.raises(LLMError) as excinfo:
+        provider._map_error(_make_httpx_sdk_exc(ix.APIConnectionError))
+
+    assert not isinstance(excinfo.value, LLMTimeoutError)
 
 
 # -- OpenAI message validation ------------------------------------------------
