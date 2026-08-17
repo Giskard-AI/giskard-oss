@@ -29,7 +29,7 @@ class StaticEchoScenarioGenerator(ScenarioGenerator):
         return [
             Scenario("echo")
             .interact(inputs="ping", outputs=echo)
-            .check(Equals(key="trace.last.outputs", expected_value="ping"))
+            .check(Equals(target_key="trace.last.outputs", expected_value="ping"))
         ]
 
 

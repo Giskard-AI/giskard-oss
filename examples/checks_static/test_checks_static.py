@@ -13,8 +13,8 @@ async def main() -> None:
     result = await (
         Scenario("echo")
         .interact(inputs="hello", outputs=echo)
-        .check(Equals(key="trace.last.inputs", expected_value="hello"))
-        .check(Equals(key="trace.last.outputs", expected_value="hello"))
+        .check(Equals(target_key="trace.last.inputs", expected_value="hello"))
+        .check(Equals(target_key="trace.last.outputs", expected_value="hello"))
         .run()
     )
     assert result.passed
