@@ -88,7 +88,7 @@ class Discriminated(BaseModel):
 
     @computed_field
     def kind(self) -> str | None:
-        """The discriminator field identifying the concrete type.
+        """Return the discriminator field identifying the concrete type.
 
         Returns
         -------
@@ -127,6 +127,24 @@ class Discriminated(BaseModel):
 
     @classmethod
     def register(cls, kind: str) -> Callable[[type[T]], type[T]]:
+        """Return a decorator registering a subclass under a discriminator value.
+
+        Parameters
+        ----------
+        kind : str
+            Value of the ``kind`` discriminator field identifying the subclass.
+
+        Returns
+        -------
+        Callable
+            Class decorator that registers the subclass and returns it unchanged.
+
+        Examples
+        --------
+        Decorate a subclass with ``@Animal.register("dog")`` to register it under
+        the ``"dog"`` kind.
+        """
+
         def decorator(subclass: type[T]) -> type[T]:
             _REGISTRY.register_subclass(cls, subclass, kind)
             return subclass

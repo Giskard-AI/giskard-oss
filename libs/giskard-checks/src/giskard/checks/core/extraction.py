@@ -86,6 +86,25 @@ def _is_list_expression(expression: JSONPath) -> bool:
 
 
 def resolve[TraceType: Trace](trace: TraceType, key: str) -> Any:  # pyright: ignore[reportMissingTypeArgument]
+    """Extract a value from a trace with a JSONPath expression.
+
+    Parameters
+    ----------
+    trace : Trace
+        Trace to read from; it is exposed to the expression as ``trace``.
+    key : str
+        JSONPath expression, e.g. ``trace.last.outputs``.
+
+    Returns
+    -------
+    Any
+        The matched value, a list when the expression matches several nodes, or
+        a ``NoMatch`` marker when nothing matches.
+
+    Examples
+    --------
+    ``resolve(trace, "trace.last.outputs")`` returns the last output of the trace.
+    """
     expression: JSONPath = parse(key)
     matches: list[DatumInContext] = expression.find({"trace": trace.model_dump()})
 

@@ -68,4 +68,53 @@ make test      # pytest for packages under libs/
 
 Run `make help` for other targets (for example scoped tests with `PACKAGE=giskard-checks`).
 
+### Docstrings
+
+Public APIs (exported modules, classes, functions, and methods) use **NumPy-style** docstrings: a one-line summary, a `Parameters` section with types and descriptions, `Returns` when applicable, and an `Examples` section for non-obvious usage.
+
+```python
+async def vulnerability_scan(
+    target: Target,
+    description: str,
+    languages: list[str],
+    max_scenarios: int | None = None,
+) -> SuiteResult:
+    """Generate and run the standard vulnerability scan suite.
+
+    Parameters
+    ----------
+    target : Target
+        System under test (sync or async callable).
+    description : str
+        Natural-language description of the agent under test.
+    languages : list of str
+        BCP-47 language codes the agent is expected to handle.
+    max_scenarios : int, optional
+        Upper bound on scenarios across generators. ``None`` uses the
+        active preset / per-generator defaults.
+
+    Returns
+    -------
+    SuiteResult
+        Completed suite result (the grouped report is also printed).
+
+    Examples
+    --------
+    >>> async def echo(inputs: str) -> str:
+    ...     return inputs
+    >>> result = await vulnerability_scan(
+    ...     echo, "A demo agent", ["en"], max_scenarios=5
+    ... )
+    >>> isinstance(result.pass_rate, float)
+    True
+    """
+```
+
+This is enforced, not just recommended:
+
+* Ruff's `D` rules (`convention = "numpy"`) check the shape of every docstring in `libs/*/src`, so a malformed section fails `make lint`. Tests are exempt.
+* `make check-docstrings` (part of `make check`) fails when a name a package re-exports in `__all__` — or a public method or property of such a class — has no docstring. Overrides inherit the base method's docstring and only need their own when they add something. It also rejects Google-style sections (`Args:`, `Returns:`, ...), which ruff cannot see: those names are not numpydoc sections, so its `D4xx` rules never fire on them.
+
+Ruff's own `D1xx` rules stay off: they cannot tell a public API from an internal helper, and requiring a docstring on every private helper produces filler, not documentation.
+
 **This guide was heavily inspired by the awesome [Hugging Face guide to contributing](https://github.com/huggingface/transformers/blob/main/CONTRIBUTING.md).**

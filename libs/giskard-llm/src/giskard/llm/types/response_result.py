@@ -12,6 +12,8 @@ ResponseOutputItem = ResponseOutputMessage | ResponseFunctionToolCall
 
 
 class ResponseResult(_BaseModel):
+    """Provider-agnostic result of a Responses API call."""
+
     id: str
     outputs: list[ResponseOutputItem] = Field(
         validation_alias=AliasChoices("output", "outputs")

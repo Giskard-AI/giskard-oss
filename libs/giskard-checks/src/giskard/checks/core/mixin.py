@@ -5,6 +5,8 @@ from ..settings import get_default_embedding_model, get_default_generator
 
 
 class WithGeneratorMixin(BaseModel):
+    """Mixin adding an optional ``generator`` field falling back to the default one."""
+
     generator: BaseGenerator | None = Field(
         default=None,
         description="Generator for LLM evaluation. Defaults to the global default generator if None.",
@@ -17,6 +19,8 @@ class WithGeneratorMixin(BaseModel):
 
 
 class WithEmbeddingMixin(BaseModel):
+    """Mixin adding an optional ``embedding_model`` field falling back to the default one."""
+
     embedding_model: BaseEmbeddingModel | None = Field(
         default=None,
         description="Embedding model for embedding text. Defaults to the global default if None.",

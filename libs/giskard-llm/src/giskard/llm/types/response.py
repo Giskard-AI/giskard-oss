@@ -21,6 +21,8 @@ class ResponseOutputRefusal(_BaseModel):
 
 
 class ResponseOutputText(_BaseModel):
+    """A plain-text block in a Responses API output message."""
+
     type: Literal["output_text"] = "output_text"
     text: str
 
@@ -41,6 +43,8 @@ FunctionCallOutput = ResponseFunctionCallOutput
 
 
 class ResponseFunctionToolCall(_BaseModel):
+    """A tool call emitted by the model in a Responses API result."""
+
     type: Literal["function_call"] = "function_call"
     arguments: ArgumentDict
     call_id: str

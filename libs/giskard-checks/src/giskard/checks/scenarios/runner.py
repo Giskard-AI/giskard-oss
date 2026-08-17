@@ -312,7 +312,6 @@ class ScenarioRunner:
         ScenarioResult
             Results from the last run executed, updated with multi-run metadata.
         """
-
         configured_runs = (
             _validate_multiple_runs(multiple_runs) or scenario.multiple_runs
         )

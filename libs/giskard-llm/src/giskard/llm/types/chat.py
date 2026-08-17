@@ -56,11 +56,15 @@ CompletionContent = TextContent | RefusalContent
 
 
 class ToolCallFunction(_BaseModel):
+    """Name and parsed arguments of a tool the model asked to call."""
+
     name: str
     arguments: ArgumentDict
 
 
 class ToolCall(_BaseModel):
+    """A tool call emitted by the model in a chat completion."""
+
     type: Literal["function"] = "function"
     id: str
     function: ToolCallFunction

@@ -36,8 +36,17 @@ markers = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "W", "I", "F"]
-ignore = ["E501"]
+select = ["E", "W", "I", "F", "D"]
+ignore = ["E501", "D1"]
+# D1 (missing docstrings) is enforced on the public API only, by
+# tools/check_public_docstrings.py; here we enforce NumPy section style
+# wherever a docstring exists.
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+
 
 [tool.ruff.lint.isort.sections]
 "my_packages" = ["giskard"]

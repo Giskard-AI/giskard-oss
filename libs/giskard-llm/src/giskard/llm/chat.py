@@ -1,3 +1,5 @@
+"""Constructors for the chat message types accepted by every provider."""
+
 from typing import Literal
 
 from .types import (

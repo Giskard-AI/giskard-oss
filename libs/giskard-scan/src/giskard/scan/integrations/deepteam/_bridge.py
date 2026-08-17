@@ -58,8 +58,10 @@ class ScanTargetCallback:
         return None
 
     def trace_for(self, turns: "list[Any] | None") -> "Trace | None":  # pyright: ignore[reportMissingTypeArgument]
-        """Return the lossless Trace accumulated for *turns*, or None if we never
-        produced a turn in this conversation (e.g. a seeded opening turn).
+        """Return the lossless Trace accumulated for *turns*, or None.
+
+        None means we never produced a turn in this conversation (e.g. a seeded
+        opening turn).
 
         The uuid cache is ours: callers hand us the test case's turns and get a
         Trace back rather than reaching into ``traces``/``METADATA_UUID_KEY``.

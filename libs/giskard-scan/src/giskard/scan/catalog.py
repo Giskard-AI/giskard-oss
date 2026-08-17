@@ -76,26 +76,34 @@ async def generate_suite(
     :meth:`~giskard.checks.scenarios.suite.Suite.run`'s ``parallel`` argument
     (or by scan helpers that pass it through).
 
-    Args:
-        description: Natural-language description of the agent under test.
-        languages: BCP-47 language codes the agent is expected to handle.
-        generators: Sequence of generator instances or classes to use.
-        max_scenarios: Total upper bound on scenarios across all generators.
-            None lets each generator apply its own default.
-        seed: Integer seed for the top-level RNG, ensuring reproducibility
-            across runs with the same arguments. Child RNGs are spawned before
-            concurrent generation so results stay stable under TaskGroup
-            scheduling.
-        target_mode: Whether the agent under test supports single-turn or
-            multi-turn conversations. ``"singleturn"`` skips generators that
-            are multi-turn by design and caps turn budgets to 1 on others.
-            Defaults to :data:`~giskard.scan.generators.base.DEFAULT_TARGET_MODE`.
-        knowledge_base: Optional documents forwarded via the context to
-            generators that use knowledge-base context. Raw strings are
-            normalized to a :class:`KnowledgeBase`.
+    Parameters
+    ----------
+    description : str
+        Natural-language description of the agent under test.
+    languages : list of str
+        BCP-47 language codes the agent is expected to handle.
+    generators : sequence
+        Generator instances or classes to use.
+    max_scenarios : int, optional
+        Total upper bound on scenarios across all generators. ``None`` lets each
+        generator apply its own default.
+    seed : int, optional
+        Seed for the top-level RNG, ensuring reproducibility across runs with the
+        same arguments. Child RNGs are spawned before concurrent generation so
+        results stay stable under TaskGroup scheduling.
+    target_mode : str, optional
+        Whether the agent under test supports single-turn or multi-turn
+        conversations. ``"singleturn"`` skips generators that are multi-turn by
+        design and caps turn budgets to 1 on others. Defaults to
+        :data:`~giskard.scan.generators.base.DEFAULT_TARGET_MODE`.
+    knowledge_base : KnowledgeBase or list of str, optional
+        Documents forwarded via the context to generators that use knowledge-base
+        context. Raw strings are normalized to a :class:`KnowledgeBase`.
 
-    Returns:
-        A Suite containing all generated scenarios, ready for execution.
+    Returns
+    -------
+    Suite
+        Suite containing all generated scenarios, ready for execution.
     """
     if max_scenarios is not None and max_scenarios < 0:
         raise ValueError(f"max_scenarios must be non-negative, got {max_scenarios}")

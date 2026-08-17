@@ -19,6 +19,8 @@ class ResponseOutputTextBlockParam(TypedDict, total=False):
 
 
 class ResponseFunctionCallOutputParam(TypedDict, total=False):
+    """Tool-call result fed back to the model as Responses API input."""
+
     type: Required[Literal["function_call_output"]]
     call_id: Required[str]
     output: Required[str]

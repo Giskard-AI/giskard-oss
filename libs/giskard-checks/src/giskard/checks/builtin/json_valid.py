@@ -58,6 +58,23 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
     def validate_schema_definition(
         cls, schema: dict[str, Any] | None
     ) -> dict[str, Any] | None:
+        """Validate the configured JSON Schema at construction time.
+
+        Parameters
+        ----------
+        schema : dict, optional
+            JSON Schema the check validates outputs against.
+
+        Returns
+        -------
+        dict or None
+            The schema, unchanged.
+
+        Raises
+        ------
+        ValueError
+            If the schema is not a valid, resolvable JSON Schema.
+        """
         if schema is None:
             return schema
 

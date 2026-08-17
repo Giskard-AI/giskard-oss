@@ -168,8 +168,9 @@ class LidarScanAdapter:
         return await self._to_suite_result(scan_result, duration_ms, bridged)
 
     async def _trace_from_target_calls(self, attempt, bridged) -> Trace:  # pyright: ignore[reportMissingTypeArgument]
-        """Rebuild a scan Trace by joining lidar's per-call records to the typed
-        interactions the bridge captured.
+        """Rebuild a scan Trace from lidar's per-call records.
+
+        The records are joined to the typed interactions the bridge captured.
 
         ``attempt.target_calls`` is lidar's authoritative, ordered list of
         ``target.complete`` calls for this attempt; each carries the ``call_id``

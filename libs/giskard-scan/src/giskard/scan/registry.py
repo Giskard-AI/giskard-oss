@@ -18,6 +18,20 @@ class SuiteGeneratorRegistry:
     def register(
         self, generator: "ScenarioGenerator | type[ScenarioGenerator]"
     ) -> None:
+        """Add a generator to the registry.
+
+        Parameters
+        ----------
+        generator : ScenarioGenerator or type
+            Generator instance, or a subclass to instantiate with its defaults.
+
+        Raises
+        ------
+        TypeError
+            If it is not a :class:`ScenarioGenerator`.
+        ValueError
+            If an equivalently configured generator is already registered.
+        """
         instance = _normalize_generator(generator)
         if not isinstance(instance, ScenarioGenerator):
             raise TypeError(
@@ -32,6 +46,18 @@ class SuiteGeneratorRegistry:
     def unregister(
         self, generator: "ScenarioGenerator | type[ScenarioGenerator]"
     ) -> None:
+        """Remove a previously registered generator.
+
+        Parameters
+        ----------
+        generator : ScenarioGenerator or type
+            Generator to remove; a subclass matches an instance with defaults.
+
+        Raises
+        ------
+        ValueError
+            If the generator is not registered.
+        """
         instance = _normalize_generator(generator)
         try:
             self._generators.remove(instance)
@@ -39,9 +65,22 @@ class SuiteGeneratorRegistry:
             raise ValueError(f"{type(instance).__name__} is not registered") from None
 
     def clear(self) -> None:
+        """Remove every registered generator."""
         self._generators.clear()
 
     def generators(self, commercial_use: bool = False) -> list[ScenarioGenerator]:
+        """Return the registered generators.
+
+        Parameters
+        ----------
+        commercial_use : bool, default False
+            Keep only generators whose data allows commercial use.
+
+        Returns
+        -------
+        list of ScenarioGenerator
+            Generators in registration order.
+        """
         return [
             generator
             for generator in self._generators

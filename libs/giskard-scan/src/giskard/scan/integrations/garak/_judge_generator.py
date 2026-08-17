@@ -18,7 +18,7 @@ def _conversation_to_messages(
     """Convert a garak Conversation into Giskard chat-message dicts.
 
     Giskard's ``complete`` accepts ``ChatMessageParam`` dicts and validates them,
-    so plain ``{\"role\", \"content\"}`` dicts are sufficient. Turns whose text is None
+    so plain ``{'role', 'content'}`` dicts are sufficient. Turns whose text is None
     (multimodal/file turns) are rendered as empty strings; the judge only sends
     system/user text turns in practice.
     """

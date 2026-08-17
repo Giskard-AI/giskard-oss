@@ -4,7 +4,8 @@ from typing import TypedDict
 class SharedScanOptions(TypedDict, total=False):
     """Optional execution settings shared by quality and vulnerability scans.
 
-    Attributes:
+    Attributes
+    ----------
         max_scenarios: Total upper bound on scenarios across all generators.
             ``None`` lets each generator apply its own default.
         seed: Integer seed used for reproducible scenario generation.
@@ -42,7 +43,8 @@ class ScanOptions(SharedScanOptions, total=False):
     passing these keys as explicit keyword arguments to
     :func:`~giskard.scan.vulnerability.vulnerability_scan`.
 
-    Attributes:
+    Attributes
+    ----------
         commercial_use: When ``True``, exclude generators whose datasets do not
             permit commercial use. Defaults to ``False``.
     """

@@ -170,7 +170,6 @@ class Tool(BaseModel):
         str
             The serialized result of calling the function.
         """
-
         try:
             # Coerce dict arguments into typed objects via the Pydantic params model.
             # Extra keys not in model_fields are dropped (Pydantic extra='ignore').
@@ -225,7 +224,7 @@ class ToolMethod:
 
 
 def _default_catch(exception: Exception) -> Any:
-    """Default error handler for tools.
+    """Convert an exception into a serializable error, the default tool handler.
 
     Parameters
     ----------
@@ -243,7 +242,7 @@ def _default_catch(exception: Exception) -> Any:
 def tool(
     _func: F | None = None, *, catch: Callable[[Exception], Any] | None = _default_catch
 ) -> Tool:
-    """Decorator to create a tool from a function.
+    """Create a tool from a function.
 
     The function should have type annotations and a docstring in numpy or Google
     format. The docstring should describe the function and its parameters.

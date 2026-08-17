@@ -666,6 +666,18 @@ class SuiteResult(BaseResult, frozen=True):
         return [r for r in self.results if r.failed or r.errored]
 
     def to_junit_xml(self, path: str | Path | None = None) -> str:
+        """Render the suite result as a JUnit XML report.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path, optional
+            File to write the report to. ``None`` only returns it.
+
+        Returns
+        -------
+        str
+            The JUnit XML document.
+        """
         from ..export.junit import to_junit_xml
 
         return to_junit_xml(self, path=path)
@@ -700,7 +712,6 @@ class SuiteResult(BaseResult, frozen=True):
         GroupedSuiteResult
             Wrapper holding this result, the key, and per-group stats.
         """
-
         buckets: defaultdict[str | None, dict[str, int]] = defaultdict(
             lambda: {"passed": 0, "failed": 0, "errored": 0, "skipped": 0}
         )

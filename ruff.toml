@@ -1,0 +1,11 @@
+# Config for files outside libs/* (tools/, giskard_pypi_shim/). Each lib carries
+# its own equivalent ruff section in its pyproject.toml.
+[lint]
+select = ["E", "W", "I", "F", "D"]
+ignore = ["E501", "D1"]
+
+# D1 (missing docstrings) is enforced on the public API only, by
+# tools/check_public_docstrings.py; here we enforce NumPy section style
+# wherever a docstring exists.
+[lint.pydocstyle]
+convention = "numpy"

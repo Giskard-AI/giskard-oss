@@ -53,6 +53,8 @@ async def _run_check[
 
 
 class TestCaseRunner:
+    """Runs a test case's checks sequentially and reports timing telemetry."""
+
     def __init__(self):
         pass
 
@@ -62,6 +64,20 @@ class TestCaseRunner:
         test_case: TestCase[InputType, OutputType, TraceType],
         return_exception: bool = False,
     ) -> TestCaseResult:
+        """Run every check of the test case against its trace.
+
+        Parameters
+        ----------
+        test_case : TestCase
+            Test case to run.
+        return_exception : bool, default False
+            Turn a check that raises into an error result instead of propagating.
+
+        Returns
+        -------
+        TestCaseResult
+            Result of every check, plus the aggregated status.
+        """
         telemetry_tag("giskard_component", "test_case_runner")
         telemetry_tag("giskard_operation", "test_case_run")
 

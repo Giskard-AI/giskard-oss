@@ -21,7 +21,6 @@ def normalize_data[T](
     data: T, normalization_form: NormalizationForm | None = None
 ) -> T:
     """Normalize a dictionary or list using the given normalization form."""
-
     match data:
         case dict():
             return type(data)(

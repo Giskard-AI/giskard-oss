@@ -138,9 +138,7 @@ telemetry = Posthog(
 
 
 def disable_telemetry() -> None:
-    """
-    Disable telemetry. Overrides the environment variable settings.
-    """
+    """Disable telemetry, overriding the environment variable settings."""
     telemetry.disabled = True
     telemetry.disable_geoip = True
 
@@ -207,6 +205,18 @@ def telemetry_run_context() -> Iterator[None]:
 
 
 def scoped_telemetry[F: Callable[..., object]](func: F) -> F:
+    """Wrap a function so each call runs in its own telemetry run context.
+
+    Parameters
+    ----------
+    func : callable
+        Function or coroutine function to wrap.
+
+    Returns
+    -------
+    callable
+        Wrapper of the same kind (sync or async) as ``func``.
+    """
     if asyncio.iscoroutinefunction(func):
 
         @functools.wraps(func)

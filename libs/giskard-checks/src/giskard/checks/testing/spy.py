@@ -10,6 +10,12 @@ from ..core.interaction import Interaction, InteractionSpec
 class WithSpy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     InteractionSpec[InputType, OutputType, TraceType]
 ):
+    """Interaction spec that patches a target with a ``MagicMock`` while generating.
+
+    The recorded calls are attached to each interaction it wraps, so checks can
+    assert on what the agent called.
+    """
+
     interaction_generator: InteractionSpec[InputType, OutputType, TraceType]
     target: str
 

@@ -59,4 +59,13 @@ packages = ["src/giskard"]
 [tool.ruff.lint]
 # I: [isort](https://docs.astral.sh/ruff/rules/#isort-i)
 # F401: [unused-import](https://docs.astral.sh/ruff/rules/unused-import/)
-select = ["I", "F401"]
+select = ["I", "F401", "D"]
+ignore = ["D1"]
+# D1 (missing docstrings) is enforced on the public API only, by
+# tools/check_public_docstrings.py; here we enforce NumPy section style
+# wherever a docstring exists.
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]

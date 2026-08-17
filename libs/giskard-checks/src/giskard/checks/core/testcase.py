@@ -41,6 +41,18 @@ class TestCase[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
     )
 
     async def run(self, return_exception: bool = False) -> TestCaseResult:
+        """Run every check of the test case against its trace.
+
+        Parameters
+        ----------
+        return_exception : bool, default False
+            Turn a check that raises into an error result instead of propagating.
+
+        Returns
+        -------
+        TestCaseResult
+            Result of every check, plus the aggregated status.
+        """
         # Lazy import to avoid circular dependency with runner importing TestCase
         from ..testing.runner import get_runner
 

@@ -119,6 +119,9 @@ test-package-conflict: ## Test package conflict with giskard legacy package inst
 lint: ## Run linting checks
 	uv run ruff check .
 
+check-docstrings: ## Check every public API symbol has a docstring
+	uv run python tools/check_public_docstrings.py
+
 format: ## Format code with ruff
 	uv run ruff format .
 	uv run ruff check --fix .
@@ -185,7 +188,7 @@ check-notices: ## Check that THIRD_PARTY_NOTICES.md is up to date (run make gene
 		exit 1; \
 	fi
 
-check: lint check-format check-compat typecheck security check-licenses check-notices ## Run all checks
+check: lint check-format check-docstrings check-compat typecheck security check-licenses check-notices ## Run all checks
 
 clean: ## Clean up build artifacts and caches
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

@@ -90,6 +90,18 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
         *interactions: Interaction[InputType, OutputType]
         | InteractionGenerator[Interaction[InputType, OutputType], Self],
     ) -> Self:
+        """Build a trace from the given interactions.
+
+        Parameters
+        ----------
+        *interactions : Interaction or InteractionGenerator
+            Concrete interactions to append and specifications to generate from.
+
+        Returns
+        -------
+        Self
+            Trace containing every successfully generated interaction.
+        """
         return await cls().with_interactions(*interactions)
 
     async def with_interactions(
@@ -186,6 +198,19 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
     def for_target[In, Out, Tr: Trace](  # pyright: ignore[reportMissingTypeArgument]
         cls, target: Target[In, Out, Tr]
     ) -> Tr:
+        """Build an empty trace of the type the target expects.
+
+        Parameters
+        ----------
+        target : Target
+            System under test whose signature the trace type is inferred from.
+
+        Returns
+        -------
+        Trace
+            Empty trace of the inferred type, or a plain :class:`Trace` when the
+            type cannot be inferred.
+        """
         # Local import: utils.inference imports Trace, so a module-level import
         # here would create a circular import at load time.
         from ...utils.inference import _infer_trace_type

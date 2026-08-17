@@ -102,7 +102,8 @@ class HuggingFaceDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
     languages with no matching subset are skipped; if none match, an empty list
     is returned and a warning is emitted.
 
-    Attributes:
+    Attributes
+    ----------
         repo_id: Hugging Face dataset repository id (e.g. ``"giskardai/do-not-answer-scenarios"``).
         repo_allow_commercial_use: Whether the dataset's license permits
             commercial use. Set explicitly per repo (the license recorded on

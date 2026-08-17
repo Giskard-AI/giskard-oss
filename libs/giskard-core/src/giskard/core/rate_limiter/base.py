@@ -138,13 +138,16 @@ class BaseRateLimiter(Discriminated, ABC):
 
     @override
     def model_post_init(self, context: Any, /) -> None:
+        """Register the freshly built limiter in the shared instance registry."""
         self._registry.register_instance(self)
         super().model_post_init(context)
 
     @override
     def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
-        """Return self so that deep-copying a generator doesn't duplicate
-        rate-limiter state (which contains unpicklable asyncio primitives)."""
+        """Return self, so deep-copying a generator does not duplicate state.
+
+        The rate-limiter state contains unpicklable asyncio primitives.
+        """
         return self
 
     @asynccontextmanager

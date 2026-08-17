@@ -22,7 +22,8 @@ class ScenarioContext(BaseModel):
     run. Per-generator values (scenario budget, RNG) are passed as separate
     parameters to ``generate_scenario`` and are not part of this object.
 
-    Attributes:
+    Attributes
+    ----------
         description: Natural-language description of the agent under test.
         languages: BCP-47 language codes the agent is expected to handle.
         knowledge_base: Optional document context, ``None`` when the run has
@@ -53,7 +54,8 @@ class ScenarioGenerator(BaseModel):
     def allow_commercial_use(self) -> bool:
         """Whether the generator allows commercial use.
 
-        Returns:
+        Returns
+        -------
             True if the generator allows commercial use, False otherwise.
         """
         return True
@@ -67,23 +69,28 @@ class ScenarioGenerator(BaseModel):
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Generate a list of test scenarios for the described agent.
 
-        Args:
-            context: Run-wide :class:`ScenarioContext` describing the agent,
-                its languages, and optional shared knowledge base.
-            max_scenarios: Upper bound on the number of scenarios to return.
-                ``None`` means no limit (generator-specific default applies).
-            rng: Seeded NumPy random generator for reproducible sampling.
-                In a multi-generator context, each generator receives an
-                independent child RNG spawned from a shared parent via
-                ``rng.spawn()``.
-            target_mode: Desired conversation mode for generated scenarios.
-                ``"singleturn"`` generates single-turn test cases.
-                ``"multiturn"`` generates multi-turn test cases. Defaults to
-                :data:`DEFAULT_TARGET_MODE`.
+        Parameters
+        ----------
+        context : ScenarioContext
+            Run-wide context describing the agent, its languages, and optional
+            shared knowledge base.
+        max_scenarios : int, optional
+            Upper bound on the number of scenarios to return. ``None`` means no
+            limit (generator-specific default applies).
+        rng : numpy.random.Generator, optional
+            Seeded random generator for reproducible sampling. In a
+            multi-generator context, each generator receives an independent child
+            RNG spawned from a shared parent via ``rng.spawn()``.
+        target_mode : str, optional
+            Desired conversation mode for generated scenarios. ``"singleturn"``
+            generates single-turn test cases, ``"multiturn"`` multi-turn ones.
+            Defaults to :data:`DEFAULT_TARGET_MODE`.
 
-        Returns:
-            A list of :class:`~giskard.checks.core.scenario.Scenario` objects
-            ready to be collected into a :class:`~giskard.checks.scenarios.Suite`.
+        Returns
+        -------
+        list of Scenario
+            Scenarios ready to be collected into a
+            :class:`~giskard.checks.scenarios.Suite`.
         """
         raise NotImplementedError
 
@@ -120,7 +127,8 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
 
     Subclasses must implement :meth:`load_scenarios`.
 
-    Attributes:
+    Attributes
+    ----------
         tags: Tags applied to every loaded scenario via
             :meth:`~giskard.checks.core.scenario.Scenario.with_tags`.
     """
@@ -132,7 +140,8 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Load scenarios, annotating each with ``description`` and ``languages``.
 
-        Returns:
+        Returns
+        -------
             A list of scenarios.
         """
         raise NotImplementedError
@@ -149,14 +158,21 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
         Shared by the bundled and Hugging Face dataset generators so the
         parsing, annotation, and tagging behaviour stays identical.
 
-        Args:
-            lines: Iterable of raw JSONL lines (blank lines are skipped).
-            description: Forwarded into each scenario's annotations.
-            languages: Forwarded into each scenario's annotations.
-            source: Human-readable origin (path or repo file) used in error messages.
+        Parameters
+        ----------
+        lines : iterable of str
+            Raw JSONL lines (blank lines are skipped).
+        description : str
+            Forwarded into each scenario's annotations.
+        languages : list of str
+            Forwarded into each scenario's annotations.
+        source : str
+            Human-readable origin (path or repo file) used in error messages.
 
-        Returns:
-            A list of annotated scenarios.
+        Returns
+        -------
+        list of Scenario
+            The annotated scenarios.
         """
         scenarios: list[Scenario[Any, Any, Trace[Any, Any]]] = []
         for line_num, line in enumerate(lines, start=1):
@@ -189,21 +205,27 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Load and optionally subsample scenarios from the bundled dataset.
 
-        Args:
-            context: Run-wide context providing description and languages
-                forwarded to each scenario's annotations.
-            max_scenarios: Maximum number of scenarios to return.  When
-                ``None``, defaults to :data:`_DEFAULT_MAX_SCENARIOS` (20).
-            rng: Random generator used for subset sampling.  A fresh
-                ``np.random.default_rng()`` is created if ``None``.
-            target_mode: Desired conversation mode for generated scenarios.
-                ``"singleturn"`` caps each interaction generator to a single
-                step; ``"multiturn"`` keeps the dataset's own turn budgets.
-                Defaults to :data:`DEFAULT_TARGET_MODE`.
+        Parameters
+        ----------
+        context : ScenarioContext
+            Run-wide context providing description and languages forwarded to
+            each scenario's annotations.
+        max_scenarios : int, optional
+            Maximum number of scenarios to return. ``None`` defaults to
+            :data:`_DEFAULT_MAX_SCENARIOS` (20).
+        rng : numpy.random.Generator, optional
+            Random generator used for subset sampling. A fresh
+            ``np.random.default_rng()`` is created if ``None``.
+        target_mode : str, optional
+            Desired conversation mode for generated scenarios. ``"singleturn"``
+            caps each interaction generator to a single step; ``"multiturn"``
+            keeps the dataset's own turn budgets. Defaults to
+            :data:`DEFAULT_TARGET_MODE`.
 
-        Returns:
-            A list of annotated :class:`~giskard.checks.core.scenario.Scenario`
-            objects, ordered by their original dataset position.
+        Returns
+        -------
+        list of Scenario
+            Annotated scenarios, ordered by their original dataset position.
         """
         # load_scenarios does blocking I/O (file reads, and network for the HF
         # subclass). Generators run concurrently via asyncio.TaskGroup, so offload
@@ -254,7 +276,8 @@ class LocalDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
     ``languages``.  When ``max_scenarios`` is set and smaller than the dataset
     size, a random subset is drawn without replacement using ``rng``.
 
-    Attributes:
+    Attributes
+    ----------
         dataset_name: Stem of the ``.jsonl`` file inside the package
             ``data/`` directory (e.g. ``"prompt_injection"``).
     """

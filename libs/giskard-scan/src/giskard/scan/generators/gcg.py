@@ -45,7 +45,8 @@ class GCGInjectionScenarioGenerator(HuggingFaceDatasetScenarioGenerator):
     prompt's language; per the upstream probe, they may not generalize to
     translated prompts.
 
-    Attributes:
+    Attributes
+    ----------
         repo_id: Hugging Face dataset of harmful base prompts. Defaults to the
             HarmBench scenarios dataset.
     """

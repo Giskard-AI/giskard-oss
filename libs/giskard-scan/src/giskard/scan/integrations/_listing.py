@@ -27,20 +27,27 @@ def list_scan_items(
 ) -> list[str]:
     """List selectable item names for a scan tool.
 
-    Args:
-        tool: ``"giskard"`` returns scenario generator class names,
-            ``"garak"`` returns probe plugin names, ``"deepteam"`` returns
-            supported vulnerability and attack names. Other values raise
-            ``ValueError``.
-        include_inactive: Garak only — also include inactive catalog probes.
-            Ignored for other tools.
+    Parameters
+    ----------
+    tool : str
+        ``"giskard"`` returns scenario generator class names, ``"garak"`` returns
+        probe plugin names, ``"deepteam"`` returns supported vulnerability and
+        attack names. Other values raise ``ValueError``.
+    include_inactive : bool, default False
+        Garak only — also include inactive catalog probes. Ignored for other
+        tools.
 
-    Returns:
+    Returns
+    -------
+    list of str
         Sorted unique names suitable for the corresponding scan API.
 
-    Raises:
-        ValueError: If ``tool`` is not one of the supported values.
-        ImportError: If an optional tool dependency is not installed.
+    Raises
+    ------
+    ValueError
+        If ``tool`` is not one of the supported values.
+    ImportError
+        If an optional tool dependency is not installed.
     """
     if tool == "giskard":
         return _list_giskard_generators()

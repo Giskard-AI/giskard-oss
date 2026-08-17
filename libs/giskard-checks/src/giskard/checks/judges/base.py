@@ -63,6 +63,7 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
 
     @property
     def output_type(self) -> type[BaseModel] | None:
+        """Return the pydantic model the judge parses the LLM answer into."""
         return LLMCheckResult
 
     def get_prompt(self) -> str | ChatMessage | MessageTemplate | TemplateReference:

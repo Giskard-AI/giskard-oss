@@ -8,12 +8,16 @@ type QualitySummaryRow = dict[str, str | int | float | None]
 async def generate_quality_recommendation(result: SuiteResult) -> str:
     """Generate a recommendation for the failed quality scan scenarios.
 
-    Args:
-        result: Completed suite result from a quality scan.
+    Parameters
+    ----------
+    result : SuiteResult
+        Completed suite result from a quality scan.
 
-    Returns:
-        Recommendation text, or an empty string when the scan has no failures
-        or errors to explain.
+    Returns
+    -------
+    str
+        Recommendation text, or an empty string when the scan has no failures or
+        errors to explain.
     """
     if not result.failures_and_errors:
         return ""

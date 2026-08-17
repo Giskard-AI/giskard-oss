@@ -90,12 +90,16 @@ class LLMClient:
     def configure(self, name: str, provider: str | None = None, **kwargs: Any) -> None:
         """Register a named provider configuration.
 
-        Args:
-            name: Alias for this provider (used as model string prefix).
-            provider: Provider type from the registry. Defaults to *name*.
-            **kwargs: Connection config (api_key, base_url, ...) and
-                behavior config (merge_system, ...). Values may use
-                ``os.environ/VAR_NAME`` syntax for deferred env var resolution.
+        Parameters
+        ----------
+        name : str
+            Alias for this provider (used as model string prefix).
+        provider : str, optional
+            Provider type from the registry. Defaults to ``name``.
+        **kwargs : Any
+            Connection config (``api_key``, ``base_url``, ...) and behavior
+            config (``merge_system``, ...). Values may use
+            ``os.environ/VAR_NAME`` syntax for deferred env var resolution.
         """
         name = name.strip()
         provider_type = (provider or name).strip()

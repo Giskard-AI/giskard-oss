@@ -69,8 +69,7 @@ def await_on_loop[T](
 
 
 def reject_unexpected_kwargs(tool: str, kwargs: dict[str, Any]) -> None:
-    """Raise ``TypeError`` if ``kwargs`` still holds keys after the adapter popped
-    the options it recognizes.
+    """Raise ``TypeError`` for kwargs the adapter did not recognize.
 
     Each adapter knows its own valid kwargs and pops them; anything left over is a
     caller typo (e.g. ``probe`` for ``probes``) that would otherwise be silently

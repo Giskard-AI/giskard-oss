@@ -57,6 +57,24 @@ class BaseEmbeddingModel(Discriminated, ABC):
         max_batch_size: int | None = None,
         max_total_chars: int | None = None,
     ) -> list[np.ndarray]:
+        """Embed texts, splitting them into provider-sized batches.
+
+        Parameters
+        ----------
+        texts : list of str
+            Texts to embed.
+        params : EmbeddingParams, optional
+            Provider parameters overriding the model defaults.
+        max_batch_size : int, optional
+            Maximum number of texts per request. ``None`` uses the default.
+        max_total_chars : int, optional
+            Maximum total characters per request. ``None`` uses the default.
+
+        Returns
+        -------
+        list of numpy.ndarray
+            One embedding vector per input text, in input order.
+        """
         embedding_batches = []
         for batch in self.batched_embeddings(texts, max_batch_size, max_total_chars):
             embedding_batches.extend(await self._embed(batch, params))
