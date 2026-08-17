@@ -104,6 +104,10 @@ test-lidar: install-lidar-test ## Run lidar integration tests
 test-unit-minimal: ## Run unit tests on minimal deps (no provider SDKs), optional PACKAGE=<name>
 	$(foreach lib,$(TEST_LIBS),uv run pytest libs/$(lib) -m "not functional" &&) true
 
+test-examples: ## Run canonical examples and README snippet lint
+	uv run pytest examples tools/test_lint_readme_snippets.py -q
+	uv run python tools/lint_readme_snippets.py
+
 test-no-providers: ## Run tests that verify behavior when provider SDKs are missing
 	uv run pytest libs/giskard-llm -m "no_providers"
 
