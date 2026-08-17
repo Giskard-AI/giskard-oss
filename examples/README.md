@@ -10,8 +10,9 @@ make test-examples
 
 ## Checks static
 
-`checks_static/test_checks_static.py` shows a small `Scenario` with a custom
-`CheckResult` check. It is a minimal happy-path example for the checks API.
+`checks_static/test_checks_static.py` shows a small `Scenario` with two
+serializable `Equals` checks. It is a minimal happy-path example for the checks
+API.
 
 ## Scan stub
 
