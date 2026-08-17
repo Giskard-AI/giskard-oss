@@ -14,11 +14,17 @@ make test-examples
 serializable `Equals` checks. It is a minimal happy-path example for the checks
 API.
 
-## Scan stub
+## Scan custom generators
 
-`scan_stub/test_scan_stub.py` shows an offline `vulnerability_scan` flow. It
-uses an empty generator list and a static suite stub, so it does not need a
-model provider or network access.
+`scan_custom_generators/test_scan_custom_generators.py` shows how to pass a
+custom `ScenarioGenerator` to `generate_suite`. The generator returns a static
+scenario, so the whole scan runs without monkeypatching, a model provider, or
+network access.
+
+`generate_suite` gives each generator the same agent context and a scenario
+budget. This example returns one deterministic scenario, then runs the suite
+against the target. Use this pattern when you want to test a known risk or add
+domain-specific scenarios to a scan.
 
 Repository maintenance tools do not belong in this directory. See `tools/`
 for checks such as the README snippet linter.
