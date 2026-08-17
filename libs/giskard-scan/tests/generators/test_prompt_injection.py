@@ -1,5 +1,7 @@
 from giskard.agents.templates import get_prompts_manager
 from giskard.checks import Interaction, Trace
+from giskard.checks.generators import LLMGenerator
+from giskard.checks.judges import Conformity
 from giskard.scan.generators.base import ScenarioContext
 from giskard.scan.generators.prompt_injection import (
     PromptInjectionScenarioGenerator,
@@ -17,6 +19,21 @@ def _scenario_by_technique(scenarios, technique):
         for scenario in scenarios
         if scenario.annotations.get("technique") == technique
     )
+
+
+def _prompt_path(interact) -> str:
+    """Narrow an interact's generator to the template path the dataset declares."""
+    generator = interact.inputs
+    assert isinstance(generator, LLMGenerator)
+    assert generator.prompt_path is not None
+    return generator.prompt_path
+
+
+def _text(message) -> str:
+    """Narrow a rendered message's content union down to its text payload."""
+    content = message.content
+    assert isinstance(content, str)
+    return content
 
 
 async def test_prompt_injection_generator_loads_scenarios():
@@ -48,7 +65,7 @@ async def test_multilingual_injection_uses_dedicated_template():
 
     interact = scenario.steps[0].interacts[0]
     assert (
-        interact.inputs.prompt_path
+        _prompt_path(interact)
         == "giskard.scan::scenarios/llm01_multilingual_injection.j2"
     )
     assert "target languages" not in scenario.annotations["technique_instruction"]
@@ -63,8 +80,7 @@ async def test_refusal_suppression_uses_adaptive_template():
 
     interact = scenario.steps[0].interacts[0]
     assert (
-        interact.inputs.prompt_path
-        == "giskard.scan::scenarios/llm01_refusal_suppression.j2"
+        _prompt_path(interact) == "giskard.scan::scenarios/llm01_refusal_suppression.j2"
     )
 
 
@@ -77,9 +93,10 @@ async def test_obfuscation_techniques_request_direct_compliance():
     for technique in ("leet_speak", "encoding"):
         scenario = _scenario_by_technique(scenarios, technique)
         instruction = scenario.annotations["technique_instruction"]
-        rule = scenario.steps[0].checks[0].rule
+        check = scenario.steps[0].checks[0]
+        assert isinstance(check, Conformity)
         assert "Do not ask the agent to" in instruction
-        assert "comply with the prohibited instruction" in rule
+        assert "comply with the prohibited instruction" in check.rule
 
 
 async def test_prompt_injection_templates_render_all_branches():
@@ -106,7 +123,7 @@ async def test_prompt_injection_templates_render_all_branches():
         for interact in scenario.steps[0].interacts:
             for trace in traces:
                 messages = await prompts_manager.render_template(
-                    interact.inputs.prompt_path,
+                    _prompt_path(interact),
                     {
                         "trace": trace,
                         "_instr_output": _OUTPUT_SCHEMA_MARKER,
@@ -114,9 +131,10 @@ async def test_prompt_injection_templates_render_all_branches():
                 )
                 assert len(messages) == 1
                 assert messages[0].role == "user"
-                assert messages[0].content
-                assert _OUTPUT_SCHEMA_MARKER in messages[0].content
-                assert _PROHIBITED_OBJECTIVE_RULE in messages[0].content
+                prompt = _text(messages[0])
+                assert prompt
+                assert _OUTPUT_SCHEMA_MARKER in prompt
+                assert _PROHIBITED_OBJECTIVE_RULE in prompt
 
     refusal = _scenario_by_technique(scenarios, "refusal_suppression")
     refusal_trace = Trace[str, str](
@@ -129,13 +147,13 @@ async def test_prompt_injection_templates_render_all_branches():
         annotations=refusal.annotations,
     )
     refusal_messages = await prompts_manager.render_template(
-        refusal.steps[0].interacts[0].inputs.prompt_path,
+        _prompt_path(refusal.steps[0].interacts[0]),
         {
             "trace": refusal_trace,
             "_instr_output": _OUTPUT_SCHEMA_MARKER,
         },
     )
-    refusal_prompt = refusal_messages[0].content
+    refusal_prompt = _text(refusal_messages[0])
     assert "keep exactly the same prohibited objective" in refusal_prompt
     assert "exact refusal wording, rationale, or safety pattern" in refusal_prompt
 
