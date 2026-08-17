@@ -86,6 +86,32 @@ def test_from_google_thinking_tokens_counted_in_output():
     assert out.usage.input_tokens + out.usage.output_tokens == out.usage.total_tokens
 
 
+def test_from_google_tool_use_prompt_tokens_counted_in_input():
+    """Tool-use prompt tokens are input, and total falls back to their sum."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Answer."}]},
+                    "finish_reason": "STOP",
+                }
+            ],
+            "usage_metadata": {
+                "prompt_token_count": 10,
+                "tool_use_prompt_token_count": 7,
+                "candidates_token_count": 5,
+                "thoughts_token_count": 20,
+            },
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.usage is not None
+    assert out.usage.input_tokens == 17
+    assert out.usage.output_tokens == 25
+    assert out.usage.total_tokens == 42
+    assert out.usage.input_tokens + out.usage.output_tokens == out.usage.total_tokens
+
+
 def test_from_google_multiple_text_parts_joined():
     """Multiple `text` parts are joined with newlines, matching multi-part model output."""
     raw = _raw(
