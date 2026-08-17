@@ -1,5 +1,4 @@
 import sys
-from collections import defaultdict
 from typing import Any, Callable, Generic, TypeVar
 
 from pydantic import (
@@ -18,7 +17,6 @@ class _Registry(Generic[T]):
     def __init__(self):
         self._subclasses: dict[type, dict[str, type]] = {}
         self._kinds: dict[type[T], str] = {}
-        self._reverse_kinds: dict[type[T], dict[str, type[T]]] = defaultdict(dict)
 
     def register_base(self, base_cls: type[T]):
         if not issubclass(base_cls, Discriminated):
@@ -56,7 +54,6 @@ class _Registry(Generic[T]):
 
         self._subclasses[actual_base_cls][kind] = subclass
         self._kinds[subclass] = kind
-        self._reverse_kinds[actual_base_cls][kind] = subclass
 
 
 _REGISTRY = _Registry()
@@ -114,10 +111,11 @@ class Discriminated(BaseModel):
             if not isinstance(kind, str):
                 raise ValueError(f"Kind is expected to be a string, got {type(kind)}")
 
-            if kind not in _REGISTRY._reverse_kinds[origin]:
+            registered = _REGISTRY._subclasses.get(origin)
+            if registered is None or kind not in registered:
                 raise ValueError(f"Kind {kind} is not registered for class {origin}")
 
-            return _REGISTRY._reverse_kinds[origin][kind].model_validate(value)
+            return registered[kind].model_validate(value)
 
         return core_schema.no_info_plain_validator_function(validate_discriminated)
 

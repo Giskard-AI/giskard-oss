@@ -132,7 +132,11 @@ suite.append(scenario2)
 
 # Run the suite
 results = await suite.run()
-print(f"Aggregated pass rate: {results.pass_rate * 100}%")
+# `pass_rate` is None when nothing was evaluated (empty or fully skipped suite)
+if results.pass_rate is None:
+    print("Aggregated pass rate: n/a")
+else:
+    print(f"Aggregated pass rate: {results.pass_rate * 100}%")
 ```
 
 Why this library?
@@ -179,7 +183,7 @@ API Overview
 
 **Built-in and LLM-based checks**
 - `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
-- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LessThan`, `LessThanEquals` (`LesserThan` and `LesserThanEquals` are deprecated aliases).
+- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterThanEquals`, `LessThan`, `LessThanEquals`.
 - `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
 - JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks via `key` or check-specific fields like `answer_key`.
 
@@ -222,7 +226,7 @@ from giskard.checks import Check, CheckResult, Interaction, TestCase, Trace
 @Check.register("my_custom_check")
 class MyCustomCheck(Check):
     async def run(self, trace: Trace) -> CheckResult:
-        return CheckResult.success("Check passed")
+        return CheckResult.success(message="Check passed")
 
 
 trace = Trace(interactions=[Interaction(inputs="test", outputs="result")])
@@ -255,9 +259,11 @@ class AdvancedSecurityCheck(Check):
         current = trace.last
         score = await some_security_analysis(current.outputs)
         if score >= self.threshold:
-            return CheckResult.success(f"Security score {score:.2f} meets threshold")
+            return CheckResult.success(
+                message=f"Security score {score:.2f} meets threshold"
+            )
         return CheckResult.failure(
-            f"Security score {score:.2f} below threshold {self.threshold}"
+            message=f"Security score {score:.2f} below threshold {self.threshold}"
         )
 ```
 
@@ -540,8 +546,12 @@ class CustomLLMCheck(BaseLLMCheck):
         trace: Trace,
     ) -> CheckResult:
         if output_value.score >= 0.8:
-            return CheckResult.success(f"Score {output_value.score} meets threshold")
-        return CheckResult.failure(f"Score {output_value.score} below threshold")
+            return CheckResult.success(
+                message=f"Score {output_value.score} meets threshold"
+            )
+        return CheckResult.failure(
+            message=f"Score {output_value.score} below threshold"
+        )
 ```
 
 Notes
