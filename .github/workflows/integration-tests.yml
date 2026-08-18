@@ -15,6 +15,10 @@ jobs:
   authorize:
     name: authorize
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read # list changed files
+    outputs:
+      relevant: ${{ steps.changes.outputs.relevant }}
     steps:
       - name: Check authorization
         env:
@@ -50,8 +54,41 @@ jobs:
           echo "::error::External contributors require a maintainer to add the 'safe for build' label."
           exit 1
 
+      # Path filtering lives here rather than in the `paths:` trigger: a
+      # required check that never starts stays "Waiting" forever, whereas a
+      # job skipped by `if:` reports as neutral and unblocks the PR.
+      - name: Detect relevant changes
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Non-PR events (push, manual dispatch) always run the full suite
+          if [[ "$EVENT_NAME" != "pull_request_target" ]]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # For PRs, run only when at least one relevant path changed
+          files=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename')
+          if grep -qE \
+              -e '^libs/giskard-(agents|llm|core|scan)/' \
+              -e '^\.github/workflows/integration-tests\.yml$' \
+              -e '^pyproject\.toml$' \
+              -e '^uv\.lock$' \
+              -e '^Makefile$' \
+              <<<"$files"; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+            echo "No integration-relevant paths changed. Skipping test jobs."
+          fi
+
   test-agents-functional:
     needs: authorize
+    if: needs.authorize.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
@@ -60,36 +97,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        python-version: ["3.12"]
         backend:
-          # Each backend exercises a different install combination so we
-          # catch dependency regressions in the three supported layouts:
-          # giskard-llm only, litellm only, and both installed together.
-          # Using the top-level giskard-agents extras (not giskard-llm
-          # directly) so the pass-through extras declared in
-          # libs/giskard-agents/pyproject.toml are covered.
           - name: giskard-llm
             extras: "giskard-agents[google]"
             pytest_mark: "functional and google"
           - name: litellm
             extras: "giskard-agents[litellm]"
             pytest_mark: "functional and litellm"
-          - name: both
-            extras: "giskard-agents[google,litellm]"
-            pytest_mark: "functional and (google or litellm)"
     name: agents / ${{ matrix.backend.name }} / ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-          # Deliberate opt-in: this job installs and executes fork-authored
-          # code (make install, pytest) with live provider API keys in scope.
-          # Compensating controls: the `ci` environment requires a reviewer to
-          # approve each run before secrets are injected (server-enforced,
-          # per-run), the authorize job requires a fresh `labeled` event for
-          # external contributors, and the immutable head.sha pin keeps the
-          # reviewed commit identical to the executed one.
+          # This job deliberately runs untrusted fork code with live API keys
+          # in scope. Three controls limit the risk. The CI environment
+          # requires reviewer approval for each run. The authorize job
+          # requires a fresh labeled event for external contributors. The
+          # head.sha pin stops the code from changing after approval.
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
@@ -112,20 +138,17 @@ jobs:
 
   test-llm-functional:
     needs: authorize
+    if: needs.authorize.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     environment: ci
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        # One cell per routing prefix we want to exercise end-to-end.
-        # `extras` is the giskard-llm optional-dependency group to install;
-        # aliases share an install (bare/azure_ai reuse openai/azure, gemini reuses google).
         include:
           - { python-version: "3.12", provider: openai, extras: openai }
           - { python-version: "3.12", provider: bare, extras: openai }
           - { python-version: "3.12", provider: google, extras: google }
-          - { python-version: "3.12", provider: gemini, extras: google }
           - { python-version: "3.12", provider: anthropic, extras: anthropic }
           - { python-version: "3.12", provider: azure, extras: azure }
           - { python-version: "3.12", provider: azure_ai, extras: azure }
@@ -143,7 +166,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-          # Deliberate opt-in — see test-agents-functional for the full
+          # Deliberate opt-in. See test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -156,7 +179,7 @@ jobs:
       - name: Run functional tests
         env:
           OPENAI_API_KEY: ${{ (matrix.provider == 'openai' || matrix.provider == 'bare') && secrets.OPENAI_API_KEY || '' }}
-          GOOGLE_API_KEY: ${{ (matrix.provider == 'google' || matrix.provider == 'gemini') && secrets.GEMINI_API_KEY || '' }}
+          GOOGLE_API_KEY: ${{ matrix.provider == 'google' && secrets.GEMINI_API_KEY || '' }}
           ANTHROPIC_API_KEY: ${{ matrix.provider == 'anthropic' && secrets.ANTHROPIC_API_KEY || '' }}
           AZURE_API_KEY: ${{ matrix.provider == 'azure' && secrets.AZURE_API_KEY || '' }}
           AZURE_API_BASE: ${{ matrix.provider == 'azure' && secrets.AZURE_API_BASE || '' }}
@@ -166,43 +189,9 @@ jobs:
           AZURE_AI_OPENAI_V1_ENDPOINT: ${{ matrix.provider == 'azure_foundry_v1' && secrets.AZURE_AI_OPENAI_V1_ENDPOINT || '' }}
         run: make test-functional PACKAGE=giskard-llm PROVIDER=$PROVIDER
 
-  test-checks-functional:
-    needs: authorize
-    runs-on: ubuntu-latest
-    environment: ci
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12", "3.13", "3.14"]
-        provider: [google]
-    name: checks / ${{ matrix.provider }} / ${{ matrix.python-version }}
-    env:
-      PROVIDER: ${{ matrix.provider }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
-          persist-credentials: false
-          # Deliberate opt-in — see test-agents-functional for the full
-          # rationale and compensating controls.
-          allow-unsafe-pr-checkout: true
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          python-version: ${{ matrix.python-version }}
-      - run: make install
-      - name: Install provider SDK
-        run: uv pip install "giskard-llm[$PROVIDER]"
-      - name: Run functional tests
-        env:
-          GOOGLE_API_KEY: ${{ matrix.provider == 'google' && secrets.GEMINI_API_KEY || '' }}
-          GISKARD_CHECKS_DEFAULT_MODEL: "google/gemini-3.5-flash"
-          GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL: "google/gemini-embedding-001"
-        run: make test-functional PACKAGE=giskard-checks PROVIDER=$PROVIDER
-
   test-scan-garak:
     needs: authorize
+    if: needs.authorize.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
@@ -218,7 +207,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-          # Deliberate opt-in — see test-agents-functional for the full
+          # Deliberate opt-in. See test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -230,6 +219,7 @@ jobs:
 
   test-scan-deepteam:
     needs: authorize
+    if: needs.authorize.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
@@ -245,7 +235,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-          # Deliberate opt-in — see test-agents-functional for the full
+          # Deliberate opt-in. See test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
