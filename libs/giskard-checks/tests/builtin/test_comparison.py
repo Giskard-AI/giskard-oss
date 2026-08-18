@@ -22,6 +22,7 @@ from giskard.checks import (
     Trace,
 )
 from giskard.checks.core.extraction import NoMatch
+from pydantic import ValidationError
 
 
 class TestLessThan:
@@ -1220,3 +1221,88 @@ class TestLessThanSerialisation:
     def test_less_than_equals_serialises_with_new_kind(self):
         check = LessThanEquals(expected_value=10, key="trace.last.outputs")
         assert check.model_dump()["kind"] == "less_than_equals"
+
+
+class TestDefaultKey:
+    """``key`` defaults to ``trace.last.outputs`` like every peer check."""
+
+    @pytest.mark.parametrize(
+        "check_cls",
+        [Equals, NotEquals, LessThan, GreaterThan, LessThanEquals, GreaterThanEquals],
+    )
+    def test_key_is_not_required(self, check_cls: type[Any]):
+        assert not check_cls.model_fields["key"].is_required()
+
+    @pytest.mark.parametrize(
+        "check_cls",
+        [Equals, NotEquals, LessThan, GreaterThan, LessThanEquals, GreaterThanEquals],
+    )
+    def test_constructs_without_key_and_defaults(self, check_cls: type[Any]):
+        check = check_cls(expected_value=5)
+        assert check.key == "trace.last.outputs"
+
+    def test_explicit_key_still_overrides_default(self):
+        check = Equals(expected_value=5, key="trace.last.inputs")
+        assert check.key == "trace.last.inputs"
+
+    async def test_default_key_resolves_against_real_trace_pass(self):
+        """The default must actually resolve at run() time, not just be set."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="ignored", outputs="hello"),
+        )
+        check = Equals(expected_value="hello")
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.details is not None
+        assert result.details["actual_value"] == "hello"
+
+    async def test_default_key_resolves_against_real_trace_fail(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="ignored", outputs="hello"),
+        )
+        check = Equals(expected_value="goodbye")
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.details is not None
+        assert result.details["actual_value"] == "hello"
+
+    async def test_default_key_targets_last_interaction(self):
+        """The default resolves the *last* interaction, not the first."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="a", outputs=1),
+            Interaction(inputs="b", outputs=2),
+        )
+
+        assert (
+            await GreaterThan(expected_value=1).run(trace)
+        ).status == CheckStatus.PASS
+        assert (await Equals(expected_value=2).run(trace)).status == CheckStatus.PASS
+        assert (await Equals(expected_value=1).run(trace)).status == CheckStatus.FAIL
+
+    async def test_explicit_key_overrides_default_at_runtime(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="question", outputs="answer"),
+        )
+        check = Equals(expected_value="question", key="trace.last.inputs")
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.details is not None
+        assert result.details["actual_value"] == "question"
+
+    def test_unknown_key_still_rejected_under_extra_forbid(self):
+        """Defaulting ``key`` must not let stale/renamed fields bind silently."""
+        with pytest.raises(ValidationError):
+            Equals.model_validate(
+                {"kind": "equals", "expected_value": 5, "keyy": "trace.last.outputs"}
+            )
+
+    async def test_round_trip_without_key_keeps_default(self):
+        check = Equals(expected_value="hello")
+        restored = Check.model_validate(check.model_dump())
+        assert restored.key == "trace.last.outputs"  # pyright: ignore[reportAttributeAccessIssue]

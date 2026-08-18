@@ -4,6 +4,8 @@ import uuid
 from collections.abc import Sequence
 from typing import Any, override
 
+import pytest
+from giskard.agents.embeddings import BaseEmbeddingModel, LitellmEmbeddingModel
 from giskard.agents.generators import (
     BaseGenerator,
     GenerationParams,
@@ -12,17 +14,26 @@ from giskard.agents.generators import (
 from giskard.agents.generators.giskard_llm_generator import (
     GiskardLLMGenerator,
 )
-from giskard.agents.generators.middleware import RetryPolicy
+from giskard.agents.generators.middleware import (
+    CompletionMiddleware,
+    RateLimiterMiddleware,
+    RetryMiddleware,
+    RetryPolicy,
+)
 from giskard.agents.tools import Tool
 from giskard.agents.workflow import ChatWorkflow, ErrorPolicy
 from giskard.core import MinIntervalRateLimiter
+from giskard.core.discriminated import (
+    _REGISTRY,
+    Discriminated,
+)
 from giskard.llm.types import (
     AssistantMessage,
     ChatMessage,
     Choice,
     CompletionResponse,
 )
-from pydantic import Field
+from pydantic import Field, ValidationError
 
 
 def test_generator_serialization():
@@ -204,3 +215,128 @@ async def test_chat_workflow_serialization_custom_generator():
     chat = await deserialized.run()
     assert chat.last.role == "assistant"
     assert chat.last.content == "Workflow test response"
+
+
+# -- Unknown-key rejection (``extra="forbid"``) ------------------------------
+
+
+def test_generator_rejects_unknown_key():
+    """A typo'd key on a generator must fail loudly, not silently default."""
+    payload = {
+        "kind": "giskard_llm",
+        "model": "gpt-4",
+        # Typo: the real field is ``retry_policy``. Silently dropping this key
+        # would leave retry_policy at its default instead of max_attempts=9.
+        "retry_polcy": {"max_attempts": 9},
+    }
+
+    with pytest.raises(ValidationError, match="retry_polcy"):
+        BaseGenerator.model_validate(payload)
+
+    with pytest.raises(ValidationError, match="retry_polcy"):
+        GiskardLLMGenerator.model_validate(payload)
+
+
+def test_middleware_rejects_unknown_key():
+    """A typo'd key on a middleware must fail loudly."""
+    payload = {"kind": "retry", "retry_polcy": {"max_attempts": 9}}
+
+    with pytest.raises(ValidationError, match="retry_polcy"):
+        CompletionMiddleware.model_validate(payload)
+
+    with pytest.raises(ValidationError, match="retry_polcy"):
+        RetryMiddleware.model_validate(payload)
+
+
+def test_middleware_rejects_unknown_key_nested_in_generator():
+    """A typo inside ``BaseGenerator.middlewares`` must fail loudly."""
+    payload = {
+        "kind": "giskard_llm",
+        "model": "gpt-4",
+        "middlewares": [{"kind": "retry", "retry_polcy": {"max_attempts": 9}}],
+    }
+
+    with pytest.raises(ValidationError, match="retry_polcy"):
+        BaseGenerator.model_validate(payload)
+
+
+def test_embedding_model_rejects_unknown_key():
+    """A typo'd ``model_name`` must not silently embed with the default model."""
+    payload = {"kind": "litellm", "model_name": "text-embedding-3-small"}
+
+    with pytest.raises(ValidationError, match="model_name"):
+        BaseEmbeddingModel.model_validate(payload)
+
+    with pytest.raises(ValidationError, match="model_name"):
+        LitellmEmbeddingModel.model_validate(payload)
+
+
+# -- ``kind`` discriminator round-trips --------------------------------------
+
+
+def _registered_subclasses(base: type[Discriminated]) -> dict[str, type[Discriminated]]:
+    return dict(_REGISTRY._subclasses[base])  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.parametrize(
+    ("base", "instances"),
+    [
+        (BaseGenerator, {"giskard_llm": GiskardLLMGenerator(model="m")}),
+        (
+            CompletionMiddleware,
+            {
+                "retry": RetryMiddleware(),
+                "rate_limiter": RateLimiterMiddleware(
+                    rate_limiter=MinIntervalRateLimiter.from_rpm(100)
+                ),
+            },
+        ),
+        (BaseEmbeddingModel, {"litellm": LitellmEmbeddingModel()}),
+    ],
+    ids=["generator", "middleware", "embedding"],
+)
+def test_kind_round_trips_under_forbid(
+    base: type[Discriminated], instances: dict[str, Discriminated]
+):
+    """``model_dump()`` emits ``kind``; ``model_validate()`` must accept it back.
+
+    Covers the polymorphic path (``Base.model_validate``) and the direct path
+    (``Subclass.model_validate``), which bypasses the registry entirely.
+    """
+    for kind, instance in instances.items():
+        dumped = instance.model_dump()
+        assert dumped["kind"] == kind
+
+        polymorphic = base.model_validate(dumped)
+        assert type(polymorphic) is type(instance)
+        assert polymorphic.kind == kind
+
+        direct = type(instance).model_validate(dumped)
+        assert type(direct) is type(instance)
+        assert direct.kind == kind
+
+        # JSON round trip too: the middleware module docstring advertises it.
+        from_json = base.model_validate_json(instance.model_dump_json())
+        assert type(from_json) is type(instance)
+
+
+@pytest.mark.parametrize(
+    "base",
+    [BaseGenerator, CompletionMiddleware, BaseEmbeddingModel],
+    ids=["generator", "middleware", "embedding"],
+)
+def test_every_registered_subclass_forbids_extra(base: type[Discriminated]):
+    """No registered subclass may weaken ``extra`` back to allow/ignore.
+
+    Pydantic merges ``model_config`` along the MRO, so a subclass declaring its
+    own config keeps ``extra="forbid"`` unless it sets ``extra`` itself. Test
+    doubles defined in other libs' suites may deliberately opt out, so only the
+    production tree is asserted.
+    """
+    for kind, subclass in _registered_subclasses(base).items():
+        if not subclass.__module__.startswith("giskard."):
+            continue
+        assert subclass.model_config.get("extra") == "forbid", (
+            f"{subclass.__name__} (kind={kind!r}) resolves to "
+            f"extra={subclass.model_config.get('extra')!r}"
+        )

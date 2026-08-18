@@ -5,6 +5,7 @@ from pydantic import (
     BaseModel,
     GetCoreSchemaHandler,
     computed_field,
+    model_validator,
 )
 from pydantic_core import core_schema
 
@@ -60,6 +61,31 @@ _REGISTRY = _Registry()
 
 
 class Discriminated(BaseModel):
+    """Base for polymorphic models keyed by a ``kind`` discriminator.
+
+    Subclasses are registered with ``@Base.register("kind")`` and are then
+    selected by that string during validation, so a dumped model round-trips
+    back to its concrete type.
+
+    Notes
+    -----
+    Several discriminated bases in this codebase set
+    ``model_config = ConfigDict(extra="forbid")``. This is the canonical
+    explanation of that choice; the individual bases point here rather than
+    repeating it.
+
+    Without ``extra="forbid"`` pydantic silently drops unrecognized keys. A
+    persisted model referencing a renamed or misspelled field would then fall
+    back to that field's default and run "successfully" against the wrong
+    configuration -- a silent wrong answer rather than a loud error. Each base
+    documents in its own ``Notes`` which of its fields makes this concrete.
+
+    ``extra="forbid"`` is inherited by every subclass, including those that
+    declare their own ``model_config``, because pydantic merges config dicts
+    along the MRO. A subclass must therefore not set ``extra`` itself -- doing
+    so silently reopens the hole for that whole branch of the hierarchy.
+    """
+
     @computed_field
     def kind(self) -> str | None:
         """The discriminator field identifying the concrete type.
@@ -76,6 +102,28 @@ class Discriminated(BaseModel):
             return _REGISTRY._kinds[cls]
 
         return None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_discriminator(cls, data: Any) -> Any:
+        """Tolerate the ``kind`` discriminator on input.
+
+        ``kind`` is a ``computed_field``, so ``model_dump()`` emits it even
+        though it is not a model field. A model configured with
+        ``extra="forbid"`` would otherwise reject it, breaking every
+        ``model_dump() -> model_validate()`` round trip -- including the one
+        the registry itself performs in ``__get_pydantic_core_schema__``.
+
+        This runs on the concrete subclass, so it also covers a direct
+        ``SomeSubclass.model_validate(dumped)`` call, which never goes through
+        ``validate_discriminated``. Dropping (rather than validating) the value
+        is safe: the registry has already used ``kind`` to select the class by
+        the time this runs, and ``kind`` is derived from the concrete class, so
+        the incoming value is redundant.
+        """
+        if isinstance(data, dict) and "kind" in data:
+            return {k: v for k, v in data.items() if k != "kind"}  # pyright: ignore[reportUnknownVariableType]
+        return data
 
     @classmethod
     def register(cls, kind: str) -> Callable[[type[T]], type[T]]:
