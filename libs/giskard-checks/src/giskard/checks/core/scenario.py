@@ -1,6 +1,6 @@
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.experimental.missing_sentinel import MISSING
 
 from .check import Check
@@ -15,7 +15,18 @@ class Step[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: igno
 
     Each step corresponds to one TestCase at runtime: interactions are applied
     to the trace, then checks validate the resulting trace state.
+
+    Notes
+    -----
+    Unknown fields are rejected (``extra="forbid"``). Both fields default to an
+    empty list, so a misspelled key would otherwise be dropped silently and
+    yield a step that runs its interactions but asserts nothing -- a suite that
+    tests nothing looks identical to one that passes.
     """
+
+    # Rationale and the subclass rule: see ``Discriminated`` in giskard-core.
+    # (``Step`` is a plain ``BaseModel``, but the same config-merge rule holds.)
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     interacts: list[InteractionSpec[InputType, OutputType, TraceType]] = Field(
         default_factory=list,
@@ -86,6 +97,18 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
     tags : list[str]
         Flat ``'Key:Value'`` labels for grouping and Hub upload alignment.
         Tags without ``:`` are bare boolean labels.
+
+    Notes
+    -----
+    Unlike ``Check``, ``Scenario`` deliberately does **not** set
+    ``extra="forbid"``. Scenarios are parsed from JSONL hosted in remote
+    Hugging Face dataset repositories (see ``HuggingFaceDatasetScenarioGenerator``
+    in ``giskard-scan``), which release independently of this package. Forbidding
+    extras would make any field added upstream an instant hard failure for every
+    already-installed version, so tolerating unknown keys is the correct policy
+    at this boundary. Strictness stays where the input is user-authored, such as
+    ``Check``. Note that unknown keys are silently dropped: scenario metadata
+    that must survive parsing belongs in ``annotations``, not at the top level.
     """
 
     name: str = Field(

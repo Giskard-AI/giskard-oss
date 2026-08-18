@@ -1,11 +1,11 @@
 import asyncio
 from abc import ABC, abstractmethod
 from functools import reduce
-from typing import TYPE_CHECKING, Any, Literal, Self, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self, Sequence
 
 from giskard.core import BaseRateLimiter, Discriminated, discriminated_base
 from giskard.llm.types import ChatMessage, ChatMessageParam, CompletionResponse
-from pydantic import Field, TypeAdapter
+from pydantic import ConfigDict, Field, TypeAdapter
 
 from ._types import GenerationParams
 from .middleware import (
@@ -30,7 +30,16 @@ class BaseGenerator(Discriminated, ABC):
     ``Message`` / ``Tool`` objects and whatever wire format its provider
     expects.  Workflow, tool, and chat code work exclusively with
     ``Message`` objects and never call provider APIs directly.
+
+    Unknown fields are rejected (``extra="forbid"``). Without this, pydantic
+    silently drops unrecognized keys: a persisted scenario referencing a
+    renamed field would fall back to that field's default and the generator
+    would run with the wrong configuration -- e.g. a typo'd ``retry_polcy``
+    leaving ``retry_policy`` at its default instead of the intended value.
     """
+
+    # Rationale and the subclass rule: see ``Discriminated`` in giskard-core.
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     params: GenerationParams = Field(default_factory=GenerationParams)
     retry_policy: RetryPolicy | None = Field(default=None)

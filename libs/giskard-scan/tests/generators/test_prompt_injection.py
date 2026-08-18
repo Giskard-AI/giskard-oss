@@ -158,6 +158,46 @@ async def test_prompt_injection_templates_render_all_branches():
     assert "exact refusal wording, rationale, or safety pattern" in refusal_prompt
 
 
+async def test_prompt_injection_category_is_reachable_at_runtime():
+    """Every scenario's ``category`` must survive parsing and reach the trace.
+
+    ``category`` lives inside each scenario's ``annotations`` object in the
+    JSONL. A top-level ``category`` key would be silently dropped by pydantic
+    -- ``Scenario`` tolerates extras rather than forbidding them, because it
+    also parses remote datasets -- making it unreachable at runtime.
+    """
+    gen = PromptInjectionScenarioGenerator()
+    description = "A documentation chatbot"
+    languages = ["en"]
+    scenarios = await gen.generate_scenario(
+        ScenarioContext(description=description, languages=languages)
+    )
+    assert scenarios
+
+    categories = set()
+    for scenario in scenarios:
+        # Reachable on the parsed model...
+        category = scenario.annotations.get("category")
+        assert isinstance(category, str) and category, (
+            f"scenario {scenario.name!r} has no category annotation"
+        )
+        categories.add(category)
+
+        # ...and at runtime: the runner seeds the trace from the scenario's
+        # annotations. Drop the LLM-backed steps so the scenario can run
+        # offline while keeping the annotations under test.
+        scenario.steps = []
+        result = await scenario.run(multiple_runs=1)
+        trace: Trace[object, object] = result.final_trace
+        assert trace.annotations["category"] == category
+        # The loader-injected annotations are not clobbered.
+        assert trace.annotations["description"] == description
+        assert trace.annotations["languages"] == languages
+
+    # Categories identify a scenario, so they must not collide.
+    assert len(categories) == len(scenarios)
+
+
 def _max_steps(scenario):
     return [
         interact.inputs.max_steps
