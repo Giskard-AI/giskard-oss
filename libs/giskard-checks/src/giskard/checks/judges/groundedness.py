@@ -25,8 +25,8 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     ----------
     answer : str | MISSING
         The answer text to evaluate for groundedness. If omitted, extracted from
-        the trace using ``answer_key``.
-    answer_key : str
+        the trace using ``target_key``.
+    target_key : str
         JSONPath expression to extract the answer from the trace
         (default: "trace.last.outputs").
 
@@ -55,9 +55,9 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     answer: str | MISSING = Field(
         default=MISSING, description="Input source for the answer to evaluate"
     )
-    answer_key: JSONPathStr = Field(
+    target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        description="Key to extract the answer from the trace",
+        description=("Key to extract the answer from the trace."),
     )
     context: str | list[str] | MISSING = Field(
         default=MISSING, description="Input source for the reference context"
@@ -77,7 +77,7 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         if early := error_if_unresolved_answer_or_context(
             trace,
             answer=self.answer,
-            answer_key=self.answer_key,
+            answer_key=self.target_key,
             context=self.context,
             context_key=self.context_key,
         ):
@@ -102,7 +102,7 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             "answer": format_prompt_text(
                 provided_or_resolve(
                     trace,
-                    key=self.answer_key,
+                    key=self.target_key,
                     value=self.answer,
                 )
             ),

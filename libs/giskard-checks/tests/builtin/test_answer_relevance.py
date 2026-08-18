@@ -291,7 +291,7 @@ class TestAnswerRelevanceInputResolution:
         check = AnswerRelevance(
             generator=generator,
             question_key="trace.interactions[0].inputs.query",
-            answer_key="trace.interactions[0].outputs.response",
+            target_key="trace.interactions[0].outputs.response",
         )
         trace = await Trace.from_interactions(
             Interaction(
@@ -362,7 +362,7 @@ class TestAnswerRelevanceUnresolvedKeys:
         generator = MockGenerator(passed=True, reason="Judge must not run.")
         check = AnswerRelevance(
             generator=generator,
-            answer_key="trace.last.metadata.does_not_exist",
+            target_key="trace.last.metadata.does_not_exist",
         )
         trace = await Trace.from_interactions(
             Interaction(inputs="What is the best language?", outputs="Python"),
@@ -383,7 +383,7 @@ class TestAnswerRelevanceUnresolvedKeys:
         check = AnswerRelevance(
             generator=generator,
             question_key="trace.last.metadata.no_question",
-            answer_key="trace.last.metadata.no_answer",
+            target_key="trace.last.metadata.no_answer",
         )
         trace = await Trace.from_interactions(
             Interaction(inputs="What's Python?", outputs="A snake.")
@@ -404,7 +404,7 @@ class TestAnswerRelevanceUnresolvedKeys:
             question="Direct question",
             answer="Direct answer",
             question_key="trace.last.metadata.does_not_exist",
-            answer_key="trace.last.metadata.also_missing",
+            target_key="trace.last.metadata.also_missing",
         )
 
         result = await check.run(Trace())

@@ -28,7 +28,7 @@ def _make_checks() -> list[Check[Any, Any, Any]]:
     ]
     checks: list[Check[Any, Any, Any]] = [
         StringMatching(keyword="hello"),
-        Equals(expected_value=5, key="trace.last.outputs"),
+        Equals(expected_value=5, target_key="trace.last.outputs"),
         # Aliased field populated; the empty-vs-populated distinction is
         # covered by ``test_json_valid_accepts_both_alias_and_field_name``.
         JsonValid(schema={"type": "object"}),

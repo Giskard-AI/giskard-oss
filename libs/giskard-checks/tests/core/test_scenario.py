@@ -1334,15 +1334,17 @@ class TestScenarioExtendAndSerialization:
         fluent = (
             Scenario("fluent")
             .interact("Hello", "Hi")
-            .check(Equals(expected_value="Hi", key="trace.last.outputs"))
+            .check(Equals(expected_value="Hi", target_key="trace.last.outputs"))
             .interact("World", "Echo: World")
-            .check(Equals(expected_value="Echo: World", key="trace.last.outputs"))
+            .check(
+                Equals(expected_value="Echo: World", target_key="trace.last.outputs")
+            )
         )
         from_seq = Scenario(name="fluent").extend(
             Interact(inputs="Hello", outputs="Hi"),
-            Equals(expected_value="Hi", key="trace.last.outputs"),
+            Equals(expected_value="Hi", target_key="trace.last.outputs"),
             Interact(inputs="World", outputs="Echo: World"),
-            Equals(expected_value="Echo: World", key="trace.last.outputs"),
+            Equals(expected_value="Echo: World", target_key="trace.last.outputs"),
         )
 
         result_fluent = await fluent.run()
@@ -1368,7 +1370,7 @@ class TestScenarioExtendAndSerialization:
         scenario = (
             Scenario("serialize_test", multiple_runs=2)
             .interact("Hello", "Hi")
-            .check(Equals(expected_value="Hi", key="trace.last.outputs"))
+            .check(Equals(expected_value="Hi", target_key="trace.last.outputs"))
         )
         serialized = scenario.model_dump()
         assert serialized["multiple_runs"] == 2
@@ -1386,7 +1388,9 @@ class TestScenarioExtendAndSerialization:
             steps=[
                 Step(
                     interacts=[Interact(inputs="Hello", outputs="Hi")],
-                    checks=[Equals(expected_value="Hi", key="trace.last.outputs")],
+                    checks=[
+                        Equals(expected_value="Hi", target_key="trace.last.outputs")
+                    ],
                 ),
             ],
         )
@@ -1449,7 +1453,9 @@ class TestScenarioDynamicBinding:
         result = await (
             Scenario("test", target=echo_sut)  # target provided on scenario level
             .interact("hello")  # no outputs provided
-            .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+            .check(
+                Equals(expected_value="Echo: hello", target_key="trace.last.outputs")
+            )
             .run()
         )
 
@@ -1460,7 +1466,9 @@ class TestScenarioDynamicBinding:
         result = await (
             Scenario("test")  # no target provided
             .interact("hello")  # no outputs provided
-            .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+            .check(
+                Equals(expected_value="Echo: hello", target_key="trace.last.outputs")
+            )
             .run(target=echo_sut)  # target provided on run
         )
         assert result.passed
@@ -1470,7 +1478,9 @@ class TestScenarioDynamicBinding:
         result = await (
             Scenario("test", target=echo_sut)  # target provided on scenario level
             .interact("hello")  # no outputs provided
-            .check(Equals(expected_value="Echo: HELLO", key="trace.last.outputs"))
+            .check(
+                Equals(expected_value="Echo: HELLO", target_key="trace.last.outputs")
+            )
             .run(
                 target=echo_upper_sut
             )  # target provided on run (overrides scenario level target)
@@ -1497,7 +1507,7 @@ async def test_scenario_result_snapshots_tags():
     scenario = (
         Scenario("s", tags=["Category:Hallucination"])
         .interact("hello", sut)
-        .check(Equals(expected_value="reply: hello", key="trace.last.outputs"))
+        .check(Equals(expected_value="reply: hello", target_key="trace.last.outputs"))
     )
     result = await scenario.run()
     assert result.tags == ["Category:Hallucination"]

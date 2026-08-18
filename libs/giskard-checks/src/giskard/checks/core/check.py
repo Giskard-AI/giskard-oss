@@ -22,6 +22,7 @@ class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     silently drops unrecognized keys: a persisted suite referencing a renamed
     field would fall back to that field's default and the check would run
     green while evaluating the wrong value.
+
     """
 
     # Rationale and the subclass rule: see ``Discriminated`` in giskard-core.

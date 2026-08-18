@@ -35,8 +35,14 @@ Inside the library, import from `..core.extraction` (module `giskard.checks.core
 
 ### Reading values
 
-- **`resolve(trace, key)`** — Use when the value always comes from the trace (e.g. comparison `key`).
-- **`provided_or_resolve(trace, key=..., value=...)`** — Use when the user may pass an inline value **or** fall back to a path (e.g. `answer` + `answer_key`). If `value is not MISSING`, that wins; otherwise the path is evaluated.
+- **`resolve(trace, key)`** — Use when the value always comes from the trace (e.g. the subject `target_key`).
+- **`provided_or_resolve(trace, key=..., value=...)`** — Use when the user may pass an inline value **or** fall back to a path (e.g. `keyword` + `keyword_key`). If `value is not MISSING`, that wins; otherwise the path is evaluated.
+
+### Naming JSONPath fields
+
+- The field naming the **value under test** is always `target_key` (matches the Giskard Hub). It is the only accepted name for that selector and serializes as `target_key`.
+- Every **other** JSONPath field is `{static}_key`, named after the sibling static field holding the literal it would otherwise resolve (`keyword`/`keyword_key`, `context`/`context_key`).
+- Both rules are enforced by `tests/core/test_key_naming_convention.py`.
 
 Optional inline-or-path fields: type as `T | MISSING = MISSING` (and `JSONPathStr | MISSING = MISSING` for optional `*_key` fields). Pass fields directly to `provided_or_resolve`; validate combinations with a `@model_validator` if only one of (inline, `*_key`) may be set (see `StringMatching` / `ComparisonCheck`). Do not use `None` to mean "extract from trace"—omit the field so it stays `MISSING`. Explicit `None` is only valid when comparing against or supplying `None` as a real value (e.g. `Equals(expected_value=None)`).
 
