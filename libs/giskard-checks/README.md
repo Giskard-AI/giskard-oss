@@ -185,7 +185,7 @@ API Overview
 - `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
 - `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterThanEquals`, `LessThan`, `LessThanEquals`.
 - `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
-- JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks. The value under test is always selected by `target_key`; other selectors are named after their static sibling (e.g. `context_key`, `expected_value_key`). Each check still accepts its former spelling (`key`, `text_key`, `answer_key`, ...) on input, but always serializes as `target_key`.
+- JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks. The value under test is always selected by `target_key`; other selectors are named after their static sibling (e.g. `context_key`, `expected_value_key`).
 
 **Testing utilities**
 - `giskard.checks.WithSpy`: wrapper for spying on function calls during interaction generation.
