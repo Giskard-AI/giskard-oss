@@ -40,7 +40,7 @@ Inside the library, import from `..core.extraction` (module `giskard.checks.core
 
 ### Naming JSONPath fields
 
-- The field naming the **value under test** is always `target_key` (matches the Giskard Hub). Give it `validation_alias=AliasChoices("target_key", <domain name>, <legacy name>)` so older spellings keep loading, but never serialize as anything but `target_key`.
+- The field naming the **value under test** is always `target_key` (matches the Giskard Hub). It is the only accepted name for that selector and serializes as `target_key`.
 - Every **other** JSONPath field is `{static}_key`, named after the sibling static field holding the literal it would otherwise resolve (`keyword`/`keyword_key`, `context`/`context_key`).
 - Both rules are enforced by `tests/core/test_key_naming_convention.py`.
 
