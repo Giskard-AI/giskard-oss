@@ -66,29 +66,23 @@ LLM-backed checks or generators.
 
 ### Migration guide
 
-1. Pin your current production setup to v2 before starting the migration:
-
-   ```sh
-   pip install "giskard[llm]>2,<3"
-   ```
-
-2. Move agent tests to `giskard.checks`. Wrap the system under test as a
+1. Move agent tests to `giskard.checks`. Wrap the system under test as a
    synchronous or asynchronous callable, then model each evaluation as a
    `Scenario` made of interactions and checks.
 
-3. Replace v2 LLM Scan calls with `vulnerability_scan`. Describe the target
+2. Replace v2 LLM Scan calls with `vulnerability_scan`. Describe the target
    agent and choose the threat coverage, language, concurrency, and target
    mode needed by your application.
 
-4. Replace RAGET test-set generation and evaluation with `quality_scan` and a
+3. Replace RAGET test-set generation and evaluation with `quality_scan` and a
    `KnowledgeBase`. Review the new scenario-based result model before porting
    any thresholds or report processing.
 
-5. If your project uses tabular/ML automatic scanning, Hub, or the legacy ML
+4. If your project uses tabular/ML automatic scanning, Hub, or the legacy ML
    test suite, keep that part on v2. Those features are deliberately outside
    the v3 product scope.
 
-6. Rebuild test suites and report processing around the new scenario and suite
+5. Rebuild test suites and report processing around the new scenario and suite
    result models. Then re-run your test suite.
 
 ### Notes
@@ -96,7 +90,5 @@ LLM-backed checks or generators.
 - This changelog is intentionally migration-focused. It covers the release
   boundary from `v2.19.2` to the v3 codebase, rather than reproducing every
   commit from the rewrite.
-- See [issue #2733](https://github.com/Giskard-AI/giskard-oss/issues/2733) for
-  the changelog-tracking discussion.
 
 [3.0.0]: https://github.com/Giskard-AI/giskard-oss/compare/v2.19.2...main
