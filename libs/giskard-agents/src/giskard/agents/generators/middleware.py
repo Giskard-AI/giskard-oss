@@ -8,12 +8,12 @@ and round-trips via ``model_dump_json`` / ``model_validate_json``.
 
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any
+from typing import Any, ClassVar
 
 import tenacity as t
 from giskard.core import BaseRateLimiter, Discriminated, discriminated_base
 from giskard.llm.types import ChatMessage, CompletionResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ._types import GenerationParams
 
@@ -34,7 +34,16 @@ class CompletionMiddleware(Discriminated, ABC):
     Subclasses wrap the ``next_fn`` with cross-cutting logic (retries,
     throttling, caching, logging, …) and must be registered with
     ``@CompletionMiddleware.register("name")``.
+
+    Unknown fields are rejected (``extra="forbid"``). Without this, pydantic
+    silently drops unrecognized keys: a persisted pipeline referencing a
+    renamed field would fall back to that field's default, so the middleware
+    would round-trip "successfully" while throttling or retrying with the
+    wrong configuration.
     """
+
+    # Rationale and the subclass rule: see ``Discriminated`` in giskard-core.
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     @abstractmethod
     async def call(

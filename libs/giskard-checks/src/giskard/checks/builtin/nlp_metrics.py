@@ -68,9 +68,9 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
     (``pip install 'giskard-checks[readability]'``).
     """
 
-    key: JSONPathStr = Field(
+    target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        description="JSONPath expression to extract the text to evaluate.",
+        description=("JSONPath expression to extract the text to evaluate."),
     )
     metric: ReadabilityMetric = Field(
         default="flesch_reading_ease",
@@ -117,9 +117,9 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
         """Execute the readability check against the provided trace."""
         textstat = import_module("textstat")
 
-        text = resolve(trace, self.key)
+        text = resolve(trace, self.target_key)
         details = {
-            "key": self.key,
+            "target_key": self.target_key,
             "metric": self.metric,
             "score_guide": READABILITY_SCORE_GUIDE[self.metric],
             "min_score": self.min_score,
@@ -127,15 +127,15 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
         }
 
         if isinstance(text, NoMatch):
-            return CheckResult.failure(
-                message=f"No value found for key '{self.key}'.",
+            return CheckResult.error(
+                message=f"No value found for key '{self.target_key}'.",
                 details={**details, "text": text},
             )
 
         if not isinstance(text, str):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=(
-                    f"Value for key '{self.key}' must be a string, but found "
+                    f"Value for key '{self.target_key}' must be a string, but found "
                     f"{type(text).__name__}."
                 ),
                 details={**details, "value": str(text)},

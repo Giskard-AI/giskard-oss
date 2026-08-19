@@ -14,8 +14,9 @@ class AllOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     """Passes only when **all** inner checks pass (short-circuits on first failure).
 
     Runs each check in order. The first failing or erroring check stops
-    evaluation and its result is returned immediately. If all checks pass,
-    a combined success result is returned.
+    evaluation and its result is returned immediately. Skipped checks do not
+    stop evaluation. If all checks pass, a combined success result is returned;
+    if every check was skipped, a skip result is returned.
 
     Attributes
     ----------
@@ -26,8 +27,8 @@ class AllOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     --------
     >>> from giskard.checks import AllOf, LessThan, Equals
     >>> check = AllOf(checks=[
-    ...     LessThan(expected_value=10, key="trace.last.outputs"),
-    ...     Equals(expected_value=5, key="trace.last.outputs"),
+    ...     LessThan(expected_value=10, target_key="trace.last.outputs"),
+    ...     Equals(expected_value=5, target_key="trace.last.outputs"),
     ... ])
     """
 
@@ -40,6 +41,8 @@ class AllOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     async def run(self, trace: TraceType) -> CheckResult:
         """Run all checks in order, short-circuiting on the first failure.
 
+        Skipped checks are not treated as failures and do not stop evaluation.
+
         Parameters
         ----------
         trace : TraceType
@@ -48,16 +51,34 @@ class AllOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
         Returns
         -------
         CheckResult
-            The first non-passing result, or a combined success if all pass.
+            The first failing or erroring result, a skip if every check was
+            skipped, or a combined success otherwise.
         """
         passed_messages: list[str] = []
+        skipped_messages: list[str] = []
+        all_skipped = True
 
         for check in self.checks:
             result = await check.run(trace)
+            if result.skipped:
+                if result.message:
+                    skipped_messages.append(result.message)
+                continue
             if not result.passed:
                 return result
+            all_skipped = False
             if result.message:
                 passed_messages.append(result.message)
+
+        if all_skipped and self.checks:
+            return CheckResult.skip(
+                message="All checks were skipped."
+                + (
+                    f" Details: {'; '.join(skipped_messages)}"
+                    if skipped_messages
+                    else ""
+                ),
+            )
 
         return CheckResult.success(
             message="; ".join(passed_messages)
@@ -85,8 +106,8 @@ class AnyOf[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     --------
     >>> from giskard.checks import AnyOf, StringMatching
     >>> check = AnyOf(checks=[
-    ...     StringMatching(keyword="yes", key="trace.last.outputs"),
-    ...     StringMatching(keyword="approved", key="trace.last.outputs"),
+    ...     StringMatching(keyword="yes", target_key="trace.last.outputs"),
+    ...     StringMatching(keyword="approved", target_key="trace.last.outputs"),
     ... ])
     """
 
@@ -157,7 +178,7 @@ class Not[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMis
     Examples
     --------
     >>> from giskard.checks import Not, StringMatching
-    >>> check = Not(check=StringMatching(keyword="forbidden", key="trace.last.outputs"))
+    >>> check = Not(check=StringMatching(keyword="forbidden", target_key="trace.last.outputs"))
     """
 
     check: Check[InputType, OutputType, TraceType] = Field(

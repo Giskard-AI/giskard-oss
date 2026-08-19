@@ -1,8 +1,16 @@
 """Tests for the Toxicity LLM-based check."""
 
+import pytest
+from giskard.agents.errors import WorkflowError
 from giskard.checks import CheckStatus, Interaction, Toxicity, Trace
+from pydantic import ValidationError
 
-from ..testing_utils import MockJudgeGenerator as MockGenerator
+from ..testing_utils import (
+    InvalidReasonMockJudgeGenerator,
+)
+from ..testing_utils import (
+    MockJudgeGenerator as MockGenerator,
+)
 
 
 async def test_clean_content_passes() -> None:
@@ -83,7 +91,9 @@ async def test_prompt_includes_full_trace_including_prior_turns() -> None:
     assert isinstance(prompt, str)
     assert "<TRACE>" in prompt
     assert "</TRACE>" in prompt
-    assert "Do you agree with <hateful claim>?" in prompt
+    # The prior turn is included; untrusted angle brackets are escaped by the
+    # `fence` filter so trace content cannot forge the <TRACE> markers.
+    assert "Do you agree with &lt;hateful claim&gt;?" in prompt
 
 
 async def test_custom_output_key() -> None:
@@ -91,7 +101,7 @@ async def test_custom_output_key() -> None:
     generator = MockGenerator(passed=True, reason="Safe content.")
     check = Toxicity(
         generator=generator,
-        output_key="trace.last.outputs.message",
+        target_key="trace.last.outputs.message",
     )
     interaction = Interaction(
         inputs={"query": "Hello"},
@@ -159,17 +169,15 @@ async def test_violence_category_fails() -> None:
     assert result.details["inputs"]["categories"] == ["violence"]
 
 
-async def test_none_reason_is_handled() -> None:
-    """Test that a None reason from the LLM is handled gracefully."""
-    generator = MockGenerator(passed=True, reason=None)
+async def test_blank_reason_raises_workflow_error() -> None:
+    """Blank/null judge reasons fail structured-output validation via WorkflowError."""
     check = Toxicity(
-        generator=generator,
+        generator=InvalidReasonMockJudgeGenerator(reason=None),
         output="Clean response.",
     )
-    result = await check.run(Trace())
-
-    assert result.status == CheckStatus.PASS
-    assert result.details["reason"] is None
+    with pytest.raises(WorkflowError) as exc_info:
+        _ = await check.run(Trace())
+    assert isinstance(exc_info.value.exception, ValidationError)
 
 
 async def test_direct_output_overrides_trace() -> None:
@@ -207,3 +215,53 @@ async def test_check_is_serialisable() -> None:
     reconstructed = Check.model_validate(data)
     assert isinstance(reconstructed, Toxicity)
     assert reconstructed.categories == ["hate_speech"]
+
+
+async def test_unresolvable_output_key_returns_error() -> None:
+    """An unresolvable ``output_key`` errors instead of silently passing."""
+    generator = MockGenerator(passed=True, reason="Judge must not run.")
+    check = Toxicity(
+        generator=generator,
+        target_key="trace.last.metadata.does_not_exist",
+    )
+    trace = Trace(interactions=[Interaction(inputs="Hi", outputs="Hello.")])
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.ERROR
+    assert "output key" in (result.message or "")
+    assert "trace.last.metadata.does_not_exist" in (result.message or "")
+    assert len(generator.calls) == 0
+
+
+async def test_not_does_not_invert_unresolved_output_key_error() -> None:
+    """``Not(...)`` must leave the ERROR uninverted, not launder it into PASS."""
+    from giskard.checks import Not
+
+    generator = MockGenerator(passed=True, reason="Judge must not run.")
+    check = Toxicity(
+        generator=generator,
+        target_key="trace.last.metadata.does_not_exist",
+    )
+    trace = Trace(interactions=[Interaction(inputs="Hi", outputs="Hello.")])
+
+    result = await Not(check=check).run(trace)
+
+    assert result.status == CheckStatus.ERROR
+    assert len(generator.calls) == 0
+
+
+async def test_directly_provided_output_bypasses_broken_key() -> None:
+    """A direct ``output`` takes priority, so ``output_key`` is never resolved."""
+    generator = MockGenerator(passed=True, reason="Clean.")
+    check = Toxicity(
+        generator=generator,
+        output="Directly provided text.",
+        target_key="trace.last.metadata.does_not_exist",
+    )
+
+    result = await check.run(Trace())
+
+    assert result.status == CheckStatus.PASS
+    assert result.details["inputs"]["output"] == "Directly provided text."
+    assert len(generator.calls) == 1

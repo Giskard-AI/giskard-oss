@@ -7,6 +7,8 @@ from pydantic.experimental.missing_sentinel import MISSING
 from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
+from ..core.result import CheckResult
+from ._inputs import ResolvableInput, error_if_unresolved
 from .base import BaseLLMCheck
 
 
@@ -34,9 +36,9 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         JSONPath expression to extract the question from the trace
         (default: ``"trace.last.inputs"``).
     answer : str | MISSING
-        The answer to evaluate. When provided, takes priority over ``answer_key``.
-        If omitted, extracted from the trace using ``answer_key``.
-    answer_key : JSONPathStr
+        The answer to evaluate. When provided, takes priority over ``target_key``.
+        If omitted, extracted from the trace using ``target_key``.
+    target_key : JSONPathStr
         JSONPath expression to extract the answer from the trace
         (default: ``"trace.last.outputs"``).
     context : str | MISSING
@@ -44,6 +46,18 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         (e.g., ``"This is a chatbot that answers questions about programming languages"``).
         Not extracted from the trace—supply directly when needed. Defaults to an
         empty string when omitted.
+    include_history : bool
+        Whether to pass the conversation history to the judge (default: ``True``).
+        Set to ``False`` to score the current turn in isolation, omitting the
+        ``<CONVERSATION HISTORY>`` section from the prompt entirely.
+
+    Notes
+    -----
+    When ``question_key`` or ``target_key`` matches nothing in the trace, the check
+    returns ``CheckStatus.ERROR`` without invoking the judge. History is supporting
+    context only: the judge is instructed to score the resolved question/answer and
+    never to substitute a question inferred from history, so a misconfigured key
+    surfaces as an error instead of being silently rescued.
 
     Examples
     --------
@@ -66,11 +80,11 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
     )
     answer: str | MISSING = Field(
         default=MISSING,
-        description="The answer to evaluate. Takes priority over answer_key.",
+        description="The answer to evaluate. Takes priority over target_key.",
     )
-    answer_key: JSONPathStr = Field(
+    target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        description="JSONPath to extract the answer from the trace.",
+        description=("JSONPath to extract the answer from the trace."),
     )
     context: str | MISSING = Field(
         default=MISSING,
@@ -79,12 +93,35 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
             "Not extracted from the trace—supply directly when needed."
         ),
     )
+    include_history: bool = Field(
+        default=True,
+        description=(
+            "Whether to pass the conversation history to the judge as supporting "
+            "context. Set to False to score the current turn in isolation."
+        ),
+    )
 
     @override
     def get_prompt(self) -> TemplateReference:
         return TemplateReference(
             template_name="giskard.checks::judges/answer_relevance.j2"
         )
+
+    @override
+    async def run(self, trace: TraceType) -> CheckResult:
+        """Return ERROR when question/answer keys do not resolve; else run the judge.
+
+        Guarding here—before ``super().run()``—means a misconfigured key costs no
+        judge call. The question is checked first so a fully missing trace reports
+        the key that best explains the misconfiguration.
+        """
+        if early := error_if_unresolved(
+            trace,
+            ResolvableInput("question", self.question_key, self.question),
+            ResolvableInput("answer", self.target_key, self.answer, "target_key"),
+        ):
+            return early
+        return await super().run(trace)
 
     @override
     async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
@@ -98,8 +135,8 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         Returns
         -------
         dict[str, str]
-            Template variables with ``question``, ``answer``, ``history``, and
-            ``context`` keys.
+            Template variables with ``question``, ``answer``, and ``context`` keys,
+            plus ``history`` when ``include_history`` is enabled.
         """
         question = provided_or_resolve(
             trace,
@@ -108,13 +145,20 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         )
         answer = provided_or_resolve(
             trace,
-            key=self.answer_key,
+            key=self.target_key,
             value=self.answer,
         )
 
-        return {
+        inputs: dict[str, Any] = {
             "question": question,
             "answer": answer,
-            "history": trace,
             "context": self.context if self.context is not MISSING else "",
         }
+
+        # Omitted entirely (rather than passed empty) when disabled, so the
+        # template drops the <CONVERSATION HISTORY> section instead of rendering
+        # an empty one.
+        if self.include_history:
+            inputs["history"] = trace
+
+        return inputs

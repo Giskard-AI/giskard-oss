@@ -8,7 +8,6 @@ Tests cover:
 - Serialisation round-trip via model_dump / model_validate
 """
 
-import warnings
 from typing import Any
 
 from giskard.checks import (
@@ -16,7 +15,6 @@ from giskard.checks import (
     AnyOf,
     Equals,
     Interaction,
-    LesserThan,
     LessThan,
     Not,
     Trace,
@@ -118,6 +116,52 @@ class TestAllOf:
         assert result.status == CS.ERROR
         assert result.errored
 
+    async def test_skip_then_fail_returns_failure(self):
+        """A skipped check does not mask a later failure."""
+        check = AllOf(checks=[_skip_fn_check("skipped"), _failing_fn_check("boom")])
+        result = await check.run(Trace())
+
+        assert result.failed
+        assert "boom" in (result.message or "")
+
+    async def test_skip_then_pass_returns_success(self):
+        """A skipped check does not prevent an overall pass."""
+        check = AllOf(checks=[_skip_fn_check("skipped"), _passing_fn_check("ok")])
+        result = await check.run(Trace())
+
+        assert result.passed
+        assert "ok" in (result.message or "")
+
+    async def test_all_skipped_returns_skip(self):
+        """When every check is skipped, the result is a skip with composed details."""
+        check = AllOf(checks=[_skip_fn_check("a"), _skip_fn_check("b")])
+        result = await check.run(Trace())
+
+        assert result.status == CS.SKIP
+        assert result.skipped
+        assert result.message == "All checks were skipped. Details: a; b"
+
+    async def test_all_skipped_without_messages(self):
+        """All-skipped with empty inner messages omits the Details suffix."""
+
+        async def _skip_no_msg(trace: Trace[Any, Any]) -> CheckResult:
+            return CheckResult.skip()
+
+        check = AllOf(checks=[FnCheck(fn=_skip_no_msg), FnCheck(fn=_skip_no_msg)])
+        result = await check.run(Trace())
+
+        assert result.status == CS.SKIP
+        assert result.skipped
+        assert result.message == "All checks were skipped."
+
+    async def test_skip_then_error_returns_error(self):
+        """An erroring check after a skip still short-circuits."""
+        check = AllOf(checks=[_skip_fn_check("skipped"), _error_fn_check("boom")])
+        result = await check.run(Trace())
+
+        assert result.status == CS.ERROR
+        assert result.errored
+
     async def test_single_check_pass(self):
         """Single passing check returns success."""
         check = AllOf(checks=[_passing_fn_check("only")])
@@ -139,8 +183,8 @@ class TestAllOf:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AllOf(
             checks=[
-                LessThan(expected_value=10, key="trace.last.outputs"),
-                Equals(expected_value=5, key="trace.last.outputs"),
+                LessThan(expected_value=10, target_key="trace.last.outputs"),
+                Equals(expected_value=5, target_key="trace.last.outputs"),
             ]
         )
         result = await check.run(trace)
@@ -152,8 +196,8 @@ class TestAllOf:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AllOf(
             checks=[
-                LessThan(expected_value=10, key="trace.last.outputs"),
-                Equals(expected_value=99, key="trace.last.outputs"),  # will fail
+                LessThan(expected_value=10, target_key="trace.last.outputs"),
+                Equals(expected_value=99, target_key="trace.last.outputs"),  # will fail
             ]
         )
         result = await check.run(trace)
@@ -222,8 +266,8 @@ class TestAnyOf:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AnyOf(
             checks=[
-                Equals(expected_value=99, key="trace.last.outputs"),  # fail
-                Equals(expected_value=5, key="trace.last.outputs"),  # pass
+                Equals(expected_value=99, target_key="trace.last.outputs"),  # fail
+                Equals(expected_value=5, target_key="trace.last.outputs"),  # pass
             ]
         )
         result = await check.run(trace)
@@ -235,13 +279,32 @@ class TestAnyOf:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AnyOf(
             checks=[
-                Equals(expected_value=99, key="trace.last.outputs"),
-                Equals(expected_value=100, key="trace.last.outputs"),
+                Equals(expected_value=99, target_key="trace.last.outputs"),
+                Equals(expected_value=100, target_key="trace.last.outputs"),
             ]
         )
         result = await check.run(trace)
 
         assert result.failed
+
+    async def test_error_short_circuits(self):
+        """ERROR from an earlier arm is returned without running later arms."""
+        call_log: list[str] = []
+
+        async def _err(trace: Trace[Any, Any]) -> CheckResult:
+            call_log.append("first")
+            return CheckResult.error(message="boom")
+
+        async def _should_not_run(trace: Trace[Any, Any]) -> CheckResult:
+            call_log.append("second")
+            return CheckResult.success(message="second")
+
+        check = AnyOf(checks=[FnCheck(fn=_err), FnCheck(fn=_should_not_run)])
+        result = await check.run(Trace())
+
+        assert result.status == CS.ERROR
+        assert result.errored
+        assert "second" not in call_log
 
 
 # ---------------------------------------------------------------------------
@@ -302,8 +365,42 @@ class TestNot:
         """Not works with a real built-in check."""
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         # Equals(99) fails → Not inverts to pass
-        check = Not(check=Equals(expected_value=99, key="trace.last.outputs"))
+        check = Not(check=Equals(expected_value=99, target_key="trace.last.outputs"))
         result = await check.run(trace)
+
+        assert result.passed
+
+    async def test_missing_key_not_inverted_to_pass(self):
+        """Not must not turn a missing-key Equals into a pass (#2637)."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="q", outputs="the answer")
+        )
+        inner = Equals(target_key="trace.last.metadata.nope", expected_value="x")
+        result = await Not(check=inner).run(trace)
+
+        assert result.status == CS.ERROR
+        assert result.errored
+        assert "No value found for key" in (result.message or "")
+
+    async def test_match_type_mismatch_not_inverted_to_pass(self):
+        """Not must not invert Equals match= type mismatches into a pass (#2637)."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="q", outputs="the answer")
+        )
+        inner = Equals(target_key="trace.last.outputs", expected_value="x", match="any")
+        result = await Not(check=inner).run(trace)
+
+        assert result.status == CS.ERROR
+        assert result.errored
+        assert "Expected a list, set, or tuple" in (result.message or "")
+
+    async def test_evaluable_failure_still_inverted(self):
+        """Evaluable assertion failure under Not still becomes a pass."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="q", outputs="the answer")
+        )
+        inner = Equals(target_key="trace.last.outputs", expected_value="other")
+        result = await Not(check=inner).run(trace)
 
         assert result.passed
 
@@ -363,25 +460,13 @@ class TestSerialization:
     async def test_all_of_serialises(self):
         """AllOf round-trips through model_dump."""
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=3))
-        check = AllOf(checks=[LessThan(expected_value=10, key="trace.last.outputs")])
+        check = AllOf(
+            checks=[LessThan(expected_value=10, target_key="trace.last.outputs")]
+        )
         data = check.model_dump()
 
         assert data["kind"] == "all_of"
         assert data["checks"][0]["kind"] == "less_than"
-
-        restored = AllOf.model_validate(data)
-        result = await restored.run(trace)
-        assert result.passed
-
-    async def test_all_of_deserialises_legacy_lesser_than_kind(self):
-        """Serialized checks using the legacy lesser_than kind still load."""
-        trace = await Trace.from_interactions(Interaction(inputs="q", outputs=3))
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            legacy_check = LesserThan(expected_value=10, key="trace.last.outputs")
-        data = AllOf(checks=[legacy_check]).model_dump()
-
-        assert data["checks"][0]["kind"] == "lesser_than"
 
         restored = AllOf.model_validate(data)
         result = await restored.run(trace)
@@ -392,8 +477,8 @@ class TestSerialization:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AnyOf(
             checks=[
-                Equals(expected_value=99, key="trace.last.outputs"),
-                Equals(expected_value=5, key="trace.last.outputs"),
+                Equals(expected_value=99, target_key="trace.last.outputs"),
+                Equals(expected_value=5, target_key="trace.last.outputs"),
             ]
         )
         data = check.model_dump()
@@ -407,7 +492,7 @@ class TestSerialization:
     async def test_not_serialises(self):
         """Not round-trips through model_dump."""
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
-        check = Not(check=Equals(expected_value=99, key="trace.last.outputs"))
+        check = Not(check=Equals(expected_value=99, target_key="trace.last.outputs"))
         data = check.model_dump()
 
         assert data["kind"] == "not"
@@ -422,8 +507,8 @@ class TestSerialization:
         trace = await Trace.from_interactions(Interaction(inputs="q", outputs=5))
         check = AllOf(
             checks=[
-                Not(check=Equals(expected_value=99, key="trace.last.outputs")),
-                LessThan(expected_value=10, key="trace.last.outputs"),
+                Not(check=Equals(expected_value=99, target_key="trace.last.outputs")),
+                LessThan(expected_value=10, target_key="trace.last.outputs"),
             ]
         )
         data = check.model_dump()

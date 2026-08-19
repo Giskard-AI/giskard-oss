@@ -14,6 +14,7 @@ from giskard.checks import (
     Interact,
     Interaction,
     TestCase,
+    TestCaseResult,
     Trace,
 )
 
@@ -30,7 +31,7 @@ class TestTestCaseNormalCases:
         )
         check = Equals(
             expected_value="test_output",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
         test_case = TestCase(
             name="single_check",
@@ -55,11 +56,11 @@ class TestTestCaseNormalCases:
         checks = [
             Equals(
                 expected_value=42,
-                key="trace.interactions[-1].outputs.result",
+                target_key="trace.interactions[-1].outputs.result",
             ),
             Equals(
                 expected_value="ok",
-                key="trace.interactions[-1].outputs.status",
+                target_key="trace.interactions[-1].outputs.status",
             ),
         ]
         test_case = TestCase(
@@ -79,7 +80,9 @@ class TestTestCaseNormalCases:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equals(expected_value="expected", key="trace.interactions[-1].outputs")
+        check = Equals(
+            expected_value="expected", target_key="trace.interactions[-1].outputs"
+        )
         test_case = TestCase(
             name="failing_check",
             trace=trace,
@@ -102,15 +105,15 @@ class TestTestCaseNormalCases:
         checks = [
             Equals(
                 expected_value="output",
-                key="trace.interactions[-1].outputs",
+                target_key="trace.interactions[-1].outputs",
             ),  # Passes
             Equals(
                 expected_value="wrong",
-                key="trace.interactions[-1].outputs",
+                target_key="trace.interactions[-1].outputs",
             ),  # Fails
             Equals(
                 expected_value="output",
-                key="trace.interactions[-1].outputs",
+                target_key="trace.interactions[-1].outputs",
             ),  # Passes
         ]
         test_case = TestCase(
@@ -135,19 +138,19 @@ class TestTestCaseNormalCases:
         checks = [
             Equals(
                 expected_value="output",
-                key="trace.interactions[-1].outputs",
+                target_key="trace.interactions[-1].outputs",
             ),  # Passes
             Equals(
                 expected_value="wrong1",
-                key="trace.interactions[-1].outputs",
+                target_key="trace.interactions[-1].outputs",
             ),  # Fails
             Equals(
                 expected_value="wrong2",
-                key="trace.interactions[-1].outputs",
+                target_key="trace.interactions[-1].outputs",
             ),  # Fails
             Equals(
                 expected_value="output",
-                key="trace.interactions[-1].outputs",
+                target_key="trace.interactions[-1].outputs",
             ),  # Passes
         ]
         test_case = TestCase(
@@ -170,7 +173,9 @@ class TestTestCaseNormalCases:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equals(expected_value="output", key="trace.interactions[-1].outputs")
+        check = Equals(
+            expected_value="output", target_key="trace.interactions[-1].outputs"
+        )
         test_case = TestCase(
             name=None,
             trace=trace,
@@ -191,7 +196,9 @@ class TestTestCaseResult:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equals(expected_value="output", key="trace.interactions[-1].outputs")
+        check = Equals(
+            expected_value="output", target_key="trace.interactions[-1].outputs"
+        )
         test_case = TestCase(
             name="properties_test",
             trace=trace,
@@ -214,11 +221,11 @@ class TestTestCaseResult:
         checks = [
             Equals(
                 expected_value="output",
-                key="trace.interactions[-1].outputs",
+                target_key="trace.interactions[-1].outputs",
             ),  # Passes
             Equals(
                 expected_value="wrong",
-                key="trace.interactions[-1].outputs",
+                target_key="trace.interactions[-1].outputs",
             ),  # Fails
         ]
         test_case = TestCase(
@@ -269,7 +276,9 @@ class TestTestCaseResult:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equals(expected_value="output", key="trace.interactions[-1].outputs")
+        check = Equals(
+            expected_value="output", target_key="trace.interactions[-1].outputs"
+        )
         test_case = TestCase(
             name="no_failures_test",
             trace=trace,
@@ -281,12 +290,70 @@ class TestTestCaseResult:
         failures = result.format_failures()
         assert len(failures) == 0
 
+    async def test_testcase_result_format_failures_reports_skipped(self):
+        """A skipped check is reported: SKIP reaches no verdict, so it must be explained."""
+        result = TestCaseResult(
+            results=[
+                CheckResult.skip(
+                    message="precondition not met",
+                    details={"check_name": "skipped_check"},
+                )
+            ],
+            duration_ms=0,
+        )
+
+        assert result.skipped
+        failures = result.format_failures()
+        assert len(failures) == 1
+        assert "SKIPPED" in failures[0]
+        assert "skipped_check" in failures[0]
+        assert "precondition not met" in failures[0]
+
+    async def test_testcase_result_assert_passed_explains_skip(self):
+        """assert_passed() on a fully skipped test case must not raise a blank message."""
+        result = TestCaseResult(
+            results=[
+                CheckResult.skip(
+                    message="precondition not met",
+                    details={"check_name": "skipped_check"},
+                )
+            ],
+            duration_ms=0,
+        )
+
+        with pytest.raises(AssertionError) as exc_info:
+            result.assert_passed()
+
+        error_message = str(exc_info.value)
+        assert "SKIPPED" in error_message
+        assert "precondition not met" in error_message
+
+    async def test_testcase_result_format_failures_reports_error_result(self):
+        """An ERROR check result is reported with the ERRORED label."""
+        result = TestCaseResult(
+            results=[
+                CheckResult.error(
+                    message="key could not be resolved",
+                    details={"check_name": "erroring_check"},
+                )
+            ],
+            duration_ms=0,
+        )
+
+        assert result.errored
+        failures = result.format_failures()
+        assert len(failures) == 1
+        assert "ERRORED" in failures[0]
+        assert "erroring_check" in failures[0]
+
     async def test_testcase_result_assert_passed_success(self):
         """Test assert_passed() when test case passes."""
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equals(expected_value="output", key="trace.interactions[-1].outputs")
+        check = Equals(
+            expected_value="output", target_key="trace.interactions[-1].outputs"
+        )
         test_case = TestCase(
             name="assert_passed_success",
             trace=trace,
@@ -303,7 +370,9 @@ class TestTestCaseResult:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equals(expected_value="wrong", key="trace.interactions[-1].outputs")
+        check = Equals(
+            expected_value="wrong", target_key="trace.interactions[-1].outputs"
+        )
         test_case = TestCase(
             name="assert_passed_failure",
             trace=trace,
@@ -328,7 +397,9 @@ class TestTestCaseAssertPassed:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equals(expected_value="output", key="trace.interactions[-1].outputs")
+        check = Equals(
+            expected_value="output", target_key="trace.interactions[-1].outputs"
+        )
         test_case = TestCase(
             name="assert_passed_success",
             trace=trace,
@@ -343,7 +414,9 @@ class TestTestCaseAssertPassed:
         trace = await Trace.from_interactions(
             Interaction(inputs="input", outputs="output")
         )
-        check = Equals(expected_value="wrong", key="trace.interactions[-1].outputs")
+        check = Equals(
+            expected_value="wrong", target_key="trace.interactions[-1].outputs"
+        )
         test_case = TestCase(
             name="assert_passed_failure",
             trace=trace,
@@ -371,7 +444,7 @@ class TestTestCaseEdgeCases:
         )
         check = Equals(
             expected_value="Hi Alice!",
-            key="trace.interactions[-1].outputs.response",
+            target_key="trace.interactions[-1].outputs.response",
         )
         test_case = TestCase(
             name="complex_interaction",
@@ -395,7 +468,7 @@ class TestTestCaseEdgeCases:
         )
         check = Equals(
             expected_value="Processed: test",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
         test_case = TestCase(
             name="dynamic_outputs",

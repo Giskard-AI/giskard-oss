@@ -2,8 +2,8 @@
 name = "giskard"
 readme = "README.md"
 license = { text = "Apache Software License 2.0" }
-version = "3.0.0b1"
-description = "The testing framework dedicated to ML models, from tabular to LLMs"
+version = "3.0.0rc1"
+description = "Evals, red teaming, and test generation for agentic systems"
 authors = [{ name = "Giskard AI", email = "hello@giskard.ai" }]
 
 # Pypi classifiers: https://pypi.org/classifiers/
@@ -19,29 +19,33 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 
-dependencies = ["giskard-checks>=1.0.2b4,<2"]
+dependencies = ["giskard-checks>=1.0.2rc1,<2"]
 
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
 # Native LLM providers
-openai = ["giskard-llm[openai]>=1.0.0b4,<2"]
-google = ["giskard-llm[google]>=1.0.0b4,<2"]
-anthropic = ["giskard-llm[anthropic]>=1.0.0b4,<2"]
-azure = ["giskard-llm[azure]>=1.0.0b4,<2"]
+openai = ["giskard-llm[openai]>=1.0.0rc1,<2"]
+google = ["giskard-llm[google]>=1.0.0rc1,<2"]
+anthropic = ["giskard-llm[anthropic]>=1.0.0rc1,<2"]
+azure = ["giskard-llm[azure]>=1.0.0rc1,<2"]
 
 # External LLM providers
-litellm = ["giskard-agents[litellm]>=1.0.2b4,<2"]
+litellm = ["giskard-agents[litellm]>=1.0.2rc1,<2"]
 
 # Optional checks dependencies
-regorus = ["giskard-checks[regorus]>=1.0.2b4,<2"]
+regorus = ["giskard-checks[regorus]>=1.0.2rc1,<2"]
 
 # Optional giskard libs
-scan = ["giskard-scan>=1.0.0b2,<2"]
+scan = ["giskard-scan>=1.0.0rc1,<2"]
+
+# Optional scan dependencies
+garak = ["giskard-scan[garak]>=1.0.0rc1,<2"] # Heavy dep, not included by default
+deepteam = ["giskard-scan[deepteam]>=1.0.0rc1,<2"] # Heavy dep, not included by default
 
 # Aggregated packages
-all-llms = ["giskard-llm[all]>=1.0.0b4,<2"] # Install all native LLM providers
-all-checks = ["giskard-checks[all]>=1.0.2b4,<2"] # Install all optional checks dependencies
+all-llms = ["giskard-llm[all]>=1.0.0rc1,<2"] # Install all native LLM providers
+all-checks = ["giskard-checks[all]>=1.0.2rc1,<2"] # Install all optional checks dependencies
 full = ["giskard[all-llms,all-checks,scan,litellm]"]
 
 [project.urls]
@@ -101,4 +105,12 @@ dev = [
     "ipykernel==7.3.0",
     "pip-audit==2.10.1",
     "pylint-pydantic==0.4.1",
+]
+garak-test = [
+    { include-group = "test" },
+    "giskard-scan[garak]",
+]
+deepteam-test = [
+    { include-group = "test" },
+    "giskard-scan[deepteam]",
 ]

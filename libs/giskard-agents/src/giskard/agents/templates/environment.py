@@ -26,12 +26,95 @@ class LLMFormattable(Protocol):
         ...
 
 
-def _finalize_value(value: Any) -> Any:
+class Trusted(str):
+    """A string that is rendered into prompts verbatim, without escaping.
+
+    Prompt templates escape every interpolated value by default (see
+    :func:`_finalize_value`). Values wrapped in ``Trusted`` opt out of that
+    escaping, and must therefore never be derived from untrusted input.
+    """
+
+
+def _render_value(value: Any) -> str:
     if isinstance(value, LLMFormattable):
-        return value._repr_prompt_()
-    if isinstance(value, BaseModel):
+        value = value._repr_prompt_()
+    elif isinstance(value, BaseModel):
         return json.dumps(value.model_dump(mode="json"), indent=4)
-    return value
+    if value is None:
+        return ""
+    return value if isinstance(value, str) else str(value)
+
+
+def _escape(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _finalize_value(value: Any) -> str:
+    """Render an interpolated template expression, escaping it by default.
+
+    Prompts embed untrusted data (agent outputs, traces, documents) inside
+    pseudo-XML markers such as ``<AGENT ANSWER>...</AGENT ANSWER>``. The
+    environment renders prompts with ``autoescape=False``, so unescaped data
+    could contain a literal closing marker and inject instructions into the
+    judge. Escaping ``&``, ``<`` and ``>`` for every value makes the markers
+    unforgeable while keeping the text human- and model-readable; a template
+    that genuinely needs raw output opts out with :class:`Trusted` (available
+    in templates as the ``trusted`` filter).
+
+    Parameters
+    ----------
+    value : Any
+        The interpolated value. ``None`` renders as an empty string.
+
+    Returns
+    -------
+    str
+        The rendered text, escaped unless the value is :class:`Trusted`.
+    """
+    if isinstance(value, Trusted):
+        return str(value)
+    return _escape(_render_value(value))
+
+
+def trusted(value: Any) -> Trusted:
+    """Mark a value as safe to render verbatim, bypassing prompt escaping.
+
+    Only use on values that cannot be influenced by untrusted input, such as
+    generated output-format instructions.
+
+    Parameters
+    ----------
+    value : Any
+        The trusted value. Rendered like a normal template expression;
+        ``None`` renders as an empty string.
+
+    Returns
+    -------
+    Trusted
+        The rendered text, exempt from escaping.
+    """
+    return value if isinstance(value, Trusted) else Trusted(_render_value(value))
+
+
+def fence(value: Any) -> Trusted:
+    """Escape a value explicitly.
+
+    Kept for backwards compatibility with templates written before escaping
+    became the default; :func:`_finalize_value` now escapes every interpolated
+    value, so this filter is a no-op in practice.
+
+    Parameters
+    ----------
+    value : Any
+        The (untrusted) value to embed in a prompt. ``None`` renders as an
+        empty string.
+
+    Returns
+    -------
+    Trusted
+        The escaped text, marked so it is not escaped a second time.
+    """
+    return Trusted(_escape(_render_value(value)))
 
 
 _inline_env = SandboxedEnvironment(
@@ -42,6 +125,8 @@ _inline_env = SandboxedEnvironment(
     autoescape=False,
     finalize=_finalize_value,
 )
+_inline_env.filters["fence"] = fence
+_inline_env.filters["trusted"] = trusted
 
 
 class MessageExtension(Extension):
@@ -92,7 +177,7 @@ class PromptsLoader(PrefixLoader):
 
 def create_message_environment(loader_mapping: dict[str, Path]) -> SandboxedEnvironment:
     """Create a Jinja2 environment with MessageExtension."""
-    return SandboxedEnvironment(
+    env = SandboxedEnvironment(
         loader=PromptsLoader(
             {
                 namespace: FileSystemLoader(path)
@@ -109,3 +194,6 @@ def create_message_environment(loader_mapping: dict[str, Path]) -> SandboxedEnvi
         enable_async=True,
         finalize=_finalize_value,
     )
+    env.filters["fence"] = fence
+    env.filters["trusted"] = trusted
+    return env

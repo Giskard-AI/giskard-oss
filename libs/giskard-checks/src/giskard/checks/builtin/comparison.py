@@ -1,4 +1,3 @@
-import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Literal, Self, override
 
@@ -36,8 +35,13 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     - Result formatting
     """
 
-    key: JSONPathStr = Field(
-        ..., description="The key to extract the actual value from the trace"
+    target_key: JSONPathStr = Field(
+        default="trace.last.outputs",
+        description=(
+            "JSONPath expression to extract the actual value from the trace. "
+            "Defaults to 'trace.last.outputs' which extracts the last "
+            "interaction's outputs."
+        ),
     )
     expected_value: ExpectedType | MISSING = Field(
         default=MISSING,
@@ -155,9 +159,9 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         details: dict[str, Any],
     ) -> CheckResult:
         if not isinstance(actual_value, (list, set, tuple)):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=(
-                    f"Expected a list, set, or tuple at key '{self.key}' when match is "
+                    f"Expected a list, set, or tuple at key '{self.target_key}' when match is "
                     f"{self.match!r}, but got {type(actual_value).__name__}."
                 ),
                 details=details,
@@ -174,7 +178,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
                 matched_items.append(item)
 
         if any(result is None for result in comparison_results):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=self._unsupported_comparison_message(
                     actual_value, expected_value
                 ),
@@ -209,7 +213,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     @override
     async def run(self, trace: TraceType) -> CheckResult:
         """Execute the check against the provided trace."""
-        actual_value = resolve(trace, self.key)
+        actual_value = resolve(trace, self.target_key)
         expected_value = provided_or_resolve(
             trace,
             key=self.expected_value_key,
@@ -222,14 +226,14 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         }
 
         if isinstance(expected_value, NoMatch):
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"No value found for expected value key '{self.expected_value_key}'.",
                 details=details,
             )
 
         if isinstance(actual_value, NoMatch):
-            return CheckResult.failure(
-                message=f"No value found for key '{self.key}', expected a value {self._comparison_message} {repr(self.expected_value)}.",
+            return CheckResult.error(
+                message=f"No value found for key '{self.target_key}', expected a value {self._comparison_message} {repr(self.expected_value)}.",
                 details=details,
             )
 
@@ -238,7 +242,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
 
         compare_result = self._try_compare(actual_value, expected_value)
         if compare_result is None:
-            return CheckResult.failure(
+            return CheckResult.error(
                 message=f"Comparison not supported: {type(actual_value).__name__} does not support {self._operator_symbol} comparison with {type(expected_value).__name__}",
                 details=details,
             )
@@ -275,8 +279,10 @@ class LessThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrigh
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    key : str
-        The key to extract the actual value from the trace
+    target_key : JSONPathStr
+        JSONPath expression to extract the actual value from the trace.
+        Defaults to "trace.last.outputs" which extracts the last
+        interaction's outputs.
     """
 
     @override
@@ -295,26 +301,6 @@ class LessThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrigh
     def _operator_symbol(self) -> str:
         """Get the operator symbol for error messages."""
         return "<"
-
-
-@Check.register("lesser_than")
-class LesserThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
-    LessThan[InputType, OutputType, TraceType, ExpectedType]
-):
-    """Deprecated alias for :class:`LessThan`.
-
-    .. deprecated::
-        Use :class:`LessThan` instead. This alias remains for backward
-        compatibility with serialized checks using ``kind="lesser_than"``.
-    """
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        warnings.warn(
-            "LesserThan is deprecated; use LessThan instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(*args, **kwargs)
 
 
 @Check.register("greater_than")
@@ -338,8 +324,10 @@ class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyr
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    key : str
-        The key to extract the actual value from the trace
+    target_key : JSONPathStr
+        JSONPath expression to extract the actual value from the trace.
+        Defaults to "trace.last.outputs" which extracts the last
+        interaction's outputs.
     """
 
     @override
@@ -381,8 +369,10 @@ class LessThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # 
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    key : str
-        The key to extract the actual value from the trace
+    target_key : JSONPathStr
+        JSONPath expression to extract the actual value from the trace.
+        Defaults to "trace.last.outputs" which extracts the last
+        interaction's outputs.
     """
 
     @override
@@ -403,28 +393,8 @@ class LessThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # 
         return "<="
 
 
-@Check.register("lesser_than_equals")
-class LesserThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
-    LessThanEquals[InputType, OutputType, TraceType, ExpectedType]
-):
-    """Deprecated alias for :class:`LessThanEquals`.
-
-    .. deprecated::
-        Use :class:`LessThanEquals` instead. This alias remains for backward
-        compatibility with serialized checks using ``kind="lesser_than_equals"``.
-    """
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        warnings.warn(
-            "LesserThanEquals is deprecated; use LessThanEquals instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(*args, **kwargs)
-
-
 @Check.register("greater_than_equals")
-class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
+class GreaterThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright: ignore[reportMissingTypeArgument]
     ComparisonCheck[InputType, OutputType, TraceType, ExpectedType]
 ):
     """Check that validates if extracted values are greater than or equal to an expected value.
@@ -444,8 +414,10 @@ class GreaterEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # p
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    key : str
-        The key to extract the actual value from the trace
+    target_key : JSONPathStr
+        JSONPath expression to extract the actual value from the trace.
+        Defaults to "trace.last.outputs" which extracts the last
+        interaction's outputs.
     """
 
     @override
@@ -487,8 +459,10 @@ class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright:
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    key : str
-        The key to extract the actual value from the trace
+    target_key : JSONPathStr
+        JSONPath expression to extract the actual value from the trace.
+        Defaults to "trace.last.outputs" which extracts the last
+        interaction's outputs.
     """
 
     @override
@@ -530,8 +504,10 @@ class NotEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrig
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    key : str
-        The key to extract the actual value from the trace
+    target_key : JSONPathStr
+        JSONPath expression to extract the actual value from the trace.
+        Defaults to "trace.last.outputs" which extracts the last
+        interaction's outputs.
     """
 
     @override

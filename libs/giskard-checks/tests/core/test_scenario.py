@@ -13,6 +13,7 @@ from giskard.checks import (
     Equals,
     Interact,
     Interaction,
+    InteractionGenerationError,
     InteractionSpec,
     Scenario,
     Step,
@@ -94,6 +95,64 @@ class GeneratorErrorComponent(InteractionSpec[str, str, Trace[str, str]]):
         """Yield an interaction then raise an error on next iteration."""
         yield Interaction(inputs="test", outputs="result", metadata={})
         raise RuntimeError("Generator error")
+
+
+@InteractionSpec.register("chained_generator_error_component")
+class ChainedGeneratorErrorComponent(InteractionSpec[str, str, Trace[str, str]]):
+    """Component whose generator raises an error chained to a root cause."""
+
+    @override
+    async def generate(
+        self, trace: Trace[str, str]
+    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+        """Yield an interaction then raise a chained error on next iteration."""
+        yield Interaction(inputs="test", outputs="result", metadata={})
+        try:
+            raise KeyError("root cause")
+        except KeyError as root:
+            raise RuntimeError("Generator error") from root
+
+
+@InteractionSpec.register("implicit_context_error_component")
+class ImplicitContextErrorComponent(InteractionSpec[str, str, Trace[str, str]]):
+    """Component whose generator raises without explicit `from` chaining."""
+
+    @override
+    async def generate(
+        self, trace: Trace[str, str]
+    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+        """Yield an interaction then raise, chaining the cause implicitly."""
+        yield Interaction(inputs="test", outputs="result", metadata={})
+        try:
+            raise KeyError("root cause")
+        except KeyError:
+            raise RuntimeError("Generator error")
+
+
+@InteractionSpec.register("failing_interaction_component")
+class FailingInteractionComponent(InteractionSpec[str, str, Trace[str, str]]):
+    """Component whose generator raises before yielding anything."""
+
+    @override
+    async def generate(
+        self, trace: Trace[str, str]
+    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+        """Raise before producing any interaction."""
+        raise RuntimeError("Generator error")
+        yield  # pragma: no cover - makes this an async generator
+
+
+@InteractionSpec.register("nested_generator_error_component")
+class NestedGeneratorErrorComponent(InteractionSpec[str, str, Trace[str, str]]):
+    """Component that delegates to another spec through the trace."""
+
+    @override
+    async def generate(
+        self, trace: Trace[str, str]
+    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+        """Yield an interaction then drive a failing spec via the trace."""
+        trace = yield Interaction(inputs="outer", outputs="result", metadata={})
+        _ = await trace.with_interaction(GeneratorErrorComponent())
 
 
 # Test Classes
@@ -308,6 +367,53 @@ class TestScenarioNormalCases:
         # Only first interaction was added to trace
         assert len(result.final_trace.interactions) == 1
         assert result.final_trace.interactions[0] == interaction1
+        assert result.errored
+
+    async def test_skipped_step_without_checks_reports_skip_not_pass(self):
+        """A checkless step that never ran must report SKIP, never PASS."""
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+
+        result = await (
+            Scenario("skipped_checkless_step")
+            .add_interaction(MockInteractionSpec(interactions=[interaction1]))
+            .check(MockCheck(result=CheckResult.failure(message="Check 1 failed")))
+            .add_interaction(MockInteractionSpec(interactions=[interaction2]))
+            .run()
+        )
+
+        assert len(result.steps) == 2
+        assert result.steps[0].failed
+        # The second step carries no checks and never ran.
+        assert result.steps[1].skipped
+        assert not result.steps[1].passed
+        assert len(result.steps[1].results) == 1
+        assert result.steps[1].results[0].skipped
+        assert result.steps[1].results[0].details.get("check_name") == "step"
+        failures = result.steps[1].format_failures()
+        assert len(failures) == 1
+        assert "step SKIPPED:" in failures[0]
+        assert "Unknown check" not in failures[0]
+        assert result.failed
+
+    async def test_skipped_step_without_checks_after_error_reports_skip(self):
+        """Same as above when the preceding step errored rather than failed."""
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+
+        result = await (
+            Scenario("skipped_checkless_step_after_error")
+            .add_interaction(MockInteractionSpec(interactions=[interaction1]))
+            .check(MockCheck(result=CheckResult.error(message="Check 1 errored")))
+            .add_interaction(MockInteractionSpec(interactions=[interaction2]))
+            .run()
+        )
+
+        assert len(result.steps) == 2
+        assert result.steps[0].errored
+        assert result.steps[1].skipped
+        assert not result.steps[1].passed
+        assert result.steps[1].results[0].details.get("check_name") == "step"
         assert result.errored
 
     async def test_trace_accumulation_across_components(self):
@@ -780,20 +886,115 @@ class TestScenarioErrorHandling:
 
     async def test_generator_raises_exception_after_yield(self):
         """Test that generator exceptions from InteractionSpec propagate."""
-        check1 = MockCheck(result=CheckResult.success(message="Check 1"))
         generator_error_component = GeneratorErrorComponent()
-        check2 = MockCheck(result=CheckResult.success(message="Check 2"))
+        check = MockCheck(result=CheckResult.success(message="Check"))
 
-        # InteractionSpec generator errors currently propagate and stop execution
-        # The first interaction should be added before the error is raised
+        # InteractionSpec generator errors propagate when exceptions are not returned.
         with pytest.raises(RuntimeError, match="Generator error"):
             _ = await (
                 Scenario("generator_exception")
-                .check(check1)
                 .add_interaction(generator_error_component)
-                .check(check2)
+                .check(check)
                 .run()
             )
+
+    async def test_generator_exception_keeps_its_own_cause(self):
+        """Test that a chained generator error reaches the caller unwrapped."""
+        builder = Scenario("chained_generator_exception").add_interaction(
+            ChainedGeneratorErrorComponent()
+        )
+
+        with pytest.raises(RuntimeError, match="Generator error") as exc_info:
+            _ = await builder.run()
+
+        # The trace wraps generator failures to hand back partial progress; the
+        # runner unwraps it without flattening the generator's own cause chain.
+        assert isinstance(exc_info.value.__cause__, KeyError)
+        assert not isinstance(exc_info.value, InteractionGenerationError)
+
+    async def test_generator_exception_keeps_implicit_context(self):
+        """Test that an implicitly chained generator error keeps its context."""
+        builder = Scenario("implicit_context_exception").add_interaction(
+            ImplicitContextErrorComponent()
+        )
+
+        with pytest.raises(RuntimeError, match="Generator error") as exc_info:
+            _ = await builder.run()
+
+        # Unwrapping must not suppress the context Python set implicitly when the
+        # generator raised inside an `except` block without an explicit `from`.
+        assert exc_info.value.__cause__ is None
+        assert isinstance(exc_info.value.__context__, KeyError)
+        assert not exc_info.value.__suppress_context__
+
+    async def test_nested_generator_exception_is_not_double_wrapped(self):
+        """Test that a spec driving another spec reports the original error."""
+        builder = Scenario("nested_generator_exception").add_interaction(
+            NestedGeneratorErrorComponent()
+        )
+
+        with pytest.raises(RuntimeError, match="Generator error") as exc_info:
+            _ = await builder.run()
+
+        assert not isinstance(exc_info.value, InteractionGenerationError)
+
+        result = await builder.run(return_exception=True)
+
+        # The nested spec's progress is preserved alongside the outer spec's.
+        step = result.steps[0]
+        assert step.error is not None
+        assert step.error.exception_type == "RuntimeError"
+        assert [
+            interaction.inputs for interaction in result.final_trace.interactions
+        ] == ["outer", "test"]
+        assert step.last_interaction_index == 1
+
+    async def test_generator_exception_before_first_yield(self):
+        """Test that a generator failing before any yield leaves an empty trace."""
+        builder = Scenario("no_yield_exception").add_interaction(
+            FailingInteractionComponent()
+        )
+
+        result = await builder.run(return_exception=True)
+
+        step = result.steps[0]
+        assert step.error is not None
+        assert step.error.phase == "input_generation"
+        assert result.final_trace.interactions == []
+        assert step.last_interaction_index is None
+
+    async def test_generator_exception_returned_as_test_case_error(self):
+        """Test input generation exceptions become test case errors when requested."""
+        generator_error_component = GeneratorErrorComponent()
+        check = MockCheck(result=CheckResult.success(message="Check"))
+
+        result = await (
+            Scenario("generator_exception")
+            .add_interaction(generator_error_component)
+            .check(check)
+            .run(return_exception=True)
+        )
+
+        assert result.errored
+        assert len(result.steps) == 1
+
+        step = result.steps[0]
+        assert step.errored
+        assert step.error is not None
+        assert step.error.message == "Generator error"
+        assert step.error.exception_type == "RuntimeError"
+        assert step.error.phase == "input_generation"
+        assert step.error.traceback is not None
+        assert "Generator error" in step.error.traceback
+        assert step.last_interaction_index == 0
+
+        assert len(result.final_trace.interactions) == 1
+        assert result.final_trace.interactions[0].inputs == "test"
+        assert result.final_trace.interactions[0].outputs == "result"
+
+        assert len(step.results) == 1
+        assert step.results[0].skipped
+        assert "input generation failure" in (step.results[0].message or "")
 
     async def test_all_executed_results_collected(self):
         """Test that all checks in a step are executed and results collected."""
@@ -1133,15 +1334,17 @@ class TestScenarioExtendAndSerialization:
         fluent = (
             Scenario("fluent")
             .interact("Hello", "Hi")
-            .check(Equals(expected_value="Hi", key="trace.last.outputs"))
+            .check(Equals(expected_value="Hi", target_key="trace.last.outputs"))
             .interact("World", "Echo: World")
-            .check(Equals(expected_value="Echo: World", key="trace.last.outputs"))
+            .check(
+                Equals(expected_value="Echo: World", target_key="trace.last.outputs")
+            )
         )
         from_seq = Scenario(name="fluent").extend(
             Interact(inputs="Hello", outputs="Hi"),
-            Equals(expected_value="Hi", key="trace.last.outputs"),
+            Equals(expected_value="Hi", target_key="trace.last.outputs"),
             Interact(inputs="World", outputs="Echo: World"),
-            Equals(expected_value="Echo: World", key="trace.last.outputs"),
+            Equals(expected_value="Echo: World", target_key="trace.last.outputs"),
         )
 
         result_fluent = await fluent.run()
@@ -1167,7 +1370,7 @@ class TestScenarioExtendAndSerialization:
         scenario = (
             Scenario("serialize_test", multiple_runs=2)
             .interact("Hello", "Hi")
-            .check(Equals(expected_value="Hi", key="trace.last.outputs"))
+            .check(Equals(expected_value="Hi", target_key="trace.last.outputs"))
         )
         serialized = scenario.model_dump()
         assert serialized["multiple_runs"] == 2
@@ -1185,7 +1388,9 @@ class TestScenarioExtendAndSerialization:
             steps=[
                 Step(
                     interacts=[Interact(inputs="Hello", outputs="Hi")],
-                    checks=[Equals(expected_value="Hi", key="trace.last.outputs")],
+                    checks=[
+                        Equals(expected_value="Hi", target_key="trace.last.outputs")
+                    ],
                 ),
             ],
         )
@@ -1248,7 +1453,9 @@ class TestScenarioDynamicBinding:
         result = await (
             Scenario("test", target=echo_sut)  # target provided on scenario level
             .interact("hello")  # no outputs provided
-            .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+            .check(
+                Equals(expected_value="Echo: hello", target_key="trace.last.outputs")
+            )
             .run()
         )
 
@@ -1259,7 +1466,9 @@ class TestScenarioDynamicBinding:
         result = await (
             Scenario("test")  # no target provided
             .interact("hello")  # no outputs provided
-            .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+            .check(
+                Equals(expected_value="Echo: hello", target_key="trace.last.outputs")
+            )
             .run(target=echo_sut)  # target provided on run
         )
         assert result.passed
@@ -1269,7 +1478,9 @@ class TestScenarioDynamicBinding:
         result = await (
             Scenario("test", target=echo_sut)  # target provided on scenario level
             .interact("hello")  # no outputs provided
-            .check(Equals(expected_value="Echo: HELLO", key="trace.last.outputs"))
+            .check(
+                Equals(expected_value="Echo: HELLO", target_key="trace.last.outputs")
+            )
             .run(
                 target=echo_upper_sut
             )  # target provided on run (overrides scenario level target)
@@ -1296,7 +1507,7 @@ async def test_scenario_result_snapshots_tags():
     scenario = (
         Scenario("s", tags=["Category:Hallucination"])
         .interact("hello", sut)
-        .check(Equals(expected_value="reply: hello", key="trace.last.outputs"))
+        .check(Equals(expected_value="reply: hello", target_key="trace.last.outputs"))
     )
     result = await scenario.run()
     assert result.tags == ["Category:Hallucination"]

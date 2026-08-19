@@ -66,7 +66,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         (default: "trace.last.metadata.reference_text").
 
         Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
-    actual_answer_key : str
+    target_key : str
         JSONPath expression to extract the actual answer from the trace
         (default: "trace.last.outputs").
 
@@ -88,15 +88,16 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         default=0.95, description="The threshold for the semantic similarity"
     )
     reference_text: str | MISSING = Field(
-        default=MISSING, description="The reference text to compare the output with"
+        default=MISSING,
+        description="The reference text to compare the output with",
     )
     reference_text_key: JSONPathStr = Field(
         default="trace.last.metadata.reference_text",
         description="The key to extract the reference text from the trace",
     )
-    actual_answer_key: JSONPathStr = Field(
+    target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        description="The key to extract the actual answer from the trace",
+        description=("The key to extract the actual answer from the trace."),
     )
 
     @override
@@ -115,49 +116,58 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
         CheckResult
             The result of the check evaluation.
         """
-        reference_text = provided_or_resolve(
+        reference = provided_or_resolve(
             trace,
             key=self.reference_text_key,
             value=self.reference_text,
         )
-        if isinstance(reference_text, NoMatch):
-            return CheckResult.failure(
+        if isinstance(reference, NoMatch):
+            return CheckResult.error(
                 message=f"No value found for reference text key '{self.reference_text_key}'.",
                 details={
                     "reference_text_key": self.reference_text_key,
-                    "reference_text": reference_text,
+                    "reference_text": reference,
                 },
             )
-        if reference_text is None or reference_text == "":
-            return CheckResult.failure(
+        if reference is None or reference == "":
+            return CheckResult.error(
                 message="No reference text found",
                 details={
                     "reference_text_key": self.reference_text_key,
-                    "reference_text": reference_text,
+                    "reference_text": reference,
                 },
             )
-        actual_answer = resolve(trace, self.actual_answer_key)
+        actual_answer = resolve(trace, self.target_key)
         if isinstance(actual_answer, NoMatch):
-            return CheckResult.failure(
-                message=f"No value found for actual answer key '{self.actual_answer_key}'.",
+            return CheckResult.error(
+                message=f"No value found for actual answer key '{self.target_key}'.",
                 details={
                     "actual_answer": actual_answer,
-                    "actual_answer_key": self.actual_answer_key,
+                    "target_key": self.target_key,
                 },
             )
         if actual_answer is None or actual_answer == "":
-            return CheckResult.failure(
+            return CheckResult.error(
                 message="No actual answer found",
                 details={
                     "actual_answer": actual_answer,
-                    "actual_answer_key": self.actual_answer_key,
+                    "target_key": self.target_key,
                 },
             )
 
-        actual_answer = str(actual_answer)
-        reference_text = str(reference_text)
+        if failure := self._failure_if_collection(
+            "reference text", self.reference_text_key, reference
+        ):
+            return failure
+        if failure := self._failure_if_collection(
+            "actual answer", self.target_key, actual_answer
+        ):
+            return failure
 
-        emb_a, emb_b = await self.get_embeddings([actual_answer, reference_text])
+        actual_answer = str(actual_answer)
+        reference = str(reference)
+
+        emb_a, emb_b = await self.get_embeddings([actual_answer, reference])
         similarity = cosine_similarity(emb_a, emb_b)
 
         passed = similarity >= self.threshold
@@ -169,7 +179,7 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                     "similarity": similarity,
                     "threshold": self.threshold,
                     "actual_answer": actual_answer,
-                    "reference_text": reference_text,
+                    "reference_text": reference,
                 },
             )
         else:
@@ -179,9 +189,32 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                     "similarity": similarity,
                     "threshold": self.threshold,
                     "actual_answer": actual_answer,
-                    "reference_text": reference_text,
+                    "reference_text": reference,
                 },
             )
+
+    def _failure_if_collection(
+        self, label: str, key: str, value: object
+    ) -> CheckResult | None:
+        """Fail when a keypath resolved to a collection instead of one scalar.
+
+        Wildcard / multi-match paths become lists; ``str(list)`` would embed
+        Python repr text nobody wrote. Non-collection scalars still stringify.
+        """
+        if not isinstance(value, (list, tuple, set, dict)):
+            return None
+        return CheckResult.failure(
+            message=(
+                f"Value for {label} key '{key}' must be a single value, but "
+                f"found {type(value).__name__}. Use a key that resolves to "
+                "one value."
+            ),
+            details={
+                "reference_text_key": self.reference_text_key,
+                "target_key": self.target_key,
+                "value": str(value),
+            },
+        )
 
     async def get_embeddings(self, texts: list[str]) -> list[np.ndarray]:
         """Generate embeddings for the given texts.

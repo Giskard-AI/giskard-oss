@@ -1,10 +1,11 @@
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from typing import ClassVar
 
 import numpy as np
 from giskard.core import Discriminated, discriminated_base
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 def _parse_environ_or_default(env_var: str, default: int) -> int:
@@ -30,6 +31,18 @@ class EmbeddingParams(BaseModel):
 
 @discriminated_base
 class BaseEmbeddingModel(Discriminated, ABC):
+    """Base class for embedding models.
+
+    Unknown fields are rejected (``extra="forbid"``). Without this, pydantic
+    silently drops unrecognized keys: because concrete models default their
+    ``model`` field, a persisted check carrying a typo'd key (``model_name``
+    instead of ``model``) would embed with the default model and every
+    similarity score would be computed against the wrong vector space.
+    """
+
+    # Rationale and the subclass rule: see ``Discriminated`` in giskard-core.
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
     params: EmbeddingParams = Field(default_factory=EmbeddingParams)
 
     @abstractmethod

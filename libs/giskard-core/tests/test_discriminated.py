@@ -2,7 +2,7 @@ from typing import Generic, TypeVar
 
 import pytest
 from giskard.core import Discriminated, discriminated_base
-from pydantic import TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 
 @discriminated_base
@@ -220,3 +220,78 @@ def test_type_adpter_with_multiple_discriminated_kind_conflicts():
     assert furniture_first_adapter.validate_python(
         {"kind": "dog", "name": "Buddy", "value": 100, "breed": "Labrador"}
     ) == WronglyRegisteredDog(name="Buddy", breed="Labrador")
+
+
+@discriminated_base
+class StrictVehicle(Discriminated):
+    """A discriminated base that forbids unknown fields."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    wheels: int
+
+
+@StrictVehicle.register("car")
+class StrictCar(StrictVehicle):
+    """A car."""
+
+    doors: int = 4
+
+
+def test_strict_discriminated_direct_round_trip():
+    """A subclass with ``extra='forbid'`` round-trips via a direct validate.
+
+    ``kind`` is a ``computed_field``, so ``model_dump()`` emits it even though
+    it is not a model field. Under ``extra='forbid'`` a direct
+    ``StrictCar.model_validate(dump)`` must not reject it.
+    """
+    car = StrictCar(wheels=4, doors=2)
+    dump = car.model_dump()
+    assert dump["kind"] == "car"
+
+    assert StrictCar.model_validate(dump) == car
+    assert StrictCar.model_validate_json(car.model_dump_json()) == car
+
+
+def test_strict_discriminated_polymorphic_round_trip():
+    """The same model round-trips through the polymorphic registry path."""
+    car = StrictCar(wheels=4, doors=2)
+    dump = car.model_dump()
+
+    assert StrictVehicle.model_validate(dump) == car
+    assert StrictVehicle.model_validate_json(car.model_dump_json()) == car
+
+
+def test_strict_discriminated_nested_field_round_trip():
+    """A discriminated field on another model round-trips under ``forbid``."""
+
+    class Garage(BaseModel):
+        vehicle: StrictVehicle
+
+    garage = Garage(vehicle=StrictCar(wheels=4, doors=2))
+    assert Garage.model_validate(garage.model_dump()) == garage
+
+
+def test_strict_discriminated_still_rejects_unknown_fields():
+    """Dropping ``kind`` must not weaken ``extra='forbid'`` for other keys."""
+    with pytest.raises(ValidationError):
+        StrictCar.model_validate({"wheels": 4, "doors": 2, "spoiler": True})
+
+
+def test_kind_is_not_writable():
+    """``kind`` stays computed: passing it never overrides the real kind.
+
+    Tolerating ``kind`` on input (so ``model_dump()`` round-trips under
+    ``extra="forbid"``) must not promote it to a writable model field. This is
+    an invariant of ``Discriminated`` itself, so it holds for every subclass in
+    every lib -- ``Check``, ``InteractionSpec``, ``InputGenerator``, and the
+    generator/middleware/embedding bases all inherit it from here.
+    """
+    car = StrictCar.model_validate({"kind": "not-a-car", "wheels": 4})
+    assert car.kind == "car"
+    assert "kind" not in StrictCar.model_fields
+
+    dog = Dog.model_validate({"kind": "cat", "name": "Buddy", "breed": "Labrador"})
+    assert dog.kind == "dog"
+    assert isinstance(dog, Dog)
+    assert "kind" not in Dog.model_fields

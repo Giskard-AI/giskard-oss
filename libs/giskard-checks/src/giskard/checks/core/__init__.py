@@ -1,5 +1,5 @@
 from .check import Check
-from .exceptions import InputGenerationException
+from .exceptions import InputGenerationException, InteractionGenerationError
 from .extraction import resolve
 from .interaction import Interact, Interaction, InteractionSpec, Trace
 from .result import (
@@ -9,8 +9,11 @@ from .result import (
     GroupStats,
     Metric,
     ScenarioResult,
+    ScenarioStatus,
     SuiteResult,
+    TestCaseError,
     TestCaseResult,
+    TestCaseStatus,
 )
 from .scenario import Scenario, Step
 from .testcase import TestCase
@@ -31,9 +34,13 @@ __all__ = [
     "GroupStats",
     "Metric",
     "ScenarioResult",
+    "ScenarioStatus",
     "SuiteResult",
+    "TestCaseError",
     "TestCaseResult",
+    "TestCaseStatus",
     "TestCase",
     "InputGenerationException",
+    "InteractionGenerationError",
     "resolve",
 ]

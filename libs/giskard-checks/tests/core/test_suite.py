@@ -70,7 +70,7 @@ async def test_suite_target_precedence(sut1, sut2):
     scenario = (
         Scenario("test", target=sut1)
         .interact("hello")
-        .check(Equals(expected_value="SUT2: hello", key="trace.last.outputs"))
+        .check(Equals(expected_value="SUT2: hello", target_key="trace.last.outputs"))
     )
 
     # Suite with a different target
@@ -88,7 +88,7 @@ async def test_suite_run_target_precedence(sut1, sut2, sut3):
     scenario = (
         Scenario("test", target=sut1)
         .interact("hello")
-        .check(Equals(expected_value="SUT3: hello", key="trace.last.outputs"))
+        .check(Equals(expected_value="SUT3: hello", target_key="trace.last.outputs"))
     )
 
     suite = Suite(name="my_suite", target=sut2)
@@ -106,13 +106,13 @@ async def test_suite_mixed_targets(sut1, sut2):
     scenario1 = (
         Scenario("s1", target=sut1)
         .interact("hello")
-        .check(Equals(expected_value="SUT1: hello", key="trace.last.outputs"))
+        .check(Equals(expected_value="SUT1: hello", target_key="trace.last.outputs"))
     )
 
     scenario2 = (
         Scenario("s2", target=sut2)
         .interact("world")
-        .check(Equals(expected_value="SUT2: world", key="trace.last.outputs"))
+        .check(Equals(expected_value="SUT2: world", target_key="trace.last.outputs"))
     )
 
     # Suite with NO target
@@ -133,7 +133,7 @@ async def test_suite_result_aggregation():
     scenario2 = (
         Scenario("s2")
         .interact("b", "c")
-        .check(Equals(expected_value="b", key="trace.last.outputs"))
+        .check(Equals(expected_value="b", target_key="trace.last.outputs"))
     )
 
     suite = Suite(name="agg_suite")
@@ -368,6 +368,43 @@ async def test_suite_parallel_fail_fast_when_return_exception_is_false():
 
 
 @pytest.mark.asyncio
+async def test_suite_continues_after_input_generation_error_with_return_exception():
+    def target(inputs):
+        if inputs == "boom":
+            raise RuntimeError("target failed")
+        return inputs
+
+    failing = (
+        Scenario("failing_input_generation")
+        .interact("boom")
+        .check(Equals(expected_value="boom", target_key="trace.last.outputs"))
+    )
+    passing = (
+        Scenario("passing_after_error")
+        .interact("ok")
+        .check(Equals(expected_value="ok", target_key="trace.last.outputs"))
+    )
+    suite = Suite(name="input_generation_errors", target=target)
+    suite.append(failing).append(passing)
+
+    result = await suite.run(return_exception=True, verbose=False)
+
+    assert len(result.results) == 2
+    assert result.errored_count == 1
+    assert result.passed_count == 1
+
+    failing_result = result.results[0]
+    assert failing_result.errored
+    assert failing_result.steps[0].error is not None
+    assert failing_result.steps[0].error.message == "target failed"
+    assert failing_result.steps[0].error.exception_type == "RuntimeError"
+    assert failing_result.steps[0].error.phase == "input_generation"
+    assert failing_result.steps[0].results[0].skipped
+
+    assert result.results[1].passed
+
+
+@pytest.mark.asyncio
 async def test_suite_parallel_telemetry_includes_flag(monkeypatch):
     events = []
 
@@ -552,7 +589,7 @@ async def test_suite_progress_records_each_scenario_outcome(monkeypatch):
     failing = (
         Scenario("s2")
         .interact("b", "c")
-        .check(Equals(expected_value="b", key="trace.last.outputs"))
+        .check(Equals(expected_value="b", target_key="trace.last.outputs"))
     )
     suite = Suite(name="record_suite")
     suite.append(passing).append(failing)
@@ -599,6 +636,56 @@ def test_group_stats_total_includes_skipped():
 def test_group_stats_pass_rate_excludes_skipped_from_denominator():
     stats = GroupStats(name="X", passed=2, failed=1, errored=0, skipped=5)
     assert stats.pass_rate == pytest.approx(2 / 3)
+
+
+def test_suite_pass_rate_none_when_empty():
+    from giskard.checks.core.result import SuiteResult
+    from giskard.checks.scenarios.suite import Suite
+
+    suite_result = SuiteResult(results=[], duration_ms=0, suite=Suite(name="test"))
+    assert suite_result.pass_rate is None
+
+
+def test_suite_pass_rate_none_when_all_skipped():
+    from giskard.checks.core.interaction.trace import Trace
+    from giskard.checks.core.result import (
+        CheckResult,
+        ScenarioResult,
+        SuiteResult,
+        TestCaseResult,
+    )
+    from giskard.checks.scenarios.suite import Suite
+
+    skipped_scenario = ScenarioResult(
+        scenario_name="t_skip",
+        steps=[
+            TestCaseResult(
+                results=[CheckResult.skip(message="precondition not met")],
+                duration_ms=0,
+            )
+        ],
+        duration_ms=0,
+        final_trace=Trace(interactions=[]),
+    )
+    suite_result = SuiteResult(
+        results=[skipped_scenario],
+        duration_ms=0,
+        suite=Suite(name="test"),
+    )
+    assert suite_result.skipped_count == 1
+    assert suite_result.pass_rate is None
+
+
+def test_suite_result_rich_console_renders_em_dash_when_pass_rate_none():
+    result = SuiteResult(results=[], duration_ms=0)
+    assert result.pass_rate is None
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "Pass Rate:" in output
+    assert "—" in output
 
 
 def test_suite_group_by_skipped_scenario_counted_separately():
@@ -658,12 +745,12 @@ async def test_suite_group_by_returns_grouped_suite_result(identity_sut):
     suite.append(
         Scenario("t1", tags=["Category:Hallucination"])
         .interact("hi")
-        .check(Equals(expected_value="hi", key="trace.last.outputs"))
+        .check(Equals(expected_value="hi", target_key="trace.last.outputs"))
     )
     suite.append(
         Scenario("t2", tags=["Category:Adversarial"])
         .interact("hi")
-        .check(Equals(expected_value="WRONG", key="trace.last.outputs"))
+        .check(Equals(expected_value="WRONG", target_key="trace.last.outputs"))
     )
     suite.append(Scenario("t3").interact("hi"))  # untagged, no checks
 
