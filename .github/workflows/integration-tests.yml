@@ -2,6 +2,7 @@ name: Integration Tests
 
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] guarded by authorize job, label gate for external PRs, and immutable head.sha checkout
+    branches: [main]
     types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
@@ -55,7 +56,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -113,7 +116,9 @@ jobs:
   test-llm-functional:
     needs: authorize
     runs-on: ubuntu-latest
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -169,7 +174,9 @@ jobs:
   test-checks-functional:
     needs: authorize
     runs-on: ubuntu-latest
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -206,7 +213,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -233,7 +242,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 45
     strategy:
       fail-fast: false
