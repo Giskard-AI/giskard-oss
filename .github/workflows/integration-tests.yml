@@ -2,6 +2,7 @@ name: Integration Tests
 
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] guarded by authorize job, label gate for external PRs, and immutable head.sha checkout
+    branches: [main]
     types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
