@@ -44,9 +44,11 @@ if spec and spec.has_location:
 __version__ = get_lib_version("giskard-core")
 
 print(
-    "Thanks for using Giskard open-source! If you need deeper agent scans "
-    "reports, collaboration debugging, human feedback and more features, "
-    "check out our enterprise version: https://giskard.ai"
+    "Thank you for using Giskard open-source! 🐢🙏\n"
+    "Giskard Enterprise adds deeper agent scans, audit reports with remediation guidance, "
+    "test review interfaces for root-cause analysis & human feedback integration, "
+    "and team collaboration — with flexible pricing. "
+    "Learn more: https://giskard.ai"
 )
 
 __all__ = [
