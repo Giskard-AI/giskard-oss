@@ -43,6 +43,12 @@ if spec and spec.has_location:
 
 __version__ = get_lib_version("giskard-core")
 
+print(
+    "Thanks for using Giskard open-source! If you need deeper agent scans "
+    "reports, collaboration debugging, human feedback and more features, "
+    "check out our enterprise version: https://giskard.ai"
+)
+
 __all__ = [
     "__version__",
     # Discriminated unions
