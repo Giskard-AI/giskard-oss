@@ -88,18 +88,15 @@ scenario = (
 )
 ```
 
-The `run()` method is async. In a script, wrap it with `asyncio.run()`:
+Use `run_sync()` in a script without a running event loop. In notebooks and
+other async contexts, await `run()` directly:
 
 ```python
-import asyncio
+# Script / no running event loop
+result = scenario.run_sync()
 
-
-async def main():
-    result = await scenario.run()
-    print(result)
-
-
-asyncio.run(main())
+# Notebook, pytest async test, or async function
+result = await scenario.run()
 ```
 
 Running Multiple Scenarios with Suite
