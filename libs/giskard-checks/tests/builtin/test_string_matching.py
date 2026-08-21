@@ -329,11 +329,26 @@ async def test_empty_text() -> None:
 
 
 async def test_empty_keyword() -> None:
-    """Test behavior with empty keyword."""
+    """Test that an empty keyword is rejected instead of matching every text."""
     check = StringMatching(text="Hello", keyword="")
     result = await check.run(Trace())
-    # Empty string should be found in any text
-    assert result.status == CheckStatus.PASS
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "keyword must not be empty" in result.message.lower()
+
+
+async def test_empty_keyword_from_trace_returns_error() -> None:
+    """Test that an empty keyword extracted from a trace is rejected."""
+    check = StringMatching(
+        text="Hello",
+        keyword_key="trace.last.inputs.keyword",
+    )
+    result = await check.run(
+        Trace(interactions=[Interaction(inputs={"keyword": ""}, outputs={})])
+    )
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "keyword must not be empty" in result.message.lower()
 
 
 async def test_unicode_e_acute_nfc_nfd_matching() -> None:

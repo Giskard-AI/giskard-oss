@@ -278,14 +278,29 @@ async def test_literal_special_chars_not_escaped() -> None:
 
 
 async def test_empty_pattern_regex_mode() -> None:
-    """Test behavior with empty pattern in regex mode."""
+    """Test that an empty pattern is rejected instead of matching every text."""
     check = RegexMatching(
         text="Hello",
         pattern="",
     )
     result = await check.run(Trace())
-    # Empty regex matches any string
-    assert result.status == CheckStatus.PASS
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "pattern must not be empty" in result.message.lower()
+
+
+async def test_empty_pattern_from_trace_returns_error() -> None:
+    """Test that an empty pattern extracted from a trace is rejected."""
+    check = RegexMatching(
+        text="Hello",
+        pattern_key="trace.last.inputs.pattern",
+    )
+    result = await check.run(
+        Trace(interactions=[Interaction(inputs={"pattern": ""}, outputs={})])
+    )
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "pattern must not be empty" in result.message.lower()
 
 
 async def test_missing_pattern_validation() -> None:
