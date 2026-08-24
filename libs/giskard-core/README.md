@@ -54,11 +54,10 @@ To **keep usage analytics** but **disable GeoIP only**, set this environment var
 
 ### Enterprise welcome message
 
-When you run a Giskard suite or scan in an interactive environment, a one-time message on **stderr** may mention Giskard Enterprise. It is not printed on import, in CI, during pytest, or when stderr is not a TTY (except common notebook environments such as Jupyter, Colab, or Kaggle).
+Running a Giskard suite or scan in an interactive session shows a one-time message about Giskard Enterprise.
 
-To suppress it, set this environment variable to a truthy value before running (or add it to your project `.env`):
+To hide this message, set `GISKARD_HIDE_WELCOME` to a truthy value, such as `true`, before running or add it to your `.env` file.
 
-- `GISKARD_HIDE_WELCOME`
 
 ### For library authors
 
