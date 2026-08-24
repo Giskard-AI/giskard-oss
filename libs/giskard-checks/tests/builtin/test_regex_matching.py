@@ -303,6 +303,15 @@ async def test_empty_pattern_from_trace_returns_error() -> None:
     assert "pattern must not be empty" in result.message.lower()
 
 
+async def test_whitespace_only_pattern_returns_error() -> None:
+    """Test that a whitespace-only regex pattern is rejected."""
+    check = RegexMatching(text="The capital of France is Paris.", pattern=" ")
+    result = await check.run(Trace())
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "pattern must not be empty" in result.message.lower()
+
+
 async def test_missing_pattern_validation() -> None:
     """Test that either pattern or pattern_key must be provided."""
     with pytest.raises(ValueError, match="pattern"):

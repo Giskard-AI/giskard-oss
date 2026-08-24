@@ -351,6 +351,15 @@ async def test_empty_keyword_from_trace_returns_error() -> None:
     assert "keyword must not be empty" in result.message.lower()
 
 
+async def test_whitespace_only_keyword_returns_error() -> None:
+    """Test that a whitespace-only keyword is rejected."""
+    check = StringMatching(text="The capital of France is Paris.", keyword=" ")
+    result = await check.run(Trace())
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "keyword must not be empty" in result.message.lower()
+
+
 async def test_unicode_e_acute_nfc_nfd_matching() -> None:
     """Test that 'é' (U+00E9) matches 'é' (U+0065 U+0301) with NFC normalization."""
     # U+00E9 is the composed form (NFC)

@@ -109,12 +109,12 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
                 ),
             )
 
-        if matcher == "":
+        if not matcher.strip():
             return (
                 None,
                 None,
                 CheckResult.error(
-                    message=f"Value for {matcher_name} must not be empty.",
+                    message=f"Value for {matcher_name} must not be empty or whitespace-only.",
                     details=details,
                 ),
             )
