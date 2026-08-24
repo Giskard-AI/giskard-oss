@@ -5,6 +5,7 @@ from contextlib import contextmanager, nullcontext
 from typing import Any, Generic, Self, TypeVar
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
+from giskard.core.welcome import maybe_show_welcome
 from pydantic import BaseModel, Field
 from pydantic.experimental.missing_sentinel import MISSING
 from rich.console import RenderableType
@@ -212,6 +213,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         result_v2 = await suite.run(target=my_sut_v2)
         ```
         """
+        maybe_show_welcome()
         target = target if target is not MISSING else self.target
         has_target = target is not MISSING
 

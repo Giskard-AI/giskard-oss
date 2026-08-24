@@ -52,6 +52,14 @@ To **keep usage analytics** but **disable GeoIP only**, set this environment var
 
 - `GISKARD_TELEMETRY_DISABLE_GEOIP`
 
+### Enterprise welcome message
+
+When you run a Giskard suite or scan in an interactive environment, a one-time message on **stderr** may mention Giskard Enterprise. It is not printed on import, in CI, during pytest, or when stderr is not a TTY (except common notebook environments such as Jupyter, Colab, or Kaggle).
+
+To suppress it, set this environment variable to a truthy value before running:
+
+- `GISKARD_HIDE_WELCOME`
+
 ### For library authors
 
 The client and helpers are exported from `giskard.core`: `telemetry`, `telemetry_tag`, `telemetry_run_context`, `scoped_telemetry`, and `disable_telemetry`. New events should follow the same rules: **no user strings, secrets, file paths, or model I/O** in analytics payloads.
