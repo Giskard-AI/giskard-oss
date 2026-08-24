@@ -94,7 +94,7 @@ jobs:
           # external contributors, and the immutable head.sha pin keeps the
           # reviewed commit identical to the executed one.
           allow-unsafe-pr-checkout: true
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -151,7 +151,7 @@ jobs:
           # Deliberate opt-in — see test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -194,7 +194,7 @@ jobs:
           # Deliberate opt-in — see test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -230,7 +230,7 @@ jobs:
           # Deliberate opt-in — see test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -259,7 +259,7 @@ jobs:
           # Deliberate opt-in — see test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
