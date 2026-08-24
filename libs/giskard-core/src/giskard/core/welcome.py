@@ -1,7 +1,7 @@
 import sys
 from os import getenv
 
-from giskard.core.telemetry.telemetry import _is_true_str
+from giskard.core.utils import is_true_env_str
 
 _WELCOME_MESSAGE = (
     "Thank you for using Giskard open-source! 🐢 🙏\n"
@@ -16,7 +16,7 @@ _shown = False
 
 def _should_show_welcome() -> bool:
     value = getenv("GISKARD_QUIET")
-    return not _is_true_str(value)
+    return not is_true_env_str(value)
 
 
 def maybe_show_welcome() -> None:
