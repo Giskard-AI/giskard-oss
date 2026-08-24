@@ -22,6 +22,8 @@ Find a list of packages below
 |✔|anyio|
 |✔|attrs|
 |✔|backoff|
+|✔|boto3|
+|✔|botocore|
 |✔|celine-regorus|
 |✔|certifi|
 |✔|cffi|
@@ -50,6 +52,7 @@ Find a list of packages below
 |✔|importlib-metadata|
 |✔|jinja2|
 |✔|jiter|
+|✔|jmespath|
 |✔|joblib|
 |✔|jsonpath-ng|
 |✔|jsonschema|
@@ -74,6 +77,7 @@ Find a list of packages below
 |✔|pydantic-settings|
 |✔|pygments|
 |✔|pyphen|
+|✔|python-dateutil|
 |✔|python-dotenv|
 |✔|pyyaml|
 |✔|referencing|
@@ -81,7 +85,9 @@ Find a list of packages below
 |✔|requests|
 |✔|rich|
 |✔|rpds-py|
+|✔|s3transfer|
 |✔|setuptools|
+|✔|six|
 |✔|sniffio|
 |✔|tenacity|
 |✔|textstat|
@@ -149,6 +155,20 @@ Find a list of packages below
 - HomePage: https://github.com/litl/backoff
 - Author: Bob Green
 - License: MIT License
+- Compatible: True
+
+### boto3-1.43.78
+
+- HomePage: https://github.com/boto/boto3
+- Author: Amazon Web Services
+- License: Apache-2.0
+- Compatible: True
+
+### botocore-1.43.78
+
+- HomePage: https://github.com/boto/botocore
+- Author: Amazon Web Services
+- License: Apache-2.0
 - Compatible: True
 
 ### celine-regorus-0.9.1.post20260227075446
@@ -347,6 +367,13 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
+### jmespath-1.1.0
+
+- HomePage: https://github.com/jmespath/jmespath.py
+- Author: James Saryerwinnie
+- License: MIT License
+- Compatible: True
+
 ### joblib-1.5.3
 
 - HomePage:
@@ -515,6 +542,13 @@ Find a list of packages below
 - License: GNU General Public License v2;; GNU Lesser General Public License v2;; Mozilla Public License 1.1 _MPL 1.1_;; later _GPLv2__;; later _LGPLv2__
 - Compatible: True
 
+### python-dateutil-2.9.0.post0
+
+- HomePage: https://github.com/dateutil/dateutil
+- Author: Gustavo Niemeyer
+- License: Apache Software License;; BSD License
+- Compatible: True
+
 ### python-dotenv-1.2.2
 
 - HomePage:
@@ -564,11 +598,25 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
+### s3transfer-0.19.2
+
+- HomePage: https://github.com/boto/s3transfer
+- Author: Amazon Web Services
+- License: Apache Software License
+- Compatible: True
+
 ### setuptools-83.0.0
 
 - HomePage:
 - Author: Python Packaging Authority
 - License: MIT
+- Compatible: True
+
+### six-1.17.0
+
+- HomePage: https://github.com/benjaminp/six
+- Author: Benjamin Peterson
+- License: MIT License
 - Compatible: True
 
 ### sniffio-1.3.1
