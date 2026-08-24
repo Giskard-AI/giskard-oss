@@ -22,7 +22,10 @@ def _should_show_welcome() -> bool:
 def maybe_show_welcome() -> None:
     """Print the enterprise welcome message at most once per process."""
     global _shown
-    if _shown or not _should_show_welcome():
+    try:
+        if _shown or not _should_show_welcome():
+            return
+        _shown = True
+        print(_WELCOME_MESSAGE, file=sys.stderr)
+    except Exception:
         return
-    _shown = True
-    print(_WELCOME_MESSAGE, file=sys.stderr)
