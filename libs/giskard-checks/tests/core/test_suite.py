@@ -101,6 +101,27 @@ async def test_suite_run_target_precedence(sut1, sut2, sut3):
 
 
 @pytest.mark.asyncio
+async def test_suite_run_invokes_maybe_show_welcome(sut1, monkeypatch):
+    """Verify Suite.run always calls the enterprise welcome hook."""
+    calls: list[object] = []
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite.maybe_show_welcome",
+        lambda: calls.append(None),
+    )
+    scenario = (
+        Scenario("test", target=sut1)
+        .interact("hello")
+        .check(Equals(expected_value="SUT1: hello", target_key="trace.last.outputs"))
+    )
+    suite = Suite(name="welcome_hook", target=sut1)
+    suite.append(scenario)
+
+    result = await suite.run(verbose=False)
+    assert result.passed_count == 1
+    assert calls == [None]
+
+
+@pytest.mark.asyncio
 async def test_suite_mixed_targets(sut1, sut2):
     """Verify that scenarios without suite-level target still work with their own targets."""
     scenario1 = (

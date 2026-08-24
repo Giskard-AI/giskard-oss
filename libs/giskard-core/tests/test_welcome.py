@@ -16,6 +16,8 @@ def reset_welcome_state():
     [
         ({}, True, [], True),
         ({"GISKARD_HIDE_WELCOME": "1"}, True, [], False),
+        ({"GISKARD_HIDE_WELCOME": ""}, True, [], True),
+        ({"GISKARD_HIDE_WELCOME": "maybe"}, True, [], True),
         ({"CI": "true"}, True, [], False),
         ({"TF_BUILD": "True"}, True, [], False),
         ({"PYTEST_VERSION": "8.0.0"}, True, [], False),
@@ -75,3 +77,29 @@ def test_maybe_show_welcome_prints_once(monkeypatch, capsys):
     captured = capsys.readouterr()
 
     assert captured.err.count("Thank you for using Giskard open-source!") == 1
+
+
+def test_maybe_show_welcome_does_not_raise_on_invalid_hide_welcome(monkeypatch, capsys):
+    monkeypatch.setenv("GISKARD_HIDE_WELCOME", "maybe")
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("PYTEST_VERSION", raising=False)
+    monkeypatch.setattr(environment.sys.stderr, "isatty", lambda: True)
+
+    welcome.maybe_show_welcome()
+    captured = capsys.readouterr()
+
+    assert "Thank you for using Giskard open-source!" in captured.err
+    assert welcome._shown is True
+
+
+def test_maybe_show_welcome_swallows_settings_errors(monkeypatch):
+    def boom() -> object:
+        raise RuntimeError("settings failed")
+
+    monkeypatch.setattr(welcome, "get_settings", boom)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("PYTEST_VERSION", raising=False)
+    monkeypatch.setattr(environment.sys.stderr, "isatty", lambda: True)
+
+    welcome.maybe_show_welcome()
+    assert welcome._shown is False

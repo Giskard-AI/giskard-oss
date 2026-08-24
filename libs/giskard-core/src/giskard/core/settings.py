@@ -1,7 +1,9 @@
 """Environment-backed settings for giskard-core."""
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from .environment import is_truthy_env
 
 
 class GiskardCoreSettings(BaseSettings):
@@ -22,6 +24,15 @@ class GiskardCoreSettings(BaseSettings):
         default=False,
         description="Suppress the one-shot enterprise welcome message on suite/scan runs.",
     )
+
+    @field_validator("hide_welcome", mode="before")
+    @classmethod
+    def _normalize_hide_welcome(cls, value: object) -> bool:
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return False
+        return is_truthy_env(str(value))
 
 
 def get_settings() -> GiskardCoreSettings:
