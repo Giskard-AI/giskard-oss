@@ -458,7 +458,7 @@ Find a list of packages below
 - License: 0BSD;; BSD-3-Clause;; CC0-1.0;; MIT;; Zlib
 - Compatible: True
 
-### openai-2.43.0
+### openai-2.54.0
 
 - HomePage:
 - Author: OpenAI
