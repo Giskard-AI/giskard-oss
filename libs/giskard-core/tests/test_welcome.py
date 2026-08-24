@@ -1,3 +1,5 @@
+import types
+
 import pytest
 from giskard.core import environment, welcome
 
@@ -41,7 +43,9 @@ def test_should_show_welcome(
     for module_name in ("IPython", "google.colab"):
         monkeypatch.delitem(environment.sys.modules, module_name, raising=False)
     for module_name in notebook_modules:
-        environment.sys.modules[module_name] = object()
+        monkeypatch.setitem(
+            environment.sys.modules, module_name, types.ModuleType(module_name)
+        )
 
     monkeypatch.setattr(environment.sys.stderr, "isatty", lambda: stderr_tty)
 

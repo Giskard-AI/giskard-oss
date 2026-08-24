@@ -1,4 +1,5 @@
 import sys
+import types
 
 import pytest
 from giskard.core.environment import (
@@ -28,18 +29,18 @@ def test_is_truthy_env(value, expected):
 
 def test_classify_environment_prefers_ci(monkeypatch):
     monkeypatch.setenv("CI", "true")
-    monkeypatch.setitem(sys.modules, "google.colab", object())
+    monkeypatch.setitem(sys.modules, "google.colab", types.ModuleType("google.colab"))
     assert classify_environment() == "ci"
 
 
 def test_classify_environment_detects_colab(monkeypatch):
     monkeypatch.delenv("CI", raising=False)
-    monkeypatch.setitem(sys.modules, "google.colab", object())
+    monkeypatch.setitem(sys.modules, "google.colab", types.ModuleType("google.colab"))
     assert classify_environment() == "colab"
 
 
 def test_is_notebook_environment_includes_ipython(monkeypatch):
-    monkeypatch.setitem(sys.modules, "IPython", object())
+    monkeypatch.setitem(sys.modules, "IPython", types.ModuleType("IPython"))
     assert is_notebook_environment() is True
 
 
