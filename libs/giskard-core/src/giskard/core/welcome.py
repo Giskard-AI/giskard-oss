@@ -5,8 +5,9 @@ from giskard.core.utils import is_true_env_str
 
 _WELCOME_MESSAGE = (
     "Thank you for using Giskard open-source! 🐢 🙏\n"
-    "Giskard Enterprise adds deeper agent scans, audit reports with remediation guidance,\n"
-    "test review interfaces for root-cause analysis & human feedback integration,\n"
+    "Giskard Enterprise adds deeper agent scans, audit reports\n"
+    "with remediation guidance, test review interfaces\n"
+    "for root-cause analysis & human feedback integration,\n"
     "and team collaboration — with flexible pricing.\n"
     "Learn more: https://giskard.ai"
 )
