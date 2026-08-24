@@ -1,9 +1,7 @@
-"""One-time enterprise welcome message for giskard-checks imports."""
-
 import sys
 from os import getenv
 
-_TRUTHY_ENV_VALUES = frozenset({"1", "true", "yes", "on", "t", "y"})
+from giskard.core.telemetry.telemetry import _is_true_str
 
 _WELCOME_MESSAGE = (
     "Thank you for using Giskard open-source! 🐢 🙏\n"
@@ -17,18 +15,14 @@ _shown = False
 
 
 def _should_show_welcome() -> bool:
-    value = getenv("GISKARD_HIDE_WELCOME")
-    return value is None or value.strip().lower() not in _TRUTHY_ENV_VALUES
+    value = getenv("GISKARD_QUIET")
+    return not _is_true_str(value)
 
 
 def maybe_show_welcome() -> None:
     """Print the enterprise welcome message at most once per process."""
     global _shown
-    try:
-        if _shown or not _should_show_welcome():
-            return
-        _shown = True
-        print(_WELCOME_MESSAGE, file=sys.stderr)
-    except Exception:
-        # Best-effort UX: never abort a suite or scan because the banner failed.
+    if _shown or not _should_show_welcome():
         return
+    _shown = True
+    print(_WELCOME_MESSAGE, file=sys.stderr)
