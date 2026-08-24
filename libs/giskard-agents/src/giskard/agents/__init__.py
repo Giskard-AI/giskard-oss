@@ -2,9 +2,15 @@ from giskard.core.utils import get_lib_version
 
 from .chat import Chat
 from .context import RunContext
-from .embeddings import BaseEmbeddingModel, EmbeddingModel
+from .embeddings import (
+    BaseEmbeddingModel,
+    EmbeddingModel,
+    GiskardLLMEmbeddingModel,
+    LiteLLMEmbeddingModel,
+)
 from .errors import Error, ModelRefusalError, WorkflowError
 from .generators import BaseGenerator, Generator
+from .resolve import resolve_embedding_model, resolve_generator
 from .templates import (
     MessageTemplate,
     add_prompts_path,
@@ -21,6 +27,8 @@ __all__ = [
     "__version__",
     "Generator",
     "BaseGenerator",
+    "resolve_generator",
+    "resolve_embedding_model",
     "ChatWorkflow",
     "TemplateReference",
     "Chat",
@@ -38,5 +46,7 @@ __all__ = [
     "Error",
     "BaseEmbeddingModel",
     "EmbeddingModel",
+    "GiskardLLMEmbeddingModel",
+    "LiteLLMEmbeddingModel",
     "StepType",
 ]
