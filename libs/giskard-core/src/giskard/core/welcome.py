@@ -1,14 +1,9 @@
-"""Gated enterprise welcome message for human-facing Giskard runs."""
+"""One-time enterprise welcome message for giskard-checks imports."""
 
 import sys
+from os import getenv
 
-from .environment import (
-    is_ci_environment,
-    is_notebook_environment,
-    is_pytest_run,
-    stderr_is_tty,
-)
-from .settings import get_settings
+_TRUTHY_ENV_VALUES = frozenset({"1", "true", "yes", "on", "t", "y"})
 
 _WELCOME_MESSAGE = (
     "Thank you for using Giskard open-source! 🐢 🙏\n"
@@ -22,16 +17,12 @@ _shown = False
 
 
 def _should_show_welcome() -> bool:
-    return (
-        not get_settings().hide_welcome
-        and not is_ci_environment()
-        and not is_pytest_run()
-        and (stderr_is_tty() or is_notebook_environment())
-    )
+    value = getenv("GISKARD_HIDE_WELCOME")
+    return value is None or value.strip().lower() not in _TRUTHY_ENV_VALUES
 
 
 def maybe_show_welcome() -> None:
-    """Print the enterprise welcome message at most once per process when appropriate."""
+    """Print the enterprise welcome message at most once per process."""
     global _shown
     try:
         if _shown or not _should_show_welcome():

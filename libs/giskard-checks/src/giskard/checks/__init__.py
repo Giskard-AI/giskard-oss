@@ -4,6 +4,7 @@ from pathlib import Path
 
 from giskard.agents import add_prompts_path
 from giskard.core.utils import get_lib_version
+from giskard.core.welcome import maybe_show_welcome
 
 from . import builtin, judges
 from .builtin import (
@@ -79,6 +80,7 @@ if not get_settings().disable_rich_pretty:
     install()
 
 add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.checks")
+maybe_show_welcome()
 
 
 __all__ = [

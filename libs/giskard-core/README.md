@@ -52,13 +52,6 @@ To **keep usage analytics** but **disable GeoIP only**, set this environment var
 
 - `GISKARD_TELEMETRY_DISABLE_GEOIP`
 
-### Enterprise welcome message
-
-Running a Giskard suite or scan in an interactive session shows a one-time message about Giskard Enterprise.
-
-To hide this message, set `GISKARD_HIDE_WELCOME` to a truthy value, such as `true`, before running or add it to your `.env` file.
-
-
 ### For library authors
 
 The client and helpers are exported from `giskard.core`: `telemetry`, `telemetry_tag`, `telemetry_run_context`, `scoped_telemetry`, and `disable_telemetry`. New events should follow the same rules: **no user strings, secrets, file paths, or model I/O** in analytics payloads.
