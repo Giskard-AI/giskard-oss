@@ -1,7 +1,5 @@
-import sys
-
 import pytest
-from giskard.core import welcome
+from giskard.core import environment, welcome
 
 
 @pytest.fixture(autouse=True)
@@ -46,11 +44,11 @@ def test_maybe_show_welcome_gates(
         monkeypatch.setenv(key, value)
 
     for module_name in ("IPython", "google.colab"):
-        monkeypatch.delitem(sys.modules, module_name, raising=False)
+        monkeypatch.delitem(environment.sys.modules, module_name, raising=False)
     for module_name in notebook_modules:
-        sys.modules[module_name] = object()
+        environment.sys.modules[module_name] = object()
 
-    monkeypatch.setattr(welcome.sys.stderr, "isatty", lambda: stderr_tty)
+    monkeypatch.setattr(environment.sys.stderr, "isatty", lambda: stderr_tty)
 
     welcome.maybe_show_welcome()
     captured = capsys.readouterr()
@@ -76,7 +74,7 @@ def test_maybe_show_welcome_gates(
 def test_maybe_show_welcome_prints_once(monkeypatch, capsys):
     monkeypatch.delenv("CI", raising=False)
     monkeypatch.delenv("PYTEST_VERSION", raising=False)
-    monkeypatch.setattr(welcome.sys.stderr, "isatty", lambda: True)
+    monkeypatch.setattr(environment.sys.stderr, "isatty", lambda: True)
 
     welcome.maybe_show_welcome()
     welcome.maybe_show_welcome()
