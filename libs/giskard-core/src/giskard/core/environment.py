@@ -60,11 +60,7 @@ def classify_environment() -> EnvironmentKind:
 
 def stderr_is_tty() -> bool:
     """Return whether stderr is connected to an interactive terminal."""
-    stderr = sys.stderr
-    isatty = getattr(stderr, "isatty", None)
-    if not callable(isatty):
-        return False
     try:
-        return bool(isatty())
+        return sys.stderr.isatty()
     except (AttributeError, ValueError, OSError):
         return False

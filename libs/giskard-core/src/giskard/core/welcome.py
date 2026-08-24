@@ -22,15 +22,12 @@ _shown = False
 
 
 def _should_show_welcome() -> bool:
-    if get_settings().hide_welcome:
-        return False
-    if is_ci_environment():
-        return False
-    if is_pytest_run():
-        return False
-    if not stderr_is_tty() and not is_notebook_environment():
-        return False
-    return True
+    return (
+        not get_settings().hide_welcome
+        and not is_ci_environment()
+        and not is_pytest_run()
+        and (stderr_is_tty() or is_notebook_environment())
+    )
 
 
 def maybe_show_welcome() -> None:

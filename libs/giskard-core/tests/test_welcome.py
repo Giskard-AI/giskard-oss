@@ -9,30 +9,25 @@ def reset_welcome_state():
     welcome._shown = False
 
 
-def test_import_does_not_print_welcome(capsys):
-    capsys.readouterr()
-    assert welcome._shown is False
-
-
 @pytest.mark.parametrize(
-    ("env", "stderr_tty", "notebook_modules"),
+    ("env", "stderr_tty", "notebook_modules", "expected"),
     [
-        ({}, True, []),
-        ({"GISKARD_HIDE_WELCOME": "1"}, True, []),
-        ({"CI": "true"}, True, []),
-        ({"TF_BUILD": "True"}, True, []),
-        ({"PYTEST_VERSION": "8.0.0"}, True, []),
-        ({}, False, []),
-        ({}, False, ["IPython"]),
-        ({}, False, ["google.colab"]),
+        ({}, True, [], True),
+        ({"GISKARD_HIDE_WELCOME": "1"}, True, [], False),
+        ({"CI": "true"}, True, [], False),
+        ({"TF_BUILD": "True"}, True, [], False),
+        ({"PYTEST_VERSION": "8.0.0"}, True, [], False),
+        ({}, False, [], False),
+        ({}, False, ["IPython"], True),
+        ({}, False, ["google.colab"], True),
     ],
 )
-def test_maybe_show_welcome_gates(
+def test_should_show_welcome(
     monkeypatch,
-    capsys,
     env,
     stderr_tty,
     notebook_modules,
+    expected,
 ):
     monkeypatch.delenv("GISKARD_HIDE_WELCOME", raising=False)
     monkeypatch.delenv("CI", raising=False)
@@ -50,25 +45,20 @@ def test_maybe_show_welcome_gates(
 
     monkeypatch.setattr(environment.sys.stderr, "isatty", lambda: stderr_tty)
 
+    assert welcome._should_show_welcome() is expected
+
+
+def test_maybe_show_welcome_prints_to_stderr(monkeypatch, capsys):
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("PYTEST_VERSION", raising=False)
+    monkeypatch.setattr(environment.sys.stderr, "isatty", lambda: True)
+
     welcome.maybe_show_welcome()
     captured = capsys.readouterr()
 
-    should_show = (
-        env.get("GISKARD_HIDE_WELCOME") is None
-        and env.get("CI") is None
-        and env.get("TF_BUILD") is None
-        and env.get("PYTEST_VERSION") is None
-        and (stderr_tty or notebook_modules)
-    )
-
-    if should_show:
-        assert "Thank you for using Giskard open-source!" in captured.err
-        assert captured.out == ""
-        assert welcome._shown is True
-    else:
-        assert captured.err == ""
-        assert captured.out == ""
-        assert welcome._shown is False
+    assert "Thank you for using Giskard open-source!" in captured.err
+    assert captured.out == ""
+    assert welcome._shown is True
 
 
 def test_maybe_show_welcome_prints_once(monkeypatch, capsys):

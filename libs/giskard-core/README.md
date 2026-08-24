@@ -60,8 +60,6 @@ To suppress it, set this environment variable to a truthy value before running (
 
 - `GISKARD_HIDE_WELCOME`
 
-This follows the same `GISKARD_*` settings pattern as other packages (see `giskard.core.settings.GiskardCoreSettings`).
-
 ### For library authors
 
 The client and helpers are exported from `giskard.core`: `telemetry`, `telemetry_tag`, `telemetry_run_context`, `scoped_telemetry`, and `disable_telemetry`. New events should follow the same rules: **no user strings, secrets, file paths, or model I/O** in analytics payloads.
