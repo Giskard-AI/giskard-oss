@@ -11,7 +11,7 @@ from typing import cast
 
 from posthog import Posthog, identify_context, set_context_session, tag
 
-from ..utils import GISKARD_LIBS_VERSIONS
+from ..utils import GISKARD_LIBS_VERSIONS, is_true_env_str
 
 _DISABLING_ENV_VARS = [
     "DO_NOT_TRACK",
@@ -20,32 +20,24 @@ _DISABLING_ENV_VARS = [
 _DISABLE_GEOIP_ENV_VARS = [
     "GISKARD_TELEMETRY_DISABLE_GEOIP",
 ]
-# Common truthy values used in CLI tools and web frameworks
-_TRUTHY_VALUES = {"1", "true", "yes", "on", "t", "y"}
-
-
-def _is_true_str(value: str | None) -> bool:
-    if value is None:
-        return False
-
-    value = value.strip().lower()
-
-    return value in _TRUTHY_VALUES
 
 
 def _should_disable() -> bool:
-    return any(_is_true_str(os.getenv(var)) for var in _DISABLING_ENV_VARS)
+    return any(is_true_env_str(os.getenv(var)) for var in _DISABLING_ENV_VARS)
 
 
 def _should_disable_geoip() -> bool:
     return _should_disable() or any(
-        _is_true_str(os.getenv(var)) for var in _DISABLE_GEOIP_ENV_VARS
+        is_true_env_str(os.getenv(var)) for var in _DISABLE_GEOIP_ENV_VARS
     )
+
+
+ENV_INFORMATION: dict[str, str] = {}
 
 
 def _get_environment_info() -> str:
     # Detect CI (standard across GH Actions, GitLab, Jenkins, etc.)
-    is_ci = _is_true_str(os.getenv("CI")) or _is_true_str(os.getenv("TF_BUILD"))
+    is_ci = is_true_env_str(os.getenv("CI")) or is_true_env_str(os.getenv("TF_BUILD"))
 
     # Detect Colab
     is_colab = "google.colab" in sys.modules
@@ -60,9 +52,6 @@ def _get_environment_info() -> str:
     if is_kaggle:
         return "kaggle"
     return "local"
-
-
-ENV_INFORMATION: dict[str, str] = {}
 
 
 def _get_env_information() -> dict[str, str]:
