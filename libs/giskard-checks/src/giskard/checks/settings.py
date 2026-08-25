@@ -70,7 +70,7 @@ def set_default_generator(generator: BaseGenerator | str) -> None:
     generator : BaseGenerator or str
         The generator to use as default for all LLM checks. A model
         identifier string (e.g. ``"openai/gpt-4o-mini"``) is wrapped in a
-        :class:`~giskard.agents.generators.Generator`.
+        :class:`~giskard.agents.Generator`.
 
     Examples
     --------
@@ -81,14 +81,12 @@ def set_default_generator(generator: BaseGenerator | str) -> None:
 
     Pass a generator instance when you need extra configuration::
 
-        from giskard.agents.generators import Generator
+        from giskard.agents import Generator
         from giskard.checks import set_default_generator
         set_default_generator(Generator(model="openai/gpt-4o-mini"))
     """
     global _default_generator
     if isinstance(generator, str):
-        from giskard.agents.generators import Generator
-
         _default_generator = Generator(model=generator)
     else:
         _default_generator = generator
