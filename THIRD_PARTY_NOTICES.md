@@ -157,14 +157,14 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### boto3-1.43.78
+### boto3-1.43.79
 
 - HomePage: https://github.com/boto/boto3
 - Author: Amazon Web Services
 - License: Apache-2.0
 - Compatible: True
 
-### botocore-1.43.78
+### botocore-1.43.79
 
 - HomePage: https://github.com/boto/botocore
 - Author: Amazon Web Services
