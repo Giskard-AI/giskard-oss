@@ -191,7 +191,7 @@ API Overview
 - `giskard.checks.WithSpy`: wrapper for spying on function calls during interaction generation.
 
 **Settings**
-- `giskard.checks.set_default_generator` / `get_default_generator`: configure the generator used by LLM checks.
+- `giskard.checks.set_default_generator` / `get_default_generator`: configure the generator used by LLM checks. `set_default_generator` accepts a `BaseGenerator` instance or a model identifier string (e.g. `"openai/gpt-4o-mini"`).
 - Environment variables (or `.env` at the project root), prefixed with `GISKARD_CHECKS_`:
   - `GISKARD_CHECKS_DEFAULT_MODEL` — default LLM model (default: `openai/gpt-4o-mini`).
   - `GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL` — default embedding model (default: `text-embedding-3-small`).
@@ -455,9 +455,8 @@ Use `UserSimulator` for LLM-powered user personas in multi-turn scenarios. Suppo
 
 ```python
 from giskard.checks import Scenario, UserSimulator, set_default_generator
-from giskard.agents.generators import Generator
 
-set_default_generator(Generator(model="openai/gpt-4o-mini"))
+set_default_generator("openai/gpt-4o-mini")
 
 result = await (
     Scenario("user-simulation")
@@ -473,8 +472,6 @@ LLM-based checks
 ----------------
 
 ```python
-from giskard.agents.generators import Generator
-
 from giskard.checks import (
     Conformity,
     LLMJudge,
@@ -483,7 +480,7 @@ from giskard.checks import (
 )
 
 # Configure the default LLM generator
-set_default_generator(Generator(model="openai/gpt-4o-mini"))
+set_default_generator("openai/gpt-4o-mini")
 
 result = await (
     Scenario("llm-example")
