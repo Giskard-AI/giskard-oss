@@ -31,7 +31,7 @@ anthropic = ["giskard-llm[anthropic]>=1.0.0,<2"]
 azure = ["giskard-llm[azure]>=1.0.0,<2"]
 
 # External LLM providers
-litellm = ["giskard-agents[litellm]>=1.0.2rc1,<2"]
+litellm = ["giskard-agents[litellm]>=1.0.2,<2"]
 
 # Optional checks dependencies
 regorus = ["giskard-checks[regorus]>=1.0.2rc1,<2"]
