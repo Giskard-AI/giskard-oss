@@ -18,6 +18,8 @@ class GenerationParams(BaseModel):
         List of tools available to the model.
     timeout : float | int | None, optional
         Maximum time in seconds to wait for the completion request.
+    api_base : str | None, optional
+        Base URL for OpenAI-compatible completion endpoints.
     """
 
     temperature: float = Field(default=1.0)
@@ -25,6 +27,7 @@ class GenerationParams(BaseModel):
     response_format: type[BaseModel] | None = Field(default=None)
     tools: list[Tool] = Field(default_factory=list)
     timeout: float | int | None = Field(default=None)
+    api_base: str | None = Field(default=None)
 
     def merge(self, overrides: "GenerationParams | None") -> "GenerationParams":
         """Return a copy with *overrides*' explicitly-set fields applied on top.
