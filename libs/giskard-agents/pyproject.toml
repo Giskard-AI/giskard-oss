@@ -7,7 +7,7 @@ license = { text = "MIT" }
 authors = [{ name = "Giskard R&D", email = "rnd@giskard.ai" }]
 requires-python = ">=3.12"
 dependencies = [
-    "giskard-llm>=1.0.0rc1,<2",
+    "giskard-llm>=1.0.0,<2",
     "pydantic>=2.11.0,<3",
     "griffe>=1.7.0,<3",
     "typing-extensions>=4.14.0,<5",
@@ -19,11 +19,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-openai = ["giskard-llm[openai]>=1.0.0rc1,<2"]
-google = ["giskard-llm[google]>=1.0.0rc1,<2"]
-anthropic = ["giskard-llm[anthropic]>=1.0.0rc1,<2"]
+openai = ["giskard-llm[openai]>=1.0.0,<2"]
+google = ["giskard-llm[google]>=1.0.0,<2"]
+anthropic = ["giskard-llm[anthropic]>=1.0.0,<2"]
 litellm = ["litellm>=1.83.0,<2"]
-all = ["giskard-llm[all]>=1.0.0rc1,<2"]
+all = ["giskard-llm[all]>=1.0.0,<2"]
 
 [build-system]
 requires = ["hatchling"]
