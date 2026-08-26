@@ -2,7 +2,7 @@
 name = "giskard"
 readme = "README.md"
 license = { text = "Apache Software License 2.0" }
-version = "3.0.0rc1"
+version = "3.0.0"
 description = "Evals, red teaming, and test generation for agentic systems"
 authors = [{ name = "Giskard AI", email = "hello@giskard.ai" }]
 
