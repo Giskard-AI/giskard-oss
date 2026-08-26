@@ -51,6 +51,8 @@ in-place upgrade of the v2 API.
 - Optional, aggregated telemetry. Prompts, outputs, and scenario text are not
   sent. Set `DO_NOT_TRACK=1` or `GISKARD_TELEMETRY_DISABLED=1` before import to
   opt out.
+- `giskard.checks.set_default_generator` accepts a model identifier string
+  (e.g. `"openai/gpt-4o-mini"`) in addition to a `BaseGenerator` instance.
 
 ### Installation
 
