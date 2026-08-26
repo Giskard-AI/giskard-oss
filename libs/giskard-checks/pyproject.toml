@@ -1,6 +1,6 @@
 [project]
 name = "giskard-checks"
-version = "1.0.2rc1"
+version = "1.0.2"
 description = "Scenario-based evaluations and LLM-as-judge checks for agentic systems"
 readme = "README.md"
 license = { text = "MIT" }
