@@ -1,6 +1,6 @@
 [project]
 name = "giskard-checks"
-version = "1.0.2rc1"
+version = "1.0.2"
 description = "Scenario-based evaluations and LLM-as-judge checks for agentic systems"
 readme = "README.md"
 license = { text = "MIT" }
@@ -9,9 +9,9 @@ dependencies = [
     "jsonpath-ng>=1.7.0,<2",
     "pydantic>=2.12,<3",
     "pydantic-settings>=2.7,<3",
-    "giskard-agents>=1.0.2rc1,<2",
+    "giskard-agents>=1.0.2,<2",
     "jinja2>=3.1.6,<4",
-    "giskard-core>=1.0.1rc1,<2",
+    "giskard-core>=1.0.1,<2",
     "jsonschema>=4.23.0,<5",
     "numpy>=2.4.1,<3",
     "regex>=2026.1.15",
