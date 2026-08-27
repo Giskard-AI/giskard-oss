@@ -209,6 +209,11 @@ check-notices: ## Check that THIRD_PARTY_NOTICES.md is up to date (run make gene
 check-extra-pins: ## Assert root pyproject lower bounds match workspace member versions
 	uv run python tools/check_extra_pins.py
 
+check-workspace-pins: ## Assert PACKAGE pins equal VERSION in root and libs (used by the release workflow)
+	@test -n "$(PACKAGE)" || { echo "PACKAGE is required (e.g. PACKAGE=giskard-checks VERSION=1.0.3)"; exit 1; }
+	@test -n "$(VERSION)" || { echo "VERSION is required (e.g. PACKAGE=giskard-checks VERSION=1.0.3)"; exit 1; }
+	uv run python tools/check_extra_pins.py "$(PACKAGE)" "$(VERSION)"
+
 bump-workspace-pins: ## Rewrite >= pins for PACKAGE to VERSION (used by the release workflow)
 	@test -n "$(PACKAGE)" || { echo "PACKAGE is required (e.g. PACKAGE=giskard-checks VERSION=1.0.3)"; exit 1; }
 	@test -n "$(VERSION)" || { echo "VERSION is required (e.g. PACKAGE=giskard-checks VERSION=1.0.3)"; exit 1; }

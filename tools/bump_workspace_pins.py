@@ -2,7 +2,7 @@
 
 Used by the release workflow after ``uv version`` so root extras (and
 downstream lib pins) stay aligned with the member version that
-``check_extra_pins`` enforces.
+``check_extra_pins PACKAGE VERSION`` enforces.
 """
 
 import re
