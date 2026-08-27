@@ -165,6 +165,20 @@ jobs:
             echo "tag=$PACKAGE/v$NEW_VERSION" >> $GITHUB_OUTPUT
           fi
 
+      # check-extra-pins requires root extras to match the member version.
+      # Rewrite those pins (and the same >= pins in downstream libs) in the
+      # same commit as the version bump so main CI stays green after a release.
+      # Verify walks the same files Sync writes, scoped to PACKAGE/VERSION.
+      - name: Sync workspace dependency pins
+        env:
+          VERSION: ${{ steps.bump.outputs.new_version }}
+        run: make bump-workspace-pins
+
+      - name: Verify extra pins
+        env:
+          VERSION: ${{ steps.bump.outputs.new_version }}
+        run: make check-workspace-pins
+
       - name: Update lockfile
         run: uv lock
 
@@ -181,7 +195,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "$PKG_DIR/pyproject.toml" "uv.lock"
+          git add "$PKG_DIR/pyproject.toml" "uv.lock" "pyproject.toml" libs/*/pyproject.toml
           git commit -m "chore($PACKAGE): bump version to $NEW_VERSION"
 
       - name: Push to main

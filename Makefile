@@ -5,6 +5,7 @@ LIBS := giskard-core giskard-llm giskard-agents giskard-checks giskard-scan
 # "test the metapackage" means "test everything it pins", i.e. all of LIBS.
 METAPACKAGE := giskard
 PACKAGE ?= # Optional package to test (e.g., giskard-core, giskard-agents, giskard-checks)
+VERSION ?= # Optional, for bump-workspace-pins (e.g. VERSION=1.0.3)
 AGENT_NAME ?= # Optional, for setup-for-agents telemetry
 REASON ?= # Optional, for setup-for-agents telemetry
 
@@ -105,7 +106,7 @@ test-unit-minimal: ## Run unit tests on minimal deps (no provider SDKs), optiona
 	$(foreach lib,$(TEST_LIBS),uv run pytest libs/$(lib) -m "not functional" &&) true
 
 test-examples: ## Run canonical examples and README snippet lint
-	uv run pytest examples tools/test_lint_readme_snippets.py -q
+	uv run pytest examples tools -q
 	uv run python tools/lint_readme_snippets.py
 
 test-no-providers: ## Run tests that verify behavior when provider SDKs are missing
@@ -207,6 +208,16 @@ check-notices: ## Check that THIRD_PARTY_NOTICES.md is up to date (run make gene
 
 check-extra-pins: ## Assert root pyproject lower bounds match workspace member versions
 	uv run python tools/check_extra_pins.py
+
+check-workspace-pins: ## Assert PACKAGE pins equal VERSION in root and libs (used by the release workflow)
+	@test -n "$(PACKAGE)" || { echo "PACKAGE is required (e.g. PACKAGE=giskard-checks VERSION=1.0.3)"; exit 1; }
+	@test -n "$(VERSION)" || { echo "VERSION is required (e.g. PACKAGE=giskard-checks VERSION=1.0.3)"; exit 1; }
+	uv run python tools/check_extra_pins.py "$(PACKAGE)" "$(VERSION)"
+
+bump-workspace-pins: ## Rewrite >= pins for PACKAGE to VERSION (used by the release workflow)
+	@test -n "$(PACKAGE)" || { echo "PACKAGE is required (e.g. PACKAGE=giskard-checks VERSION=1.0.3)"; exit 1; }
+	@test -n "$(VERSION)" || { echo "VERSION is required (e.g. PACKAGE=giskard-checks VERSION=1.0.3)"; exit 1; }
+	uv run python tools/bump_workspace_pins.py "$(PACKAGE)" "$(VERSION)"
 
 check: lint check-format check-compat typecheck security check-licenses check-notices check-extra-pins ## Run all checks
 
