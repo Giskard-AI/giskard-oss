@@ -53,6 +53,11 @@ in-place upgrade of the v2 API.
   opt out.
 - `giskard.checks.set_default_generator` accepts a model identifier string
   (e.g. `"openai/gpt-4o-mini"`) in addition to a `BaseGenerator` instance.
+- `JsonValid` documents the SSRF risk of remote JSON Schema `$ref` retrieval
+  and adds `allow_remote_refs` (default `False`). In-document refs such as
+  `#/$defs/...` still resolve; set `allow_remote_refs=True` only for schema
+  URLs you control. The schema field is intended for the developer writing
+  the eval, not untrusted end-user input.
 
 ### Installation
 

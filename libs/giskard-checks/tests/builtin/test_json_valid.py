@@ -159,7 +159,14 @@ def test_invalid_schema_fails_at_instantiation() -> None:
     assert "Provided JSON Schema is invalid" in str(exc_info.value)
 
 
-async def test_unresolvable_schema_ref_returns_error() -> None:
+async def test_unresolvable_schema_ref_returns_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _fail_urlopen(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("remote $ref must not be fetched by default")
+
+    monkeypatch.setattr("urllib.request.urlopen", _fail_urlopen)
+
     check = JsonValid(schema={"$ref": "https://unreachable.example.com/schema"})
     trace = await Trace.from_interactions(
         Interaction(inputs="Return JSON", outputs='{"name": "Alice"}')
@@ -172,6 +179,55 @@ async def test_unresolvable_schema_ref_returns_error() -> None:
     assert result.message is not None
     assert "unresolvable $ref" in result.message
     assert "https://unreachable.example.com/schema" in result.message
+
+
+async def test_in_document_schema_ref_resolves_without_remote_fetch() -> None:
+    check = JsonValid(
+        parse=False,
+        schema={
+            "$defs": {"pos": {"type": "integer", "minimum": 0}},
+            "type": "object",
+            "properties": {"n": {"$ref": "#/$defs/pos"}},
+            "required": ["n"],
+        },
+    )
+    trace = await Trace.from_interactions(
+        Interaction(inputs="Return JSON", outputs={"n": 1})
+    )
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.PASS
+
+
+async def test_allow_remote_refs_fetches_http_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from io import BytesIO
+    from unittest.mock import MagicMock
+
+    def fake_urlopen(request: object, *_args: object, **_kwargs: object) -> object:
+        uri = getattr(request, "full_url", str(request))
+        assert uri == "http://schemas.example.test/object.json"
+        cm = MagicMock()
+        cm.__enter__.return_value = BytesIO(b'{"type":"object"}')
+        cm.__exit__.return_value = False
+        return cm
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    check = JsonValid(
+        parse=False,
+        allow_remote_refs=True,
+        schema={"$ref": "http://schemas.example.test/object.json"},
+    )
+    trace = await Trace.from_interactions(
+        Interaction(inputs="Return JSON", outputs={"name": "Alice"})
+    )
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.PASS
 
 
 async def test_missing_key_fails() -> None:
@@ -210,7 +266,10 @@ def test_json_valid_is_exported() -> None:
 
 def test_json_valid_serialization_roundtrip() -> None:
     check = JsonValid(
-        target_key="trace.last.outputs.response", schema={"type": "object"}, parse=False
+        target_key="trace.last.outputs.response",
+        schema={"type": "object"},
+        parse=False,
+        allow_remote_refs=True,
     )
 
     data = check.model_dump()
@@ -219,6 +278,7 @@ def test_json_valid_serialization_roundtrip() -> None:
     assert data["kind"] == "json_valid"
     assert data["schema"] == {"type": "object"}
     assert data["parse"] is False
+    assert data["allow_remote_refs"] is True
     assert isinstance(restored, JsonValid)
     # The dump and restored model preserve the canonical ``target_key``.
     assert data["target_key"] == "trace.last.outputs.response"
@@ -226,6 +286,7 @@ def test_json_valid_serialization_roundtrip() -> None:
     assert restored.target_key == "trace.last.outputs.response"
     assert restored.expected_schema == {"type": "object"}
     assert restored.parse is False
+    assert restored.allow_remote_refs is True
 
 
 async def test_parse_false_accepts_plain_string() -> None:
