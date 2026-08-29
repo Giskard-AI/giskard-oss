@@ -22,8 +22,17 @@ from giskard.llm.routing import (
         ("anthropic/claude-opus-4-6", ("anthropic", "claude-opus-4-6")),
         ("azure/gpt-4o", ("azure", "gpt-4o")),
         ("azure_ai/gpt-4o", ("azure_ai", "gpt-4o")),
+        ("orcarouter/claude-haiku-4.5", ("orcarouter", "claude-haiku-4.5")),
     ],
-    ids=["openai", "google", "gemini-alias", "anthropic", "azure", "azure_ai"],
+    ids=[
+        "openai",
+        "google",
+        "gemini-alias",
+        "anthropic",
+        "azure",
+        "azure_ai",
+        "orcarouter",
+    ],
 )
 def test_parse_model_string_valid(model_str: str, expected: tuple[str, str]):
     assert _parse_model_string(model_str) == expected
@@ -204,6 +213,15 @@ def test_client_unconfigured_registry_provider():
         mock_create.return_value = MagicMock()
         client._get_provider("openai")
         mock_create.assert_called_once_with("openai")
+
+
+def test_client_unconfigured_orcarouter_registry_provider():
+    """OrcaRouter is a named registry provider usable without configure()."""
+    client = LLMClient()
+    with patch("giskard.llm.routing._create_provider") as mock_create:
+        mock_create.return_value = MagicMock()
+        client._get_provider("orcarouter")
+        mock_create.assert_called_once_with("orcarouter")
 
 
 def test_client_unknown_provider_raises():
