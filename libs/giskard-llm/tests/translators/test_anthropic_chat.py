@@ -414,10 +414,10 @@ def test_unknown_completion_params_warn(caplog):
     assert "temperature" not in payload
     assert payload.get("extra_body") == {"temperature": 0.2}
     assert "top_p" not in payload
-    assert "stop_sequences" not in payload
+    assert payload.get("stop_sequences") == ["STOP"]
     joined = " ".join(r.message for r in caplog.records)
     assert "top_p" in joined
-    assert "stop_sequences" in joined
+    assert "stop_sequences" not in joined
 
 
 def test_sdk_v1_messages_create_accepts_translator_payload():
@@ -428,10 +428,14 @@ def test_sdk_v1_messages_create_accepts_translator_payload():
     from anthropic.resources.messages.messages import AsyncMessages
 
     payload = AnthropicChatTranslator.to_anthropic(
-        _MODEL, [UserMessage(content="Hello.")], temperature=0.2
+        _MODEL,
+        [UserMessage(content="Hello.")],
+        temperature=0.2,
+        stop_sequences=["STOP"],
     )
     assert "temperature" not in payload
     assert payload.get("extra_body") == {"temperature": 0.2}
+    assert payload.get("stop_sequences") == ["STOP"]
     inspect.signature(AsyncMessages.create).bind_partial(**payload)
 
 

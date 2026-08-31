@@ -46,6 +46,7 @@ if TYPE_CHECKING:
         tools: Sequence[ToolUnionParam]
         system: str | list[TextBlockParam]
         extra_body: dict[str, object]
+        stop_sequences: Sequence[str]
         timeout: float | httpxTimeout | None
         output_config: OutputConfigParam
 else:
@@ -58,6 +59,7 @@ logger = logging.getLogger(__name__)
 KNOWN_COMPLETION_PARAMS = frozenset(
     {
         "max_tokens",
+        "stop_sequences",
         "temperature",
         "timeout",
         "tools",
@@ -190,6 +192,7 @@ class AnthropicChatConfigParams(_BaseModel):
     tools: Sequence[ToolDef] | None = None
     system: str | list[SystemTextBlock] | None = None
     temperature: float | None = None
+    stop_sequences: Sequence[str] | None = None
     timeout: float | httpxTimeout | None = None
     output_config: dict[str, object] | None = None
 
