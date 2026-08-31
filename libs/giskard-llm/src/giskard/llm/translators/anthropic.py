@@ -2,7 +2,13 @@ import logging
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 
-from pydantic import BaseModel, SerializationInfo, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    SerializationInfo,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from ..types import (
     AssistantMessage,
@@ -186,6 +192,21 @@ class AnthropicChatConfigParams(_BaseModel):
     temperature: float | None = None
     timeout: float | httpxTimeout | None = None
     output_config: dict[str, object] | None = None
+
+    @field_validator("timeout", mode="before")
+    @classmethod
+    def _coerce_timeout(cls, v: Any) -> Any:
+        # httpx2 mis-parses an httpx (v1) Timeout as a scalar; convert it.
+        # isinstance, not __module__: SDKs relabel re-exported httpx classes.
+        try:
+            from httpx import Timeout as HttpxV1Timeout
+        except ImportError:
+            return v
+        if isinstance(v, HttpxV1Timeout):
+            from httpx2 import Timeout
+
+            return Timeout(connect=v.connect, read=v.read, write=v.write, pool=v.pool)
+        return v
 
     @field_serializer("messages")
     def serialize_messages(

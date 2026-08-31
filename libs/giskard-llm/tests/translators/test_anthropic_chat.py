@@ -433,3 +433,33 @@ def test_sdk_v1_messages_create_accepts_translator_payload():
     assert "temperature" not in payload
     assert payload.get("extra_body") == {"temperature": 0.2}
     inspect.signature(AsyncMessages.create).bind_partial(**payload)
+
+
+def test_httpx_v1_timeout_converted_to_httpx2():
+    """An httpx (v1) Timeout is converted, not mis-parsed as a scalar by httpx2."""
+    httpx = pytest.importorskip("httpx")
+    pytest.importorskip("httpx2")
+    from httpx2 import Timeout
+
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL,
+        [UserMessage(content="Hello.")],
+        timeout=httpx.Timeout(5.0, connect=2.0),
+    )
+    timeout = payload.get("timeout")
+    assert isinstance(timeout, Timeout)
+    assert timeout.connect == 2.0
+    assert timeout.read == 5.0
+    assert timeout.write == 5.0
+    assert timeout.pool == 5.0
+
+
+def test_httpx2_timeout_passes_through():
+    """A native httpx2 Timeout is forwarded untouched."""
+    httpx2 = pytest.importorskip("httpx2")
+
+    original = httpx2.Timeout(5.0, connect=2.0)
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL, [UserMessage(content="Hello.")], timeout=original
+    )
+    assert payload.get("timeout") is original
