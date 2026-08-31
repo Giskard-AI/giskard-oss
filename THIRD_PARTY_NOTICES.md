@@ -132,7 +132,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### anthropic-1.0.0
+### anthropic-1.2.0
 
 - HomePage:
 - Author: Anthropic
