@@ -106,7 +106,10 @@ def test_process_env_wins_over_dotenv(env_value, _clean_opt_out_env, monkeypatch
     assert telemetry_mod._should_disable() is False
 
 
-def test_late_opt_out_stops_sender_and_is_one_way(monkeypatch, _clean_opt_out_env):
+@pytest.mark.parametrize("channel", ["process-env", "dotenv"])
+def test_late_opt_out_stops_sender_and_is_one_way(
+    channel, monkeypatch, _clean_opt_out_env
+):
     client = telemetry_mod.telemetry
     paused: list[bool] = []
 
@@ -122,7 +125,12 @@ def test_late_opt_out_stops_sender_and_is_one_way(monkeypatch, _clean_opt_out_en
     monkeypatch.setattr(
         telemetry_mod.atexit, "unregister", lambda fn: unregistered.append(fn)
     )
-    monkeypatch.setenv("GISKARD_TELEMETRY_DISABLED", "1")
+    if channel == "process-env":
+        monkeypatch.setenv("GISKARD_TELEMETRY_DISABLED", "1")
+    else:
+        (_clean_opt_out_env / ".env").write_text(
+            "GISKARD_TELEMETRY_DISABLED=1\n", encoding="utf-8"
+        )
 
     telemetry_mod._apply_env_opt_out()
 
@@ -132,8 +140,11 @@ def test_late_opt_out_stops_sender_and_is_one_way(monkeypatch, _clean_opt_out_en
     assert paused == [True]
     assert unregistered == [client.join]
 
-    # One-way: unsetting the flag does not re-enable sending.
-    monkeypatch.delenv("GISKARD_TELEMETRY_DISABLED")
+    # One-way: removing the flag does not re-enable sending.
+    if channel == "process-env":
+        monkeypatch.delenv("GISKARD_TELEMETRY_DISABLED")
+    else:
+        (_clean_opt_out_env / ".env").unlink()
     telemetry_mod._apply_env_opt_out()
     assert client.disabled is True
     assert client.send is False
@@ -268,6 +279,59 @@ def test_opt_out_before_import_makes_no_http(tmp_path, env_extra, dotenv_text):
     assert payload["http_urls"] == []
     assert payload["queue_size"] == 0
     assert all(alive is False for alive in payload["consumer_alive"])
+
+
+_ENABLED_PROBE = r"""
+import json
+import time
+
+calls = []
+
+
+def record(self, method, url, *args, **kwargs):
+    calls.append(str(url))
+    raise RuntimeError("network blocked")
+
+
+import requests
+
+requests.Session.request = record
+
+from giskard.core.telemetry.telemetry import (
+    telemetry,
+    telemetry_capture,
+    telemetry_run_context,
+)
+
+for consumer in telemetry.consumers:
+    consumer.flush_interval = 0.2  # shorten the 5s batching window
+
+with telemetry_run_context():
+    telemetry_capture("enabled_event")
+
+deadline = time.monotonic() + 10
+while not calls and time.monotonic() < deadline:
+    time.sleep(0.05)
+print(
+    json.dumps(
+        {
+            "send": bool(telemetry.send),
+            "disabled": bool(telemetry.disabled),
+            "urls": calls,
+        }
+    )
+)
+"""
+
+
+def test_enabled_telemetry_still_sends(tmp_path):
+    """Guard the opposite direction: with no opt-out flag an upload to the
+    PostHog host must be attempted."""
+    payload = _run_probe(_ENABLED_PROBE, tmp_path, {})
+    assert payload["send"] is True
+    assert payload["disabled"] is False
+    assert any("eu.i.posthog.com" in url for url in payload["urls"])
+    assert payload["id_file_exists"] is True
 
 
 _LATE_OPT_OUT_PROBE = r"""
