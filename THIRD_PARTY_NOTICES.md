@@ -29,6 +29,7 @@ Find a list of packages below
 |✔|cffi|
 |✔|charset-normalizer|
 |✔|click|
+|✔|cloudpickle|
 |✔|colorama|
 |✔|cryptography|
 |✔|defusedxml|
@@ -207,6 +208,13 @@ Find a list of packages below
 - HomePage:
 - Author:
 - License: BSD-3-Clause
+- Compatible: True
+
+### cloudpickle-3.1.2
+
+- HomePage: https://github.com/cloudpipe/cloudpickle
+- Author: The cloudpickle developer team
+- License: BSD License
 - Compatible: True
 
 ### colorama-0.4.6
