@@ -23,80 +23,41 @@ _DISABLE_GEOIP_ENV_VARS = [
     "GISKARD_TELEMETRY_DISABLE_GEOIP",
 ]
 _OPT_OUT_ENV_KEYS = frozenset((*_DISABLING_ENV_VARS, *_DISABLE_GEOIP_ENV_VARS))
-# python-dotenv: unquoted inline comments need whitespace before ``#``.
-_UNQUOTED_INLINE_COMMENT = re.compile(r"\s+#.*")
 
 
-def _strip_wrapping_quotes(value: str) -> str:
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
-        return value[1:-1]
-    return value
+def _dotenv_flags() -> dict[str, str]:
+    """Opt-out flags from a cwd ``.env``, the file giskard.checks settings already read.
 
-
-def _dotenv_value(raw: str) -> str:
-    """Return a dotenv assignment value (quotes and unquoted `` #`` comments)."""
-    val = raw.strip()
-    if len(val) >= 2 and val[0] in {'"', "'"}:
-        quote = val[0]
-        end = val.find(quote, 1)
-        if end != -1:
-            return val[1:end]
-    return _UNQUOTED_INLINE_COMMENT.sub("", val).rstrip()
-
-
-def _is_true_str(value: str | None) -> bool:
-    if value is None:
-        return False
-    return is_true_env_str(_strip_wrapping_quotes(value.strip()))
-
-
-def _parse_dotenv(path: Path) -> dict[str, str]:
+    Minimal dotenv rules: ``export`` prefixes and unquoted `` # comment`` tails
+    are dropped; ``errors="replace"`` so a non-UTF-8 file cannot abort import.
+    """
     try:
-        # ``errors="replace"`` so a Latin-1/UTF-16 cwd ``.env`` cannot abort
-        # ``import giskard``. ASCII opt-out keys still parse.
-        text = path.read_text(encoding="utf-8", errors="replace").lstrip("\ufeff")
+        text = Path(".env").read_text(encoding="utf-8", errors="replace")
     except OSError:
         return {}
-
-    values: dict[str, str] = {}
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("export "):
-            line = line[7:].strip()
-        if "=" not in line:
-            continue
-        key, _, val = line.partition("=")
-        key = key.strip()
-        if key in _OPT_OUT_ENV_KEYS:
-            values[key] = _dotenv_value(val)
-    return values
+    flags: dict[str, str] = {}
+    for line in text.lstrip("\ufeff").splitlines():
+        key, sep, value = line.strip().removeprefix("export ").partition("=")
+        if sep and key.strip() in _OPT_OUT_ENV_KEYS:
+            flags[key.strip()] = re.sub(r"\s+#.*", "", value).strip()
+    return flags
 
 
-def _lookup_env(name: str) -> str | None:
-    """Return a telemetry flag from the process env, else cwd ``.env``.
-
-    Process environment wins so an exported opt-out is not overridden by a
-    leftover ``.env`` value. ``giskard.checks`` already reads cwd ``.env`` for
-    ``GISKARD_CHECKS_*`` settings, so the same file is consulted here without
-    mutating ``os.environ``.
-    """
-    if name in os.environ:
-        return os.environ[name]
-    path = Path(".env")
-    if not path.is_file():
-        return None
-    return _parse_dotenv(path).get(name)
+def _flag_is_true(name: str) -> bool:
+    """True if ``name`` is truthy in the process env, else in cwd ``.env``."""
+    value = os.environ.get(name)
+    if value is None:
+        value = _dotenv_flags().get(name)
+    return value is not None and is_true_env_str(value.strip().strip("'\""))
 
 
 def _should_disable() -> bool:
-    return any(_is_true_str(_lookup_env(var)) for var in _DISABLING_ENV_VARS)
+    return any(_flag_is_true(var) for var in _DISABLING_ENV_VARS)
 
 
 def _should_disable_geoip() -> bool:
     return _should_disable() or any(
-        _is_true_str(_lookup_env(var)) for var in _DISABLE_GEOIP_ENV_VARS
+        _flag_is_true(var) for var in _DISABLE_GEOIP_ENV_VARS
     )
 
 
@@ -186,9 +147,8 @@ _anonymous_id = _get_or_create_anonymous_id()
 # dashboards, while _anonymous_id keeps them all linked to the same user.
 _process_session_id = str(uuid.uuid4())
 
-# ``send=False`` skips the consumer thread and atexit join so a firewalled
-# process never opens ``eu.i.posthog.com`` (blocked hosts otherwise surface as
-# upload errors / flush timeouts even when no events should be sent).
+# send=False when opted out: no consumer thread, no atexit join, no HTTP,
+# so a firewalled ``eu.i.posthog.com`` is never contacted.
 _disabled_at_import = _should_disable()
 telemetry = Posthog(
     project_api_key="phc_Asp36pe4X5WMqeJ4aMMV4gq5LGdGw69mdYSdEYGpbxm2",  # pragma: allowlist secret
@@ -200,34 +160,23 @@ telemetry = Posthog(
 
 
 def disable_telemetry() -> None:
-    """Disable telemetry for this process.
+    """Disable telemetry for this process, overriding the environment variables.
 
-    Overrides environment variable settings. Stops the PostHog sender so no
-    further requests are made to the analytics host. Pauses consumers and
-    clears them so atexit ``join`` does not wait on in-flight uploads (for
-    example when ``eu.i.posthog.com`` is blocked). Does not remove
-    ``~/.giskard/id`` if it was already created.
+    One-way. Stops the PostHog sender so no further requests reach the
+    analytics host. Does not remove ``~/.giskard/id`` if it was already created.
     """
     telemetry.disabled = True
     telemetry.disable_geoip = True
     telemetry.send = False
-    consumers = telemetry.consumers
-    if consumers:
-        for consumer in consumers:
-            consumer.pause()
-        # Drop the list so atexit ``Client.join`` does not ``Thread.join`` an
-        # in-flight upload. ``atexit.unregister(telemetry.join)`` is best-effort:
-        # CPython 3.13 compares the registered bound method by identity, so it
-        # often does not match a newly created ``telemetry.join``.
-        telemetry.consumers = []
+    for consumer in telemetry.consumers or []:
+        consumer.pause()
+    # Consumers are daemon threads; with the atexit join unregistered they
+    # cannot delay exit on uploads to a blocked host.
     atexit.unregister(telemetry.join)
 
 
 def _apply_env_opt_out() -> None:
-    """Honor opt-out flags set after import (notebooks, ``.env``, ``os.environ``).
-
-    Disable is one-way: unsetting the flags later does not re-enable sending.
-    """
+    """Honor opt-out flags set after import (notebooks, ``.env``); one-way."""
     if _should_disable():
         disable_telemetry()
     elif _should_disable_geoip():
