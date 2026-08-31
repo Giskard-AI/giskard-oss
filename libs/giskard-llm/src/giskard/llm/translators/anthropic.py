@@ -314,9 +314,7 @@ class AnthropicChatTranslator:
         # public temperature API by forwarding it through extra_body.
         temperature = payload.pop("temperature", None)
         if temperature is not None:
-            extra_body = dict(payload.get("extra_body") or {})
-            extra_body["temperature"] = temperature
-            payload["extra_body"] = extra_body
+            payload["extra_body"] = {"temperature": temperature}
         return cast("CompletionCreateParams", cast(object, payload))
 
     @staticmethod
