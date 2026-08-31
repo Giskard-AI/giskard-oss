@@ -379,6 +379,20 @@ async def test_sdk_v1_async_anthropic_accepts_httpx2_http_client():
         await http_client.aclose()
 
 
+async def test_sdk_v1_async_anthropic_rejects_httpx_v1_http_client():
+    """Unmocked SDK check: v1 raises TypeError for an httpx (v1) AsyncClient."""
+    pytest.importorskip("anthropic")
+    httpx = pytest.importorskip("httpx")
+    from anthropic import AsyncAnthropic
+
+    http_client = httpx.AsyncClient()
+    try:
+        with pytest.raises(TypeError, match="http_client"):
+            AsyncAnthropic(api_key="sk-test", http_client=http_client)
+    finally:
+        await http_client.aclose()
+
+
 class _FakeHttpOptions:
     def __init__(self, httpxAsyncClient=None, headers=None):
         self.httpx_async_client = httpxAsyncClient
