@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from anthropic.types.text_block_param import TextBlockParam
     from anthropic.types.tool_union_param import ToolUnionParam
     from anthropic.types.tool_use_block_param import ToolUseBlockParam
-    from httpx import Timeout as httpxTimeout
+    from httpx2 import Timeout as httpxTimeout
 
     class CompletionCreateParams(TypedDict, total=False):
         messages: Required[Sequence[MessageParam]]
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
         max_tokens: Required[int]
         tools: Sequence[ToolUnionParam]
         system: str | list[TextBlockParam]
-        temperature: float
+        extra_body: dict[str, object]
         timeout: float | httpxTimeout | None
         output_config: OutputConfigParam
 else:
@@ -279,13 +279,21 @@ class AnthropicChatTranslator:
             **params,
         )
 
-        return cast(
-            "CompletionCreateParams",
+        payload = cast(
+            dict[str, Any],
             cast(
                 object,
                 anthropic_params.model_dump(context={"provider": _PROVIDER}),
             ),
         )
+        # SDK v1 dropped sampling kwargs on messages.create (TypeError). Keep the
+        # public temperature API by forwarding it through extra_body.
+        temperature = payload.pop("temperature", None)
+        if temperature is not None:
+            extra_body = dict(payload.get("extra_body") or {})
+            extra_body["temperature"] = temperature
+            payload["extra_body"] = extra_body
+        return cast("CompletionCreateParams", cast(object, payload))
 
     @staticmethod
     def block_content_to_giskard(

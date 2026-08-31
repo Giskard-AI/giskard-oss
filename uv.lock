@@ -1511,7 +1511,7 @@ openai = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.40,<2" },
+    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=1,<2" },
     { name = "giskard-core", editable = "libs/giskard-core" },
     { name = "giskard-llm", extras = ["openai"], marker = "extra == 'azure'", editable = "libs/giskard-llm" },
     { name = "giskard-llm", extras = ["openai", "google", "anthropic"], marker = "extra == 'all'", editable = "libs/giskard-llm" },
