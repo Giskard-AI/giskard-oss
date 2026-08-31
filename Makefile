@@ -160,7 +160,7 @@ security: ## Check for security vulnerabilities
 # each package's version from the installed env via importlib, so output is pinned to
 # uv.lock instead of whatever PyPI resolves to at runtime. Pinned for reproducibility.
 LICENSECHECK_VERSION := 2026.0.8
-LICENSECHECK := uv run --with licensecheck==$(LICENSECHECK_VERSION) licensecheck --license MIT
+LICENSECHECK := uv run --locked --all-extras --with licensecheck==$(LICENSECHECK_VERSION) licensecheck --license MIT
 # Scan scope for the default license/notices gate. Keep this aligned with what
 # `pip install giskard[full]` actually pulls: optional scan extras `garak` and
 # `deepteam` are intentionally omitted here. Their transitive trees are large
