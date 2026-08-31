@@ -157,14 +157,14 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### boto3-1.43.82
+### boto3-1.43.38
 
 - HomePage: https://github.com/boto/boto3
 - Author: Amazon Web Services
 - License: Apache-2.0
 - Compatible: True
 
-### botocore-1.43.82
+### botocore-1.43.38
 
 - HomePage: https://github.com/boto/botocore
 - Author: Amazon Web Services
@@ -444,7 +444,7 @@ Find a list of packages below
 - License: Apache License 2.0
 - Compatible: True
 
-### nltk-3.10.0
+### nltk-3.10.3
 
 - HomePage: https://www.nltk.org/
 - Author: NLTK Team
@@ -598,7 +598,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### s3transfer-0.19.2
+### s3transfer-0.19.0
 
 - HomePage: https://github.com/boto/s3transfer
 - Author: Amazon Web Services

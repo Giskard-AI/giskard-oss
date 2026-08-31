@@ -120,3 +120,27 @@ def test_rejects_non_dataset_inputs(monkeypatch):
     )
     with pytest.raises(TypeError, match="DatasetInputGenerator"):
         _load(monkeypatch, [bad])
+
+
+async def test_suffixed_prompt_is_what_generate_yields():
+    """The GCG suffix must be the input actually sent, not only the public field.
+
+    ``_suffix_interact`` uses ``model_copy(update={"inputs": ...})``, which skips
+    validators. If Interact cached its input provider at construction, generate()
+    would still yield the unsuffixed HarmBench prompt.
+    """
+    from giskard.checks import Trace
+
+    interact = Interact(
+        inputs=DatasetInputGenerator(prompt="PROMPT_A"),
+        outputs=lambda inputs: inputs,
+    )
+    suffixed = GCGInjectionScenarioGenerator._suffix_interact(interact, "SUFFIX")
+
+    assert isinstance(suffixed.inputs, DatasetInputGenerator)
+    assert suffixed.inputs.prompt == "PROMPT_A SUFFIX"
+
+    generator = suffixed.generate(Trace(interactions=[]))
+    record = await anext(generator)
+    await generator.aclose()
+    assert record.inputs == "PROMPT_A SUFFIX"
