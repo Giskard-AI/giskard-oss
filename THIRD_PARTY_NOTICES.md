@@ -29,6 +29,7 @@ Find a list of packages below
 |✔|cffi|
 |✔|charset-normalizer|
 |✔|click|
+|✔|cloudpickle|
 |✔|colorama|
 |✔|cryptography|
 |✔|defusedxml|
@@ -46,7 +47,9 @@ Find a list of packages below
 |✔|h11|
 |✔|hf-xet|
 |✔|httpcore|
+|✔|httpcore2|
 |✔|httpx|
+|✔|httpx2|
 |✔|huggingface-hub|
 |✔|idna|
 |✔|importlib-metadata|
@@ -94,6 +97,7 @@ Find a list of packages below
 |✔|tiktoken|
 |✔|tokenizers|
 |✔|tqdm|
+|✔|truststore|
 |✔|typing-extensions|
 |✔|typing-inspection|
 |✔|urllib3|
@@ -129,7 +133,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### anthropic-0.111.0
+### anthropic-1.2.0
 
 - HomePage:
 - Author: Anthropic
@@ -204,6 +208,13 @@ Find a list of packages below
 - HomePage:
 - Author:
 - License: BSD-3-Clause
+- Compatible: True
+
+### cloudpickle-3.1.2
+
+- HomePage: https://github.com/cloudpipe/cloudpickle
+- Author: The cloudpickle developer team
+- License: BSD License
 - Compatible: True
 
 ### colorama-0.4.6
@@ -325,11 +336,25 @@ Find a list of packages below
 - License: BSD-3-Clause
 - Compatible: True
 
+### httpcore2-2.12.0
+
+- HomePage:
+- Author: Tom Christie
+- License: BSD-3-Clause
+- Compatible: True
+
 ### httpx-0.28.1
 
 - HomePage:
 - Author: Tom Christie
 - License: BSD License
+- Compatible: True
+
+### httpx2-2.12.0
+
+- HomePage:
+- Author: Tom Christie
+- License: BSD-3-Clause
 - Compatible: True
 
 ### huggingface-hub-1.16.1
@@ -659,6 +684,13 @@ Find a list of packages below
 - HomePage:
 - Author:
 - License: MIT;; MPL-2.0
+- Compatible: True
+
+### truststore-0.10.4
+
+- HomePage:
+- Author: Seth Michael Larson
+- License: MIT
 - Compatible: True
 
 ### typing-extensions-4.15.0
