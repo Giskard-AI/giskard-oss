@@ -2,9 +2,12 @@
 
 from typing import Any
 
+from giskard.core import scoped_telemetry, telemetry_capture
+
 from ..core.result import SuiteResult
 
 
+@scoped_telemetry
 def to_hub_format(result: SuiteResult) -> dict[str, Any]:
     """Convert a SuiteResult into a JSON-serializable Giskard Hub payload.
 
@@ -20,4 +23,16 @@ def to_hub_format(result: SuiteResult) -> dict[str, Any]:
     dict[str, Any]
         JSON-serializable representation of the suite result
     """
+    telemetry_capture(
+        "checks_hub_exported",
+        properties={
+            "integration": "giskard-checks",
+            "scenario_count": len(result.results),
+            "passed_count": result.passed_count,
+            "failed_count": result.failed_count,
+            "errored_count": result.errored_count,
+            "skipped_count": result.skipped_count,
+            "has_recommendation": bool(result.recommendation),
+        },
+    )
     return result.model_dump(mode="json", fallback=str)

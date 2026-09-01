@@ -382,3 +382,56 @@ async def test_quality_scan_hides_recommendation_when_generation_fails(
 
     assert result.failed_count == 1
     assert result.recommendation == ""
+
+
+async def test_quality_scan_emits_privacy_safe_product_telemetry(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    quality_suite_generator_registry.register(_DeterministicQualityGenerator())
+    monkeypatch.setattr(SuiteResult, "print_report", lambda self, **_: None)
+    monkeypatch.setattr(
+        settings,
+        "_default_generator",
+        _MockRecommendationGenerator(responses=["private recommendation"]),
+    )
+    events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        quality_module,
+        "telemetry_capture",
+        lambda event, *, properties: events.append((event, properties)),
+    )
+    monkeypatch.setattr(quality_module, "telemetry_tag", lambda *_: None)
+
+    result = await quality_scan(
+        target=lambda inputs: inputs,
+        description="private agent description",
+        languages=["en"],
+        knowledge_base=["private knowledge-base document"],
+        max_scenarios=2,
+    )
+
+    assert [event for event, _ in events] == [
+        "scan_run_started",
+        "scan_run_finished",
+    ]
+    assert events[0][1] == {
+        "integration": "giskard-scan",
+        "scan_type": "quality",
+        "target_mode": "multiturn",
+        "language_count": 1,
+        "scenario_budget": "small",
+        "parallel": True,
+        "has_knowledge_base": True,
+    }
+    assert events[1][1] == {
+        **events[0][1],
+        "duration_ms": result.duration_ms,
+        "scenario_count": 2,
+        "passed_count": 1,
+        "failed_count": 1,
+        "errored_count": 0,
+        "skipped_count": 0,
+    }
+    assert "private agent description" not in repr(events)
+    assert "private knowledge-base document" not in repr(events)
+    assert "private recommendation" not in repr(events)
