@@ -54,6 +54,12 @@ in-place upgrade of the v2 API.
 - `giskard.checks.set_default_generator` accepts a model identifier string
   (e.g. `"openai/gpt-4o-mini"`) in addition to a `BaseGenerator` instance.
 
+### Fixed
+
+- `Interact.generate()` now uses the live `inputs`/`outputs` fields after
+  `model_copy(update=...)`. GCG scans previously sent the unsuffixed HarmBench
+  prompt because the copied Interact kept a stale input provider.
+
 ### Installation
 
 ```sh

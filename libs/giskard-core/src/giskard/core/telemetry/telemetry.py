@@ -1,8 +1,10 @@
 import asyncio
+import atexit
 import contextvars
 import functools
 import hashlib
 import os
+import re
 import sys
 import uuid
 from collections.abc import Callable, Iterator
@@ -69,15 +71,42 @@ _UNKNOWN_EXCEPTION_PROPERTIES = {
     "source_component": "unknown",
     "traceback_fingerprint": "unknown",
 }
+_OPT_OUT_ENV_KEYS = frozenset((*_DISABLING_ENV_VARS, *_DISABLE_GEOIP_ENV_VARS))
+
+
+def _dotenv_flags() -> dict[str, str]:
+    """Opt-out flags from a cwd ``.env``, the file giskard.checks settings already read.
+
+    Minimal dotenv rules: ``export`` prefixes and unquoted `` # comment`` tails
+    are dropped; ``errors="replace"`` so a non-UTF-8 file cannot abort import.
+    """
+    try:
+        text = Path(".env").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+    flags: dict[str, str] = {}
+    for line in text.lstrip("\ufeff").splitlines():
+        key, sep, value = line.strip().removeprefix("export ").partition("=")
+        if sep and key.strip() in _OPT_OUT_ENV_KEYS:
+            flags[key.strip()] = re.sub(r"\s+#.*", "", value).strip()
+    return flags
+
+
+def _flag_is_true(name: str) -> bool:
+    """True if ``name`` is truthy in the process env, else in cwd ``.env``."""
+    value = os.environ.get(name)
+    if value is None:
+        value = _dotenv_flags().get(name)
+    return value is not None and is_true_env_str(value.strip().strip("'\""))
 
 
 def _should_disable() -> bool:
-    return any(is_true_env_str(os.getenv(var)) for var in _DISABLING_ENV_VARS)
+    return any(_flag_is_true(var) for var in _DISABLING_ENV_VARS)
 
 
 def _should_disable_geoip() -> bool:
     return _should_disable() or any(
-        is_true_env_str(os.getenv(var)) for var in _DISABLE_GEOIP_ENV_VARS
+        _flag_is_true(var) for var in _DISABLE_GEOIP_ENV_VARS
     )
 
 
@@ -167,20 +196,40 @@ _anonymous_id = _get_or_create_anonymous_id()
 # dashboards, while _anonymous_id keeps them all linked to the same user.
 _process_session_id = str(uuid.uuid4())
 
+# send=False when opted out: no consumer thread, no atexit join, no HTTP,
+# so a firewalled ``eu.i.posthog.com`` is never contacted.
+_disabled_at_import = _should_disable()
 telemetry = Posthog(
     project_api_key="phc_Asp36pe4X5WMqeJ4aMMV4gq5LGdGw69mdYSdEYGpbxm2",  # pragma: allowlist secret
     host="https://eu.i.posthog.com",
-    disabled=_should_disable(),
+    disabled=_disabled_at_import,
     disable_geoip=_should_disable_geoip(),
+    send=not _disabled_at_import,
 )
 
 
 def disable_telemetry() -> None:
-    """
-    Disable telemetry. Overrides the environment variable settings.
+    """Disable telemetry for this process, overriding the environment variables.
+
+    One-way. Stops the PostHog sender so no further requests reach the
+    analytics host. Does not remove ``~/.giskard/id`` if it was already created.
     """
     telemetry.disabled = True
     telemetry.disable_geoip = True
+    telemetry.send = False
+    for consumer in telemetry.consumers or []:
+        consumer.pause()
+    # Consumers are daemon threads; with the atexit join unregistered they
+    # cannot delay exit on uploads to a blocked host.
+    atexit.unregister(telemetry.join)
+
+
+def _apply_env_opt_out() -> None:
+    """Honor opt-out flags set after import (notebooks, ``.env``); one-way."""
+    if _should_disable():
+        disable_telemetry()
+    elif _should_disable_geoip():
+        telemetry.disable_geoip = True
 
 
 # Tracks whether we are currently inside any telemetry scope.
@@ -209,7 +258,8 @@ def telemetry_capture(
     properties : dict[str, object] or None
         Optional event properties, passed through to PostHog unchanged.
     """
-    if not _in_telemetry_scope.get():
+    _apply_env_opt_out()
+    if telemetry.disabled or not _in_telemetry_scope.get():
         return
     _ = telemetry.capture(event, properties=properties)
 
@@ -306,6 +356,7 @@ def telemetry_run_context() -> Iterator[None]:
     is_outermost = not _in_telemetry_scope.get()
     token = _in_telemetry_scope.set(True)
     try:
+        _apply_env_opt_out()
         with telemetry.new_context(capture_exceptions=False):
             if _anonymous_id is not None:
                 identify_context(_anonymous_id)
