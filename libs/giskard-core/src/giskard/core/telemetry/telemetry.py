@@ -1,12 +1,14 @@
 import asyncio
 import contextvars
 import functools
+import hashlib
 import os
 import sys
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from types import FrameType
 from typing import cast
 
 from posthog import Posthog, identify_context, set_context_session, tag
@@ -20,6 +22,53 @@ _DISABLING_ENV_VARS = [
 _DISABLE_GEOIP_ENV_VARS = [
     "GISKARD_TELEMETRY_DISABLE_GEOIP",
 ]
+_EXCEPTION_TYPES: dict[type[Exception], str] = {
+    AssertionError: "AssertionError",
+    AttributeError: "AttributeError",
+    ImportError: "ImportError",
+    IndexError: "IndexError",
+    KeyError: "KeyError",
+    MemoryError: "MemoryError",
+    NotImplementedError: "NotImplementedError",
+    OSError: "OSError",
+    RuntimeError: "RuntimeError",
+    TimeoutError: "TimeoutError",
+    TypeError: "TypeError",
+    ValueError: "ValueError",
+}
+_GISKARD_COMPONENTS = frozenset({"agents", "checks", "core", "llm", "scan"})
+
+
+def _get_component_roots() -> dict[str, tuple[Path, ...]]:
+    core_root = Path(__file__).resolve().parents[1]
+    namespace_root = core_root.parent
+    roots: dict[str, tuple[Path, ...]] = {}
+    for component in _GISKARD_COMPONENTS:
+        installed_root = namespace_root / component
+        candidates = [installed_root] if installed_root.is_dir() else []
+        if (
+            namespace_root.parent.name == "src"
+            and namespace_root.parent.parent.name == "giskard-core"
+        ):
+            workspace_root = (
+                namespace_root.parents[2]
+                / f"giskard-{component}"
+                / "src"
+                / "giskard"
+                / component
+            )
+            if workspace_root.is_dir():
+                candidates.append(workspace_root)
+        roots[component] = tuple(candidate.resolve() for candidate in candidates)
+    return roots
+
+
+_GISKARD_COMPONENT_ROOTS = _get_component_roots()
+_UNKNOWN_EXCEPTION_PROPERTIES = {
+    "exception_type": "other",
+    "source_component": "unknown",
+    "traceback_fingerprint": "unknown",
+}
 
 
 def _should_disable() -> bool:
@@ -165,6 +214,87 @@ def telemetry_capture(
     _ = telemetry.capture(event, properties=properties)
 
 
+def _get_owned_frame_identifier(frame: FrameType) -> tuple[str, str] | None:
+    module_name = frame.f_globals.get("__name__")
+    if not isinstance(module_name, str):
+        return None
+
+    name_parts = module_name.split(".")
+    if len(name_parts) < 2 or name_parts[0] != "giskard":
+        return None
+    component = name_parts[1]
+    if component not in _GISKARD_COMPONENTS:
+        return None
+
+    module = sys.modules.get(module_name)
+    if module is None or frame.f_globals is not vars(module):
+        return None
+
+    module_origin = getattr(getattr(module, "__spec__", None), "origin", None)
+    if not isinstance(module_origin, str):
+        return None
+
+    frame_path = Path(frame.f_code.co_filename).resolve()
+    module_path = Path(module_origin).resolve()
+    if frame_path != module_path or not frame_path.is_file():
+        return None
+
+    for component_root in _GISKARD_COMPONENT_ROOTS[component]:
+        try:
+            relative_path = frame_path.relative_to(component_root)
+        except ValueError:
+            continue
+        module_parts = relative_path.with_suffix("").parts
+        if module_parts[-1] == "__init__":
+            module_parts = module_parts[:-1]
+        expected_module_name = ".".join(("giskard", component, *module_parts))
+        if module_name != expected_module_name:
+            continue
+        return component, relative_path.as_posix()
+    return None
+
+
+def _get_exception_properties(error: Exception) -> dict[str, object]:
+    exception_type = _EXCEPTION_TYPES.get(type(error), "other")
+    owned_frames: list[tuple[str, str]] = []
+    traceback = error.__traceback__
+    while traceback is not None:
+        owned_frame = _get_owned_frame_identifier(traceback.tb_frame)
+        if owned_frame is not None:
+            owned_frames.append(owned_frame)
+        traceback = traceback.tb_next
+
+    if not owned_frames:
+        return {
+            **_UNKNOWN_EXCEPTION_PROPERTIES,
+            "exception_type": exception_type,
+        }
+
+    fingerprint_input = "\n".join(
+        f"{component}:{relative_path}" for component, relative_path in owned_frames
+    )
+    fingerprint = hashlib.sha256(fingerprint_input.encode()).hexdigest()[:16]
+    return {
+        "exception_type": exception_type,
+        "source_component": owned_frames[-1][0],
+        "traceback_fingerprint": f"v1:{fingerprint}",
+    }
+
+
+def _capture_uncaught_exception(error: Exception) -> None:
+    properties: dict[str, object]
+    try:
+        properties = _get_exception_properties(error)
+    except Exception:
+        properties = dict(_UNKNOWN_EXCEPTION_PROPERTIES)
+
+    try:
+        telemetry_capture("giskard_uncaught_exception", properties=properties)
+    except Exception:
+        # Telemetry is best-effort and must never replace the application error.
+        pass
+
+
 @contextmanager
 def telemetry_run_context() -> Iterator[None]:
     """Open a PostHog context scope for a logical operation (sync or async body).
@@ -186,10 +316,7 @@ def telemetry_run_context() -> Iterator[None]:
             except Exception as e:
                 # Do not send exception text: it may contain user content, secrets, or paths.
                 if is_outermost:
-                    telemetry_capture(
-                        "giskard_uncaught_exception",
-                        properties={"exception_type": type(e).__name__},
-                    )
+                    _capture_uncaught_exception(e)
                 raise
     finally:
         _in_telemetry_scope.reset(token)

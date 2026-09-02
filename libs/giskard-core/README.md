@@ -23,7 +23,7 @@ pip install giskard-core
 
 Installed versions of `giskard-core`, `giskard-checks`, and `giskard-agents` (each the package version or `not_installed`), a coarse **environment** label (`ci`, `colab`, `kaggle`, or `local`), and when you run **giskard-checks** flows, aggregated non-content metrics such as step counts, counts of checks by `kind`, booleans (e.g. custom trace type or target present), durations, and pass/fail/skip-style outcomes. **Scenario names, prompts, model outputs, trace content, and exception messages are not sent.**
 
-If an error propagates through the telemetry context, a single event may record **`exception_type`** (the Python class name only), not the exception string or traceback.
+If an error propagates through the telemetry context, a single event may record a fixed-vocabulary **`exception_type`**, a coarse **`source_component`** (`core`, `llm`, `agents`, `checks`, `scan`, or `unknown`), and a versioned **`traceback_fingerprint`** derived only from verified Giskard-owned source locations. The fingerprint groups failures from the same public Giskard call path; it is not a secret identifier and may change when source lines move. Exception messages, traceback text, absolute paths, function names, source code, external frames, user/model content, and caller-defined exception class names are not sent.
 
 ### Anonymous identifier
 
