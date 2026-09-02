@@ -2,7 +2,13 @@ import logging
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 
-from pydantic import BaseModel, SerializationInfo, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    SerializationInfo,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from ..types import (
     AssistantMessage,
@@ -31,7 +37,7 @@ if TYPE_CHECKING:
     from anthropic.types.text_block_param import TextBlockParam
     from anthropic.types.tool_union_param import ToolUnionParam
     from anthropic.types.tool_use_block_param import ToolUseBlockParam
-    from httpx import Timeout as httpxTimeout
+    from httpx2 import Timeout as httpxTimeout
 
     class CompletionCreateParams(TypedDict, total=False):
         messages: Required[Sequence[MessageParam]]
@@ -39,7 +45,8 @@ if TYPE_CHECKING:
         max_tokens: Required[int]
         tools: Sequence[ToolUnionParam]
         system: str | list[TextBlockParam]
-        temperature: float
+        extra_body: dict[str, object]
+        stop_sequences: Sequence[str]
         timeout: float | httpxTimeout | None
         output_config: OutputConfigParam
 else:
@@ -52,6 +59,7 @@ logger = logging.getLogger(__name__)
 KNOWN_COMPLETION_PARAMS = frozenset(
     {
         "max_tokens",
+        "stop_sequences",
         "temperature",
         "timeout",
         "tools",
@@ -184,8 +192,24 @@ class AnthropicChatConfigParams(_BaseModel):
     tools: Sequence[ToolDef] | None = None
     system: str | list[SystemTextBlock] | None = None
     temperature: float | None = None
+    stop_sequences: Sequence[str] | None = None
     timeout: float | httpxTimeout | None = None
     output_config: dict[str, object] | None = None
+
+    @field_validator("timeout", mode="before")
+    @classmethod
+    def _coerce_timeout(cls, v: Any) -> Any:
+        # httpx2 mis-parses an httpx (v1) Timeout as a scalar; convert it.
+        # isinstance, not __module__: SDKs relabel re-exported httpx classes.
+        try:
+            from httpx import Timeout as HttpxV1Timeout
+        except ImportError:
+            return v
+        if isinstance(v, HttpxV1Timeout):
+            from httpx2 import Timeout
+
+            return Timeout(connect=v.connect, read=v.read, write=v.write, pool=v.pool)
+        return v
 
     @field_serializer("messages")
     def serialize_messages(
@@ -279,13 +303,19 @@ class AnthropicChatTranslator:
             **params,
         )
 
-        return cast(
-            "CompletionCreateParams",
+        payload = cast(
+            dict[str, Any],
             cast(
                 object,
                 anthropic_params.model_dump(context={"provider": _PROVIDER}),
             ),
         )
+        # SDK v1 dropped sampling kwargs on messages.create (TypeError). Keep the
+        # public temperature API by forwarding it through extra_body.
+        temperature = payload.pop("temperature", None)
+        if temperature is not None:
+            payload["extra_body"] = {"temperature": temperature}
+        return cast("CompletionCreateParams", cast(object, payload))
 
     @staticmethod
     def block_content_to_giskard(
