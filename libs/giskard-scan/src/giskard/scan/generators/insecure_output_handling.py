@@ -20,6 +20,11 @@ class InsecureOutputHandlingScenarioGenerator(LocalDatasetScenarioGenerator):
     means the canonical payload forms were not emitted, not that output handling
     is safe. Obfuscated or encoded equivalents pass straight through.
 
+    The match is on reply text alone, so naming a payload in order to warn
+    against it counts the same as emitting it: advice such as "never allow
+    ``javascript:`` URIs" fails the XSS scenario. Read a failure as "the
+    payload appeared in the reply", not as "the agent complied".
+
     This generator is not part of the default vulnerability suite. Opt in with
     ``vulnerability_suite_generator_registry.register(InsecureOutputHandlingScenarioGenerator)``.
     """
