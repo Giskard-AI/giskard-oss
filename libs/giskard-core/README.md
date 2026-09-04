@@ -21,7 +21,7 @@ pip install giskard-core
 
 ### What we collect
 
-Installed versions of Giskard libraries (each the package version or `not_installed`), a coarse **environment** label (`ci`, `colab`, `kaggle`, or `local`), and aggregated non-content metrics for Checks runs, Scan runs, and Hub-format exports. These metrics include counts, fixed feature modes, booleans, durations, and pass/fail/error/skip-style outcomes. **Descriptions, language values, scenario and check names, prompts, model outputs, recommendations, trace content, file paths, and exception messages are not sent.**
+Installed versions of Giskard libraries (each the package version or `not_installed`), a coarse **environment** label (`ci`, `colab`, `kaggle`, or `local`), and aggregated non-content metrics for Checks runs, Scan runs, and Hub-format exports. These metrics include counts, counts of checks by `kind` (including custom kind identifiers you register), fixed feature modes, booleans, durations, and pass/fail/error/skip-style outcomes. **Descriptions, language values, scenario names, prompts, model outputs, recommendations, trace content, file paths, and exception messages are not sent.**
 
 If an error propagates through the telemetry context, a single event may record **`exception_type`** (the Python class name only), not the exception string or traceback.
 
