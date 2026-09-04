@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from giskard.core import scoped_telemetry, telemetry_capture
+from giskard.core import scoped_telemetry, telemetry_capture, telemetry_tag
 
 from ..core.result import SuiteResult
 
@@ -23,6 +23,9 @@ def to_hub_format(result: SuiteResult) -> dict[str, Any]:
     dict[str, Any]
         JSON-serializable representation of the suite result
     """
+    telemetry_tag("giskard_component", "export")
+    telemetry_tag("giskard_operation", "to_hub_format")
+    payload = result.model_dump(mode="json", fallback=str)
     telemetry_capture(
         "checks_hub_exported",
         properties={
@@ -35,4 +38,4 @@ def to_hub_format(result: SuiteResult) -> dict[str, Any]:
             "has_recommendation": bool(result.recommendation),
         },
     )
-    return result.model_dump(mode="json", fallback=str)
+    return payload

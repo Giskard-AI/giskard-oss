@@ -127,22 +127,29 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     }
     telemetry_capture("scan_run_started", properties=telemetry_properties)
 
-    suite = await generate_suite(
-        description=description,
-        languages=languages,
-        generators=quality_suite_generator_registry.generators(),
-        max_scenarios=opts["max_scenarios"],
-        seed=opts["seed"],
-        target_mode=target_mode,
-        knowledge_base=knowledge_base,
-    )
+    try:
+        suite = await generate_suite(
+            description=description,
+            languages=languages,
+            generators=quality_suite_generator_registry.generators(),
+            max_scenarios=opts["max_scenarios"],
+            seed=opts["seed"],
+            target_mode=target_mode,
+            knowledge_base=knowledge_base,
+        )
 
-    result: SuiteResult = await suite.run(
-        target,
-        parallel=opts["parallel"],
-        max_concurrency=opts["max_concurrency"],
-        return_exception=opts["return_exception"],
-    )
+        result: SuiteResult = await suite.run(
+            target,
+            parallel=opts["parallel"],
+            max_concurrency=opts["max_concurrency"],
+            return_exception=opts["return_exception"],
+        )
+    except Exception:
+        telemetry_capture(
+            "scan_run_finished",
+            properties={**telemetry_properties, "outcome": "error"},
+        )
+        raise
     try:
         recommendation = await generate_quality_recommendation(result)
     except Exception:
@@ -153,6 +160,7 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
         "scan_run_finished",
         properties={
             **telemetry_properties,
+            "outcome": "completed",
             "duration_ms": quality_result.duration_ms,
             "scenario_count": len(quality_result.results),
             "passed_count": quality_result.passed_count,
