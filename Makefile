@@ -38,9 +38,11 @@ install: ## Install project dependencies
 # `make check` red on a tree nobody touched. Pinned for the same reason as
 # LICENSECHECK_VERSION below.
 RUFF_VERSION := 0.16.1
+DETECT_SECRETS_VERSION := 1.5.0
 
 install-tools: ## Install development tools
 	uv tool install ruff==$(RUFF_VERSION)
+	uv tool install detect-secrets==$(DETECT_SECRETS_VERSION)
 	uv tool install vermin
 	uv tool install basedpyright
 	uv tool install pre-commit --with pre-commit-uv
@@ -156,6 +158,9 @@ typecheck: ## Run type checking with basedpyright
 security: ## Check for security vulnerabilities
 	uv run pip-audit --skip-editable
 
+check-secrets: ## Check for secrets not covered by the audited baseline
+	uv tool run detect-secrets==$(DETECT_SECRETS_VERSION) scan --baseline .secrets.baseline
+
 # Run licensecheck INSIDE the synced project env (uv run --with, not uvx): it reads
 # each package's version from the installed env via importlib, so output is pinned to
 # uv.lock instead of whatever PyPI resolves to at runtime. Pinned for reproducibility.
@@ -219,7 +224,7 @@ bump-workspace-pins: ## Rewrite >= pins for PACKAGE to VERSION (used by the rele
 	@test -n "$(VERSION)" || { echo "VERSION is required (e.g. PACKAGE=giskard-checks VERSION=1.0.3)"; exit 1; }
 	uv run python tools/bump_workspace_pins.py "$(PACKAGE)" "$(VERSION)"
 
-check: lint check-format check-compat typecheck security check-licenses check-notices check-extra-pins ## Run all checks
+check: lint check-format check-compat typecheck security check-secrets check-licenses check-notices check-extra-pins ## Run all checks
 
 clean: ## Clean up build artifacts and caches
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
