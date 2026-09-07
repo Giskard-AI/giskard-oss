@@ -11,7 +11,6 @@ from .templates import (
     get_prompts_manager,
     remove_prompts_path,
     set_default_prompts_path,
-    set_prompts_path,
 )
 from .tools import Tool, tool
 from .workflow import ChatWorkflow, ErrorPolicy, StepType, TemplateReference
@@ -28,7 +27,6 @@ __all__ = [
     "Tool",
     "tool",
     "MessageTemplate",
-    "set_prompts_path",
     "set_default_prompts_path",
     "add_prompts_path",
     "remove_prompts_path",

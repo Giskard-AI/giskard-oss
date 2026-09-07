@@ -18,6 +18,8 @@ Use `make help` for the self-documented command list. Prefer Makefile targets ov
 
 Write the approach to `tasks/todo.md` before touching implementation files. Keep it current as work progresses, and add a short review/results section before opening a PR.
 
+Do **not** commit agent-local planning artifacts: `tasks/todo.md`, `docs/plans/`, `docs/specs/`, or equivalent. Keep them on disk for the run if useful; leave them out of `git add` / PR diffs.
+
 ## Stop Conditions
 
 Do not open a PR when the issue is ambiguous, contradictory, or missing acceptance criteria. Post one issue comment with the specific questions needed to proceed, then stop.

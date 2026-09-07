@@ -8,7 +8,7 @@ class SharedScanOptions(TypedDict, total=False):
         max_scenarios: Total upper bound on scenarios across all generators.
             ``None`` lets each generator apply its own default.
         seed: Integer seed used for reproducible scenario generation.
-        group_by: Result annotation key used to group the printed report.
+        group_by: Result tag key used to group the printed report.
             ``None`` prints the ungrouped report.
         parallel: When ``True``, run generated scenarios concurrently against
             the target (suite *execution*). Defaults to ``True`` for scans.
@@ -96,7 +96,7 @@ def resolve_scan_options(
     seed : int
         Integer seed used for reproducible scenario generation.
     group_by : str or None
-        Result annotation key used to group the printed report.
+        Result tag key used to group the printed report.
     parallel : bool
         When ``True``, run generated scenarios concurrently against the target.
         This is suite *execution*; scenario *generation* always runs generators

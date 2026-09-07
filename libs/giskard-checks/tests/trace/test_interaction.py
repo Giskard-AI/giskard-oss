@@ -1,9 +1,11 @@
 from collections.abc import AsyncGenerator, Generator
+from typing import override
 
 import pytest
 from giskard.checks import (
     Interact,
     Interaction,
+    InteractionGenerationError,
     InteractionSpec,
     Trace,
     UserSimulator,
@@ -34,6 +36,75 @@ class TestInteraction:
             await generator.asend(
                 Trace(interactions=[Interaction(inputs=1, outputs=2, metadata={})])
             )
+
+    async def test_interaction_generation_error_preserves_partial_trace(self):
+        """Direct trace callers can recover completed generator progress."""
+        cleanup_events: list[str] = []
+
+        class FailingInteractionSpec(InteractionSpec[str, str, Trace[str, str]]):
+            @override
+            async def generate(
+                self, trace: Trace[str, str]
+            ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+                try:
+                    trace = yield Interaction(inputs="first", outputs="result")
+                    yield Interaction(
+                        inputs="second",
+                        outputs=trace.interactions[-1].outputs,
+                    )
+                    raise RuntimeError("Generator error")
+                finally:
+                    cleanup_events.append("closed")
+
+        initial = Trace[str, str](
+            interactions=[Interaction(inputs="existing", outputs="result")]
+        )
+
+        with pytest.raises(InteractionGenerationError) as exc_info:
+            await initial.with_interactions(
+                Interaction(inputs="before", outputs="result"),
+                FailingInteractionSpec(),
+            )
+
+        assert [item.inputs for item in exc_info.value.partial_trace.interactions] == [
+            "existing",
+            "before",
+            "first",
+            "second",
+        ]
+        assert isinstance(exc_info.value.__cause__, RuntimeError)
+        assert str(exc_info.value.__cause__) == "Generator error"
+        assert cleanup_events == ["closed"]
+
+    async def test_nested_generation_error_is_raised_once(self):
+        """A spec driving another spec keeps one wrapper and the richest trace."""
+
+        class InnerSpec(InteractionSpec[str, str, Trace[str, str]]):
+            @override
+            async def generate(
+                self, trace: Trace[str, str]
+            ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+                yield Interaction(inputs="inner", outputs="result")
+                raise RuntimeError("Generator error")
+
+        class OuterSpec(InteractionSpec[str, str, Trace[str, str]]):
+            @override
+            async def generate(
+                self, trace: Trace[str, str]
+            ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+                trace = yield Interaction(inputs="outer", outputs="result")
+                _ = await trace.with_interaction(InnerSpec())
+
+        with pytest.raises(InteractionGenerationError) as exc_info:
+            await Trace[str, str]().with_interaction(OuterSpec())
+
+        # The wrapper is raised once, so the root cause stays one hop away and
+        # the inner spec's progress is not discarded by an outer re-wrap.
+        assert isinstance(exc_info.value.__cause__, RuntimeError)
+        assert [item.inputs for item in exc_info.value.partial_trace.interactions] == [
+            "outer",
+            "inner",
+        ]
 
     async def test_interaction_with_inputs_generator(self):
         def inputs_generator(

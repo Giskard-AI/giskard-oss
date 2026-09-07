@@ -193,7 +193,7 @@ chat = await (
 For more complicated prompts you can define your template in a separate file. First tell `giskard.agents` where to find the templates (you probably want to do this in your `__init__.py` file):
 
 ```python
-agents.set_prompts_path("path/to/the/prompts")
+agents.set_default_prompts_path("path/to/the/prompts")
 ```
 
 Write your templates in jinja2:

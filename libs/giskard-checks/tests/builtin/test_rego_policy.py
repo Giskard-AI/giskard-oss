@@ -80,7 +80,7 @@ def test_rego_policy_requires_regorus_on_model_validate_json(
 
 
 async def test_no_match_on_key_fails() -> None:
-    check = _check(key="trace.last.metadata.missing")
+    check = _check(target_key="trace.last.metadata.missing")
     trace = await Trace.from_interactions(
         Interaction(inputs="test", outputs={"role": "admin"})
     )
@@ -289,7 +289,7 @@ async def test_json_serializable_input_types(
     expected_input: Any,
 ) -> None:
     """JSONPath can target any JSON-serializable value passed via set_input_json."""
-    check = _check(policy=policy, key=key)
+    check = _check(policy=policy, target_key=key)
     trace = await Trace.from_interactions(Interaction(inputs="test", outputs=outputs))
 
     result = await check.run(trace)

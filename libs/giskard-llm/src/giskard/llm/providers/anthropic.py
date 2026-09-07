@@ -41,7 +41,8 @@ Provider-specific kwargs (configure-time):
     - ``merge_system``: if True, concatenate multiple system messages instead of raising
     - ``base_url``: custom API endpoint
     - ``timeout``: request timeout in seconds
-    - ``http_client``: caller-owned async HTTP client passed to the SDK; not closed by giskard-llm
+    - ``http_client``: caller-owned ``httpx2.AsyncClient`` passed to the SDK; not closed by giskard-llm.
+      Anthropic SDK v1 requires httpx2 (passing ``httpx.AsyncClient`` raises TypeError).
     - ``default_headers``: extra headers merged into every SDK request
 """
 
@@ -73,7 +74,7 @@ from ..types import (
 from ..utils import compact
 
 if TYPE_CHECKING:
-    from httpx import AsyncClient
+    from httpx2 import AsyncClient
 
 logger = logging.getLogger(__name__)
 

@@ -39,7 +39,7 @@ class LLMJudge[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     is available in both contexts.
 
     The LLM is expected to return a structured output with a `passed` boolean field
-    and an optional `reason` string field (see `LLMCheckResult`).
+    and a required non-blank `reason` string field (see `LLMCheckResult`).
 
     Attributes
     ----------

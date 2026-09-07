@@ -183,7 +183,7 @@ async def test_run_emits_error_for_probe_exception(
     assert check.errored
     assert "probe blew up" in (check.message or "")
     # A crashing probe must not inflate pass_rate via an empty suite.
-    assert result.pass_rate < 1.0
+    assert result.pass_rate is not None and result.pass_rate < 1.0
     assert result.errored_count == 1
 
 

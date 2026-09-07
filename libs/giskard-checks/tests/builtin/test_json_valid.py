@@ -74,7 +74,7 @@ async def test_invalid_json_string_fails(outputs: str) -> None:
 
 
 async def test_nested_jsonpath_extraction() -> None:
-    check = JsonValid(key="trace.last.outputs.response")
+    check = JsonValid(target_key="trace.last.outputs.response")
     trace = await Trace.from_interactions(
         Interaction(
             inputs="Return JSON",
@@ -175,7 +175,7 @@ async def test_unresolvable_schema_ref_returns_error() -> None:
 
 
 async def test_missing_key_fails() -> None:
-    check = JsonValid(key="trace.last.outputs.missing")
+    check = JsonValid(target_key="trace.last.outputs.missing")
     trace = await Trace.from_interactions(
         Interaction(inputs="Return JSON", outputs={"response": "{}"})
     )
@@ -210,7 +210,7 @@ def test_json_valid_is_exported() -> None:
 
 def test_json_valid_serialization_roundtrip() -> None:
     check = JsonValid(
-        key="trace.last.outputs.response", schema={"type": "object"}, parse=False
+        target_key="trace.last.outputs.response", schema={"type": "object"}, parse=False
     )
 
     data = check.model_dump()
@@ -220,7 +220,10 @@ def test_json_valid_serialization_roundtrip() -> None:
     assert data["schema"] == {"type": "object"}
     assert data["parse"] is False
     assert isinstance(restored, JsonValid)
-    assert restored.key == "trace.last.outputs.response"
+    # The dump and restored model preserve the canonical ``target_key``.
+    assert data["target_key"] == "trace.last.outputs.response"
+    assert "key" not in data
+    assert restored.target_key == "trace.last.outputs.response"
     assert restored.expected_schema == {"type": "object"}
     assert restored.parse is False
 

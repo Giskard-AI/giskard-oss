@@ -4,6 +4,7 @@ from pathlib import Path
 
 from giskard.agents import add_prompts_path
 from giskard.core.utils import get_lib_version
+from giskard.core.welcome import maybe_show_welcome
 
 from . import builtin, judges
 from .builtin import (
@@ -11,11 +12,9 @@ from .builtin import (
     AnyOf,
     Equals,
     FnCheck,
-    GreaterEquals,
     GreaterThan,
+    GreaterThanEquals,
     JsonValid,
-    LesserThan,
-    LesserThanEquals,
     LessThan,
     LessThanEquals,
     Not,
@@ -36,16 +35,19 @@ from .core import (
     InputGenerationException,
     Interact,
     Interaction,
+    InteractionGenerationError,
     InteractionSpec,
     Metric,
     Scenario,
     ScenarioResult,
+    ScenarioStatus,
     Step,
     SuiteResult,
     Target,
     TestCase,
     TestCaseError,
     TestCaseResult,
+    TestCaseStatus,
     Trace,
     resolve,
 )
@@ -78,6 +80,7 @@ if not get_settings().disable_rich_pretty:
     install()
 
 add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.checks")
+maybe_show_welcome()
 
 
 __all__ = [
@@ -94,12 +97,14 @@ __all__ = [
     "Metric",
     "Scenario",
     "ScenarioResult",
+    "ScenarioStatus",
     "Step",
     "SuiteResult",
     "Target",
     "TestCase",
     "TestCaseError",
     "TestCaseResult",
+    "TestCaseStatus",
     "Trace",
     "resolve",
     "Interact",
@@ -120,10 +125,8 @@ __all__ = [
     "NotEquals",
     "LessThan",
     "LessThanEquals",
-    "LesserThan",
     "GreaterThan",
-    "LesserThanEquals",
-    "GreaterEquals",
+    "GreaterThanEquals",
     "FnCheck",
     "JsonValid",
     "RegoPolicy",
@@ -137,6 +140,7 @@ __all__ = [
     "RegexMatching",
     # Exceptions
     "InputGenerationException",
+    "InteractionGenerationError",
     # LLM-based generators
     "BaseLLMGenerator",
     "LLMGenerator",

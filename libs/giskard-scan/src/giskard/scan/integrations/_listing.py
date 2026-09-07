@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-ScanTool = Literal["giskard", "garak", "deepteam"]
+type ScanTool = Literal["giskard", "garak", "deepteam"]
 
 
 def _list_giskard_generators() -> list[str]:
@@ -21,7 +21,7 @@ def _list_giskard_generators() -> list[str]:
 
 
 def list_scan_items(
-    tool: str,
+    tool: ScanTool,
     *,
     include_inactive: bool = False,
 ) -> list[str]:

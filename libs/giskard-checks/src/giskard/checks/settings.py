@@ -62,16 +62,34 @@ def get_settings() -> GiskardChecksSettings:
     return GiskardChecksSettings()
 
 
-def set_default_generator(generator: BaseGenerator) -> None:
+def set_default_generator(generator: BaseGenerator | str) -> None:
     """Set the default LLM generator for all checks.
 
     Parameters
     ----------
-    generator : BaseGenerator
-        The generator to use as default for all LLM checks.
+    generator : BaseGenerator or str
+        The generator to use as default for all LLM checks. A model
+        identifier string (e.g. ``"openai/gpt-4o-mini"``) is wrapped in a
+        :class:`~giskard.agents.Generator`.
+
+    Examples
+    --------
+    Pass a model identifier::
+
+        from giskard.checks import set_default_generator
+        set_default_generator("openai/gpt-4o-mini")
+
+    Pass a generator instance when you need extra configuration::
+
+        from giskard.agents import Generator
+        from giskard.checks import set_default_generator
+        set_default_generator(Generator(model="openai/gpt-4o-mini"))
     """
     global _default_generator
-    _default_generator = generator
+    if isinstance(generator, str):
+        _default_generator = Generator(model=generator)
+    else:
+        _default_generator = generator
 
 
 def get_default_generator() -> BaseGenerator:

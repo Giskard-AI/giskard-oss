@@ -28,7 +28,7 @@ from .context import RunContext
 from .errors.serializable import Error
 from .errors.workflow_errors import ModelRefusalError, WorkflowError
 from .generators import BaseGenerator, GenerationParams
-from .templates import MessageTemplate, PromptsManager, get_prompts_manager
+from .templates import MessageTemplate, PromptsManager, Trusted, get_prompts_manager
 from .tools.tool import Tool
 
 
@@ -642,5 +642,9 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         return rendered_messages
 
 
-def _output_instructions(output_model: type[BaseModel]) -> str:
-    return f"Provide your answer in JSON format, respecting this schema:\n{output_model.model_json_schema()}"
+def _output_instructions(output_model: type[BaseModel]) -> Trusted:
+    # Trusted: derived from the developer-declared output model, and must reach
+    # the LLM unescaped so the JSON schema stays readable.
+    return Trusted(
+        f"Provide your answer in JSON format, respecting this schema:\n{output_model.model_json_schema()}"
+    )

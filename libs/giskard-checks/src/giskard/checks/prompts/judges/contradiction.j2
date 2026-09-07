@@ -22,7 +22,8 @@ Your task is to check whether the agent's answer contains any factual claim that
 3. For each factual claim, check whether the reference context clearly states an incompatible fact.
 4. If at least one claim clearly contradicts the reference context, the evaluation should be false.
 5. If the answer is merely incomplete, evasive, cautious, a refusal, a clarification request, a redirect, broader than the context, or contains unsupported additions without direct conflict, the evaluation should be true.
-6. In your reasoning, mention only clear contradictions as reasons for failure. Do not fail for omissions or unsupported additions.
+6. Provide a clear reason for your evaluation decision on both pass and fail.
+7. In your reasoning, mention only clear contradictions as reasons for failure. Do not fail for omissions or unsupported additions.
 
 ## Markers
 Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT ANSWER> indicate where the reference context and agent answer are, respectively. Everything inside a marker belongs to that category.
@@ -30,13 +31,13 @@ Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT 
 -------------------
 
 <AGENT ANSWER>
-{{ answer }}
+{{ answer | fence }}
 </AGENT ANSWER>
 
 -------------------
 
 <REFERENCE CONTEXT>
-{{ context }}
+{{ context | fence }}
 </REFERENCE CONTEXT>
 
 -------------------

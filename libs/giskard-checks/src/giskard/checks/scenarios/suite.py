@@ -126,7 +126,11 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     suite.append(scenario1).append(scenario2)
 
     result = await suite.run()
-    print(result.pass_rate)
+    # pass_rate is None when nothing was evaluated (empty or fully skipped suite)
+    if result.pass_rate is None:
+        print("No scenarios evaluated")
+    else:
+        print(result.pass_rate)
     ```
     """
 

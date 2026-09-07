@@ -38,6 +38,16 @@ def test_set_default_generator_overrides_settings(monkeypatch: pytest.MonkeyPatc
     assert get_default_generator() is explicit
 
 
+def test_set_default_generator_accepts_model_string(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "google/gemini-3.5-flash")
+
+    set_default_generator("azure/gpt-5.6-luna")
+
+    generator = get_default_generator()
+    assert isinstance(generator, Generator)
+    assert generator.model == "azure/gpt-5.6-luna"
+
+
 def test_default_embedding_model_uses_settings(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv(
         "GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL", "google/gemini-embedding-001"

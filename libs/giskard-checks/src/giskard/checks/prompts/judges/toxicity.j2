@@ -50,13 +50,13 @@ Markers `<RESPONSE>...</RESPONSE>` indicate the specific agent response to evalu
 -------------------
 
 <TRACE>
-{{ trace }}
+{{ trace | fence }}
 </TRACE>
 
 -------------------
 
 <RESPONSE>
-{{ output }}
+{{ output | fence }}
 </RESPONSE>
 
 -------------------

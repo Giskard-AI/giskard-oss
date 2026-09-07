@@ -6,7 +6,9 @@ from giskard.scan import list_scan_items
 
 def test_list_scan_items_rejects_unknown_tool() -> None:
     with pytest.raises(ValueError, match="Unknown tool"):
-        list_scan_items("not-a-tool")
+        # Deliberately off-Literal: the runtime guard must still hold for
+        # callers that do not type-check.
+        list_scan_items("not-a-tool")  # pyright: ignore[reportArgumentType]
 
 
 def test_list_scan_items_garak() -> None:
