@@ -2,6 +2,12 @@
 
 Agent vulnerability scanner — red teaming, prompt injection, adversarial scenario generation.
 
+**Telemetry:** This package depends on `giskard-core`, which may send optional,
+aggregated scan lifecycle metrics (scan type, fixed execution modes, counts,
+durations, and outcomes). Descriptions, language values, generated scenarios,
+prompts, outputs, recommendations, and other user content are never included.
+See [Telemetry](../giskard-core/README.md#telemetry) for details and opt-outs.
+
 ## Scan entrypoints
 
 `quality_scan` and `vulnerability_scan` share the same explicit execution options.
