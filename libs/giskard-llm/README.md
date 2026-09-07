@@ -1,6 +1,6 @@
 # giskard-llm
 
-Lightweight LLM routing layer over native provider SDKs. Routes `provider/model` strings to the correct async SDK (OpenAI, Google Gemini, Anthropic, Azure OpenAI, Azure AI Foundry).
+Lightweight LLM routing layer over native provider SDKs. Routes `provider/model` strings to the correct async SDK (OpenAI, Google Gemini, Anthropic, Azure OpenAI, Azure AI Foundry, Eden AI).
 
 ## Installation
 
@@ -11,8 +11,8 @@ pip install giskard-llm[anthropic]   # Anthropic
 pip install giskard-llm[all]         # All providers
 ```
 
-> **Note:** Azure OpenAI (`azure/`) and Azure AI Foundry (`azure_ai/`) use the `openai` SDK.
-> Installing `giskard-llm[openai]` (or `giskard-llm[azure]`) covers all three.
+> **Note:** Azure OpenAI (`azure/`), Azure AI Foundry (`azure_ai/`) and Eden AI (`edenai/`) use the `openai` SDK.
+> Installing `giskard-llm[openai]` covers all of them.
 
 ## Quick start
 
@@ -68,6 +68,7 @@ response = await client.acompletion(
 | `anthropic/` | `anthropic` | `ANTHROPIC_API_KEY` | yes | no | `merge_system`, `timeout`, `http_client` (`httpx2`, see below), `default_headers` |
 | `azure/` | `openai` | `AZURE_API_KEY`, `AZURE_API_BASE` | yes | yes | `api_version`, `base_url`, `http_client`, `default_headers` |
 | `azure_ai/` | `openai` | `AZURE_AI_API_KEY`, `AZURE_AI_ENDPOINT` | yes | model-dependent | `base_url`, `http_client`, `default_headers` |
+| `edenai/` | `openai` | `EDENAI_API_KEY` | yes | yes | `base_url` (default `https://api.edenai.run/v3`), `timeout`, `http_client`, `default_headers` |
 
 
 ## Azure Foundry OpenAI v1
@@ -102,6 +103,54 @@ Use `azure/` for classic Azure OpenAI deployments that require `api_version`.
 Use `azure_ai/` for the existing Azure AI Foundry compatibility path. Do not
 use `azure_ai/` for new OpenAI v1 endpoints unless you intentionally need that
 legacy endpoint behavior.
+
+## Eden AI (500+ models, one key, EU/GDPR)
+
+[Eden AI](https://www.edenai.co/) is a unified, EU-based gateway exposing 500+ models
+from every major provider (OpenAI, Anthropic, Google, Mistral, Amazon, xAI, DeepSeek,
+Groq, …) behind a single OpenAI-compatible endpoint. The `edenai/` provider is a thin
+subclass of the `openai/` provider with the base URL and `EDENAI_API_KEY` preset, so
+completions, embeddings, and the Responses API all work.
+
+Eden AI model ids use a `provider/model` form, so full giskard model strings keep both
+segments (the router splits on the first `/` only):
+
+```python
+from giskard.llm import acompletion, aembedding
+
+# EDENAI_API_KEY is read from the environment
+chat = await acompletion(
+    "edenai/openai/gpt-4o",
+    [{"role": "user", "content": "Hello!"}],
+)
+chat = await acompletion(
+    "edenai/anthropic/claude-3-5-sonnet-latest",
+    [{"role": "user", "content": "Hello!"}],
+)
+emb = await aembedding("edenai/openai/text-embedding-3-small", ["Text to embed."])
+```
+
+### EU data residency (GDPR)
+
+For strict data residency, use Eden AI's **dedicated EU endpoint**
+(`https://api.eu.edenai.run/v3`) via `eu=True`. It serves only EU-hosted models
+(~270) and **rejects any non-EU model with HTTP 451**, guaranteeing inference
+stays within the European Union.
+
+```python
+from giskard.llm import LLMClient
+
+client = LLMClient()
+client.configure("eden-eu", provider="edenai", eu=True, api_key="os.environ/EDENAI_API_KEY")  # pragma: allowlist secret
+
+# EU-hosted model → OK; a non-EU model would raise a 451 error.
+chat = await client.acompletion("eden-eu/amazon/amazon.nova-lite-v1:0", messages)
+```
+
+Alternatively, keep the default endpoint and select EU-hosted model ids
+yourself: `GET https://api.edenai.run/v3/models` returns a `regions` list per
+model, and some providers publish explicit `@eu` variants (e.g.
+`edenai/amazon/amazon.nova-2-lite-v1:0@eu`).
 
 ## Custom transport and headers
 
