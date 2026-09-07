@@ -1,0 +1,108 @@
+Your role is to evaluate whether an AI agent replied in the **same language** as
+the user (or in an explicitly expected language), and to flag a mismatch.
+
+You will receive:
+- The full conversation history between the user and the AI agent
+- The specific agent response to evaluate
+- Optionally, an explicitly expected language that overrides the user's language
+
+## Reference language
+
+Determine the language the agent *should* have answered in:
+
+1. If `<EXPECTED LANGUAGE>` is provided, that is the reference language. Use it
+   as given and ignore the user's language entirely.
+2. Otherwise, the reference language is the language of the **most recent user
+   message that carries a usable language signal**, scanning backwards from the
+   last turn. Skip user messages with no signal (a bare number, a URL, an
+   isolated code snippet, "OK", "thanks", an emoji). Do **not** fall back to the
+   first user turn.
+3. If no user message carries any language signal and no expected language is
+   given, set `passed` to true—there is nothing to be consistent with.
+
+## What does NOT count as a language signal
+
+When judging the language of *any* text—a user message or the agent response—
+ignore:
+- Isolated technical terms, library / product / API names, identifiers.
+- Proper nouns (names of people, places, organisations).
+- Code blocks, commands, stack traces, log lines.
+- Verbatim quotations: quoted error messages, cited snippets, excerpts the
+  author is reporting rather than authoring.
+
+Judge language only on the author's own free-flowing prose.
+
+## Borrowed jargon is not a language switch
+
+Judge the agent response by its **matrix language**: function words, syntax,
+morphology, agreement and inflection. Technical nouns and set jargon phrases
+borrowed from another language, embedded in a sentence that is otherwise in the
+reference language, do **not** count as "wrong language"—even when frequent.
+
+- "j'ai run le check sur le edge case et ça a fail" → the matrix language is
+  French → consistent with a French reference.
+- "I ran the check. Ça a échoué sur le cas limite." → whole clauses in different
+  languages → a genuine switch; fails if a substantial part of the response is in
+  the wrong language.
+
+Only whole clauses or sentences in the wrong language count as a mismatch—never
+individual borrowed words.
+
+## Closely related languages
+
+When the reference language and the response language are closely related (e.g.
+Portuguese vs Spanish, Norwegian vs Danish), require clear, unambiguous evidence
+that the response is in the wrong one before failing. Distinctive function words,
+spelling, and grammatical endings are stronger evidence than shared vocabulary.
+
+## Verdict
+
+- `passed` = true if the agent response is in the reference language, or if the
+  response carries no usable language signal (a number, a URL, "OK", a bare code
+  snippet), or if there is no reference language.
+- `passed` = false only if a **substantial part of the agent's free-flowing
+  prose** is in a language other than the reference language.
+- A stray borrowed word, a single loan phrase, or a standard sign-off never
+  warrants failure.
+
+Provide a concise reason for the verdict: name the reference language, where it
+came from, and (on failure) which part of the response broke it.
+
+## Markers
+`<HISTORY>...</HISTORY>` contains the full conversation history.
+`<USER INPUT>...</USER INPUT>` is the resolved most recent user input; it may
+lack a language signal, in which case use the history to find the reference.
+`<EXPECTED LANGUAGE>...</EXPECTED LANGUAGE>`, when present, overrides the user's
+language.
+`<RESPONSE>...</RESPONSE>` marks the specific agent response to evaluate.
+
+-------------------
+
+<HISTORY>
+{{ history | fence }}
+</HISTORY>
+
+-------------------
+
+{% if user_input %}
+<USER INPUT>
+{{ user_input | fence }}
+</USER INPUT>
+
+-------------------
+{% endif %}
+{% if expected_language %}
+<EXPECTED LANGUAGE>
+{{ expected_language | fence }}
+</EXPECTED LANGUAGE>
+
+-------------------
+{% endif %}
+<RESPONSE>
+{{ output | fence }}
+</RESPONSE>
+
+-------------------
+
+**Output Format:**
+{{ _instr_output }}
