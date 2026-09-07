@@ -12,6 +12,7 @@ from giskard.checks import (
     Scenario,
     Trace,
     WithSpy,
+    get_default_generator,
 )
 from giskard.llm.types import ChatMessage, UserMessage
 from pydantic import BaseModel, Field, computed_field
@@ -46,12 +47,12 @@ def mock_apply_tool(mail: str, message: str) -> str:
 
 
 @pytest.fixture
-def generator() -> agents.Generator:
-    return agents.Generator(model="openai/gpt-4o-mini")
+def generator() -> agents.BaseGenerator:
+    return get_default_generator()
 
 
 @pytest.fixture
-def mock_agent(generator: agents.Generator) -> agents.ChatWorkflow[ChatMessage]:
+def mock_agent(generator: agents.BaseGenerator) -> agents.ChatWorkflow[ChatMessage]:
     return generator.chat(message=system_prompt, role="system").with_tools(
         mock_apply_tool
     )
@@ -116,15 +117,15 @@ async def test_single_message(
         ),
         Equals(
             expected_value=1,
-            key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_count']",
+            target_key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_count']",
         ),
         Equals(
             expected_value="test@test.com",
-            key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[0]",
+            target_key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[0]",
         ),
         Equals(
             expected_value="Hello, I want to apply for a job.",
-            key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[1]",
+            target_key="trace.interactions[-1].metadata['tests.integration.test_stateless.mock_apply_tool']['call_args'].args[1]",
         ),
     )
     result = await scenario.run()
@@ -159,7 +160,7 @@ class UserSimulatorOutput(BaseModel):
 
 # tests
 async def test_user_simulator(
-    generator: agents.Generator,
+    generator: agents.BaseGenerator,
     adapter: Callable[[ChatMessage, MessageTraces], Awaitable[ChatMessage]],
 ):
     async def user_simulator(

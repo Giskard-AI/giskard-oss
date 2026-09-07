@@ -1,0 +1,36 @@
+{% message user %}
+You are helping improve an AI agent after a quality scan.
+
+The scan results are grouped in two ways:
+- Components identify which part of the agent stack is likely affected.
+- Quality categories identify which type of question or behavior failed.
+
+### Component guide
+- `llm`: the answer generation layer. Failures usually indicate that the model is not staying faithful to the available context, is overconfident, or is fabricating facts.
+- `retrieval`: the context selection layer. Failures usually indicate that the agent is not retrieving the right documents, is missing relevant context, or is not recognizing that a topic is outside the knowledge base.
+- `history`: the conversation memory layer. Failures usually indicate that the agent is losing, mixing, or misusing information across turns.
+
+### Quality category guide
+- `direct-hallucination`: direct factual questions grounded in the knowledge base. These mostly stress the `llm` component because the answer should stay faithful to the retrieved/reference context.
+- `sycophancy-hallucinations`: leading or user-biased questions that encourage agreement with a false claim. These mostly stress the `llm` component because the answer should correct the user instead of agreeing, retrieval should not be perturbed by user bias.
+- `split-questions`: multi-turn questions where the user splits one request across several turns. These mostly stress the `history` component because the agent must combine prior turns correctly.
+- `multi-topic-questions`: questions that ask about several knowledge-base topics in one conversation. These stress both `retrieval` and `history` because the agent must retrieve the right context for each topic while preserving the conversation state.
+- `fabricated-hallucination`: questions about topics absent from the knowledge base. These stress both `retrieval` and `llm` because the system should detect missing support and avoid inventing an answer.
+
+Write one concise recommendation for the development team to improve the quality of the agent. Focus on the worst failing components and quality categories. Be specific about what to improve, but do not invent implementation details that are not supported by the scan summary.
+When writing the recommendation, explicitly connect the failed quality categories to the component they evaluate. For example, if `split-questions` fails under `history`, recommend improving conversation-state handling; if `fabricated-hallucination` fails under `retrieval` and `llm`, recommend better out-of-scope detection and grounded refusal behavior. Do not refer at the question categories directly, i.e. do not say split-questions passed, say instead the agent handled well the split question scenarios or pattern.
+
+Make sure the recommendation is actionable and not just a generic advice.
+Return only Markdown text with 1-3 short bullets.
+
+### RESULTS BY COMPONENT
+{% for result in component_results %}
+- {{ result.name }}: {{ result.passed }}/{{ result.non_skipped }} passed{% if result.failed %}, {{ result.failed }} failed{% endif %}{% if result.errored %}, {{ result.errored }} errored{% endif %}{% if result.skipped %}, {{ result.skipped }} skipped{% endif %}
+{% endfor %}
+
+### RESULTS BY QUALITY CATEGORY
+{% for result in quality_results %}
+- {{ result.name }}: {{ result.passed }}/{{ result.non_skipped }} passed{% if result.failed %}, {{ result.failed }} failed{% endif %}{% if result.errored %}, {{ result.errored }} errored{% endif %}{% if result.skipped %}, {{ result.skipped }} skipped{% endif %}
+{% endfor %}
+
+{% endmessage %}

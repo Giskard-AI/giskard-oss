@@ -26,14 +26,14 @@ pytestmark = pytest.mark.functional
 
 
 def _giskard_llm_generator() -> GiskardLLMGenerator:
-    return GiskardLLMGenerator(model=os.getenv("TEST_MODEL", "google/gemini-2.0-flash"))
+    return GiskardLLMGenerator(model=os.getenv("TEST_MODEL", "google/gemini-3.5-flash"))
 
 
 def _litellm_generator() -> BaseGenerator:
     from giskard.agents.generators.litellm_generator import LiteLLMGenerator
 
     return LiteLLMGenerator(
-        model=os.getenv("TEST_LITELLM_MODEL", "gemini/gemini-2.0-flash")
+        model=os.getenv("TEST_LITELLM_MODEL", "gemini/gemini-3.5-flash")
     )
 
 

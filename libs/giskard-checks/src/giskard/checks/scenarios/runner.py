@@ -6,23 +6,23 @@ updated Trace objects via the async generator protocol.
 """
 
 import time
+import traceback
 from typing import Any, cast
 
 from giskard.core import (
-    NOT_PROVIDED,
-    NotProvided,
     scoped_telemetry,
     telemetry_capture,
     telemetry_tag,
 )
+from pydantic.experimental.missing_sentinel import MISSING
 
 from .._telemetry_props import scenario_shape_properties
-from ..core import Trace
+from ..core import InteractionGenerationError, Trace
 from ..core.interaction import Interact
-from ..core.result import CheckResult, ScenarioResult, TestCaseResult
+from ..core.result import CheckResult, ScenarioResult, TestCaseError, TestCaseResult
 from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
-from ..core.types import ProviderType
+from ..core.types import Target
 from ..utils.inference import _infer_trace_type
 
 
@@ -38,30 +38,24 @@ def _validate_multiple_runs(value: int | None) -> int | None:
 
 def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
-    target: (
-        ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, TraceType], OutputType]
-        | NotProvided
-    ),
+    target: Target[InputType, OutputType, TraceType] | MISSING,
 ) -> list[Step[InputType, OutputType, TraceType]]:
     """Build steps with target bound to Interact outputs where needed.
 
     If no target is provided, returns the scenario's steps as-is. Otherwise,
-    returns new Step objects with interacts that have NOT_PROVIDED outputs
+    returns new Step objects with interacts that have MISSING outputs
     replaced by the given target.
     """
-    target = target if not isinstance(target, NotProvided) else scenario.target
+    target = target if target is not MISSING else scenario.target
 
-    if isinstance(target, NotProvided):
+    if target is MISSING:
         return scenario.steps
 
     steps = []
     for step in scenario.steps:
         interacts = []
         for interact in step.interacts:
-            if isinstance(interact, Interact) and isinstance(
-                interact.outputs, NotProvided
-            ):
+            if isinstance(interact, Interact) and interact.outputs is MISSING:
                 interact = interact.model_copy().set_outputs(target)
             interacts.append(interact)
 
@@ -72,19 +66,41 @@ def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
 
 def _resolve_trace_type[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
-    run_target: (
-        ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, TraceType], OutputType]
-        | NotProvided
-    ),
+    run_target: Target[InputType, OutputType, TraceType] | MISSING,
 ) -> type[TraceType]:
     if scenario.trace_type is not None:
         return scenario.trace_type
-    effective_target = (
-        run_target if not isinstance(run_target, NotProvided) else scenario.target
-    )
+    effective_target = run_target if run_target is not MISSING else scenario.target
     inferred = _infer_trace_type(effective_target)
     return cast(type[TraceType], inferred if inferred is not None else Trace)
+
+
+def _skipped_check_results_for_step[InputType, OutputType, TraceType: Trace[Any, Any]](
+    step: Step[InputType, OutputType, TraceType], message: str
+) -> list[CheckResult]:
+    # A step carrying no checks still has to yield one SKIP result: an empty
+    # result list would make TestCaseResult.status report PASS, turning a step
+    # that never ran into a green one. Synthetic details keep format_failures
+    # from labeling it "Unknown check".
+    if not step.checks:
+        return [
+            CheckResult.skip(
+                message=message,
+                details={"check_kind": "step", "check_name": "step"},
+            )
+        ]
+
+    return [
+        CheckResult.skip(
+            message=message,
+            details={
+                "check_kind": check.kind,
+                "check_name": check.name,
+                "check_description": check.description,
+            },
+        )
+        for check in step.checks
+    ]
 
 
 class ScenarioRunner:
@@ -122,23 +138,35 @@ class ScenarioRunner:
     async def _run_once[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ) = NOT_PROVIDED,
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
         return_exception: bool = False,
     ) -> ScenarioResult[TraceType]:
+        """Execute one scenario attempt with a fresh trace.
+
+        Parameters
+        ----------
+        scenario : Scenario
+            Scenario whose steps should be executed.
+        target : Target or MISSING
+            Optional run-specific target overriding the scenario target.
+        return_exception : bool
+            Whether input-generation errors should be recorded instead of raised.
+
+        Returns
+        -------
+        ScenarioResult
+            Result containing the trace and every materialized step result.
+        """
         start_time = time.perf_counter()
         telemetry_tag("giskard_component", "scenario_runner")
         telemetry_tag("giskard_operation", "scenario_run")
 
         trace_cls = _resolve_trace_type(scenario, target)
-        trace = cast(TraceType, trace_cls(annotations=scenario.annotations))
+        trace = trace_cls(annotations=scenario.annotations)
 
         steps = _build_steps(scenario, target)
         steps_results: list[TestCaseResult] = []
-        has_target = target is not NOT_PROVIDED
+        has_target = target is not MISSING
         shape_props = scenario_shape_properties(
             scenario,
             has_target=has_target,
@@ -150,13 +178,64 @@ class ScenarioRunner:
         )
 
         for step in steps:
-            trace = await trace.with_interactions(*step.interacts)
+            try:
+                for interaction in step.interacts:
+                    trace = await trace.with_interaction(interaction)
+            except Exception as caught:
+                error = caught
+                if isinstance(caught, InteractionGenerationError):
+                    trace = cast(TraceType, caught.partial_trace)
+                    # Report the error that stopped the generator, not the wrapper
+                    # the trace raised to hand back its partial progress.
+                    if caught.__cause__ is not None:
+                        error = caught.__cause__
+
+                if not return_exception:
+                    if error is caught:
+                        raise
+                    # Hide the InteractionGenerationError wrapper without losing
+                    # how the generator error was chained. Capture the original
+                    # links first: `raise` below re-points __context__ at the
+                    # wrapper we are unwrapping.
+                    context = error.__context__
+                    suppress_context = error.__suppress_context__
+                    try:
+                        raise error
+                    finally:
+                        error.__context__ = context
+                        error.__suppress_context__ = suppress_context
+
+                step_result = TestCaseResult(
+                    results=_skipped_check_results_for_step(
+                        step,
+                        "Checks were skipped due to input generation failure",
+                    ),
+                    duration_ms=int((time.perf_counter() - start_time) * 1000),
+                    last_interaction_index=(
+                        len(trace.interactions) - 1 if trace.interactions else None
+                    ),
+                    error=TestCaseError(
+                        message=str(error),
+                        exception_type=type(error).__name__,
+                        traceback="".join(traceback.format_exception(error)),
+                        phase="input_generation",
+                    ),
+                )
+                steps_results.append(step_result)
+                break
+
+            last_interaction_index = (
+                len(trace.interactions) - 1 if trace.interactions else None
+            )
 
             test_case = TestCase(
                 trace=trace,
                 checks=step.checks,
             )
             step_result = await test_case.run(return_exception)
+            step_result = step_result.model_copy(
+                update={"last_interaction_index": last_interaction_index}
+            )
             steps_results.append(step_result)
 
             # Stop on first failure
@@ -164,15 +243,19 @@ class ScenarioRunner:
                 break
 
         if len(steps_results) < len(steps):
+            # Skipped steps own no new interaction; point them at the trace as it stood
+            # when execution stopped so the index is never left unset.
+            skipped_last_interaction_index = (
+                len(trace.interactions) - 1 if trace.interactions else None
+            )
             for i in range(len(steps_results), len(steps)):
                 step_result = TestCaseResult(
-                    results=[
-                        CheckResult.skip(
-                            message=f"Step {i + 1} was skipped due to previous failure"
-                        )
-                        for _ in steps[i].checks
-                    ],
+                    results=_skipped_check_results_for_step(
+                        steps[i],
+                        f"Step {i + 1} was skipped due to previous failure",
+                    ),
                     duration_ms=0,
+                    last_interaction_index=skipped_last_interaction_index,
                 )
                 steps_results.append(step_result)
 
@@ -184,6 +267,7 @@ class ScenarioRunner:
             steps=steps_results,
             duration_ms=duration_ms,
             final_trace=trace,
+            tags=list(scenario.tags),
         )
 
         telemetry_capture(
@@ -200,11 +284,7 @@ class ScenarioRunner:
     async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,
         scenario: Scenario[InputType, OutputType, TraceType],
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ) = NOT_PROVIDED,
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
         return_exception: bool = False,
         multiple_runs: int | None = None,
     ) -> ScenarioResult[TraceType]:
@@ -219,8 +299,8 @@ class ScenarioRunner:
         ----------
         scenario : Scenario
             The scenario to execute.
-        target : ProviderType | NotProvided
-            Optional target override used to replace `NOT_PROVIDED` interaction outputs.
+        target : Target | MISSING, optional
+            Optional target override used to replace ``MISSING`` interaction outputs.
         return_exception : bool
             If True, return results even when exceptions occur instead of raising.
         multiple_runs : int | None

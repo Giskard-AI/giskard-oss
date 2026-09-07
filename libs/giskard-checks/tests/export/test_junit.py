@@ -10,6 +10,7 @@ from giskard.checks import (
     Trace,
 )
 from giskard.checks.export.junit import to_junit_xml
+from giskard.checks.scenarios.suite import Suite
 
 
 def _sample_suite_result() -> SuiteResult:
@@ -99,6 +100,7 @@ def _sample_suite_result() -> SuiteResult:
             ),
         ],
         duration_ms=420,
+        suite=Suite(name="test"),
     )
 
 
@@ -226,6 +228,7 @@ def test_failed_scenario_with_mixed_check_statuses_is_still_a_failure() -> None:
             )
         ],
         duration_ms=50,
+        suite=Suite(name="test"),
     )
 
     root = ET.fromstring(to_junit_xml(suite_result))

@@ -1,6 +1,8 @@
 from collections.abc import Sequence
 from typing import Literal, Protocol
 
+from pydantic import Field
+
 from ._base import ArgumentDict, _BaseModel
 
 # -- Utility functions -------------------------------------------------------------
@@ -16,9 +18,9 @@ class _TextualizableContentProtocol(Protocol):
 
 
 def _extract_text(
-    content: str
-    | Sequence[_TextualizableContentProtocol | _TextContentProtocol]
-    | None,
+    content: (
+        str | Sequence[_TextualizableContentProtocol | _TextContentProtocol] | None
+    ),
 ) -> str | None:
     if isinstance(content, str) or content is None:
         return content
@@ -34,6 +36,9 @@ def _extract_text(
 class TextContent(_BaseModel):
     type: Literal["text"] = "text"
     text: str
+    thought_signature: bytes | None = Field(
+        default=None, exclude=True, repr=False
+    )  # Gemini-specific
 
 
 class RefusalContent(_BaseModel):
@@ -59,6 +64,9 @@ class ToolCall(_BaseModel):
     type: Literal["function"] = "function"
     id: str
     function: ToolCallFunction
+    thought_signature: bytes | None = Field(
+        default=None, exclude=True, repr=False
+    )  # Gemini-specific
 
 
 class SystemMessage(_BaseModel):

@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import gc
 import time
 import uuid
 import warnings
@@ -120,6 +121,39 @@ class TestRateLimiterRegistry:
             60, max_concurrent=1, id=_uid()
         )
         assert _rate_limiter_a._state is not _rate_limiter_b._state
+
+    def test_from_id_finds_second_equal_instance_after_first_is_deleted(self):
+        # Two structurally-equal instances sharing the same id can coexist when
+        # duplicate warnings are downgraded. The registry must track them by
+        # object identity, not by structural equality, or deleting the first
+        # one makes the still-alive second one unreachable via from_id().
+        with patch(
+            "giskard.core.rate_limiter.base.GISKARD_DISABLE_DUPLICATE_RATE_LIMITERS_WARNINGS",
+            True,
+        ):
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                rl_id = _uid()
+                rate_limiter_a = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
+                rate_limiter_b = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
+                del rate_limiter_a
+
+                found = MinIntervalRateLimiter.from_id(rl_id)
+                assert found is rate_limiter_b
+
+    def test_registry_drops_tracking_entry_once_all_instances_are_collected(self):
+        # Every rate limiter created without an explicit id gets a fresh
+        # random UUID, so leaving an empty WeakValueDictionary behind in
+        # _instances after the last instance for an id is collected would
+        # leak one dict entry per ephemeral rate limiter forever.
+        rl_id = _uid()
+        rate_limiter = MinIntervalRateLimiter.from_rpm(60, id=rl_id)
+        assert rl_id in MinIntervalRateLimiter._registry._instances
+
+        del rate_limiter
+        gc.collect()
+
+        assert rl_id not in MinIntervalRateLimiter._registry._instances
 
 
 class TestDeepCopy:

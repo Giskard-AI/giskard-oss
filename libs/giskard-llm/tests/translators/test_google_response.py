@@ -47,7 +47,7 @@ from .tool_turn_fixtures import (
     google_response_user_two_parallel_tool_calls_and_results,
 )
 
-_MODEL = "gemini-2.0-flash"
+_MODEL = "gemini-3.5-flash"
 
 
 def _message(
@@ -315,4 +315,26 @@ def test_assistant_message_mixed_output_text_and_refusal_maps_to_text_parts():
             "type": "model_output",
         }
     ]
+    validate_google_interaction_params(payload)
+
+
+def test_response_format_pydantic_class_becomes_text_response_format():
+    """A Pydantic ``response_format`` is converted to the SDK's ``TextResponseFormatParam``
+    dict (``type``/``mime_type``/``schema``), mirroring the openai/anthropic translators,
+    instead of being passed through as a raw, unserializable class."""
+    from pydantic import BaseModel
+
+    class Answer(BaseModel):
+        value: int
+
+    payload = GoogleResponseTranslator.to_google(
+        _MODEL, "Hello.", response_format=Answer
+    )
+
+    assert payload.get("response_mime_type") == "application/json"
+    assert payload.get("response_format") == {
+        "type": "text",
+        "mime_type": "application/json",
+        "schema": Answer.model_json_schema(),
+    }
     validate_google_interaction_params(payload)

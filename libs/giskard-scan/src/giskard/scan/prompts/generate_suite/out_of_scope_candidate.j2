@@ -1,0 +1,49 @@
+{% message user %}
+Generate one precise but absent topic/object for an out-of-scope knowledge-base
+quality scenario.
+
+## Target Agent Description
+<description>
+{{ description }}
+</description>
+
+## Reference Context
+Use this context as inspiration for the domain, concrete objects, naming style,
+relationships, policies, products, features, requirements, or workflows.
+
+<documents>
+{% for document in reference_context %}
+Document {{ loop.index }}:
+{{ document }}
+{% if not loop.last %}
+------
+{% endif %}
+{% endfor %}
+</documents>
+
+## Generation Instructions
+Derive the absent topic/object from concrete things that already exist in the
+reference context. If products are mentioned, generate a fake product that
+resembles their naming/domain patterns. If policies, features, plans,
+relationships, requirements, integrations, or workflows are mentioned, generate
+a precise fake one that could plausibly belong to the same family.
+
+The generated topic/object must be specific enough to ask a concrete question
+about it, and must not be stated, implied, listed, or directly answerable from
+the reference context. Avoid trivial variants such as simply adding "2", "v2",
+"new", "plus", or changing only a version number.
+
+Generate the topic/object in this language: {{ language }}.
+
+Avoid:
+- topics that are explicitly contradicted by the documents;
+- generic questions outside the domain;
+- vague labels like “pricing”, “support”, or “policy”;
+- document metadata, titles, headings, file names, or wording;
+- a full user question.
+
+## Return Format
+Return JSON with:
+- topic: a concise noun phrase naming the absent object/topic.
+- reason: why it is plausible from the documents and why it appears absent.
+{% endmessage %}

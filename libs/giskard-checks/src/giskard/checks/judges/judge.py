@@ -1,7 +1,6 @@
 from typing import Self, override
 
-from giskard.agents.templates import MessageTemplate
-from giskard.agents.workflow import TemplateReference
+from giskard.agents import MessageTemplate, TemplateReference
 from giskard.llm.types import ChatMessage
 from pydantic import Field, model_validator
 
@@ -40,7 +39,7 @@ class LLMJudge[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     is available in both contexts.
 
     The LLM is expected to return a structured output with a `passed` boolean field
-    and an optional `reason` string field (see `LLMCheckResult`).
+    and a required non-blank `reason` string field (see `LLMCheckResult`).
 
     Attributes
     ----------

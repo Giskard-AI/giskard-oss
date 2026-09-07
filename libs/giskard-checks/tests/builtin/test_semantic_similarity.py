@@ -34,6 +34,26 @@ class MockEmbeddingModel(BaseEmbeddingModel):
         return result
 
 
+def _recording_embedding_model(
+    embedded: list[list[str]],
+) -> BaseEmbeddingModel:
+    """Embed mock that records texts without touching the kind registry.
+
+    Do not use ``@BaseEmbeddingModel.register`` here: a kind registered inside
+    a test body raises ``ValueError`` on the second run in the same process.
+    Direct injection does not require a registered kind.
+    """
+
+    class RecordingEmbeddingModel(BaseEmbeddingModel):
+        async def _embed(
+            self, texts: list[str], params: EmbeddingParams | None = None
+        ) -> list[np.ndarray]:
+            embedded.append(list(texts))
+            return [np.array([1.0, 0.0, 0.0]) for _ in texts]
+
+    return RecordingEmbeddingModel()
+
+
 def serialization_roundtrip[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     similarity: SemanticSimilarity[InputType, OutputType, TraceType],
 ) -> SemanticSimilarity[InputType, OutputType, TraceType]:
@@ -95,7 +115,7 @@ async def test_run_returns_success() -> None:
         embedding_model=embedding_model,
         threshold=0.95,
         reference_text="Paris is home to the Eiffel Tower.",
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
     interaction = Interaction(
         inputs={"query": "Where is the Eiffel Tower?"},
@@ -122,7 +142,7 @@ async def test_run_returns_failure() -> None:
         embedding_model=embedding_model,
         threshold=0.95,
         reference_text="Tokyo is the capital of Japan.",
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
     interaction = Interaction(
         inputs={"query": "Where is the Eiffel Tower?"},
@@ -147,7 +167,7 @@ async def test_reference_text_from_trace() -> None:
     check = SemanticSimilarity(
         embedding_model=embedding_model,
         threshold=0.90,
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
     interaction = Interaction(
         inputs={"query": "What is AI?"},
@@ -173,7 +193,7 @@ async def test_direct_reference_text_priority() -> None:
         embedding_model=embedding_model,
         threshold=0.85,
         reference_text="Direct reference",
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
     interaction = Interaction(
         inputs={"query": "Test"},
@@ -198,7 +218,7 @@ async def test_custom_actual_answer_key() -> None:
         embedding_model=embedding_model,
         threshold=0.90,
         reference_text="Reference",
-        actual_answer_key="trace.last.outputs.custom_field",
+        target_key="trace.last.outputs.custom_field",
     )
     interaction = Interaction(
         inputs={"query": "Test"},
@@ -222,7 +242,7 @@ async def test_custom_reference_text_key() -> None:
         embedding_model=embedding_model,
         threshold=0.90,
         reference_text_key="trace.last.metadata.custom_ref",
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
     interaction = Interaction(
         inputs={"query": "Test"},
@@ -254,7 +274,7 @@ async def test_threshold_variations() -> None:
         embedding_model=embedding_model,
         threshold=0.5,
         reference_text="Text B",
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
     interaction = Interaction(inputs={}, outputs={"response": "Text A"})
     result = await check_low.run(Trace(interactions=[interaction]))
@@ -265,7 +285,7 @@ async def test_threshold_variations() -> None:
         embedding_model=embedding_model,
         threshold=0.999,
         reference_text="Text B",
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
     result = await check_high.run(Trace(interactions=[interaction]))
     if expected_similarity < 0.999:
@@ -301,7 +321,7 @@ async def test_using_trace_last() -> None:
         embedding_model=embedding_model,
         threshold=0.85,
         reference_text="Reference",
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
     result = await check.run(trace)
 
@@ -325,8 +345,8 @@ async def test_empty_trace() -> None:
     )
     result = await check.run(Trace())
 
-    # When trace is empty, resolve returns NoMatch which causes check to fail
-    assert result.status == CheckStatus.FAIL
+    # When trace is empty, resolve returns NoMatch which causes check to error
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for actual answer key 'trace.last.outputs'." in result.message
@@ -346,7 +366,7 @@ async def test_custom_embedding_model_preserved_after_serialization_roundtrip() 
         embedding_model=embedding_model,
         threshold=0.92,
         reference_text="Reference",
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
     roundtrip_check = serialization_roundtrip(check)
 
@@ -373,7 +393,7 @@ async def test_serialization_roundtrip() -> None:
         embedding_model=embedding_model,
         threshold=0.92,
         reference_text="Reference",
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
 
     roundtrip_check = serialization_roundtrip(check)
@@ -406,7 +426,7 @@ async def test_missing_reference_text_in_trace() -> None:
     check = SemanticSimilarity(
         embedding_model=embedding_model,
         threshold=0.85,
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
     interaction = Interaction(
         inputs={},
@@ -416,7 +436,7 @@ async def test_missing_reference_text_in_trace() -> None:
     result = await check.run(Trace(interactions=[interaction]))
 
     # When reference is not found, check fails early
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for reference text key 'trace.last.metadata.reference_text'."
@@ -438,7 +458,7 @@ async def test_missing_actual_answer_in_trace() -> None:
         embedding_model=embedding_model,
         threshold=0.85,
         reference_text="Reference",
-        actual_answer_key="trace.last.outputs.nonexistent_field",
+        target_key="trace.last.outputs.nonexistent_field",
     )
     interaction = Interaction(
         inputs={},
@@ -448,14 +468,15 @@ async def test_missing_actual_answer_in_trace() -> None:
     result = await check.run(Trace(interactions=[interaction]))
 
     # When answer field is not found, check fails early
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for actual answer key 'trace.last.outputs.nonexistent_field'."
         in result.message
     )
     assert isinstance(result.details["actual_answer"], NoMatch)
-    assert "actual_answer_key" in result.details
+    # ``details`` names the canonical field, not the ``actual_answer_key`` alias.
+    assert "target_key" in result.details
 
 
 async def test_both_reference_and_answer_missing() -> None:
@@ -468,7 +489,7 @@ async def test_both_reference_and_answer_missing() -> None:
     check = SemanticSimilarity(
         embedding_model=embedding_model,
         threshold=0.85,
-        actual_answer_key="trace.last.outputs.missing",
+        target_key="trace.last.outputs.missing",
         reference_text_key="trace.last.metadata.missing",
     )
     interaction = Interaction(
@@ -479,7 +500,7 @@ async def test_both_reference_and_answer_missing() -> None:
     result = await check.run(Trace(interactions=[interaction]))
 
     # Check fails when reference text is missing (checked first)
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for reference text key 'trace.last.metadata.missing'."
@@ -502,7 +523,7 @@ async def test_empty_trace_with_no_direct_reference() -> None:
     result = await check.run(Trace())
 
     # Check fails when reference text is missing
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for reference text key 'trace.last.metadata.reference_text'."
@@ -523,7 +544,7 @@ async def test_missing_outputs_field_in_interaction() -> None:
         embedding_model=embedding_model,
         threshold=0.85,
         reference_text="Reference",
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
     interaction = Interaction(
         inputs={"query": "test"},
@@ -532,7 +553,7 @@ async def test_missing_outputs_field_in_interaction() -> None:
     result = await check.run(Trace(interactions=[interaction]))
 
     # When response field doesn't exist in outputs, check fails
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for actual answer key 'trace.last.outputs.response'."
@@ -552,7 +573,7 @@ async def test_missing_metadata_in_interaction() -> None:
     check = SemanticSimilarity(
         embedding_model=embedding_model,
         threshold=0.85,
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
         reference_text_key="trace.last.metadata.reference",
     )
     interaction = Interaction(
@@ -563,7 +584,7 @@ async def test_missing_metadata_in_interaction() -> None:
     result = await check.run(Trace(interactions=[interaction]))
 
     # When metadata doesn't exist, check fails (reference not found)
-    assert result.status == CheckStatus.FAIL
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for reference text key 'trace.last.metadata.reference'."
@@ -583,7 +604,7 @@ async def test_invalid_jsonpath_key() -> None:
     check = SemanticSimilarity(
         embedding_model=embedding_model,
         threshold=0.85,
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
         reference_text_key="trace.nonexistent.deeply.nested.field",
     )
     interaction = Interaction(
@@ -592,8 +613,8 @@ async def test_invalid_jsonpath_key() -> None:
     )
     result = await check.run(Trace(interactions=[interaction]))
 
-    # Invalid path resolves to NoMatch, causing check to fail
-    assert result.status == CheckStatus.FAIL
+    # Invalid path resolves to NoMatch, causing check to error
+    assert result.status == CheckStatus.ERROR
     assert result.message is not None
     assert (
         "No value found for reference text key 'trace.nonexistent.deeply.nested.field'."
@@ -615,7 +636,7 @@ async def test_similarity_at_exact_threshold() -> None:
         embedding_model=embedding_model,
         threshold=1.0,
         reference_text="Text B",
-        actual_answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
     )
     interaction = Interaction(inputs={}, outputs={"response": "Text A"})
     result = await check.run(Trace(interactions=[interaction]))
@@ -623,3 +644,88 @@ async def test_similarity_at_exact_threshold() -> None:
     # Should pass when similarity >= threshold
     assert result.status == CheckStatus.PASS
     assert result.details["similarity"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_list_valued_key_is_rejected_instead_of_embedding_its_repr():
+    """A key resolving to several values must not be embedded as `str(list)`.
+
+    Without this guard the check embeds "['a', 'b']" -- brackets and quotes
+    included -- and reports an ordinary pass/fail on a score computed from
+    text no one wrote.
+    """
+    embedded: list[list[str]] = []
+    trace = Trace[str, str](
+        interactions=[
+            Interaction(inputs="q1", outputs="a1", metadata={"ref": "first"}),
+            Interaction(inputs="q2", outputs="a2", metadata={"ref": "second"}),
+        ]
+    )
+    check = SemanticSimilarity(
+        target_key="trace.last.outputs",
+        reference_text_key="trace.interactions[*].metadata.ref",
+        threshold=0.5,
+        embedding_model=_recording_embedding_model(embedded),
+    )
+
+    result = await check.run(trace)
+
+    assert not result.passed
+    assert "must be a single value" in (result.message or "")
+    assert "reference text" in (result.message or "")
+    assert "list" in (result.message or "")
+    assert embedded == [], "nothing should have been sent to the embedding model"
+
+
+@pytest.mark.asyncio
+async def test_dict_valued_actual_answer_key_is_rejected():
+    """Default-style dict outputs must fail on the actual_answer guard path.
+
+    The list-valued reference test only exercises the first loop iteration.
+    `trace.last.outputs` often resolves to a dict; that path must reject
+    before embedding too.
+    """
+    embedded: list[list[str]] = []
+    trace = Trace[str, dict[str, str]](
+        interactions=[
+            Interaction(
+                inputs="q",
+                outputs={"response": "Paris"},
+                metadata={"ref": "Paris"},
+            )
+        ]
+    )
+    check = SemanticSimilarity(
+        target_key="trace.last.outputs",
+        reference_text_key="trace.last.metadata.ref",
+        threshold=0.5,
+        embedding_model=_recording_embedding_model(embedded),
+    )
+
+    result = await check.run(trace)
+
+    assert not result.passed
+    assert "must be a single value" in (result.message or "")
+    assert "actual answer" in (result.message or "")
+    assert "dict" in (result.message or "")
+    assert embedded == [], "nothing should have been sent to the embedding model"
+
+
+@pytest.mark.asyncio
+async def test_scalar_key_still_stringifies():
+    """Non-string scalars keep working; only collections are rejected."""
+    embedded: list[list[str]] = []
+    trace = Trace[str, str](
+        interactions=[Interaction(inputs="q", outputs="42", metadata={"ref": 42})]
+    )
+    check = SemanticSimilarity(
+        target_key="trace.last.outputs",
+        reference_text_key="trace.last.metadata.ref",
+        threshold=0.5,
+        embedding_model=_recording_embedding_model(embedded),
+    )
+
+    result = await check.run(trace)
+
+    assert result.passed
+    assert embedded == [["42", "42"]]

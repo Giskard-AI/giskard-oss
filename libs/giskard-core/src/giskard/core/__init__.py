@@ -21,7 +21,10 @@ from .telemetry import (
     telemetry_run_context,
     telemetry_tag,
 )
-from .utils import NOT_PROVIDED, NotProvided, provide_not_none
+from .utils import (
+    GISKARD_LIBS_VERSIONS,
+    get_lib_version,
+)
 
 LEGACY_GISKARD_PACKAGE_NAME = "giskard"
 
@@ -38,16 +41,17 @@ if spec and spec.has_location:
         )
     )
 
+__version__ = get_lib_version("giskard-core")
+
 __all__ = [
+    "__version__",
     # Discriminated unions
     "Discriminated",
     "discriminated_base",
     # Error handling
     "Error",
     # Utilities
-    "NotProvided",
-    "NOT_PROVIDED",
-    "provide_not_none",
+    "GISKARD_LIBS_VERSIONS",
     # Limiter
     "MinIntervalRateLimiter",
     "BaseRateLimiter",

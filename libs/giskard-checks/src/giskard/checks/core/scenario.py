@@ -1,13 +1,13 @@
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 
-from giskard.core.utils import NOT_PROVIDED, NotProvided
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.experimental.missing_sentinel import MISSING
 
 from .check import Check
 from .input_generator import InputGenerator
 from .interaction import Interact, InteractionSpec, Trace
 from .result import ScenarioResult
-from .types import GeneratorType, ProviderType
+from .types import GeneratorType, Target
 
 
 class Step[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
@@ -15,7 +15,18 @@ class Step[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: igno
 
     Each step corresponds to one TestCase at runtime: interactions are applied
     to the trace, then checks validate the resulting trace state.
+
+    Notes
+    -----
+    Unknown fields are rejected (``extra="forbid"``). Both fields default to an
+    empty list, so a misspelled key would otherwise be dropped silently and
+    yield a step that runs its interactions but asserts nothing -- a suite that
+    tests nothing looks identical to one that passes.
     """
+
+    # Rationale and the subclass rule: see ``Discriminated`` in giskard-core.
+    # (``Step`` is a plain ``BaseModel``, but the same config-merge rule holds.)
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     interacts: list[InteractionSpec[InputType, OutputType, TraceType]] = Field(
         default_factory=list,
@@ -43,7 +54,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         scenario = (
             Scenario("multi_step_test")
             .interact("Hello", lambda inputs: "Hi")
-            .check(Equals(expected_value="Hi", key="trace.last.outputs"))
+            .check(Equals(expected_value="Hi", target_key="trace.last.outputs"))
         )
         result = await scenario.run()
 
@@ -56,7 +67,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             steps=[
                 Step(
                     interacts=[Interact(inputs="Hello", outputs="Hi")],
-                    checks=[Equals(expected_value="Hi", key="trace.last.outputs")],
+                    checks=[Equals(expected_value="Hi", target_key="trace.last.outputs")],
                 ),
             ],
         )
@@ -75,14 +86,29 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
     annotations : dict[str, Any]
         Key-value pairs merged into the trace at run start.
         Can be accessed as `trace.annotations` during scenario execution.
-    target : ProviderType[[InputType], OutputType] | ProviderType[[InputType, TraceType], OutputType] | NotProvided
-        Default SUT for interactions whose outputs are ``NOT_PROVIDED`` when no
+    target : Target[InputType, OutputType, TraceType] | MISSING
+        Default SUT for interactions whose outputs are ``MISSING`` when no
         per-call ``target`` is passed to ``run`` (see ``with_target``).
     multiple_runs : int
         Default upper bound on how many times to execute the full scenario (each
         execution uses a fresh trace). Each run must pass for the next to run;
         execution stops on the first non-passing run (FAIL, ERROR, or SKIP). This
         is not a "retry until one success" mode.
+    tags : list[str]
+        Flat ``'Key:Value'`` labels for grouping and Hub upload alignment.
+        Tags without ``:`` are bare boolean labels.
+
+    Notes
+    -----
+    Unlike ``Check``, ``Scenario`` deliberately does **not** set
+    ``extra="forbid"``. Scenarios are parsed from JSONL hosted in remote
+    Hugging Face dataset repositories (see ``HuggingFaceDatasetScenarioGenerator``
+    in ``giskard-scan``), which release independently of this package. Forbidding
+    extras would make any field added upstream an instant hard failure for every
+    already-installed version, so tolerating unknown keys is the correct policy
+    at this boundary. Strictness stays where the input is user-authored, such as
+    ``Check``. Note that unknown keys are silently dropped: scenario metadata
+    that must survive parsing belongs in ``annotations``, not at the top level.
     """
 
     name: str = Field(
@@ -101,13 +127,9 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         default_factory=dict,
         description="Scenario-level annotations that will be injected in the trace.",
     )
-    target: (
-        ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, TraceType], OutputType]
-        | NotProvided
-    ) = Field(
-        default=NOT_PROVIDED,
-        description="Scenario-level target SUT that will be used to replace NOT_PROVIDED outputs.",
+    target: Target[InputType, OutputType, TraceType] | MISSING = Field(
+        default=MISSING,
+        description="Scenario-level target SUT that will be used to replace MISSING outputs.",
     )
     multiple_runs: int = Field(
         default=1,
@@ -118,6 +140,10 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         ),
         ge=1,
         strict=True,
+    )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Flat 'Key:Value' labels for grouping and Hub upload alignment.",
     )
 
     def __init__(
@@ -158,11 +184,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             | GeneratorType[[], InputType, None]
             | GeneratorType[[TraceType], InputType, TraceType]
         ),
-        outputs: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ) = NOT_PROVIDED,
+        outputs: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
         metadata: dict[str, object] | None = None,
     ) -> Self:
         """Add an interaction to the scenario.
@@ -177,9 +199,9 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         inputs : InputType | InputGenerator | Generator | Callable
             Input specification: static value, ``InputGenerator``, generator, or
             callable producing inputs (same options as ``Interact``).
-        outputs : OutputType | Callable | NotProvided, optional
-            Output specification, or ``NOT_PROVIDED`` to use the scenario-level
-            or ``run()``-level target. Defaults to ``NOT_PROVIDED``.
+        outputs : Target | MISSING, optional
+            Output specification, or ``MISSING`` to use the scenario-level
+            or ``run()``-level target. Defaults to ``MISSING``.
         metadata : dict[str, object] | None
             Optional metadata to attach to the interaction.
 
@@ -270,16 +292,13 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
 
     def with_target(
         self,
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-        ),
+        target: Target[InputType, OutputType, TraceType],
     ) -> Self:
-        """Set the default SUT for interactions with ``NOT_PROVIDED`` outputs.
+        """Set the default SUT for interactions with ``MISSING`` outputs.
 
         Parameters
         ----------
-        target : ProviderType[[InputType], OutputType] | ProviderType[[InputType, TraceType], OutputType]
+        target : Target[InputType, OutputType, TraceType]
             Callable that produces outputs given inputs (and optionally the trace).
 
         Returns
@@ -290,13 +309,25 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         self.target = target
         return self
 
+    def with_tags(self, tags: list[str]) -> Self:
+        """Set scenario tags for grouping and Hub upload.
+
+        Parameters
+        ----------
+        tags : list[str]
+            Flat strings in 'Key:Value' format. Tags without ':' are bare labels.
+
+        Returns
+        -------
+        Self
+            This scenario for method chaining.
+        """
+        self.tags = tags
+        return self
+
     async def run(
         self,
-        target: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ) = NOT_PROVIDED,
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
         return_exception: bool = False,
         multiple_runs: int | None = None,
     ) -> ScenarioResult[TraceType]:
@@ -312,22 +343,15 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
 
         Parameters
         ----------
-        target : ProviderType | NotProvided
-            Optional target override used to replace `NOT_PROVIDED` interaction outputs.
-        return_exception : bool
-            If True, return results even when exceptions occur instead of raising.
-        multiple_runs : int | None
-            Optional cap on full scenario executions. When provided, it overrides
-            the scenario-level `multiple_runs` value.
-
-        Parameters
-        ----------
-        target : ProviderType[[InputType], OutputType] | ProviderType[[InputType, TraceType], OutputType] | NotProvided, optional
-            SUT used to replace ``NOT_PROVIDED`` outputs on ``Interact`` specs.
-            Defaults to ``NOT_PROVIDED``; overrides the scenario's ``target`` when set.
+        target : Target | MISSING, optional
+            SUT used to replace ``MISSING`` outputs on ``Interact`` specs.
+            Defaults to ``MISSING``; overrides the scenario's ``target`` when set.
         return_exception : bool, default False
             If True, exceptions raised by checks become ``CheckResult.error``
             entries instead of propagating.
+        multiple_runs : int | None, optional
+            Optional cap on full scenario executions. When provided, it overrides
+            the scenario-level ``multiple_runs`` value.
 
         Returns
         -------

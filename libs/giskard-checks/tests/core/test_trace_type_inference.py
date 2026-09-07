@@ -3,7 +3,7 @@ from giskard.checks.core.interaction.trace import Trace
 from giskard.checks.core.scenario import Scenario
 from giskard.checks.scenarios.runner import _resolve_trace_type
 from giskard.checks.utils.inference import _infer_trace_type
-from giskard.core.utils import NOT_PROVIDED
+from pydantic.experimental.missing_sentinel import MISSING
 
 
 class MyTrace(Trace[str, str], frozen=True):
@@ -94,7 +94,7 @@ def test_resolve_trace_type_falls_back_to_scenario_target():
 
     scenario = Scenario("s", target=scenario_target)
 
-    assert _resolve_trace_type(scenario, NOT_PROVIDED) is MyTrace
+    assert _resolve_trace_type(scenario, MISSING) is MyTrace
 
 
 def test_resolve_trace_type_run_target_wins_over_scenario_target():
@@ -120,7 +120,7 @@ def test_resolve_trace_type_defaults_to_base_trace():
 
 def test_resolve_trace_type_defaults_to_base_trace_when_no_target():
     scenario = Scenario("s")
-    assert _resolve_trace_type(scenario, NOT_PROVIDED) is Trace
+    assert _resolve_trace_type(scenario, MISSING) is Trace
 
 
 # --- Runner integration tests ---

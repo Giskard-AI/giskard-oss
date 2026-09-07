@@ -222,7 +222,7 @@ class OpenAIProvider:
                 raise BadRequestError(
                     400, "Tool messages must have a tool_call_id.", self._PROVIDER
                 )
-            if m.role in _INSTRUCTION_ROLES and not (m.content or "").strip():
+            if m.role in _INSTRUCTION_ROLES and not (m.text or "").strip():
                 raise BadRequestError(
                     400, "System messages must have non-empty content.", self._PROVIDER
                 )

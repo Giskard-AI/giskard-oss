@@ -1,8 +1,12 @@
+from typing import TYPE_CHECKING, ClassVar
+
 from giskard.core import Discriminated, discriminated_base
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from .interaction import Trace
-from .result import CheckResult
+
+if TYPE_CHECKING:
+    from .result import CheckResult
 
 
 @discriminated_base
@@ -13,12 +17,21 @@ class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
 
     Subclasses should be registered using the @Check.register("kind") decorator
     to enable polymorphic serialization and deserialization.
+
+    Unknown fields are rejected (``extra="forbid"``). Without this, pydantic
+    silently drops unrecognized keys: a persisted suite referencing a renamed
+    field would fall back to that field's default and the check would run
+    green while evaluating the wrong value.
+
     """
+
+    # Rationale and the subclass rule: see ``Discriminated`` in giskard-core.
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, description="Check name")
     description: str | None = Field(default=None, description="Check description")
 
-    async def run(self, trace: TraceType) -> CheckResult:
+    async def run(self, trace: TraceType) -> "CheckResult":
         """Execute the check against the provided trace.
 
         Subclasses must override this method and return a `CheckResult`. The

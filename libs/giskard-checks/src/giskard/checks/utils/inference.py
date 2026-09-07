@@ -5,6 +5,7 @@ from typing import Any, get_origin, get_type_hints
 from pydantic import PydanticUserError, TypeAdapter
 
 from ..core.interaction.trace import Trace
+from ..core.types import Target
 
 
 def _get_param_hints(target: object) -> dict[str, Any]:
@@ -46,7 +47,9 @@ def _infer_input_type(outputs: object) -> type | None:
     return first_param_type
 
 
-def _infer_trace_type(target: object) -> type[Trace] | None:  # pyright: ignore[reportMissingTypeArgument]
+def _infer_trace_type[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    target: Target[InputType, OutputType, TraceType],
+) -> type[TraceType] | None:
     """Return second parameter's type if it is a Trace subclass, otherwise None."""
     param_hints = _get_param_hints(target)
     if len(param_hints) < 2:

@@ -52,6 +52,10 @@ KNOWN_COMPLETION_PARAMS = frozenset(
     {"temperature", "max_tokens", "tools", "response_format", "safety_settings"}
 )
 
+# Sentinel that skips Gemini 3 thought-signature validation when we have no real
+# signature for a tool call. https://ai.google.dev/gemini-api/docs/thought-signatures
+_SKIP_THOUGHT_SIGNATURE = b"skip_thought_signature_validator"
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,7 +80,10 @@ def _text_content(text: str) -> "PartDict":
 def serialize_text_content(
     content: TextContent, _info: SerializationInfo
 ) -> "PartDict":
-    return _text_content(content.text)
+    part = _text_content(content.text)
+    if content.thought_signature is not None:
+        part["thought_signature"] = content.thought_signature
+    return part
 
 
 @RefusalContent.register_serializer(_PROVIDER)
@@ -103,7 +110,8 @@ def serialize_tool_call(tool_call: ToolCall, info: SerializationInfo) -> "PartDi
         "function_call": {
             "name": tool_call.function.name,
             "args": tool_call.function.arguments,
-        }
+        },
+        "thought_signature": tool_call.thought_signature or _SKIP_THOUGHT_SIGNATURE,
     }
 
 
@@ -270,13 +278,15 @@ REFUSAL_REASONS = frozenset(
         "PROHIBITED_CONTENT",
         "SPII",
         "IMAGE_PROHIBITED_CONTENT",
+        "IMAGE_SAFETY",
+        "RECITATION",
+        "IMAGE_RECITATION",
     }
 )
 
 FINISH_REASON_MAP = {
     "STOP": "stop",
     "MAX_TOKENS": "length",
-    "SAFETY": "content_filter",
 } | {reason: "refusal" for reason in REFUSAL_REASONS}
 
 
@@ -321,7 +331,7 @@ class GoogleChatTranslator:
         part: "Part", num_messages: int, part_index: int
     ) -> CompletionContent | ToolCall:
         if part.text is not None:
-            return TextContent(text=part.text)
+            return TextContent(text=part.text, thought_signature=part.thought_signature)
         if part.function_call is not None:
             fc = part.function_call
             return ToolCall(
@@ -331,6 +341,7 @@ class GoogleChatTranslator:
                     name=fc.name or "",
                     arguments=fc.args or {},
                 ),
+                thought_signature=part.thought_signature,
             )
         raise ValueError(f"Unsupported part content type: {part}")
 
@@ -363,16 +374,24 @@ class GoogleChatTranslator:
         if not raw.candidates:
             return CompletionResponse(choices=[], model=model)
 
+        # ``candidate.finish_reason`` is a ``FinishReason`` enum whose ``str()`` is
+        # ``"FinishReason.SAFETY"`` (etc.), not the bare ``"SAFETY"`` the map is keyed
+        # on -- so read ``.value``. The SDK is an optional dep imported by the caller,
+        # so ``FinishReason`` is resolved lazily here (never at module load).
+        from google.genai.types import FinishReason
+
         for i, candidate in enumerate(raw.candidates):
             finish_reason = "stop"
 
-            if candidate.finish_reason:
-                finish_reason = FINISH_REASON_MAP.get(
-                    str(candidate.finish_reason), "stop"
-                )
+            fr = candidate.finish_reason
+            raw_finish_reason = (
+                fr.value if isinstance(fr, FinishReason) else str(fr or "")
+            )
+            if fr:
+                finish_reason = FINISH_REASON_MAP.get(raw_finish_reason, "stop")
 
             refusal_out = (
-                (candidate.finish_message or candidate.finish_reason)
+                (candidate.finish_message or raw_finish_reason)
                 if finish_reason == "refusal"
                 else None
             )
@@ -403,10 +422,22 @@ class GoogleChatTranslator:
 
         usage = None
         if raw.usage_metadata:
+            # google-genai defines total_token_count as the sum of prompt,
+            # candidates, tool_use_prompt and thoughts token counts. thoughts_token_count
+            # is generated (and billed) output, so fold it into output_tokens; likewise
+            # count tool_use_prompt on the input side. This keeps
+            # input_tokens + output_tokens == total_tokens when the model thinks.
+            um = raw.usage_metadata
+            input_tokens = (um.prompt_token_count or 0) + (
+                um.tool_use_prompt_token_count or 0
+            )
+            output_tokens = (um.candidates_token_count or 0) + (
+                um.thoughts_token_count or 0
+            )
             usage = Usage(
-                input_tokens=raw.usage_metadata.prompt_token_count or 0,
-                output_tokens=raw.usage_metadata.candidates_token_count or 0,
-                total_tokens=raw.usage_metadata.total_token_count or 0,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=um.total_token_count or (input_tokens + output_tokens),
             )
 
         return CompletionResponse(choices=choices, model=model, usage=usage)

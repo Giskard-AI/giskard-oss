@@ -2,12 +2,12 @@ from collections.abc import AsyncGenerator
 from typing import Any, cast, override
 
 from giskard.checks.utils.injectable import ValueGenerator, ValueProvider
-from giskard.core.utils import NOT_PROVIDED, NotProvided
-from pydantic import Field, PrivateAttr, model_validator
+from pydantic import Field, model_validator
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ...utils.inference import _infer_input_type
 from ..input_generator import InputGenerator
-from ..types import GeneratorType, ProviderType
+from ..types import GeneratorType, Target
 from .base import InteractionSpec
 from .interaction import Interaction
 from .trace import Trace
@@ -79,10 +79,11 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         Input specification. Can be a static value, callable, or generator.
         Callables can take no arguments or the current `Trace` as an argument.
         Generators yield multiple inputs and receive updated traces via `asend()`.
-    outputs : OutputType | Callable[..., OutputType | Awaitable[OutputType | Interaction]]
-        Output specification. Can be a static value or callable.
-        Callables receive the current `InputType` and optionally the current `Trace`.
-        Can return an `Interaction` object directly to override default metadata.
+    outputs : Target | MISSING
+        Output specification, or ``MISSING`` (default) to bind the scenario or
+        ``run()`` target at execution time. Can also be a static value or callable.
+        Callables receive the current ``InputType`` and optionally the current ``Trace``.
+        Can return an ``Interaction`` object directly to override default metadata.
     metadata : dict[str, Any]
         Default metadata to attach to interactions. Can be overridden if `outputs`
         returns an `Interaction` object directly.
@@ -132,35 +133,41 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         | GeneratorType[[], InputType, None]
         | GeneratorType[[TraceType], InputType, TraceType]
     ) = Field(..., description="The inputs of the interaction.")
-    outputs: (
-        ProviderType[[InputType], OutputType]
-        | ProviderType[[InputType, TraceType], OutputType]
-        | NotProvided
-    ) = Field(default=NOT_PROVIDED, description="The outputs of the interaction.")
+    outputs: Target[InputType, OutputType, TraceType] | MISSING = Field(
+        default=MISSING, description="The outputs of the interaction."
+    )
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="The metadata of the interaction."
     )
 
-    _input_value_generator_provider: ValueGenerator[..., InputType, TraceType] = (
-        PrivateAttr()
-    )
-    _output_injectable: ValueProvider[..., OutputType] = PrivateAttr()
+    @property
+    def _input_value_generator_provider(
+        self,
+    ) -> ValueGenerator[..., InputType, TraceType]:
+        """Build the input value-generator provider from the current ``inputs``.
 
-    def _validate_inputs(self) -> None:
+        Derived lazily on every access (rather than cached at construction) so it
+        always reflects the live ``inputs`` field. ``model_copy(update={"inputs":
+        ...})`` and direct assignment skip validators, so a cached provider
+        would keep driving the original input.
+        """
         try:
-            self._input_value_generator_provider = cast(
+            return cast(
                 ValueGenerator[[TraceType], InputType, TraceType],
                 ValueGenerator(self.inputs, {"trace", "input_type"}),
             )
         except ValueError as e:
             raise ValueError(f"Error getting injection settings for inputs: {e}") from e
 
-    def _validate_outputs(self) -> None:
+    @property
+    def _output_injectable(self) -> ValueProvider[..., OutputType]:
+        """Build the output provider from the current ``outputs``.
+
+        Derived lazily on every access for the same reason as
+        :attr:`_input_value_generator_provider`.
+        """
         try:
-            if not isinstance(self.outputs, NotProvided):
-                self._output_injectable = ValueProvider(
-                    self.outputs, {"inputs", "trace"}
-                )
+            return ValueProvider(self.outputs, {"inputs", "trace"})
         except ValueError as e:
             raise ValueError(
                 f"Error getting injection settings for outputs: {e}"
@@ -170,22 +177,27 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     def _validate_injection_mappings(
         self,
     ) -> "Interact[InputType, OutputType, TraceType]":
-        self._validate_inputs()
-        self._validate_outputs()
+        # Build the providers once at construction so malformed inputs/outputs
+        # fail fast here rather than at run time. The results are intentionally
+        # discarded: the providers are rebuilt lazily from the live fields.
+        _ = self._input_value_generator_provider
+        if self.outputs is not MISSING:
+            _ = self._output_injectable
 
         return self
 
     def set_outputs(
         self,
-        outputs: (
-            ProviderType[[InputType], OutputType]
-            | ProviderType[[InputType, TraceType], OutputType]
-            | NotProvided
-        ),
+        outputs: Target[InputType, OutputType, TraceType] | MISSING,
     ) -> "Interact[InputType, OutputType, TraceType]":
-        """Update the outputs of the interact and recompute the injection mappings. Returns self for chaining."""
+        """Update the outputs of the interact. Returns self for chaining.
+
+        Providers are derived from the live ``outputs`` field, so the next
+        ``generate()`` call uses this value without a separate cache refresh.
+        """
         self.outputs = outputs
-        self._validate_outputs()
+        if self.outputs is not MISSING:
+            _ = self._output_injectable
 
         return self
 
@@ -201,7 +213,7 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         try:
             inputs = await anext(generator)
             while True:
-                if isinstance(self.outputs, NotProvided):
+                if self.outputs is MISSING:
                     raise ValueError(
                         "Interaction outputs are not provided and no target was bound."
                     )

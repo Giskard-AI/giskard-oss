@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from giskard.llm.errors import BadRequestError, LLMError, RateLimitError
+from giskard.llm.errors import (
+    BadRequestError,
+    LLMError,
+    LLMTimeoutError,
+    RateLimitError,
+)
 from giskard.llm.providers.anthropic import AnthropicProvider
 from giskard.llm.providers.azure_ai import AzureAIProvider
 from giskard.llm.providers.azure_openai import AzureOpenAIProvider
@@ -28,6 +33,7 @@ from giskard.llm.types import (
 if TYPE_CHECKING:
     from google.genai.types import HttpOptionsOrDict
     from httpx import AsyncClient
+    from httpx2 import AsyncClient as Httpx2AsyncClient
 
 # -- Helpers -------------------------------------------------------------------
 
@@ -230,7 +236,7 @@ async def test_openai_completion_with_typed_tool_calls(mock_import):
 async def test_openai_embedding(mock_import):
     mock_import.return_value = MagicMock()
     provider = _make_openai_provider()
-    provider._client.embeddings = MagicMock()  # pyright: ignore[reportAttributeAccessIssue]
+    provider._client.embeddings = MagicMock()
     provider._client.embeddings.create = AsyncMock(
         return_value=_make_openai_embedding_response([[0.1, 0.2], [0.3, 0.4]])
     )
@@ -345,7 +351,7 @@ def test_anthropic_provider_forwards_transport_config():
             api_key="k",
             base_url="https://anthropic.test",
             timeout=12,
-            http_client=cast("AsyncClient", http_client),
+            http_client=cast("Httpx2AsyncClient", http_client),
             default_headers=default_headers,
         )
 
@@ -355,6 +361,36 @@ def test_anthropic_provider_forwards_transport_config():
     assert kwargs["timeout"] == 12
     assert kwargs["http_client"] is http_client
     assert kwargs["default_headers"] == default_headers
+
+
+async def test_sdk_v1_async_anthropic_accepts_httpx2_http_client():
+    """Unmocked SDK check: v1 requires httpx2.AsyncClient for http_client."""
+    pytest.importorskip("anthropic")
+    pytest.importorskip("httpx2")
+    import httpx2
+    from anthropic import AsyncAnthropic
+
+    http_client = httpx2.AsyncClient()
+    try:
+        client = AsyncAnthropic(api_key="sk-test", http_client=http_client)
+        assert client is not None
+    finally:
+        # Caller-owned: giskard-llm does not close this; the test must.
+        await http_client.aclose()
+
+
+async def test_sdk_v1_async_anthropic_rejects_httpx_v1_http_client():
+    """Unmocked SDK check: v1 raises TypeError for an httpx (v1) AsyncClient."""
+    pytest.importorskip("anthropic")
+    httpx = pytest.importorskip("httpx")
+    from anthropic import AsyncAnthropic
+
+    http_client = httpx.AsyncClient()
+    try:
+        with pytest.raises(TypeError, match="http_client"):
+            AsyncAnthropic(api_key="sk-test", http_client=http_client)
+    finally:
+        await http_client.aclose()
 
 
 class _FakeHttpOptions:
@@ -482,26 +518,38 @@ def _all_subclasses(cls: type) -> list[type]:
 
 
 def _make_httpx_sdk_exc(cls: type) -> Exception:
-    """Construct a minimal httpx-based SDK exception (openai / anthropic / google._interactions)."""
-    import httpx  # pyright: ignore[reportMissingImports]
+    """Construct a minimal httpx-based SDK exception (openai / anthropic / google._interactions).
 
-    name = cls.__name__
-    if name == "APITimeoutError":
-        return cls(request=httpx.Request("GET", "https://test"))  # type: ignore[call-arg]
-    if name == "APIConnectionError":
-        return cls(request=httpx.Request("GET", "https://test"), message="conn err")  # type: ignore[call-arg]
-    if name == "APIResponseValidationError":
-        resp = httpx.Response(200, request=httpx.Request("GET", "https://test"))
-        return cls(response=resp, body=None)  # type: ignore[call-arg]
-    # APIStatusError and all its subclasses
-    resp = httpx.Response(400, request=httpx.Request("GET", "https://test"))
-    return cls(message="test", response=resp, body=None)  # type: ignore[call-arg]
+    SDK error classes have inconsistent constructor signatures (some take
+    ``message``, some ``response``, some ``request``, some only keyword args).
+    Rather than special-casing each class name, introspect the constructor and
+    pass only the arguments it accepts.
+    """
+    import inspect
+
+    import httpx
+
+    request = httpx.Request("GET", "https://test")
+    response = httpx.Response(400, request=request)
+
+    available = {
+        "message": "test",
+        "request": request,
+        "response": response,
+        "body": None,
+    }
+
+    params = inspect.signature(cls.__init__).parameters
+    kwargs: dict[str, object] = {
+        name: value for name, value in available.items() if name in params
+    }
+    return cls(**kwargs)
 
 
 @pytest.mark.openai
 def test_openai_map_error_completeness():
     """Every openai.APIError subclass must be mapped to an LLMError."""
-    import openai  # pyright: ignore[reportMissingImports]
+    import openai
 
     provider = _make_openai_provider()
     for exc_cls in _all_subclasses(openai.APIError):
@@ -512,7 +560,7 @@ def test_openai_map_error_completeness():
 @pytest.mark.anthropic
 def test_anthropic_map_error_completeness():
     """Every anthropic.APIError subclass must be mapped to an LLMError."""
-    import anthropic  # pyright: ignore[reportMissingImports]
+    import anthropic
 
     provider = _make_anthropic_provider()
     for exc_cls in _all_subclasses(anthropic.APIError):
@@ -523,7 +571,7 @@ def test_anthropic_map_error_completeness():
 @pytest.mark.google
 def test_google_map_error_completeness():
     """Every google.genai error must be mapped to an LLMError."""
-    from google.genai import (  # pyright: ignore[reportMissingImports]
+    from google.genai import (
         errors as genai_errors,
     )
 
@@ -536,7 +584,7 @@ def test_google_map_error_completeness():
 
     # google.genai._interactions hierarchy (httpx-based, same shape as openai)
     try:
-        from google.genai import (  # pyright: ignore[reportMissingImports]
+        from google.genai import (
             _interactions as ix,
         )
 
@@ -549,6 +597,61 @@ def test_google_map_error_completeness():
     # Timeout heuristic (non-SDK exceptions with "timed out" in message)
     with pytest.raises(LLMError):
         provider._map_error(Exception("Connection timed out"))
+
+
+def _interactions_errors_or_skip() -> Any:
+    """Resolve the Interactions error module the way production does, or skip.
+
+    ``_map_error`` reaches this hierarchy through
+    ``_import_interactions_errors()``, which returns ``None`` when the private
+    ``google.genai._interactions`` module is absent (it was removed in
+    google-genai 2.9.0) and makes ``_map_error`` skip the block entirely. Going
+    through the same helper keeps these tests in step with production instead of
+    failing on an import the library itself tolerates.
+    """
+    from giskard.llm.providers.google import _import_interactions_errors
+
+    ix = _import_interactions_errors()
+    if ix is None:
+        pytest.skip(
+            "google.genai._interactions unavailable; _map_error skips this path"
+        )
+    return ix
+
+
+@pytest.mark.google
+def test_google_interactions_timeout_maps_to_timeout_error():
+    """An Interactions API timeout must map to ``LLMTimeoutError``, so it retries.
+
+    ``APITimeoutError`` subclasses ``APIConnectionError``, so it was caught by
+    the connection branch and returned as a plain ``LLMError`` with status 0.
+    ``should_retry`` only retries ``LLMTimeoutError``, so Gemini timeouts were
+    never retried while the OpenAI and Anthropic providers retried theirs.
+
+    The completeness test above cannot catch this: ``LLMTimeoutError`` is itself
+    an ``LLMError``, so mapping a timeout to the base class still satisfies it.
+    """
+    from giskard.llm.retry import should_retry
+
+    ix = _interactions_errors_or_skip()
+    provider = _make_google_provider()
+
+    with pytest.raises(LLMTimeoutError) as excinfo:
+        provider._map_error(_make_httpx_sdk_exc(ix.APITimeoutError))
+
+    assert should_retry(excinfo.value)
+
+
+@pytest.mark.google
+def test_google_interactions_connection_error_is_not_a_timeout():
+    """A plain connection error stays a non-retryable ``LLMError``."""
+    ix = _interactions_errors_or_skip()
+    provider = _make_google_provider()
+
+    with pytest.raises(LLMError) as excinfo:
+        provider._map_error(_make_httpx_sdk_exc(ix.APIConnectionError))
+
+    assert not isinstance(excinfo.value, LLMTimeoutError)
 
 
 # -- OpenAI message validation ------------------------------------------------
@@ -582,6 +685,27 @@ async def test_openai_validate_empty_system_content(mock_import):
                 {"role": "user", "content": "Hi"},
             ],
         )
+
+
+@patch("giskard.llm.providers.openai._import_openai")
+@pytest.mark.openai
+async def test_openai_validate_developer_content_as_content_blocks(mock_import):
+    """Developer ``content`` typed as a list of ``TextContent`` blocks (the SDK-native
+    shape, reachable via plain-dict validation) must be normalized through ``.text``,
+    not crash with ``AttributeError`` from calling ``.strip()`` on a list."""
+    mock_import.return_value = MagicMock()
+    provider = _make_openai_provider()
+    provider._client.chat.completions.create = AsyncMock(
+        return_value=_make_openai_response("Hello")
+    )
+    resp = await provider.complete(
+        "gpt-4o",
+        [
+            {"role": "developer", "content": [{"type": "text", "text": "Be helpful"}]},
+            {"role": "user", "content": "Hi"},
+        ],
+    )
+    assert resp.choices[0].message.content == "Hello"
 
 
 @patch("giskard.llm.providers.openai._import_openai")
@@ -708,6 +832,31 @@ async def test_anthropic_validate_empty_developer_content(mock_import):
 
 
 @patch("giskard.llm.providers.anthropic._import_anthropic")
+async def test_anthropic_validate_developer_content_as_content_blocks(mock_import):
+    """Developer ``content`` typed as a list of ``TextContent`` blocks must be
+    normalized through ``.text``, not crash with ``AttributeError`` from calling
+    ``.strip()`` on a list."""
+    mock_import.return_value = MagicMock()
+    provider = _make_anthropic_provider()
+
+    mock_raw = MagicMock()
+    mock_raw.content = [SimpleNamespace(type="text", text="Hello")]
+    mock_raw.stop_reason = "end_turn"
+    mock_raw.model = "claude-3"
+    mock_raw.usage = SimpleNamespace(input_tokens=10, output_tokens=5)
+    provider._client.messages.create = AsyncMock(return_value=mock_raw)
+
+    resp = await provider.complete(
+        "claude-3",
+        [
+            {"role": "developer", "content": [{"type": "text", "text": "Be helpful"}]},
+            {"role": "user", "content": "Hi"},
+        ],
+    )
+    assert resp.choices[0].message.content == [TextContent(text="Hello")]
+
+
+@patch("giskard.llm.providers.anthropic._import_anthropic")
 async def test_anthropic_validate_alternation(mock_import):
     mock_import.return_value = MagicMock()
     provider = _make_anthropic_provider()
@@ -720,6 +869,47 @@ async def test_anthropic_validate_alternation(mock_import):
                 {"role": "user", "content": "Hello again"},
             ],
         )
+
+
+# -- Google message validation --------------------------------------------------
+
+
+@patch("giskard.llm.providers.google._import_genai_errors")
+@pytest.mark.google
+async def test_google_validate_developer_content_as_content_blocks(mock_errors):
+    """Developer ``content`` typed as a list of ``TextContent`` blocks must be
+    normalized through ``.text``, not crash with ``AttributeError`` from calling
+    ``.strip()`` on a list."""
+    genai_types = pytest.importorskip("google.genai.types")
+    mock_errors.return_value = MagicMock()
+    provider = _make_google_provider()
+    provider._client.aio = MagicMock()
+    provider._client.aio.models = MagicMock()
+    raw = genai_types.GenerateContentResponse.model_validate(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Hello"}]},
+                    "finish_reason": "STOP",
+                }
+            ],
+            "usage_metadata": {
+                "prompt_token_count": 3,
+                "candidates_token_count": 4,
+                "total_token_count": 7,
+            },
+        }
+    )
+    provider._client.aio.models.generate_content = AsyncMock(return_value=raw)
+
+    resp = await provider.complete(
+        "gemini-3.5-flash",
+        [
+            {"role": "developer", "content": [{"type": "text", "text": "Be helpful"}]},
+            {"role": "user", "content": "Hi"},
+        ],
+    )
+    assert resp.choices[0].message.content == [TextContent(text="Hello")]
 
 
 # -- OpenAI Responses API (respond) -------------------------------------------
@@ -762,7 +952,7 @@ async def test_google_respond_text(mock_errors):
         return_value=_make_google_interaction_response()
     )
 
-    resp = await provider.respond("gemini-2.0-flash", "Hello")
+    resp = await provider.respond("gemini-3.5-flash", "Hello")
     assert resp.id == "int_001"
     assert len(resp.outputs) == 1
     assert isinstance(resp.outputs[0], ResponseOutputMessage)
@@ -787,7 +977,7 @@ async def test_google_respond_function_call(mock_errors):
         return_value=_make_google_interaction_response(steps=[fc_item])
     )
 
-    resp = await provider.respond("gemini-2.0-flash", "Weather?")
+    resp = await provider.respond("gemini-3.5-flash", "Weather?")
     assert len(resp.outputs) == 1
     assert isinstance(resp.outputs[0], ResponseFunctionToolCall)
     assert resp.outputs[0].call_id == "call_xyz"

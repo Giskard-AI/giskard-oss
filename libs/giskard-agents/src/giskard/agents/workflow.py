@@ -28,7 +28,7 @@ from .context import RunContext
 from .errors.serializable import Error
 from .errors.workflow_errors import ModelRefusalError, WorkflowError
 from .generators import BaseGenerator, GenerationParams
-from .templates import MessageTemplate, PromptsManager, get_prompts_manager
+from .templates import MessageTemplate, PromptsManager, Trusted, get_prompts_manager
 from .tools.tool import Tool
 
 
@@ -166,17 +166,23 @@ class _StepRunner:
 
     async def _run_tools(self, chat: Chat[Any]) -> AsyncGenerator[ToolMessage, None]:
         if (
-            not chat.last
+            not chat.messages
             or not isinstance(chat.last, AssistantMessage)
             or not chat.last.tool_calls
         ):
             return
 
         for tool_call in chat.last.tool_calls:
-            if tool_call.function.name not in self._workflow.tools:
-                continue  # TODO: raise an error?
+            tool_name = tool_call.function.name or "<missing>"
+            if tool_name not in self._workflow.tools:
+                registered_tools = ", ".join(sorted(self._workflow.tools)) or "<none>"
+                raise ValueError(
+                    f"Unknown tool call '{tool_name}' "
+                    f"(tool_call_id='{tool_call.id}'). "
+                    f"Registered tools: {registered_tools}."
+                )
 
-            tool = self._workflow.tools[tool_call.function.name]
+            tool = self._workflow.tools[tool_name]
             tool_content = await tool.run(
                 deserialize_arguments(tool_call.function.arguments),
                 ctx=chat.context,
@@ -636,5 +642,9 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         return rendered_messages
 
 
-def _output_instructions(output_model: type[BaseModel]) -> str:
-    return f"Provide your answer in JSON format, respecting this schema:\n{output_model.model_json_schema()}"
+def _output_instructions(output_model: type[BaseModel]) -> Trusted:
+    # Trusted: derived from the developer-declared output model, and must reach
+    # the LLM unescaped so the JSON schema stays readable.
+    return Trusted(
+        f"Provide your answer in JSON format, respecting this schema:\n{output_model.model_json_schema()}"
+    )

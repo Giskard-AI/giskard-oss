@@ -38,19 +38,25 @@ from giskard.llm import LLMClient
 client = LLMClient()
 
 # Configure with explicit values or env var references
-client.configure("openai", api_key="sk-...") # pragma: allowlist secret
-client.configure("azure-prod", provider="azure",
-    api_key="os.environ/AZURE_PROD_KEY", # pragma: allowlist secret
+client.configure("openai", api_key="sk-...")  # pragma: allowlist secret
+client.configure(
+    "azure-prod",
+    provider="azure",
+    api_key="os.environ/AZURE_PROD_KEY",  # pragma: allowlist secret
     base_url="os.environ/AZURE_PROD_ENDPOINT",
     api_version="2024-02-01",
 )
-client.configure("anthropic-relaxed", provider="anthropic",
-    api_key="os.environ/ANTHROPIC_API_KEY", # pragma: allowlist secret
+client.configure(
+    "anthropic-relaxed",
+    provider="anthropic",
+    api_key="os.environ/ANTHROPIC_API_KEY",  # pragma: allowlist secret
     merge_system=True,
 )
 
 response = await client.acompletion("azure-prod/gpt-4o", messages)
-response = await client.acompletion("anthropic-relaxed/claude-3-5-haiku-latest", messages)
+response = await client.acompletion(
+    "anthropic-relaxed/claude-3-5-haiku-latest", messages
+)
 ```
 
 ## Provider reference
@@ -59,7 +65,7 @@ response = await client.acompletion("anthropic-relaxed/claude-3-5-haiku-latest",
 |---|---|---|---|---|---|
 | `openai/` (default) | `openai` | `OPENAI_API_KEY` | yes | yes | `base_url`, `timeout`, `http_client`, `default_headers` |
 | `google/` | `google-genai` | `GOOGLE_API_KEY` / `GEMINI_API_KEY` | yes | yes | `http_client`, `default_headers`, `http_options` |
-| `anthropic/` | `anthropic` | `ANTHROPIC_API_KEY` | yes | no | `merge_system`, `timeout`, `http_client`, `default_headers` |
+| `anthropic/` | `anthropic` | `ANTHROPIC_API_KEY` | yes | no | `merge_system`, `timeout`, `http_client` (`httpx2`, see below), `default_headers` |
 | `azure/` | `openai` | `AZURE_API_KEY`, `AZURE_API_BASE` | yes | yes | `api_version`, `base_url`, `http_client`, `default_headers` |
 | `azure_ai/` | `openai` | `AZURE_AI_API_KEY`, `AZURE_AI_ENDPOINT` | yes | model-dependent | `base_url`, `http_client`, `default_headers` |
 
@@ -77,7 +83,7 @@ client = LLMClient()
 client.configure(
     "foundry-v1",
     provider="openai",
-    api_key="os.environ/AZURE_OPENAI_API_KEY", # pragma: allowlist secret
+    api_key="os.environ/AZURE_OPENAI_API_KEY",  # pragma: allowlist secret
     base_url="https://example.openai.azure.com/openai/v1/",
 )
 
@@ -113,7 +119,7 @@ client = LLMClient()
 client.configure(
     "azure-secure",
     provider="azure_ai",
-    api_key="os.environ/AZURE_AI_API_KEY", # pragma: allowlist secret
+    api_key="os.environ/AZURE_AI_API_KEY",  # pragma: allowlist secret
     base_url="os.environ/AZURE_AI_ENDPOINT",
     http_client=http_client,
     default_headers={"x-ms-useragent": "giskard-llm"},
@@ -121,12 +127,27 @@ client.configure(
 client.configure(
     "google-secure",
     provider="google",
-    api_key="os.environ/GEMINI_API_KEY", # pragma: allowlist secret
+    api_key="os.environ/GEMINI_API_KEY",  # pragma: allowlist secret
     http_client=http_client,
 )
 
 response = await client.acompletion("azure-secure/gpt-4.1-nano", messages)
 await http_client.aclose()
+```
+
+The `anthropic` provider is the exception. Anthropic SDK v1 requires an
+`httpx2.AsyncClient` and raises a `TypeError` for an `httpx.AsyncClient`.
+
+```python
+import httpx2
+
+anthropic_http_client = httpx2.AsyncClient(verify="/path/to/ca.pem")
+client.configure(
+    "anthropic-secure",
+    provider="anthropic",
+    api_key="os.environ/ANTHROPIC_API_KEY",  # pragma: allowlist secret
+    http_client=anthropic_http_client,
+)
 ```
 
 For detailed per-provider documentation (role mapping, message constraints, tool format, error mapping), see the provider class docstrings in `src/giskard/llm/providers/`.

@@ -17,7 +17,7 @@ from google.genai import types
 
 pytestmark = pytest.mark.google
 
-_MODEL = "gemini-2.0-flash"
+_MODEL = "gemini-3.5-flash"
 
 
 def _raw(data: dict[str, object]) -> types.GenerateContentResponse:
@@ -53,6 +53,63 @@ def test_from_google_assistant_text():
     assert ch.message.content == [TextContent(text="Hello from Gemini.")]
     assert ch.message.tool_calls is None
     assert ch.finish_reason == "stop"
+
+
+def test_from_google_thinking_tokens_counted_in_output():
+    """thoughts_token_count is generated output, so it belongs in output_tokens.
+
+    google-genai defines total_token_count as prompt + candidates + tool_use_prompt +
+    thoughts, so input_tokens + output_tokens must equal total_tokens even when the model
+    thinks. prompt=10, candidates=5, thoughts=20 -> total=35.
+    """
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Answer."}]},
+                    "finish_reason": "STOP",
+                }
+            ],
+            "usage_metadata": {
+                "prompt_token_count": 10,
+                "candidates_token_count": 5,
+                "thoughts_token_count": 20,
+                "total_token_count": 35,
+            },
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.usage is not None
+    assert out.usage.input_tokens == 10
+    assert out.usage.output_tokens == 25
+    assert out.usage.total_tokens == 35
+    assert out.usage.input_tokens + out.usage.output_tokens == out.usage.total_tokens
+
+
+def test_from_google_tool_use_prompt_tokens_counted_in_input():
+    """Tool-use prompt tokens are input, and total falls back to their sum."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Answer."}]},
+                    "finish_reason": "STOP",
+                }
+            ],
+            "usage_metadata": {
+                "prompt_token_count": 10,
+                "tool_use_prompt_token_count": 7,
+                "candidates_token_count": 5,
+                "thoughts_token_count": 20,
+            },
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.usage is not None
+    assert out.usage.input_tokens == 17
+    assert out.usage.output_tokens == 25
+    assert out.usage.total_tokens == 42
+    assert out.usage.input_tokens + out.usage.output_tokens == out.usage.total_tokens
 
 
 def test_from_google_multiple_text_parts_joined():
@@ -111,9 +168,175 @@ def test_from_google_text_and_function_call():
     assert msg.tool_calls[0].function.arguments == {"city": "Paris"}
 
 
+def test_from_google_function_call_captures_thought_signature():
+    """A ``function_call`` part's ``thought_signature`` is captured on the tool call."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "function_call": {
+                                    "name": "get_weather",
+                                    "args": {"city": "Paris"},
+                                },
+                                "thought_signature": b"real-signature-bytes",
+                            },
+                        ]
+                    }
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    tool_calls = out.choices[0].message.tool_calls
+    assert tool_calls is not None
+    assert tool_calls[0].thought_signature == b"real-signature-bytes"
+
+
+def test_from_google_function_call_without_signature_is_none():
+    """A ``function_call`` part with no signature leaves ``thought_signature`` unset."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "function_call": {
+                                    "name": "get_weather",
+                                    "args": {"city": "Paris"},
+                                }
+                            },
+                        ]
+                    }
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    tool_calls = out.choices[0].message.tool_calls
+    assert tool_calls is not None
+    assert tool_calls[0].thought_signature is None
+
+
+def test_from_google_text_part_captures_thought_signature():
+    """A text part's ``thought_signature`` is captured on the text content."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": "Let me think step by step.",
+                                "thought_signature": b"text-signature-bytes",
+                            },
+                        ]
+                    }
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].message.content == [
+        TextContent(
+            text="Let me think step by step.",
+            thought_signature=b"text-signature-bytes",
+        )
+    ]
+
+
 def test_from_google_empty_candidates():
     """No `candidates` yields an empty `choices` list; only `model` is set."""
     raw = _raw({"candidates": []})
     out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
     assert out.choices == []
     assert out.model == _MODEL
+
+
+def test_from_google_max_tokens_maps_to_length():
+    """A ``MAX_TOKENS`` finish reason maps to ``length``.
+
+    Regression: ``candidate.finish_reason`` round-trips through
+    ``model_validate`` as a ``FinishReason`` enum whose ``str()`` is
+    ``"FinishReason.MAX_TOKENS"``. Keying the map on ``str(enum)`` silently
+    missed and collapsed every non-STOP reason to ``"stop"``.
+    """
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "truncated"}]},
+                    "finish_reason": "MAX_TOKENS",
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].finish_reason == "length"
+
+
+def test_from_google_safety_maps_to_refusal():
+    """A ``SAFETY`` finish reason maps to ``refusal`` (not the default ``stop``)."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "blocked"}]},
+                    "finish_reason": "SAFETY",
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].finish_reason == "refusal"
+    # The refusal text must be a clean reason string, never "FinishReason.SAFETY".
+    assert out.choices[0].message.refusal == "SAFETY"
+
+
+@pytest.mark.parametrize("reason", ["IMAGE_SAFETY", "RECITATION", "IMAGE_RECITATION"])
+def test_from_google_content_blocks_map_to_refusal(reason: str):
+    """Every reason Gemini uses to block content maps to ``refusal``.
+
+    ``IMAGE_SAFETY`` is the image-modality counterpart of ``SAFETY``, and the
+    two ``RECITATION`` reasons block output that reproduces protected content.
+    All three were absent from ``REFUSAL_REASONS``, so they fell through to the
+    default ``stop`` and a blocked generation was reported as a normal one.
+    """
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "blocked"}]},
+                    "finish_reason": reason,
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].finish_reason == "refusal"
+    assert out.choices[0].message.refusal == reason
+
+
+def test_from_google_refusal_uses_finish_message_when_present():
+    """When Gemini supplies a ``finish_message``, it becomes the refusal text.
+
+    The reason code (``SAFETY``) is only the fallback; the human-readable
+    ``finish_message`` takes precedence so callers surface Gemini's explanation.
+    """
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "blocked"}]},
+                    "finish_reason": "SAFETY",
+                    "finish_message": "Blocked for safety.",
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].finish_reason == "refusal"
+    assert out.choices[0].message.refusal == "Blocked for safety."

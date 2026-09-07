@@ -1,10 +1,5 @@
-from pydantic import BaseModel
+"""Re-export of the canonical serializable Error from giskard.core."""
 
+from giskard.core import Error
 
-class Error(BaseModel):
-    """A basic serializable error."""
-
-    message: str
-
-    def __str__(self) -> str:
-        return "ERROR: " + self.message
+__all__ = ["Error"]

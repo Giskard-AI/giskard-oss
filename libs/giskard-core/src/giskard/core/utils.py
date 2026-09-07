@@ -1,18 +1,43 @@
 """Utility constants and helpers for the Giskard library ecosystem."""
 
-from typing import Literal
+from collections.abc import Iterable
+from importlib.metadata import PackageNotFoundError, version
 
-from pydantic import BaseModel
+GISKARD_LIBS = frozenset(
+    [
+        "giskard-core",
+        "giskard-checks",
+        "giskard-scan",
+        "giskard-agents",
+        "giskard-llm",
+    ]
+)
+
+_TRUTHY_ENV_VALUES = frozenset({"1", "true", "yes", "on", "t", "y"})
 
 
-class NotProvided(BaseModel):
-    """Sentinel class to indicate that a value was not provided."""
+def is_true_env_str(value: str | None) -> bool:
+    """Return whether an environment-variable value represents true.
 
-    __type__: Literal["not_provided"] = "not_provided"
+    Parameters
+    ----------
+    value : str or None
+        Environment-variable value to parse.
+    """
+    return value is not None and value.strip().lower() in _TRUTHY_ENV_VALUES
 
 
-NOT_PROVIDED = NotProvided()
+def get_lib_version(lib: str, default: str = "unknown") -> str:
+    try:
+        return version(lib)
+    except PackageNotFoundError:
+        return default
 
 
-def provide_not_none[T](value: T | None) -> T | NotProvided:
-    return value if value is not None else NOT_PROVIDED
+def _get_libs_version(
+    libs: Iterable[str], /, default: str = "unknown"
+) -> dict[str, str]:
+    return {lib: get_lib_version(lib, default) for lib in libs}
+
+
+GISKARD_LIBS_VERSIONS = _get_libs_version(GISKARD_LIBS, "not_installed")

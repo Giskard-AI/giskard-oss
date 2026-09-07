@@ -1,19 +1,9 @@
 from unittest.mock import MagicMock
 
-import pytest
+import giskard.checks.settings as settings
 from giskard.agents.generators.base import BaseGenerator
 from giskard.checks.core.mixin import WithGeneratorMixin
 from giskard.checks.settings import set_default_generator
-
-
-@pytest.fixture(autouse=True)
-def reset_default_generator():
-    """Restore the global default generator after each test."""
-    import giskard.checks.settings as settings
-
-    original = settings._default_generator
-    yield
-    settings._default_generator = original
 
 
 class ConcreteCheck(WithGeneratorMixin):
@@ -43,7 +33,6 @@ def test_explicit_generator_is_not_overridden():
 
 def test_default_generator_is_returned_when_none_set():
     """When no global set and no explicit generator, must return a generator."""
-    import giskard.checks.settings as settings
 
     settings._default_generator = None
     check = ConcreteCheck()

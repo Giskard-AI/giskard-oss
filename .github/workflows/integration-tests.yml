@@ -2,6 +2,7 @@ name: Integration Tests
 
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] guarded by authorize job, label gate for external PRs, and immutable head.sha checkout
+    branches: [main]
     types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
@@ -55,7 +56,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -79,11 +82,19 @@ jobs:
             pytest_mark: "functional and (google or litellm)"
     name: agents / ${{ matrix.backend.name }} / ${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+          # Deliberate opt-in: this job installs and executes fork-authored
+          # code (make install, pytest) with live provider API keys in scope.
+          # Compensating controls: the `ci` environment requires a reviewer to
+          # approve each run before secrets are injected (server-enforced,
+          # per-run), the authorize job requires a fresh `labeled` event for
+          # external contributors, and the immutable head.sha pin keeps the
+          # reviewed commit identical to the executed one.
+          allow-unsafe-pr-checkout: true
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -96,8 +107,8 @@ jobs:
         env:
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          TEST_MODEL: "google/gemini-2.0-flash"
-          TEST_LITELLM_MODEL: "gemini/gemini-2.0-flash"
+          TEST_MODEL: "google/gemini-3.5-flash"
+          TEST_LITELLM_MODEL: "gemini/gemini-3.5-flash"
           TEST_EMBEDDING_MODEL: "google/gemini-embedding-001"
           PYTEST_MARK: ${{ matrix.backend.pytest_mark }}
         run: uv run pytest libs/giskard-agents -m "$PYTEST_MARK"
@@ -105,7 +116,9 @@ jobs:
   test-llm-functional:
     needs: authorize
     runs-on: ubuntu-latest
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -114,24 +127,31 @@ jobs:
         # `extras` is the giskard-llm optional-dependency group to install;
         # aliases share an install (bare/azure_ai reuse openai/azure, gemini reuses google).
         include:
-          - { python-version: "3.12", provider: openai,    extras: openai    }
-          - { python-version: "3.12", provider: bare,      extras: openai    }
-          - { python-version: "3.12", provider: google,    extras: google    }
-          - { python-version: "3.12", provider: gemini,    extras: google    }
+          - { python-version: "3.12", provider: openai, extras: openai }
+          - { python-version: "3.12", provider: bare, extras: openai }
+          - { python-version: "3.12", provider: google, extras: google }
+          - { python-version: "3.12", provider: gemini, extras: google }
           - { python-version: "3.12", provider: anthropic, extras: anthropic }
-          - { python-version: "3.12", provider: azure,     extras: azure     }
-          - { python-version: "3.12", provider: azure_ai,  extras: azure     }
-          - { python-version: "3.12", provider: azure_foundry_v1, extras: openai }
+          - { python-version: "3.12", provider: azure, extras: azure }
+          - { python-version: "3.12", provider: azure_ai, extras: azure }
+          - {
+              python-version: "3.12",
+              provider: azure_foundry_v1,
+              extras: openai,
+            }
     name: llm / ${{ matrix.provider }} / ${{ matrix.python-version }}
     env:
       PROVIDER: ${{ matrix.provider }}
       EXTRAS: ${{ matrix.extras }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+          # Deliberate opt-in — see test-agents-functional for the full
+          # rationale and compensating controls.
+          allow-unsafe-pr-checkout: true
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -154,7 +174,9 @@ jobs:
   test-checks-functional:
     needs: authorize
     runs-on: ubuntu-latest
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -165,11 +187,14 @@ jobs:
     env:
       PROVIDER: ${{ matrix.provider }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+          # Deliberate opt-in — see test-agents-functional for the full
+          # rationale and compensating controls.
+          allow-unsafe-pr-checkout: true
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -179,6 +204,71 @@ jobs:
       - name: Run functional tests
         env:
           GOOGLE_API_KEY: ${{ matrix.provider == 'google' && secrets.GEMINI_API_KEY || '' }}
-          TEST_MODEL: "google/gemini-2.0-flash"
-          TEST_EMBEDDING_MODEL: "google/gemini-embedding-001"
+          GISKARD_CHECKS_DEFAULT_MODEL: "google/gemini-3.5-flash"
+          GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL: "google/gemini-embedding-001"
         run: make test-functional PACKAGE=giskard-checks PROVIDER=$PROVIDER
+
+  test-scan-garak:
+    needs: authorize
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout repository
+    environment:
+      name: ci
+      deployment: false
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+    name: scan / garak / ${{ matrix.python-version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+          # Deliberate opt-in — see test-agents-functional for the full
+          # rationale and compensating controls.
+          allow-unsafe-pr-checkout: true
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+      - run: make install-garak-test
+      - run: make test-garak
+
+  test-scan-deepteam:
+    needs: authorize
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout repository
+    environment:
+      name: ci
+      deployment: false
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+    name: scan / deepteam / ${{ matrix.python-version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+          # Deliberate opt-in — see test-agents-functional for the full
+          # rationale and compensating controls.
+          allow-unsafe-pr-checkout: true
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+      - run: make install-deepteam-test
+      # deepteam simulates and judges every attack with an LLM, so unlike garak
+      # it cannot run without a working default generator.
+      - env:
+          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GISKARD_CHECKS_DEFAULT_MODEL: "google/gemini-3.5-flash"
+          GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL: "google/gemini-embedding-001"
+        run: make test-deepteam

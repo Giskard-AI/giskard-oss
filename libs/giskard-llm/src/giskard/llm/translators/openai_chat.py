@@ -1,5 +1,4 @@
 import logging
-import re
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
@@ -9,6 +8,7 @@ from giskard.llm.types import (
     ToolDef,
 )
 from giskard.llm.types._base import _BaseModel
+from giskard.llm.utils import sanitize_schema_name
 from pydantic import BaseModel, field_validator
 
 if TYPE_CHECKING:
@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 PROVIDER = "openai"
 _PROVIDER = "openai/chat"
-_INVALID_SCHEMA_NAME_CHARS = re.compile(r"[^a-zA-Z0-9_-]")
 KNOWN_COMPLETION_PARAMS = frozenset(
     {"temperature", "max_tokens", "timeout", "tools", "response_format", "metadata"}
 )
@@ -55,7 +54,7 @@ class OpenAIChatParams(_BaseModel):
             return {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": _INVALID_SCHEMA_NAME_CHARS.sub("_", v.__name__),
+                    "name": sanitize_schema_name(v.__name__),
                     "schema": schema,
                 },
             }

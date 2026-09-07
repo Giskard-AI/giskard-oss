@@ -30,10 +30,10 @@ body:
     validations:
       required: true
   - type: input
-    id: giskard-lib-version
+    id: giskard-libs-version
     attributes:
-      label: Giskard Library Version
-      description: You can  obtain the Giskard library version with `python -c "import giskard ; print(giskard.__version__)"`
+      label: Giskard Libraries Version
+      description: You can obtain the Giskard library version with `python -c "import giskard.core; print(giskard.core.GISKARD_LIBS_VERSIONS)"`
       placeholder: e.g., 3.0.0a1
     validations:
       required: true
