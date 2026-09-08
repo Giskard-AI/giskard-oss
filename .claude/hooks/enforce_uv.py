@@ -18,7 +18,7 @@ BARE = re.compile(r"^\s*(python3?|pytest)\b")
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-    except Exception:
+    except json.JSONDecodeError:
         return 0  # fail open on unparseable input
 
     try:
@@ -41,7 +41,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
-    except Exception:
+    except Exception:  # noqa: BLE001 — fail open on any unexpected hook error
         return 0
 
 

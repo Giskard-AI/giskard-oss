@@ -25,7 +25,12 @@ def run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str] | None:
     """Run a command, returning None on any environmental failure (fail open)."""
     try:
         return subprocess.run(
-            args, cwd=cwd, capture_output=True, text=True, timeout=TIMEOUT
+            args,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -34,7 +39,7 @@ def run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str] | None:
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-    except Exception:
+    except json.JSONDecodeError:
         return 0
 
     try:
@@ -124,7 +129,7 @@ def main() -> int:
         )
         print("\n".join(lines), file=sys.stderr)
         return 2
-    except Exception:
+    except Exception:  # noqa: BLE001 — fail open on any unexpected hook error
         return 0
 
 
