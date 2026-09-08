@@ -17,7 +17,6 @@ import asyncio
 import os
 
 from dotenv import load_dotenv
-
 from giskard.agents.generators import Generator
 from giskard.checks import Trace, generate_suite, set_default_generator
 from giskard.llm import acompletion, chat
@@ -63,6 +62,11 @@ async def chatbot(inputs: UserMessage, trace: LLMTrace) -> AssistantMessage:
     return result.choices[0].message
 
 
+def _write_result(path: str, content: str) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
 async def main() -> None:
     print("Generating test suite...")
     suite = await generate_suite(
@@ -80,8 +84,9 @@ async def main() -> None:
 
     # Save result to JSON
     result_path = os.path.join(os.path.dirname(__file__), "result.json")
-    with open(result_path, "w", encoding="utf-8") as f:
-        f.write(result.model_dump_json(indent=2))
+    await asyncio.to_thread(
+        _write_result, result_path, result.model_dump_json(indent=2)
+    )
     print(f"\nSuite result saved to {result_path}")
 
 
