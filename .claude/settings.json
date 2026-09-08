@@ -4,14 +4,26 @@
     "superpowers@claude-plugins-official": true
   },
   "hooks": {
-    "PostToolUse": [
+    "PreToolUse": [
       {
-        "matcher": "Edit|Write",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "{ read -r json; fp=$(printf '%s' \"$json\" | jq -r '.tool_input.file_path' 2>/dev/null); case \"$fp\" in libs/*.py|*/libs/*.py) uv run ruff format \"$fp\" && uv run ruff check --fix \"$fp\";; esac; } 2>/dev/null || true",
-            "statusMessage": "Running ruff format + check..."
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/enforce_uv.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/quality_gate.py\"",
+            "timeout": 90,
+            "statusMessage": "Running ruff + basedpyright..."
           }
         ]
       }
