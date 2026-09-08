@@ -22,10 +22,10 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
     """Check that validates whether a trace value is valid JSON.
 
     With ``parse=True`` (default), the extracted value must be a serialized
-    JSON string, which is parsed with ``json.loads`` before validation. With
-    ``parse=False``, the value is treated as an already-parsed JSON value
-    (dict, list, str, number, bool, or None) and only checked for JSON
-    serializability and schema conformance.
+    JSON string, which is parsed before validation. With ``parse=False``, the
+    value is treated as an already-parsed JSON value (dict, list, str, finite
+    number, bool, or None) and only checked for JSON serializability and schema
+    conformance.
     """
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
@@ -91,8 +91,10 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
                     details=details,
                 )
             try:
-                value = json.loads(value)
-            except json.JSONDecodeError as err:
+                value = json.loads(
+                    value, parse_constant=self._reject_non_finite_constant
+                )
+            except ValueError as err:
                 details["error"] = str(err)
                 return CheckResult.failure(
                     message=f"Value at key '{self.target_key}' is not valid JSON: {err}",
@@ -100,7 +102,7 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
                 )
         else:
             try:
-                json.dumps(value)
+                json.dumps(value, allow_nan=False)
             except (TypeError, ValueError) as err:
                 details["error"] = str(err)
                 return CheckResult.failure(
@@ -137,6 +139,22 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
     @staticmethod
     def _validate_schema_definition(schema: dict[str, Any]) -> None:
         validator_for(schema).check_schema(schema)
+
+    @staticmethod
+    def _reject_non_finite_constant(value: str) -> None:
+        """Reject a non-finite numeric constant.
+
+        Parameters
+        ----------
+        value : str
+            Constant returned by the JSON parser.
+
+        Raises
+        ------
+        ValueError
+            Always, because JSON does not support non-finite numbers.
+        """
+        raise ValueError(f"Non-finite number {value!r} is not valid JSON.")
 
     @staticmethod
     def _validate_schema(parsed_value: Any, schema: dict[str, Any]) -> None:
