@@ -18,9 +18,10 @@ import os
 
 from dotenv import load_dotenv
 from giskard.agents.generators import Generator
-from giskard.checks import Trace, generate_suite, set_default_generator
+from giskard.checks import Trace, set_default_generator
 from giskard.llm import acompletion, chat
 from giskard.llm.types import AssistantMessage, ChatMessage, UserMessage
+from giskard.scan import generate_suite, vulnerability_suite_generator_registry
 
 load_dotenv()
 
@@ -75,6 +76,7 @@ async def main() -> None:
             "that helps users with orders, returns, and product questions."
         ),
         languages=["en"],
+        generators=vulnerability_suite_generator_registry.generators(),
         max_scenarios=20,
     )
     print(f"Generated {len(suite.scenarios)} scenarios. Running suite...\n")
