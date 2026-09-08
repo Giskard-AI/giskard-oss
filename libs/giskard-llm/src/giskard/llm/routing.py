@@ -24,6 +24,7 @@ Provider = CompletionProvider | EmbeddingProvider | ResponseProvider
 
 _PROVIDER_REGISTRY: dict[str, tuple[str, str]] = {
     "openai": ("giskard.llm.providers.openai", "OpenAIProvider"),
+    "minimax": ("giskard.llm.providers.openai", "OpenAIProvider"),
     "google": ("giskard.llm.providers.google", "GoogleProvider"),
     "gemini": ("giskard.llm.providers.google", "GoogleProvider"),
     "anthropic": ("giskard.llm.providers.anthropic", "AnthropicProvider"),

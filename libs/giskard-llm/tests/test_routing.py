@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from giskard.llm.providers.base import CompletionProvider
 from giskard.llm.routing import (
     LLMClient,
     _create_provider,
@@ -204,6 +205,20 @@ def test_client_unconfigured_registry_provider():
         mock_create.return_value = MagicMock()
         client._get_provider("openai")
         mock_create.assert_called_once_with("openai")
+
+
+@pytest.mark.parametrize("model", ["MiniMax-M3", "MiniMax-M2.7"])
+def test_client_routes_minimax_models(model):
+    client = LLMClient()
+    with patch("giskard.llm.routing._create_provider") as mock_create:
+        mock_create.return_value = MagicMock()
+        provider, routed_model = client._resolve(
+            f"minimax/{model}", CompletionProvider, "completions"
+        )
+
+    assert provider is mock_create.return_value
+    assert routed_model == model
+    mock_create.assert_called_once_with("minimax")
 
 
 def test_client_unknown_provider_raises():
