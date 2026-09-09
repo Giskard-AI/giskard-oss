@@ -1,5 +1,6 @@
 import time
 import traceback
+from typing import Any
 
 from giskard.core import scoped_telemetry, telemetry_capture, telemetry_tag
 
@@ -11,6 +12,26 @@ from ..core import Trace
 from ..core.check import Check
 from ..core.result import CheckResult, TestCaseResult
 from ..core.testcase import TestCase
+
+
+def check_spec(check: Check[Any, Any, Any]) -> dict[str, Any]:
+    """Flat ``{"kind": ..., **params}`` view of a check's configuration.
+
+    Mirrors the Giskard Hub's own check-spec wire shape (``giskard_hub``'s
+    ``check_param_to_spec``). Emitted into ``CheckResult.details["check_spec"]``
+    so a Hub import of an OSS ``SuiteResult`` can populate ``CheckResult.spec``
+    and render the check's settings (thresholds, rules, target keys) instead of
+    only pass/fail.
+
+    ``name``/``description`` are check identity, not configuration, and the Hub
+    surfaces them separately -- they are dropped here. ``fallback=str`` keeps a
+    check carrying a non-JSON field (e.g. a callable) from breaking the export.
+    """
+    dump = check.model_dump(mode="json", exclude_none=True, fallback=str)
+    dump.pop("name", None)
+    dump.pop("description", None)
+    dump.pop("kind", None)
+    return {"kind": check.kind, **dump}
 
 
 async def _run_check[
@@ -47,6 +68,7 @@ async def _run_check[
                 "check_kind": check.kind,
                 "check_name": check.name,
                 "check_description": check.description,
+                "check_spec": check_spec(check),
             }
         }
     )

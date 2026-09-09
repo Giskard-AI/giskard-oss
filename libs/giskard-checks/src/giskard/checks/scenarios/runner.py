@@ -23,6 +23,7 @@ from ..core.result import CheckResult, ScenarioResult, TestCaseError, TestCaseRe
 from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
 from ..core.types import Target
+from ..testing.runner import check_spec
 from ..utils.inference import _infer_trace_type
 
 
@@ -97,6 +98,7 @@ def _skipped_check_results_for_step[InputType, OutputType, TraceType: Trace[Any,
                 "check_kind": check.kind,
                 "check_name": check.name,
                 "check_description": check.description,
+                "check_spec": check_spec(check),
             },
         )
         for check in step.checks
