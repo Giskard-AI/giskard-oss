@@ -187,6 +187,35 @@ class TestTestCaseNormalCases:
         assert result.passed
         assert len(result.results) == 1
 
+    async def test_check_result_details_carry_flat_check_spec(self):
+        """Each CheckResult exposes the check's config as details['check_spec'].
+
+        A Hub import of the resulting SuiteResult maps details['check_spec']
+        onto CheckResult.spec (see ENG-1737), which drives the check-settings
+        panel in the evaluation UI. The dict mirrors the Hub's own wire shape:
+        a flat ``{"kind": ..., **params}`` with check identity stripped.
+        """
+        trace = await Trace.from_interactions(
+            Interaction(inputs="input", outputs="output")
+        )
+        check = Equals(
+            expected_value="output",
+            target_key="trace.interactions[-1].outputs",
+            name="exact_output",
+            description="ignored identity field",
+        )
+        test_case = TestCase(trace=trace, checks=[check])
+
+        result = await test_case.run()
+
+        spec = result.results[0].details["check_spec"]
+        assert spec["kind"] == "equals"
+        assert spec["target_key"] == "trace.interactions[-1].outputs"
+        assert spec["expected_value"] == "output"
+        # Identity, not configuration -- surfaced by the Hub separately.
+        assert "name" not in spec
+        assert "description" not in spec
+
 
 class TestTestCaseResult:
     """Test TestCaseResult properties and methods."""
