@@ -1,18 +1,31 @@
 """JSON validation check implementation."""
 
 import json
-from typing import Any, override
+from typing import Any, NoReturn, override
 
 from jsonschema import SchemaError, validate
 from jsonschema import ValidationError as JsonSchemaValidationError
 from jsonschema.validators import validator_for
 from pydantic import ConfigDict, Field, field_validator
+from referencing import Registry
 from referencing.exceptions import Unresolvable
 
 from ..core import Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, NoMatch, resolve
 from ..core.result import CheckResult
+
+
+def _reject_remote_ref(uri: str) -> NoReturn:
+    """Raise instead of fetching a JSON Schema ``$ref`` URL.
+
+    jsonschema's default registry retrieves http(s) ``$ref`` targets with
+    ``urllib.request.urlopen``. That is disabled unless the check opts in.
+    """
+    raise Unresolvable(uri)
+
+
+_LOCAL_REF_REGISTRY = Registry(retrieve=_reject_remote_ref)
 
 
 @Check.register("json_valid")
@@ -26,6 +39,13 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
     ``parse=False``, the value is treated as an already-parsed JSON value
     (dict, list, str, number, bool, or None) and only checked for JSON
     serializability and schema conformance.
+
+    Remote ``$ref`` retrieval is off by default. jsonschema would otherwise
+    fetch http(s) schema URLs during validation, which can contact arbitrary
+    hosts (SSRF). ``expected_schema`` is meant for the developer writing the
+    eval, not untrusted end-user input. Leave ``allow_remote_refs=False``
+    unless you need remote schema URLs you control. In-document references
+    such as ``#/$defs/...`` always work.
     """
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
@@ -46,6 +66,17 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
         default=None,
         alias="schema",
         description="Optional JSON Schema to validate the parsed JSON value against.",
+    )
+    allow_remote_refs: bool = Field(
+        default=False,
+        description=(
+            "If True, JSON Schema $ref/$dynamicRef URLs are fetched during "
+            "validation (jsonschema's default registry). Remote retrieval can "
+            "contact arbitrary hosts (SSRF). The schema is intended for the "
+            "developer writing the eval, not untrusted end-user input. Leave "
+            "False unless you need remote schema URLs you control. "
+            "In-document refs such as '#/$defs/...' always work."
+        ),
     )
 
     @field_validator("expected_schema")
@@ -112,7 +143,7 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
 
         if self.expected_schema is not None:
             try:
-                self._validate_schema(value, self.expected_schema)
+                self._validate_instance(value, self.expected_schema)
             except Unresolvable as err:
                 details["error"] = str(err)
                 return CheckResult.error(
@@ -138,6 +169,14 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
     def _validate_schema_definition(schema: dict[str, Any]) -> None:
         validator_for(schema).check_schema(schema)
 
-    @staticmethod
-    def _validate_schema(parsed_value: Any, schema: dict[str, Any]) -> None:
-        validate(instance=parsed_value, schema=schema)
+    def _validate_instance(self, parsed_value: Any, schema: dict[str, Any]) -> None:
+        """Validate ``parsed_value`` against ``schema``.
+
+        When ``allow_remote_refs`` is False (default), ``$ref`` URLs are not
+        fetched. In-document pointers such as ``#/$defs/...`` still resolve.
+        """
+        if self.allow_remote_refs:
+            validate(instance=parsed_value, schema=schema)
+            return
+        validator_cls = validator_for(schema)
+        validator_cls(schema, registry=_LOCAL_REF_REGISTRY).validate(parsed_value)
