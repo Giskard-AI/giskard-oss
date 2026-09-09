@@ -71,6 +71,16 @@ async def test_litellm_generator_forwards_params(mock_acompletion: Any) -> None:
     assert kwargs["max_tokens"] == 50
 
 
+async def test_litellm_generator_forwards_api_base(mock_acompletion: Any) -> None:
+    """Custom OpenAI-compatible endpoints survive params serialization."""
+    generator = LiteLLMGenerator(model="openai/test-model").with_params(
+        api_base="http://127.0.0.1:1234/v1"
+    )
+    await generator.complete(messages=_USER_MESSAGE)
+
+    assert mock_acompletion.call_args.kwargs["api_base"] == "http://127.0.0.1:1234/v1"
+
+
 async def test_litellm_generator_sanitizes_response_format_schema_name(
     mock_acompletion: Any,
 ) -> None:
