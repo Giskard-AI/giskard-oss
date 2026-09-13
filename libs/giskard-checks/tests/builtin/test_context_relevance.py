@@ -13,32 +13,37 @@ Tests cover:
 import json
 from typing import Any, override
 
-from giskard.agents.chat import Message
-from giskard.agents.generators._types import Response
 from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.checks import CheckStatus, ContextRelevance, Interaction, Trace
+from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
 from pydantic import Field
 
 
 class MockGenerator(BaseGenerator):
     passed: bool
     reason: str | None = None
-    calls: list[list[Message]] = Field(default_factory=list)
+    calls: list[list[ChatMessage]] = Field(default_factory=list)
 
     @override
     async def _call_model(
         self,
-        messages: list[Message],
+        messages: list[ChatMessage],
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
-    ) -> Response:
+    ) -> CompletionResponse:
         self.calls.append(messages)
-        return Response(
-            message=Message(
-                role="assistant",
-                content=json.dumps({"passed": self.passed, "reason": self.reason}),
-            ),
-            finish_reason="stop",
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(
+                        content=json.dumps(
+                            {"passed": self.passed, "reason": self.reason}
+                        )
+                    ),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
         )
 
 
@@ -54,7 +59,7 @@ class TestContextRelevanceBasic:
         check = ContextRelevance(
             generator=generator,
             query="How do I install Python?",
-            retrieved_context="To install Python, download the installer from python.org.",
+            context="To install Python, download the installer from python.org.",
         )
         result = await check.run(Trace())
 
@@ -74,7 +79,7 @@ class TestContextRelevanceBasic:
         check = ContextRelevance(
             generator=generator,
             query="How do I install Python?",
-            retrieved_context="Preheat oven to 180°C and bake for 25 minutes.",
+            context="Preheat oven to 180°C and bake for 25 minutes.",
         )
         result = await check.run(Trace())
 
@@ -83,11 +88,11 @@ class TestContextRelevanceBasic:
 
     async def test_llm_called_once(self):
         """Exactly one LLM call should be made per check run."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="n/a")
         check = ContextRelevance(
             generator=generator,
             query="What is Flask?",
-            retrieved_context="Flask is a lightweight Python web framework.",
+            context="Flask is a lightweight Python web framework.",
         )
         await check.run(Trace())
 
@@ -99,11 +104,11 @@ class TestContextRelevanceListHandling:
 
     async def test_list_context_passed_directly(self):
         """A list of context strings supplied directly is handled."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="n/a")
         check = ContextRelevance(
             generator=generator,
             query="What is Python?",
-            retrieved_context=[
+            context=[
                 "Python is a high-level programming language.",
                 "Python was created by Guido van Rossum.",
             ],
@@ -115,7 +120,7 @@ class TestContextRelevanceListHandling:
 
     async def test_list_context_from_trace(self):
         """A list stored in trace metadata is extracted and stringified."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="n/a")
         check = ContextRelevance(generator=generator)
         trace = await Trace.from_interactions(
             Interaction(
@@ -136,7 +141,7 @@ class TestContextRelevanceListHandling:
 
     async def test_single_string_context_from_trace(self):
         """A single string stored in trace metadata is accepted."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="n/a")
         check = ContextRelevance(generator=generator)
         trace = await Trace.from_interactions(
             Interaction(
@@ -182,7 +187,7 @@ class TestContextRelevanceMultiTurn:
 
     async def test_history_included_in_inputs(self):
         """Prior turn must appear in the history template variable."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="n/a")
         check = ContextRelevance(generator=generator)
         trace = await Trace.from_interactions(
             Interaction(
@@ -207,7 +212,7 @@ class TestContextRelevanceMultiTurn:
 
     async def test_single_turn_history_is_empty(self):
         """First interaction has no prior history."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="n/a")
         check = ContextRelevance(generator=generator)
         trace = await Trace.from_interactions(
             Interaction(
@@ -256,11 +261,11 @@ class TestContextRelevanceInputResolution:
 
     async def test_direct_query_and_context_used(self):
         """Directly supplied query/context take priority over trace."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="n/a")
         check = ContextRelevance(
             generator=generator,
             query="Direct query",
-            retrieved_context="Direct context",
+            context="Direct context",
         )
         trace = await Trace.from_interactions(
             Interaction(
@@ -277,7 +282,7 @@ class TestContextRelevanceInputResolution:
 
     async def test_query_and_context_extracted_from_trace(self):
         """When no direct values given, query/context extracted from trace."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="n/a")
         check = ContextRelevance(generator=generator)
         trace = await Trace.from_interactions(
             Interaction(
@@ -294,7 +299,7 @@ class TestContextRelevanceInputResolution:
 
     async def test_custom_keys(self):
         """Custom JSONPath keys should resolve correctly."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="n/a")
         check = ContextRelevance(
             generator=generator,
             query_key="trace.interactions[0].inputs.question",
@@ -315,7 +320,7 @@ class TestContextRelevanceInputResolution:
 
     async def test_empty_trace_no_crash(self):
         """Empty trace should not raise — NoMatch values are stringified."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="n/a")
         check = ContextRelevance(generator=generator)
 
         result = await check.run(Trace())
@@ -330,11 +335,11 @@ class TestContextRelevanceDomainContext:
 
     async def test_domain_context_included_in_inputs(self):
         """Supplied domain context must appear in template inputs."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="n/a")
         check = ContextRelevance(
             generator=generator,
             query="What is Flask?",
-            retrieved_context="Flask is a Python web framework.",
+            context="Flask is a Python web framework.",
             domain_context="This bot only retrieves Python programming documentation.",
         )
         result = await check.run(Trace())
@@ -346,11 +351,11 @@ class TestContextRelevanceDomainContext:
 
     async def test_no_domain_context_is_empty_string(self):
         """When no domain context supplied, template input is empty string."""
-        generator = MockGenerator(passed=True, reason=None)
+        generator = MockGenerator(passed=True, reason="n/a")
         check = ContextRelevance(
             generator=generator,
             query="What is Flask?",
-            retrieved_context="Flask is a web framework.",
+            context="Flask is a web framework.",
         )
         result = await check.run(Trace())
 

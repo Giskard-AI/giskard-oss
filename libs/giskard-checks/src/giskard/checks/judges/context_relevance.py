@@ -1,8 +1,8 @@
 from typing import override
 
-from giskard.agents.workflow import TemplateReference
-from giskard.core import provide_not_none
+from giskard.agents import TemplateReference
 from pydantic import Field
+from pydantic.experimental.missing_sentinel import MISSING
 
 from ..core import Trace
 from ..core.check import Check
@@ -32,7 +32,7 @@ class ContextRelevance[InputType, OutputType, TraceType: Trace](  # pyright: ign
     query_key : JSONPathStr
         JSONPath expression to extract the query from the trace
         (default: ``"trace.last.inputs"``).
-    retrieved_context : str | list[str] | None
+    context : str | list[str] | None
         The retrieved context to evaluate. When provided, takes priority over
         ``context_key``. Accepts a single string or a list of strings.
     context_key : JSONPathStr
@@ -70,7 +70,7 @@ class ContextRelevance[InputType, OutputType, TraceType: Trace](  # pyright: ign
         default="trace.last.inputs",
         description="JSONPath to extract the query from the trace.",
     )
-    retrieved_context: str | list[str] | None = Field(
+    context: str | list[str] | None = Field(
         default=None,
         description=(
             "The retrieved context to evaluate. Takes priority over context_key. "
@@ -114,13 +114,15 @@ class ContextRelevance[InputType, OutputType, TraceType: Trace](  # pyright: ign
             provided_or_resolve(
                 trace,
                 key=self.query_key,
-                value=provide_not_none(self.query),
+                value=self.query if self.query is not None else MISSING,
             )
         )
         resolved_context = provided_or_resolve(
             trace,
             key=self.context_key,
-            value=provide_not_none(self.retrieved_context),
+            value=self.context
+            if self.context is not None
+            else MISSING,
         )
         context = (
             "\n\n".join(map(str, resolved_context))
