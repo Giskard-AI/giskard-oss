@@ -1,8 +1,41 @@
 """Tests for Hub format export."""
 
+from giskard.checks import Equals, Scenario, Suite
 from giskard.checks.core.result import SuiteResult
 from giskard.checks.export import hub as hub_module
 from giskard.checks.export.hub import to_hub_format
+
+
+async def test_to_hub_format_check_details_expose_flat_check_spec() -> None:
+    """The wire payload carries each check's config under details['check_spec'].
+
+    The Hub importer maps details['check_spec'] onto CheckResult.spec (ENG-1737)
+    to render the check-settings panel; without it the Hub shows only pass/fail.
+    """
+    suite = Suite(name="s").append(
+        Scenario("sc")
+        .interact(
+            inputs="q",
+            outputs=lambda inputs, trace: {"response": {"content": "a"}},
+        )
+        .check(
+            Equals(
+                expected_value="a",
+                target_key="trace.last.outputs.response.content",
+                name="answer_is_a",
+            )
+        )
+    )
+
+    payload = to_hub_format(await suite.run())
+
+    details = payload["results"][0]["steps"][0]["results"][0]["details"]
+    assert details["check_spec"] == {
+        "kind": "equals",
+        "expected_value": "a",
+        "target_key": "trace.last.outputs.response.content",
+        "normalization_form": "NFKC",
+    }
 
 
 def test_to_hub_format_pass_rate_null_when_empty() -> None:

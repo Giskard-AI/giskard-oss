@@ -47,6 +47,7 @@ async def _run_check[
                 "check_kind": check.kind,
                 "check_name": check.name,
                 "check_description": check.description,
+                "check_spec": check.to_spec(),
             }
         }
     )
