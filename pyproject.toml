@@ -105,6 +105,7 @@ dev = [
     "ipykernel==7.3.0",
     "pip-audit==2.10.1",
     "pylint-pydantic==0.4.1",
+    "python-dotenv==1.2.2",
 ]
 garak-test = [
     { include-group = "test" },
