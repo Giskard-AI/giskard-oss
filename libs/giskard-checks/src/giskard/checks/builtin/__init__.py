@@ -17,6 +17,7 @@ from .json_valid import JsonValid
 from .nlp_metrics import Readability
 from .rego_policy import RegoPolicy
 from .semantic_similarity import SemanticSimilarity
+from .output_safety import XSSOutputCheck
 from .text_matching import RegexMatching, StringMatching
 
 __all__ = [
@@ -37,4 +38,5 @@ __all__ = [
     "GreaterThan",
     "GreaterThanEquals",
     "SemanticSimilarity",
+    "XSSOutputCheck",
 ]
