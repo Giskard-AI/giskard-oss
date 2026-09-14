@@ -29,6 +29,7 @@ _PROVIDER_REGISTRY: dict[str, tuple[str, str]] = {
     "anthropic": ("giskard.llm.providers.anthropic", "AnthropicProvider"),
     "azure": ("giskard.llm.providers.azure_openai", "AzureOpenAIProvider"),
     "azure_ai": ("giskard.llm.providers.azure_ai", "AzureAIProvider"),
+    "edenai": ("giskard.llm.providers.edenai", "EdenAIProvider"),
 }
 
 

@@ -98,6 +98,25 @@ def test_create_provider_unknown():
         _create_provider("foobar")
 
 
+def test_create_edenai_provider(monkeypatch):
+    monkeypatch.setenv("EDENAI_API_KEY", "eden-key")  # pragma: allowlist secret
+    with patch("giskard.llm.providers.openai._import_openai") as mock_import:
+        mock_import.return_value = MagicMock()
+        provider = _create_provider("edenai")
+    from giskard.llm.providers.edenai import EdenAIProvider
+
+    assert isinstance(provider, EdenAIProvider)
+
+
+def test_edenai_model_string_keeps_provider_model_suffix():
+    # The router splits on the first "/" only, so "edenai/openai/gpt-4o"
+    # yields the Eden AI model id "openai/gpt-4o" as the model name.
+    assert _parse_model_string("edenai/openai/gpt-4o") == (
+        "edenai",
+        "openai/gpt-4o",
+    )
+
+
 # -- LLMClient ----------------------------------------------------------------
 
 
