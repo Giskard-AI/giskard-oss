@@ -220,6 +220,36 @@ async def test_chat_workflow_serialization_custom_generator():
 # -- Unknown-key rejection (``extra="forbid"``) ------------------------------
 
 
+def test_generation_params_rejects_unknown_key():
+    """Unsupported GenerationParams fields must fail loudly, not silently drop."""
+    with pytest.raises(ValidationError, match="api_bass"):
+        GenerationParams(api_bass="http://127.0.0.1:1234/v1")
+
+
+def test_generation_params_preserves_api_base():
+    """api_base must survive construction and dump so backends can receive it."""
+    params = GenerationParams(api_base="http://127.0.0.1:1234/v1")
+    dumped = params.model_dump(exclude={"tools"}, exclude_unset=True)
+    assert dumped == {"api_base": "http://127.0.0.1:1234/v1"}
+
+
+def test_generator_with_params_rejects_unknown_key():
+    """``.with_params`` must reject typos instead of silently discarding them."""
+    generator = GiskardLLMGenerator(model="gpt-4")
+
+    with pytest.raises(ValidationError, match="api_bass"):
+        generator.with_params(api_bass="http://127.0.0.1:1234/v1")
+
+
+def test_generator_with_params_preserves_api_base():
+    """``.with_params(api_base=...)`` must keep the endpoint on the new params."""
+    generator = GiskardLLMGenerator(model="gpt-4").with_params(
+        api_base="http://127.0.0.1:1234/v1"
+    )
+    dumped = generator.params.model_dump(exclude={"tools"}, exclude_unset=True)
+    assert dumped == {"api_base": "http://127.0.0.1:1234/v1"}
+
+
 def test_generator_rejects_unknown_key():
     """A typo'd key on a generator must fail loudly, not silently default."""
     payload = {
