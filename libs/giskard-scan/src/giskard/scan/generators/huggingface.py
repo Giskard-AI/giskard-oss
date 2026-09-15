@@ -1,9 +1,10 @@
 import logging
+from collections.abc import Iterator
 from functools import lru_cache
-from pathlib import Path
 from typing import Any, override
 
 import httpx
+import numpy as np
 from giskard.checks import Scenario, Trace
 from huggingface_hub import DatasetCard, hf_hub_download, list_repo_files
 from huggingface_hub.errors import (
@@ -13,6 +14,7 @@ from huggingface_hub.errors import (
 )
 from pydantic import Field
 
+from ..utils.dataset_loader import iter_jsonl
 from .base import BaseDatasetScenarioGenerator
 
 logger = logging.getLogger(__name__)
@@ -118,18 +120,15 @@ class HuggingFaceDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
         return self.repo_allow_commercial_use
 
     @override
-    def load_scenarios(
+    def _dataset_identity(self) -> object:
+        return self.repo_id
+
+    @override
+    def _iter_dataset_records(
         self, description: str, languages: list[str]
-    ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
-        try:
-            subsets = _language_subsets(self.repo_id)
-        except _HUB_LOAD_ERRORS as exc:
-            if not _handle_hub_outage(self.repo_id, exc):
-                raise
-            return []
-
+    ) -> Iterator[tuple[dict[str, Any], str]]:
+        subsets = _language_subsets(self.repo_id)
         compatible = [language for language in languages if language in subsets]
-
         if not compatible:
             logger.warning(
                 "No compatible language subset found in %s for requested languages "
@@ -138,27 +137,30 @@ class HuggingFaceDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
                 languages,
                 sorted(subsets),
             )
-            return []
+            return
 
-        scenarios: list[Scenario[Any, Any, Trace[Any, Any]]] = []
+        for language in compatible:
+            for repo_file in subsets[language]:
+                local_path = hf_hub_download(
+                    self.repo_id, repo_file, repo_type="dataset"
+                )
+                source = f"{self.repo_id}/{repo_file}"
+                for record in iter_jsonl(local_path, source=source):
+                    yield record, source
+
+    @override
+    def load_scenarios(
+        self,
+        description: str,
+        languages: list[str],
+        max_scenarios: int | None = None,
+        rng: np.random.Generator | None = None,
+    ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         try:
-            for language in compatible:
-                for repo_file in subsets[language]:
-                    local_path = hf_hub_download(
-                        self.repo_id, repo_file, repo_type="dataset"
-                    )
-                    with Path(local_path).open(encoding="utf-8") as f:
-                        scenarios.extend(
-                            self._parse_scenarios(
-                                f,
-                                description=description,
-                                languages=languages,
-                                source=f"{self.repo_id}/{repo_file}",
-                            )
-                        )
+            return self._load_scenarios_with_sampling(
+                description, languages, max_scenarios, rng
+            )
         except _HUB_LOAD_ERRORS as exc:
             if not _handle_hub_outage(self.repo_id, exc):
                 raise
             return []
-
-        return scenarios
