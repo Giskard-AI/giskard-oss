@@ -320,7 +320,7 @@ class AnthropicChatTranslator:
     @staticmethod
     def block_content_to_giskard(
         block: "ContentBlock",
-    ) -> CompletionContent | ToolCall:
+    ) -> CompletionContent | ToolCall | None:
         if block.type == "text":
             return TextContent(text=block.text)
         elif block.type == "tool_use":
@@ -333,14 +333,28 @@ class AnthropicChatTranslator:
                 ),
             )
         else:
-            raise ValueError(f"Unsupported content block type: {block.type}")
+            # `thinking`/`redacted_thinking` (extended thinking) and the various
+            # server-side tool blocks (`server_tool_use`, `web_search_tool_result`,
+            # `code_execution_tool_result`, ...) have no giskard content/tool-call
+            # equivalent. Dropping them, rather than raising, keeps the rest of the
+            # response (the text and tool_use blocks a caller actually asked about)
+            # usable instead of losing the whole response to one unmapped block.
+            logger.debug(
+                "%s provider: dropping unsupported content block type: %s",
+                _PROVIDER_NAME,
+                block.type,
+            )
+            return None
 
     @staticmethod
     def blocks_to_giskard(
         blocks: "Sequence[ContentBlock]",
     ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
         content_and_tool_calls = [
-            AnthropicChatTranslator.block_content_to_giskard(block) for block in blocks
+            result
+            for block in blocks
+            if (result := AnthropicChatTranslator.block_content_to_giskard(block))
+            is not None
         ]
         content = [
             content
