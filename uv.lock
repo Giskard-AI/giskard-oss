@@ -1440,6 +1440,10 @@ dependencies = [
 all = [
     { name = "celine-regorus", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'linux' and sys_platform != 'win32')" },
     { name = "textstat" },
+    { name = "websockets" },
+]
+hub = [
+    { name = "websockets" },
 ]
 readability = [
     { name = "textstat" },
@@ -1452,7 +1456,7 @@ regorus = [
 requires-dist = [
     { name = "celine-regorus", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'regorus') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'regorus')", specifier = ">=0.9.1" },
     { name = "giskard-agents", editable = "libs/giskard-agents" },
-    { name = "giskard-checks", extras = ["readability", "regorus"], marker = "extra == 'all'", editable = "libs/giskard-checks" },
+    { name = "giskard-checks", extras = ["readability", "regorus", "hub"], marker = "extra == 'all'", editable = "libs/giskard-checks" },
     { name = "giskard-core", editable = "libs/giskard-core" },
     { name = "jinja2", specifier = ">=3.1.6,<4" },
     { name = "jsonpath-ng", specifier = ">=1.7.0,<2" },
@@ -1463,8 +1467,9 @@ requires-dist = [
     { name = "regex", specifier = ">=2026.1.15" },
     { name = "rich", specifier = ">=14.2.0,<16" },
     { name = "textstat", marker = "extra == 'readability'", specifier = ">=0.7.0" },
+    { name = "websockets", marker = "extra == 'hub'", specifier = ">=13,<16" },
 ]
-provides-extras = ["readability", "regorus", "all"]
+provides-extras = ["readability", "regorus", "hub", "all"]
 
 [[package]]
 name = "giskard-core"

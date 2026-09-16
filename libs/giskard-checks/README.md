@@ -27,6 +27,26 @@ Requires Python >= 3.12.
 - `giskard-agents>=1.0.0a1` - LLM integration, workflows, and bundled prompt templates
 - `jsonpath-ng>=1.7.0` - JSONPath expressions for data extraction
 
+Connect a local agent to Giskard Hub
+------------------------------------
+
+```python
+from giskard.checks.hub_local import connect_local_agent
+
+async def echo(payload: dict) -> dict:
+    text = payload["messages"][-1]["content"]
+    return {"response": {"role": "assistant", "content": text}}
+
+await connect_local_agent(
+    hub_url="https://app.llm.localhost",
+    api_key="...",
+    handler=echo,
+    name="Local echo",
+)
+```
+
+Requires `pip install 'giskard-checks[hub]'`. Hub creates the agent on connect and deletes it when this process disconnects.
+
 Quickstart
 ----------
 
