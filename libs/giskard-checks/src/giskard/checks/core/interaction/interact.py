@@ -167,7 +167,10 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         :attr:`_input_value_generator_provider`.
         """
         try:
-            return ValueProvider(self.outputs, {"inputs", "trace"})
+            return cast(
+                ValueProvider[..., OutputType],
+                ValueProvider(self.outputs, {"inputs", "trace"}),
+            )
         except ValueError as e:
             raise ValueError(
                 f"Error getting injection settings for outputs: {e}"

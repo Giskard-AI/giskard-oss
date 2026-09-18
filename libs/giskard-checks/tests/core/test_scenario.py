@@ -416,6 +416,40 @@ class TestScenarioNormalCases:
         assert result.steps[1].results[0].details.get("check_name") == "step"
         assert result.errored
 
+    async def test_skipped_step_check_results_carry_check_spec(self):
+        """Skipped checks still report their config via details['check_spec'].
+
+        A Hub import maps details['check_spec'] onto CheckResult.spec (ENG-1737);
+        a check skipped after an earlier failure must carry it too so its
+        settings render in the evaluation UI.
+        """
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+
+        result = await (
+            Scenario("skipped_step_keeps_spec")
+            .add_interaction(MockInteractionSpec(interactions=[interaction1]))
+            .check(MockCheck(result=CheckResult.failure(message="Check 1 failed")))
+            .add_interaction(MockInteractionSpec(interactions=[interaction2]))
+            .check(
+                Equals(
+                    expected_value="output2",
+                    target_key="trace.interactions[-1].outputs",
+                    name="second_step_check",
+                )
+            )
+            .run()
+        )
+
+        assert result.steps[1].skipped
+        skipped = result.steps[1].results[0]
+        assert skipped.skipped
+        spec = skipped.details["check_spec"]
+        assert spec["kind"] == "equals"
+        assert spec["expected_value"] == "output2"
+        assert spec["target_key"] == "trace.interactions[-1].outputs"
+        assert "name" not in spec
+
     async def test_trace_accumulation_across_components(self):
         """Test that trace accumulates interactions across components."""
         interaction1 = Interaction(inputs="1", outputs="2")
