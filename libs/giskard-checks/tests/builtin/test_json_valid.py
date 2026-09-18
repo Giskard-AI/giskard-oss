@@ -162,7 +162,10 @@ def test_invalid_schema_fails_at_instantiation() -> None:
 async def test_unresolvable_schema_ref_returns_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    urlopen_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
     def _fail_urlopen(*_args: object, **_kwargs: object) -> object:
+        urlopen_calls.append((_args, _kwargs))
         raise AssertionError("remote $ref must not be fetched by default")
 
     monkeypatch.setattr("urllib.request.urlopen", _fail_urlopen)
@@ -174,6 +177,7 @@ async def test_unresolvable_schema_ref_returns_error(
 
     result = await check.run(trace)
 
+    assert not urlopen_calls
     assert result.status == CheckStatus.ERROR
     assert result.errored
     assert result.message is not None
