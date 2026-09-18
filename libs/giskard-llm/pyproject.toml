@@ -14,7 +14,7 @@ dependencies = [
 [project.optional-dependencies]
 openai = ["openai>=1.30,<4"]
 google = ["google-genai>=2.0,<3"]
-anthropic = ["anthropic>=0.40,<1"]
+anthropic = ["anthropic>=1,<2"]
 azure = ["giskard-llm[openai]"]  # alias: azure/ and azure_ai/ use the openai SDK
 all = ["giskard-llm[openai,google,anthropic]"]
 

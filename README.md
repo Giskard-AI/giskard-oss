@@ -44,7 +44,7 @@ Requires Python 3.12+.
 | `openai` / `anthropic` / … | provider SDKs (see `pyproject.toml` optional deps) |
 
 **Telemetry:** optional aggregated analytics via `giskard-core`. No prompts or outputs are sent.
-Opt out **before importing Giskard**: `export DO_NOT_TRACK=1` or `export GISKARD_TELEMETRY_DISABLED=1`.
+Opt out with `export DO_NOT_TRACK=1` or `export GISKARD_TELEMETRY_DISABLED=1` (or the same keys in a `.env` file in the working directory). Set them before import to skip creating `~/.giskard/id`; setting them later still stops further sends.
 Details: [`giskard-core` README](libs/giskard-core/README.md#telemetry).
 
 ---

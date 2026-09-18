@@ -4,7 +4,9 @@ import logging
 import warnings
 
 from giskard.checks import SuiteResult, Target, Trace
+from giskard.core import scoped_telemetry, telemetry_capture, telemetry_tag
 
+from ._telemetry import safe_bool, safe_target_mode, scenario_budget
 from .catalog import generate_suite
 from .generators.base import DEFAULT_TARGET_MODE, TargetMode
 from .generators.knowledge_base import (
@@ -35,6 +37,7 @@ for generator_type in QUALITY_GENERATOR_TYPES:
     quality_suite_generator_registry.register(generator_type)
 
 
+@scoped_telemetry
 async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     target: Target[InputType, OutputType, TraceType],
     description: str,
@@ -111,29 +114,61 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     knowledge_base = normalize_knowledge_base(
         _warn_if_missing_knowledge_base(knowledge_base)
     )
+    telemetry_tag("giskard_component", "scan")
+    telemetry_tag("giskard_operation", "quality_scan")
+    telemetry_properties: dict[str, object] = {
+        "integration": "giskard-scan",
+        "scan_type": "quality",
+        "target_mode": safe_target_mode(target_mode),
+        "language_count": len(languages),
+        "scenario_budget": scenario_budget(opts["max_scenarios"]),
+        "parallel": safe_bool(opts["parallel"]),
+        "has_knowledge_base": knowledge_base is not None,
+    }
+    telemetry_capture("scan_run_started", properties=telemetry_properties)
 
-    suite = await generate_suite(
-        description=description,
-        languages=languages,
-        generators=quality_suite_generator_registry.generators(),
-        max_scenarios=opts["max_scenarios"],
-        seed=opts["seed"],
-        target_mode=target_mode,
-        knowledge_base=knowledge_base,
-    )
+    try:
+        suite = await generate_suite(
+            description=description,
+            languages=languages,
+            generators=quality_suite_generator_registry.generators(),
+            max_scenarios=opts["max_scenarios"],
+            seed=opts["seed"],
+            target_mode=target_mode,
+            knowledge_base=knowledge_base,
+        )
 
-    result: SuiteResult = await suite.run(
-        target,
-        parallel=opts["parallel"],
-        max_concurrency=opts["max_concurrency"],
-        return_exception=opts["return_exception"],
-    )
+        result: SuiteResult = await suite.run(
+            target,
+            parallel=opts["parallel"],
+            max_concurrency=opts["max_concurrency"],
+            return_exception=opts["return_exception"],
+        )
+    except Exception:
+        telemetry_capture(
+            "scan_run_finished",
+            properties={**telemetry_properties, "outcome": "error"},
+        )
+        raise
     try:
         recommendation = await generate_quality_recommendation(result)
     except Exception:
         logger.exception("Quality recommendation generation failed")
         recommendation = ""
     quality_result = result.model_copy(update={"recommendation": recommendation})
+    telemetry_capture(
+        "scan_run_finished",
+        properties={
+            **telemetry_properties,
+            "outcome": "completed",
+            "duration_ms": quality_result.duration_ms,
+            "scenario_count": len(quality_result.results),
+            "passed_count": quality_result.passed_count,
+            "failed_count": quality_result.failed_count,
+            "errored_count": quality_result.errored_count,
+            "skipped_count": quality_result.skipped_count,
+        },
+    )
     quality_result.print_report(group_by=opts["group_by"])
     return quality_result
 

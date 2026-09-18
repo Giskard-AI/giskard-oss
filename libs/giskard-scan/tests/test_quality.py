@@ -10,6 +10,7 @@ from giskard.checks import Equals, Scenario, Trace
 from giskard.checks.core.result import SuiteResult
 from giskard.checks.scenarios.suite import Suite
 from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
+from giskard.scan._telemetry import scenario_budget
 from giskard.scan.generators.base import ScenarioContext, ScenarioGenerator
 from giskard.scan.generators.knowledge_base import (
     HallucinationScenarioGenerator,
@@ -382,3 +383,131 @@ async def test_quality_scan_hides_recommendation_when_generation_fails(
 
     assert result.failed_count == 1
     assert result.recommendation == ""
+
+
+async def test_quality_scan_emits_privacy_safe_product_telemetry(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    quality_suite_generator_registry.register(_DeterministicQualityGenerator())
+    monkeypatch.setattr(SuiteResult, "print_report", lambda self, **_: None)
+    monkeypatch.setattr(
+        settings,
+        "_default_generator",
+        _MockRecommendationGenerator(responses=["private recommendation"]),
+    )
+    events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        quality_module,
+        "telemetry_capture",
+        lambda event, *, properties: events.append((event, properties)),
+    )
+    monkeypatch.setattr(quality_module, "telemetry_tag", lambda *_: None)
+
+    result = await quality_scan(
+        target=lambda inputs: inputs,
+        description="private agent description",
+        languages=["en"],
+        knowledge_base=["private knowledge-base document"],
+        max_scenarios=2,
+    )
+
+    assert [event for event, _ in events] == [
+        "scan_run_started",
+        "scan_run_finished",
+    ]
+    assert events[0][1] == {
+        "integration": "giskard-scan",
+        "scan_type": "quality",
+        "target_mode": "multiturn",
+        "language_count": 1,
+        "scenario_budget": "small",
+        "parallel": True,
+        "has_knowledge_base": True,
+    }
+    assert events[1][1] == {
+        **events[0][1],
+        "outcome": "completed",
+        "duration_ms": result.duration_ms,
+        "scenario_count": 2,
+        "passed_count": 1,
+        "failed_count": 1,
+        "errored_count": 0,
+        "skipped_count": 0,
+    }
+    assert "private agent description" not in repr(events)
+    assert "private knowledge-base document" not in repr(events)
+    assert "private recommendation" not in repr(events)
+
+
+async def test_quality_scan_allowlists_caller_controlled_telemetry_values(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    quality_suite_generator_registry.register(_DeterministicQualityGenerator())
+    events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        quality_module,
+        "telemetry_capture",
+        lambda event, *, properties: events.append((event, properties)),
+    )
+    monkeypatch.setattr(quality_module, "telemetry_tag", lambda *_: None)
+    monkeypatch.setattr(SuiteResult, "print_report", lambda self, **_: None)
+
+    private_string: Any = "private-caller-controlled-value"
+    private_unhashable: Any = {"private-caller-controlled-value": True}
+    await quality_scan(
+        target=lambda inputs: inputs,
+        description="description",
+        languages=[],
+        knowledge_base=None,
+        max_scenarios=0,
+        target_mode=private_unhashable,
+        parallel=private_string,
+    )
+
+    assert events[0][1]["target_mode"] == "unknown"
+    assert events[0][1]["parallel"] is None
+    assert events[0][1]["scenario_budget"] == "none"
+    assert private_string not in repr(events)
+    assert scenario_budget(private_string) == "unknown"
+
+
+@pytest.mark.parametrize("failure_stage", ["generate_suite", "suite_run"])
+async def test_quality_scan_finishes_telemetry_when_scan_raises(
+    monkeypatch: pytest.MonkeyPatch,
+    failure_stage: str,
+):
+    events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        quality_module,
+        "telemetry_capture",
+        lambda event, *, properties: events.append((event, properties)),
+    )
+    monkeypatch.setattr(quality_module, "telemetry_tag", lambda *_: None)
+
+    private_error = "private-scan-failure"
+
+    class _FailingSuite:
+        async def run(self, *_: object, **__: object) -> SuiteResult:
+            raise RuntimeError(private_error)
+
+    async def generate_suite_spy(**_: object) -> _FailingSuite:
+        if failure_stage == "generate_suite":
+            raise RuntimeError(private_error)
+        return _FailingSuite()
+
+    monkeypatch.setattr(quality_module, "generate_suite", generate_suite_spy)
+
+    with pytest.warns(RuntimeWarning, match="received no knowledge base"):
+        with pytest.raises(RuntimeError, match=private_error):
+            await quality_scan(
+                target=lambda inputs: inputs,
+                description="description",
+                languages=[],
+            )
+
+    assert [event for event, _ in events] == [
+        "scan_run_started",
+        "scan_run_finished",
+    ]
+    assert events[1][1] == {**events[0][1], "outcome": "error"}
+    assert private_error not in repr(events)

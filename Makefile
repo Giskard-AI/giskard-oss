@@ -154,7 +154,9 @@ typecheck: ## Run type checking with basedpyright
 	uv tool run basedpyright --level error .
 
 security: ## Check for security vulnerabilities
-	uv run pip-audit --skip-editable
+	# TODO: Remove --ignore-vuln PYSEC-2026-3740 when a fixed nltk release exists
+	# No fixed version yet for nltk 3.10.3 advisory PYSEC-2026-3740
+	uv run pip-audit --skip-editable --ignore-vuln PYSEC-2026-3740
 
 # Run licensecheck INSIDE the synced project env (uv run --with, not uvx): it reads
 # each package's version from the installed env via importlib, so output is pinned to
