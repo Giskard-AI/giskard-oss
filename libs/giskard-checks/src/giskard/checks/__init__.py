@@ -7,6 +7,7 @@ from giskard.core.utils import get_lib_version
 from giskard.core.welcome import maybe_show_welcome
 
 from . import builtin, judges
+from ._som import SOMJudgeGenerator
 from .builtin import (
     AllOf,
     AnyOf,
@@ -67,7 +68,15 @@ from .judges import (
 )
 from .scenarios.runner import ScenarioRunner
 from .scenarios.suite import Suite
-from .settings import get_default_generator, get_settings, set_default_generator
+from .settings import (
+    get_default_embedding_model,
+    get_default_generator,
+    get_default_judge,
+    get_settings,
+    set_default_embedding_model,
+    set_default_generator,
+    set_default_judge,
+)
 from .testing import WithSpy
 from .testing.runner import TestCaseRunner
 
@@ -154,6 +163,11 @@ __all__ = [
     "Suite",
     "ScenarioRunner",
     # Settings
+    "SOMJudgeGenerator",
     "set_default_generator",
     "get_default_generator",
+    "set_default_judge",
+    "get_default_judge",
+    "set_default_embedding_model",
+    "get_default_embedding_model",
 ]

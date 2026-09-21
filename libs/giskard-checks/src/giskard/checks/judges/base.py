@@ -1,6 +1,11 @@
 from typing import Any, override
 
-from giskard.agents import ChatWorkflow, MessageTemplate, TemplateReference
+from giskard.agents import (
+    BaseGenerator,
+    ChatWorkflow,
+    MessageTemplate,
+    TemplateReference,
+)
 from giskard.llm.types import ChatMessage
 from pydantic import BaseModel, Field, field_validator
 
@@ -8,6 +13,7 @@ from ..core import Trace
 from ..core.check import Check
 from ..core.mixin import WithGeneratorMixin
 from ..core.result import CheckResult
+from ..settings import get_default_judge
 
 
 class LLMCheckResult(BaseModel):
@@ -58,8 +64,13 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     ----------
     generator : BaseGenerator
         Generator for LLM evaluation. Defaults to the global
-        default generator if not specified.
+        default judge if not specified.
     """
+
+    @property
+    @override
+    def _generator(self) -> BaseGenerator:
+        return self.generator if self.generator is not None else get_default_judge()
 
     @property
     def output_type(self) -> type[BaseModel] | None:
