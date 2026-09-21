@@ -1,9 +1,14 @@
 from unittest.mock import MagicMock
 
 import giskard.checks.settings as settings
-from giskard.agents.generators.base import BaseGenerator
-from giskard.checks.core.mixin import WithGeneratorMixin
-from giskard.checks.settings import set_default_generator
+from giskard.agents import BaseEmbeddingModel, BaseGenerator, Generator
+from giskard.checks import LLMGenerator, LLMJudge
+from giskard.checks.core.mixin import WithEmbeddingMixin, WithGeneratorMixin
+from giskard.checks.settings import (
+    set_default_embedding_model,
+    set_default_generator,
+    set_default_judge,
+)
 
 
 class ConcreteCheck(WithGeneratorMixin):
@@ -37,3 +42,63 @@ def test_default_generator_is_returned_when_none_set():
     settings._default_generator = None
     check = ConcreteCheck()
     assert check._generator is not None
+
+
+def test_judge_reflects_global_change_after_instantiation():
+    check = LLMJudge(prompt="Evaluate the answer.")
+    judge = Generator(model="openai/gpt-4o-mini")
+
+    set_default_judge(judge)
+
+    assert check._generator is judge
+    assert check.generator is None
+
+
+def test_judge_and_input_generator_resolve_separate_defaults():
+    check = LLMJudge(prompt="Evaluate the answer.")
+    input_generator = LLMGenerator(prompt="Ask a question.")
+    generation = Generator(model="azure_ai/gpt-5.6-luna")
+    judge = Generator(model="openai/gpt-4o-mini")
+    set_default_generator(generation)
+
+    assert check._generator is generation
+    assert input_generator._generator is generation
+
+    set_default_judge(judge)
+
+    assert check._generator is judge
+    assert input_generator._generator is generation
+
+    set_default_judge(None)
+
+    assert check._generator is generation
+    assert input_generator._generator is generation
+
+
+def test_explicit_judge_generator_is_preserved():
+    explicit = Generator(model="openai/gpt-4o-mini")
+    check = LLMJudge(prompt="Evaluate the answer.", generator=explicit)
+
+    set_default_generator("azure_ai/gpt-5.6-luna")
+    set_default_judge("typesafe/jev")
+
+    assert check._generator is explicit
+
+
+def test_embedding_reflects_global_change_after_instantiation():
+    embedding_user = WithEmbeddingMixin()
+    embedding = MagicMock(spec=BaseEmbeddingModel)
+
+    set_default_embedding_model(embedding)
+
+    assert embedding_user._embedding_model is embedding
+    assert embedding_user.embedding_model is None
+
+
+def test_explicit_embedding_model_is_preserved():
+    explicit = MagicMock(spec=BaseEmbeddingModel)
+    embedding_user = WithEmbeddingMixin(embedding_model=explicit)
+
+    set_default_embedding_model("text-embedding-3-large")
+
+    assert embedding_user._embedding_model is explicit

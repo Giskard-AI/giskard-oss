@@ -191,14 +191,50 @@ API Overview
 - `giskard.checks.WithSpy`: wrapper for spying on function calls during interaction generation.
 
 **Settings**
-- `giskard.checks.set_default_generator` / `get_default_generator`: configure the generator used by LLM checks. `set_default_generator` accepts a `BaseGenerator` instance or a model identifier string (e.g. `"openai/gpt-4o-mini"`).
+- `set_default_generator` / `get_default_generator`: configure content generation. Accepts a `BaseGenerator` instance or model identifier string.
+- `set_default_judge` / `get_default_judge`: configure judging independently with a model identifier, `BaseGenerator`, or `BaseSOM`. Without a separate judge, checks continue to use the default generator. An explicit `generator=` on a check takes precedence.
+- `set_default_embedding_model` / `get_default_embedding_model`: configure embeddings with a `BaseEmbeddingModel` instance or model identifier string. An explicit per-check embedding model takes precedence.
 - Environment variables (or `.env` at the project root), prefixed with `GISKARD_CHECKS_`:
   - `GISKARD_CHECKS_DEFAULT_MODEL` — default LLM model (default: `openai/gpt-4o-mini`).
   - `GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL` — default embedding model (default: `text-embedding-3-small`).
   - `GISKARD_CHECKS_MAX_REPORTED_FAILURES` — cap on failures shown in suite reports.
   - `GISKARD_CHECKS_DISABLE_RICH_PRETTY` — disable rich REPL pretty-printing.
 
-Runtime `set_default_generator()` overrides take precedence over environment settings.
+Runtime overrides take precedence over environment settings. Pass `None` to
+`set_default_judge` or `set_default_embedding_model` to restore their fallbacks.
+
+For example, keep generation on an LLM while judging with a System One Model:
+
+```python
+from giskard.checks import (
+    set_default_embedding_model,
+    set_default_generator,
+    set_default_judge,
+)
+
+set_default_embedding_model("azure_ai/text-embedding-3-small")
+set_default_generator("azure_ai/gpt-5.6-luna")
+set_default_judge("typesafe/jev")
+```
+
+`set_default_judge` infers `model_type="som"` for providers supported by
+`giskard.agents.som` and `model_type="llm"` otherwise. You can specify the type
+explicitly. Existing `quality_scan` calls use the selected judge while scenario
+generation, simulated users and report recommendations continue to use the LLM.
+
+SOM provider clients and their connection settings live in `giskard-agents`.
+The checks integration uses a provider-neutral `BaseSOM` contract, so another
+provider can use the same judge adapter. For the TypeSafe example above, configure
+`TYPESAFE_API_KEY` and optionally `TYPESAFE_BASE_URL`; the provider resolves
+`typesafe/jev` to its native `jev-latest` alias.
+
+The SOM adapter supports the standard `LLMCheckResult` contract. It passes when
+P(pass) is at least 0.5 and reports a probability summary instead of a generated
+rationale. Custom output schemas still require an LLM. Pass a configured
+`BaseSOM` to `set_default_judge` for custom provider settings, or wrap it in
+`SOMJudgeGenerator(model=model, pass_threshold=0.8)` to choose a different threshold.
+The concrete provider handles authentication, native endpoints and gateways;
+`giskard-checks` owns the evaluation question and verdict conversion.
 
 Testing
 -------
@@ -555,7 +591,7 @@ Notes
 -----
 
 - `Trace` captures every interaction; JSONPath keys like `trace.last.outputs` resolve against that structure.
-- Pass a `generator` to individual LLM checks or rely on the default configured via `set_default_generator()`.
+- Pass a `generator` to individual checks or use `set_default_judge()`; without a separate judge, `set_default_generator()` remains the shared default.
 - Built-in LLM checks rely on templates bundled in `giskard.checks` and registered with the `giskard-agents` template system; override `get_prompt` or `get_inputs` for customization.
 
 Advanced Usage

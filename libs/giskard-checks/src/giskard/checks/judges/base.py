@@ -1,31 +1,20 @@
 from typing import Any, override
 
-from giskard.agents import ChatWorkflow, MessageTemplate, TemplateReference
+from giskard.agents import (
+    BaseGenerator,
+    ChatWorkflow,
+    MessageTemplate,
+    TemplateReference,
+)
 from giskard.llm.types import ChatMessage
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel
 
+from .._judge_result import LLMCheckResult as LLMCheckResult
 from ..core import Trace
 from ..core.check import Check
 from ..core.mixin import WithGeneratorMixin
 from ..core.result import CheckResult
-
-
-class LLMCheckResult(BaseModel):
-    """Default result model for LLM-based checks."""
-
-    reason: str = Field(
-        ...,
-        min_length=1,
-        description="Explanation for the pass or fail verdict",
-    )
-    passed: bool = Field(..., description="Whether the check passed or failed")
-
-    @field_validator("reason", mode="before")
-    @classmethod
-    def _strip_reason(cls, value: object) -> object:
-        if isinstance(value, str):
-            return value.strip()
-        return value
+from ..settings import get_default_judge
 
 
 def format_prompt_text(value: Any) -> str:
@@ -58,8 +47,13 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
     ----------
     generator : BaseGenerator
         Generator for LLM evaluation. Defaults to the global
-        default generator if not specified.
+        default judge if not specified.
     """
+
+    @property
+    @override
+    def _generator(self) -> BaseGenerator:
+        return self.generator if self.generator is not None else get_default_judge()
 
     @property
     def output_type(self) -> type[BaseModel] | None:
