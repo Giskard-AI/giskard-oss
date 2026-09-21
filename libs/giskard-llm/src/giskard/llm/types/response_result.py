@@ -1,14 +1,20 @@
 from pydantic import AliasChoices, Field
 
 from ._base import _BaseModel
-from .response import ResponseFunctionToolCall, ResponseOutputMessage
+from .response import (
+    ResponseFunctionToolCall,
+    ResponseOutputMessage,
+    ResponseReasoningItem,
+)
 from .usage import Usage
 
 # -- Response / Interaction types (Responses API + Interactions API) -----------
 
 
 # Plain assignment (not `type` statement) so isinstance(x, ResponseOutputItem) works at runtime.
-ResponseOutputItem = ResponseOutputMessage | ResponseFunctionToolCall
+ResponseOutputItem = (
+    ResponseOutputMessage | ResponseFunctionToolCall | ResponseReasoningItem
+)
 
 
 class ResponseResult(_BaseModel):
@@ -34,3 +40,8 @@ class ResponseResult(_BaseModel):
     def function_calls(self) -> list[ResponseFunctionToolCall]:
         """Return all function-call outputs."""
         return [o for o in self.outputs if isinstance(o, ResponseFunctionToolCall)]
+
+    @property
+    def reasoning(self) -> list[ResponseReasoningItem]:
+        """Return all reasoning (thinking) outputs."""
+        return [o for o in self.outputs if isinstance(o, ResponseReasoningItem)]

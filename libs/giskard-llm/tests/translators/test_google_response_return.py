@@ -18,12 +18,15 @@ from giskard.llm.types import (
     ResponseFunctionToolCall,
     ResponseOutputMessage,
     ResponseOutputText,
+    ResponseReasoningItem,
+    ResponseReasoningSummary,
 )
 from google.genai._interactions.types import (
     FunctionCallStep,
     Interaction,
     ModelOutputStep,
     TextContent,
+    ThoughtStep,
     Usage,
 )
 
@@ -154,3 +157,32 @@ def test_from_google_text_then_text_then_function():
     assert isinstance(out.outputs[2], ResponseFunctionToolCall)
     assert out.outputs[2].name == "f"
     assert out.output_text == "A\nB"
+
+
+def test_from_google_thought_step_is_reasoning_not_output_text():
+    """A Gemini ``thought`` step maps to an OpenAI ``reasoning`` item.
+
+    ``output_text`` stays the visible model answer only.
+    """
+    raw = _interaction(
+        [
+            ThoughtStep(
+                type="thought",
+                signature="sig",
+                summary=[TextContent(type="text", text="Let me think.")],
+            ),
+            ModelOutputStep(
+                type="model_output",
+                content=[TextContent(type="text", text="42")],
+            ),
+        ],
+    )
+    out = GoogleResponseTranslator.from_google(raw, _MODEL)
+    assert len(out.outputs) == 2
+    reasoning = out.outputs[0]
+    assert isinstance(reasoning, ResponseReasoningItem)
+    assert reasoning.type == "reasoning"
+    assert reasoning.summary == [ResponseReasoningSummary(text="Let me think.")]
+    assert reasoning.encrypted_content == "sig"
+    assert out.output_text == "42"
+    assert out.reasoning == [reasoning]

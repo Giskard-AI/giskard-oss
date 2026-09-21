@@ -1,3 +1,4 @@
+import base64
 import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
@@ -18,6 +19,8 @@ from ..types import (
     CompletionResponse,
     FunctionMessage,
     RefusalContent,
+    ResponseReasoningItem,
+    ResponseReasoningSummary,
     TextContent,
     ToolCall,
     ToolCallFunction,
@@ -74,6 +77,27 @@ def serialize_tool_def(tool: ToolDef, _info: SerializationInfo) -> "ToolDict":
 
 def _text_content(text: str) -> "PartDict":
     return {"text": text}
+
+
+def _b64_signature(signature: bytes) -> str:
+    return base64.b64encode(signature).decode("ascii")
+
+
+def _bytes_signature(encrypted_content: str) -> bytes:
+    return base64.b64decode(encrypted_content, validate=True)
+
+
+def _reasoning_item_to_part(item: ResponseReasoningItem) -> "PartDict":
+    """Map an OpenAI-shaped reasoning item back to a Gemini thought part."""
+    part: dict[str, Any] = {"thought": True}
+    texts = [summary.text for summary in item.summary]
+    if not texts and item.content:
+        texts = [block.text for block in item.content]
+    if texts:
+        part["text"] = "\n".join(texts)
+    if item.encrypted_content:
+        part["thought_signature"] = _bytes_signature(item.encrypted_content)
+    return cast("PartDict", cast(object, part))
 
 
 @TextContent.register_serializer(_PROVIDER)
@@ -177,7 +201,7 @@ def serialize_function_message(
 def serialize_assistant_message(
     message: AssistantMessage, info: SerializationInfo
 ) -> "ContentUnionDict":
-    parts = []
+    parts = [_reasoning_item_to_part(item) for item in message.reasoning or []]
     if message.content is not None:
         parts.extend(_assistant_content_to_parts(message.content, info))
     if message.refusal is not None:
@@ -329,7 +353,7 @@ class GoogleChatTranslator:
     @staticmethod
     def part_content_to_giskard(
         part: "Part", num_messages: int, part_index: int
-    ) -> CompletionContent | ToolCall | None:
+    ) -> CompletionContent | ToolCall | ResponseReasoningItem | None:
         if part.function_call is not None:
             fc = part.function_call
             return ToolCall(
@@ -342,14 +366,21 @@ class GoogleChatTranslator:
                 thought_signature=part.thought_signature,
             )
         if part.thought:
-            # Thought summaries (`text` + `thought=True`) and signature-only
-            # thought parts have no giskard content equivalent. Mapping the
-            # summary as TextContent would mix chain-of-thought into
-            # AssistantMessage.text (the string checks/judges evaluate);
-            # raising on a signature-only part would drop the rest of the
-            # response after a successful SDK call.
-            logger.debug("%s provider: dropping thought part", PROVIDER)
-            return None
+            summary = (
+                [ResponseReasoningSummary(text=part.text)]
+                if part.text is not None
+                else []
+            )
+            encrypted = (
+                _b64_signature(part.thought_signature)
+                if part.thought_signature
+                else None
+            )
+            return ResponseReasoningItem(
+                id=f"rsn_{num_messages}_{part_index}",
+                summary=summary,
+                encrypted_content=encrypted,
+            )
         if part.text is not None:
             return TextContent(text=part.text, thought_signature=part.thought_signature)
         # executable_code, code_execution_result, inline_data, file_data, ...
@@ -363,8 +394,12 @@ class GoogleChatTranslator:
     def parts_to_giskard(
         parts: "Sequence[Part]",
         num_messages: int,
-    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
-        content_and_tool_calls = [
+    ) -> tuple[
+        Sequence[CompletionContent],
+        Sequence[ToolCall],
+        Sequence[ResponseReasoningItem],
+    ]:
+        mapped = [
             result
             for part_index, part in enumerate(parts)
             if (
@@ -376,15 +411,14 @@ class GoogleChatTranslator:
         ]
         content = [
             content
-            for content in content_and_tool_calls
-            if not isinstance(content, ToolCall)
+            for content in mapped
+            if not isinstance(content, (ToolCall, ResponseReasoningItem))
         ]
         tool_calls = [
-            tool_call
-            for tool_call in content_and_tool_calls
-            if isinstance(tool_call, ToolCall)
+            tool_call for tool_call in mapped if isinstance(tool_call, ToolCall)
         ]
-        return content, tool_calls
+        reasoning = [item for item in mapped if isinstance(item, ResponseReasoningItem)]
+        return content, tool_calls, reasoning
 
     @staticmethod
     def from_google(
@@ -417,7 +451,7 @@ class GoogleChatTranslator:
             )
 
             if candidate.content and candidate.content.parts:
-                content, tool_calls = GoogleChatTranslator.parts_to_giskard(
+                content, tool_calls, reasoning = GoogleChatTranslator.parts_to_giskard(
                     candidate.content.parts,
                     num_messages,
                 )
@@ -426,6 +460,7 @@ class GoogleChatTranslator:
             else:
                 content = None
                 tool_calls = None
+                reasoning = None
 
             choices.append(
                 Choice(
@@ -434,6 +469,7 @@ class GoogleChatTranslator:
                         content=content if content else None,
                         refusal=refusal_out,
                         tool_calls=tool_calls if tool_calls else None,
+                        reasoning=reasoning if reasoning else None,
                     ),
                     finish_reason=finish_reason,
                     index=i,

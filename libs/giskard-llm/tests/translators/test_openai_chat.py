@@ -14,6 +14,8 @@ from giskard.llm.types import (
     DeveloperMessage,
     FunctionMessage,
     RefusalContent,
+    ResponseReasoningItem,
+    ResponseReasoningSummary,
     SystemMessage,
     TextContent,
     UserMessage,
@@ -167,6 +169,30 @@ def test_user_assistant_user():
         {"role": "assistant", "content": "Assistant reply."},
         {"role": "user", "content": "Second user."},
     ]
+    validate_openai_completion_params(payload)
+
+
+def test_assistant_reasoning_is_stripped_from_chat_completions():
+    """Chat Completions has no reasoning field; adapter-owned items are not sent."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="Why?"),
+        AssistantMessage(
+            content="4",
+            reasoning=[
+                ResponseReasoningItem(
+                    id="rsn_1",
+                    summary=[ResponseReasoningSummary(text="Because 2+2=4.")],
+                )
+            ],
+        ),
+    ]
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
+    chat_messages = list(payload["messages"])
+    assert chat_messages == [
+        {"role": "user", "content": "Why?"},
+        {"role": "assistant", "content": "4"},
+    ]
+    assert "reasoning" not in chat_messages[1]
     validate_openai_completion_params(payload)
 
 
