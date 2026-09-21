@@ -329,9 +329,7 @@ class GoogleChatTranslator:
     @staticmethod
     def part_content_to_giskard(
         part: "Part", num_messages: int, part_index: int
-    ) -> CompletionContent | ToolCall:
-        if part.text is not None:
-            return TextContent(text=part.text, thought_signature=part.thought_signature)
+    ) -> CompletionContent | ToolCall | None:
         if part.function_call is not None:
             fc = part.function_call
             return ToolCall(
@@ -343,7 +341,23 @@ class GoogleChatTranslator:
                 ),
                 thought_signature=part.thought_signature,
             )
-        raise ValueError(f"Unsupported part content type: {part}")
+        if part.thought:
+            # Thought summaries (`text` + `thought=True`) and signature-only
+            # thought parts have no giskard content equivalent. Mapping the
+            # summary as TextContent would mix chain-of-thought into
+            # AssistantMessage.text (the string checks/judges evaluate);
+            # raising on a signature-only part would drop the rest of the
+            # response after a successful SDK call.
+            logger.debug("%s provider: dropping thought part", PROVIDER)
+            return None
+        if part.text is not None:
+            return TextContent(text=part.text, thought_signature=part.thought_signature)
+        # executable_code, code_execution_result, inline_data, file_data, ...
+        logger.debug(
+            "%s provider: dropping unsupported part content type",
+            PROVIDER,
+        )
+        return None
 
     @staticmethod
     def parts_to_giskard(
@@ -351,8 +365,14 @@ class GoogleChatTranslator:
         num_messages: int,
     ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
         content_and_tool_calls = [
-            GoogleChatTranslator.part_content_to_giskard(part, num_messages, part_index)
+            result
             for part_index, part in enumerate(parts)
+            if (
+                result := GoogleChatTranslator.part_content_to_giskard(
+                    part, num_messages, part_index
+                )
+            )
+            is not None
         ]
         content = [
             content

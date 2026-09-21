@@ -221,6 +221,119 @@ def test_from_google_function_call_without_signature_is_none():
     assert tool_calls[0].thought_signature is None
 
 
+def test_from_google_thought_summary_is_dropped_not_evaluated():
+    """Thought summaries (`thought=True` + text) must not become assistant content.
+
+    Gemini thinking models prepend a thought-summary part to the answer. Mapping
+    it as ``TextContent`` would make ``AssistantMessage.text`` (the string
+    Equals/Contains/judges evaluate) equal to CoT plus the answer, so checks
+    against the visible reply would fail or pass for the wrong reason.
+    """
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": "Hmm, let me reason privately.",
+                                "thought": True,
+                                "thought_signature": b"sig",
+                            },
+                            {"text": "42"},
+                        ]
+                    },
+                    "finish_reason": "STOP",
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    msg = out.choices[0].message
+    assert msg.content == [TextContent(text="42")]
+    assert msg.text == "42"
+
+
+def test_from_google_thought_signature_only_is_dropped_not_raised():
+    """A signature-only thought part (no text) must not crash conversion.
+
+    Gemini 3 returns `{thought: true, thought_signature: ...}` parts with no
+    text. ``from_google`` used to raise ``ValueError`` after the SDK call
+    succeeded, losing the rest of the response.
+    """
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"thought": True, "thought_signature": b"sig"},
+                            {"text": "Answer."},
+                        ]
+                    },
+                    "finish_reason": "STOP",
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].message.content == [TextContent(text="Answer.")]
+
+
+def test_from_google_executable_code_is_dropped_not_raised():
+    """Code-execution parts have no chat-content equivalent and must not crash."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "executable_code": {
+                                    "language": "PYTHON",
+                                    "code": "print(1)",
+                                }
+                            },
+                            {"text": "done"},
+                        ]
+                    },
+                    "finish_reason": "STOP",
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].message.content == [TextContent(text="done")]
+
+
+def test_from_google_thought_and_function_call():
+    """A thought part ahead of a function call still yields the tool call."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"thought": True, "thought_signature": b"sig"},
+                            {
+                                "function_call": {
+                                    "name": "get_weather",
+                                    "args": {"city": "Paris"},
+                                }
+                            },
+                        ]
+                    }
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    msg = out.choices[0].message
+    assert msg.content is None
+    assert msg.tool_calls is not None
+    assert msg.tool_calls[0].function.name == "get_weather"
+
+
 def test_from_google_text_part_captures_thought_signature():
     """A text part's ``thought_signature`` is captured on the text content."""
     raw = _raw(
