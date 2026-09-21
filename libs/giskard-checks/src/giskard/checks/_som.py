@@ -12,6 +12,8 @@ from giskard.llm.types import (
 )
 from pydantic import Field
 
+from ._judge_result import LLMCheckResult
+
 
 @BaseGenerator.register("som_judge")
 class SOMJudgeGenerator(BaseGenerator):
@@ -27,9 +29,6 @@ class SOMJudgeGenerator(BaseGenerator):
         params: GenerationParams,
         metadata: dict[str, Any] | None = None,
     ) -> CompletionResponse:
-        # Avoid a circular import through settings.
-        from .judges.base import LLMCheckResult
-
         if params.response_format is not LLMCheckResult or params.tools:
             raise ValueError(
                 "SOM judges support only LLMCheckResult verdicts without tools. "
