@@ -163,3 +163,65 @@ def test_from_anthropic_refusal_category_only():
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
     assert msg.refusal == "bio"
     assert msg.is_refusal
+
+
+def test_from_anthropic_thinking_block_is_dropped_not_raised():
+    """Extended-thinking responses interleave a `thinking` block before the
+    `text` block; it has no giskard content/tool-call equivalent and must be
+    dropped rather than crashing the whole response conversion."""
+    raw = _message(
+        {
+            "content": [
+                {
+                    "type": "thinking",
+                    "thinking": "Let me work through this step by step...",
+                    "signature": "sig_abc123",
+                },
+                {"type": "text", "text": "The answer is 42."},
+            ],
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    assert out.choices[0].message.content == [TextContent(text="The answer is 42.")]
+
+
+def test_from_anthropic_redacted_thinking_only_is_dropped_not_raised():
+    """A response with only a `redacted_thinking` block (no text, no tool
+    call) must not crash; it has nothing left to report as content."""
+    raw = _message(
+        {
+            "content": [
+                {"type": "redacted_thinking", "data": "opaque-encrypted-data"},
+            ],
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    assert out.choices[0].message.content is None
+    assert out.choices[0].message.tool_calls is None
+
+
+def test_from_anthropic_thinking_and_tool_use():
+    """Extended thinking ahead of a tool call still yields the tool call."""
+    raw = _message(
+        {
+            "content": [
+                {
+                    "type": "thinking",
+                    "thinking": "I should check the weather.",
+                    "signature": "sig_xyz",
+                },
+                {
+                    "type": "tool_use",
+                    "id": "toolu_03",
+                    "name": "get_weather",
+                    "input": {"city": "Paris"},
+                },
+            ],
+            "stop_reason": "tool_use",
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    msg = out.choices[0].message
+    assert msg.content is None
+    assert msg.tool_calls is not None
+    assert msg.tool_calls[0].function.name == "get_weather"
