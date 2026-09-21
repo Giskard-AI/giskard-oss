@@ -140,7 +140,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### anyio-4.14.0
+### anyio-4.14.2
 
 - HomePage:
 - Author: Alex Grönholm
