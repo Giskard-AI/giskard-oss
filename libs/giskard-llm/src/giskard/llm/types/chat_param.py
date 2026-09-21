@@ -1,6 +1,8 @@
 from collections.abc import Sequence
 from typing import Any, Literal, Required, TypedDict
 
+from .response_param import ResponseReasoningItemParam
+
 # -- Chat content types -------------------------------------------------------------
 
 
@@ -50,6 +52,7 @@ class AssistantMessageParam(TypedDict, total=False):
     content: str | Sequence[CompletionContentParam]
     refusal: str
     tool_calls: list[ToolCallParam]
+    reasoning: list[ResponseReasoningItemParam]
 
 
 class ToolMessageParam(TypedDict, total=False):

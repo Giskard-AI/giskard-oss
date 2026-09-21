@@ -4,6 +4,7 @@ from typing import Literal, Protocol
 from pydantic import Field
 
 from ._base import ArgumentDict, _BaseModel
+from .response import ResponseReasoningItem
 
 # -- Utility functions -------------------------------------------------------------
 
@@ -113,6 +114,7 @@ class AssistantMessage(_BaseModel):
     content: str | Sequence[CompletionContent] | None = None
     refusal: str | None = None
     tool_calls: Sequence[ToolCall] | None = None
+    reasoning: Sequence[ResponseReasoningItem] | None = None
 
     @property
     def is_refusal(self) -> bool:

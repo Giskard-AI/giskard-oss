@@ -15,6 +15,8 @@ from ..types import (
     ResponseOutputMessage,
     ResponseOutputRefusal,
     ResponseOutputText,
+    ResponseReasoningItem,
+    ResponseReasoningSummary,
     ResponseResult,
     ToolDef,
     Usage,
@@ -159,6 +161,22 @@ def serialize_output_function_call_output(
     }
 
 
+@ResponseReasoningItem.register_serializer(_PROVIDER)
+def serialize_reasoning_item(
+    model: ResponseReasoningItem, _info: SerializationInfo
+) -> "StepParam":
+    """Map an OpenAI ``reasoning`` item to a Gemini Interactions ``thought`` step."""
+    texts = [summary.text for summary in model.summary]
+    if not texts and model.content:
+        texts = [block.text for block in model.content]
+    step: dict[str, Any] = {"type": "thought"}
+    if texts:
+        step["summary"] = [{"type": "text", "text": text} for text in texts]
+    if model.encrypted_content:
+        step["signature"] = model.encrypted_content
+    return cast("StepParam", cast(object, step))
+
+
 def _extract_system_instruction(input: str | Sequence[ResponseInputItem]) -> str | None:
     if isinstance(input, str):
         return None
@@ -293,6 +311,19 @@ class GoogleResponseTranslator:
                         call_id=item.id,
                         name=item.name,
                         arguments=item.arguments,
+                    )
+                )
+            elif item.type == "thought":
+                summary = [
+                    ResponseReasoningSummary(text=content.text)
+                    for content in item.summary or []
+                    if content.type == "text" and content.text
+                ]
+                outputs.append(
+                    ResponseReasoningItem(
+                        id=f"rsn_{len(outputs)}",
+                        summary=summary,
+                        encrypted_content=item.signature,
                     )
                 )
 

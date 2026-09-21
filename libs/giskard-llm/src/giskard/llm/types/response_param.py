@@ -52,9 +52,29 @@ class ResponseOutputMessageParam(TypedDict, total=False):
     role: Required[Literal["assistant"]]
 
 
+class ResponseReasoningSummaryParam(TypedDict, total=False):
+    type: Required[Literal["summary_text"]]
+    text: Required[str]
+
+
+class ResponseReasoningTextParam(TypedDict, total=False):
+    type: Required[Literal["reasoning_text"]]
+    text: Required[str]
+
+
+class ResponseReasoningItemParam(TypedDict, total=False):
+    type: Required[Literal["reasoning"]]
+    id: Required[str]
+    summary: Required[list[ResponseReasoningSummaryParam]]
+    content: list[ResponseReasoningTextParam]
+    encrypted_content: str
+    status: Literal["in_progress", "completed", "incomplete"]
+
+
 ResponseInputItemParam = (
     ResponseFunctionCallOutputParam
     | ResponseFunctionToolCallParam
     | ResponseEasyInputMessageParam
     | ResponseOutputMessageParam
+    | ResponseReasoningItemParam
 )

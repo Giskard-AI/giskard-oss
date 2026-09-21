@@ -27,6 +27,10 @@ from openai.types.responses.response_function_tool_call import ResponseFunctionT
 from openai.types.responses.response_output_message import ResponseOutputMessage
 from openai.types.responses.response_output_refusal import ResponseOutputRefusal
 from openai.types.responses.response_output_text import ResponseOutputText
+from openai.types.responses.response_reasoning_item import ResponseReasoningItem
+from openai.types.responses.response_reasoning_item import (
+    Summary as OpenAIReasoningSummary,
+)
 from openai.types.responses.response_usage import (
     InputTokensDetails,
     OutputTokensDetails,
@@ -222,3 +226,32 @@ def test_from_openai_message_then_function():
     assert out.outputs[0].output_text == "Calling tool…"
     assert isinstance(out.outputs[1], GiskardFunctionToolCall)
     assert out.outputs[1].name == "f"
+
+
+def test_from_openai_reasoning_item_is_kept_not_output_text():
+    """OpenAI ``reasoning`` output items round-trip; ``output_text`` stays the answer."""
+    reasoning = ResponseReasoningItem(
+        id="rsn_1",
+        type="reasoning",
+        summary=[
+            OpenAIReasoningSummary(type="summary_text", text="I should add them.")
+        ],
+        encrypted_content="enc",
+    )
+    msg = ResponseOutputMessage(
+        id="m4",
+        type="message",
+        role="assistant",
+        status="completed",
+        content=[ResponseOutputText(type="output_text", text="4", annotations=[])],
+    )
+    raw = Response.model_construct(id="resp_6", output=[reasoning, msg], model=_MODEL)
+    out = OpenAIResponseTranslator.from_openai(raw)
+    assert len(out.outputs) == 2
+    r = out.outputs[0]
+    assert r.type == "reasoning"
+    assert r.id == "rsn_1"
+    assert r.summary[0].text == "I should add them."
+    assert r.encrypted_content == "enc"
+    assert out.output_text == "4"
+    assert out.reasoning == [r]

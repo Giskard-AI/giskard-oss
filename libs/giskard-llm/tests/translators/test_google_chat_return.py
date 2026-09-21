@@ -12,7 +12,7 @@ import pytest
 pytest.importorskip("google.genai")
 
 from giskard.llm.translators.google_chat import GoogleChatTranslator
-from giskard.llm.types import TextContent
+from giskard.llm.types import ResponseReasoningSummary, TextContent
 from google.genai import types
 
 pytestmark = pytest.mark.google
@@ -219,6 +219,134 @@ def test_from_google_function_call_without_signature_is_none():
     tool_calls = out.choices[0].message.tool_calls
     assert tool_calls is not None
     assert tool_calls[0].thought_signature is None
+
+
+def test_from_google_thought_summary_is_reasoning_not_content():
+    """Thought summaries map to OpenAI ``reasoning`` items, not assistant content.
+
+    Gemini thinking models prepend a thought-summary part. That must not become
+    ``TextContent`` or ``AssistantMessage.text`` (the string Equals/Contains/judges
+    evaluate). It is translated to a ``type=reasoning`` item with ``summary_text``.
+    """
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": "Hmm, let me reason privately.",
+                                "thought": True,
+                                "thought_signature": b"sig",
+                            },
+                            {"text": "42"},
+                        ]
+                    },
+                    "finish_reason": "STOP",
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    msg = out.choices[0].message
+    assert msg.content == [TextContent(text="42")]
+    assert msg.text == "42"
+    assert msg.reasoning is not None
+    assert len(msg.reasoning) == 1
+    item = msg.reasoning[0]
+    assert item.type == "reasoning"
+    assert item.summary == [
+        ResponseReasoningSummary(text="Hmm, let me reason privately.")
+    ]
+    assert item.encrypted_content is not None
+
+
+def test_from_google_thought_signature_only_is_reasoning_not_raised():
+    """A signature-only thought part becomes a ``reasoning`` item, not a crash.
+
+    Gemini 3 returns `{thought: true, thought_signature: ...}` parts with no
+    text. ``from_google`` used to raise ``ValueError`` after the SDK call
+    succeeded. The opaque signature is OpenAI ``encrypted_content``.
+    """
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"thought": True, "thought_signature": b"sig"},
+                            {"text": "Answer."},
+                        ]
+                    },
+                    "finish_reason": "STOP",
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    msg = out.choices[0].message
+    assert msg.content == [TextContent(text="Answer.")]
+    assert msg.reasoning is not None
+    assert len(msg.reasoning) == 1
+    assert msg.reasoning[0].summary == []
+    assert msg.reasoning[0].encrypted_content is not None
+
+
+def test_from_google_executable_code_is_dropped_not_raised():
+    """Code-execution parts have no chat-content equivalent and must not crash."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "executable_code": {
+                                    "language": "PYTHON",
+                                    "code": "print(1)",
+                                }
+                            },
+                            {"text": "done"},
+                        ]
+                    },
+                    "finish_reason": "STOP",
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.choices[0].message.content == [TextContent(text="done")]
+
+
+def test_from_google_thought_and_function_call():
+    """A thought part ahead of a function call yields reasoning plus the tool call."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"thought": True, "thought_signature": b"sig"},
+                            {
+                                "function_call": {
+                                    "name": "get_weather",
+                                    "args": {"city": "Paris"},
+                                }
+                            },
+                        ]
+                    }
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    msg = out.choices[0].message
+    assert msg.content is None
+    assert msg.tool_calls is not None
+    assert msg.tool_calls[0].function.name == "get_weather"
+    assert msg.reasoning is not None
+    assert len(msg.reasoning) == 1
+    assert msg.reasoning[0].type == "reasoning"
 
 
 def test_from_google_text_part_captures_thought_signature():
