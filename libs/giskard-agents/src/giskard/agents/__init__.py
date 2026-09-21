@@ -5,6 +5,7 @@ from .context import RunContext
 from .embeddings import BaseEmbeddingModel, EmbeddingModel
 from .errors import Error, ModelRefusalError, WorkflowError
 from .generators import BaseGenerator, GenerationParams, Generator
+from .som import BaseSOM, SOMResponse, resolve_som
 from .templates import (
     MessageTemplate,
     add_prompts_path,
@@ -22,6 +23,9 @@ __all__ = [
     "Generator",
     "BaseGenerator",
     "GenerationParams",
+    "BaseSOM",
+    "SOMResponse",
+    "resolve_som",
     "ChatWorkflow",
     "TemplateReference",
     "Chat",
