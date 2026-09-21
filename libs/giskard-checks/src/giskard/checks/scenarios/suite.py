@@ -2,7 +2,7 @@ import asyncio
 import time
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager, nullcontext
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, Generic, Self, TypeVar, overload
 
 from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
 from pydantic import BaseModel, Field
@@ -22,6 +22,7 @@ from rich.progress import (
 from rich.text import Text
 
 from .._telemetry_props import suite_shape_properties
+from ..core._run_sync import run_sync as _run_sync
 from ..core.interaction import Trace
 from ..core.result import (
     STATUS_SUMMARY_ORDER,
@@ -161,6 +162,57 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         """
         self.scenarios.append(scenario)
         return self
+
+    @overload
+    def run_sync(
+        self,
+        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING,
+        /,
+        return_exception: bool = False,
+        parallel: bool = False,
+        max_concurrency: int | None = None,
+        verbose: bool = True,
+    ) -> SuiteResult: ...
+
+    @overload
+    def run_sync(
+        self,
+        *,
+        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),
+        return_exception: bool = False,
+        parallel: bool = False,
+        max_concurrency: int | None = None,
+        verbose: bool = True,
+    ) -> SuiteResult: ...
+
+    def run_sync(self, *args: Any, **kwargs: Any) -> SuiteResult:
+        """Run all scenarios in the suite synchronously.
+
+        Parameters
+        ----------
+        target : Target | MISSING, optional
+            Override target for all scenarios in the suite.
+        return_exception : bool, default False
+            If True, return results when exceptions occur instead of raising.
+        parallel : bool, default False
+            If True, run scenarios concurrently while preserving result order.
+        max_concurrency : int | None, optional
+            Maximum concurrent scenarios when ``parallel=True``.
+        verbose : bool, default True
+            If True, display execution progress.
+
+        Returns
+        -------
+        SuiteResult
+            The aggregated suite result.
+
+        Raises
+        ------
+        RuntimeError
+            If called while an asyncio event loop is already running. In that
+            case, use ``await suite.run(...)`` instead.
+        """
+        return _run_sync(self.run, *args, **kwargs)
 
     async def run(
         self,
