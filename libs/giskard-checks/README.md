@@ -229,7 +229,7 @@ provider can use the same judge adapter. For the TypeSafe example above, configu
 `typesafe/jev` to its native `jev-latest` alias.
 
 The SOM adapter supports the standard `LLMCheckResult` contract. It passes when
-P(pass) is at least 0.5 and reports a probability summary, without a generated
+P(pass) is at least 0.5 and reports a probability summary instead of a generated
 rationale. Custom output schemas still require an LLM. Pass a configured
 `BaseSOM` to `set_default_judge` for custom provider settings, or wrap it in
 `SOMJudgeGenerator(model=model, pass_threshold=0.8)` to choose a different threshold.

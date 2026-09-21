@@ -41,8 +41,8 @@ The API is async throughout — all run methods return coroutines.
 `BaseSOM` provides a separate interface for models that predict a probability
 from a question and chat messages. Its async `predict()` method returns a
 `SOMResponse` containing the probability, model identifier, and optional token
-usage. Applications decide how to interpret that probability; the provider does
-not assign a pass/fail verdict or generate an explanation.
+usage. Applications interpret that probability and supply any verdict or
+explanation they need.
 
 Use `resolve_som("provider/model")` to select a supported provider. The
 initial integration supports `typesafe/jev` (the provider's `jev-latest` alias),

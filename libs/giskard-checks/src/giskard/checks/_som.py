@@ -51,7 +51,7 @@ class SOMJudgeGenerator(BaseGenerator):
                 f"Python decision summary: {prediction.model} "
                 f"P(pass)={prediction.probability:.2%}; "
                 f"threshold={self.pass_threshold:.2%}. "
-                "The SOM returns a probability, not a generated rationale."
+                "The SOM returns a probability instead of a generated rationale."
             ),
         )
         return CompletionResponse(

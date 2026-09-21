@@ -90,7 +90,7 @@ async def test_probability_becomes_a_verdict(
 
     assert verdict.passed is passed
     assert "Python decision summary: example-v1" in verdict.reason
-    assert "not a generated rationale" in verdict.reason
+    assert "probability instead of a generated rationale" in verdict.reason
     assert f"P(pass)={probability:.2%}" in verdict.reason
     assert f"threshold={threshold:.2%}" in verdict.reason
     assert completion.model == "example-v1"
