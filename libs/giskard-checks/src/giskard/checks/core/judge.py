@@ -347,18 +347,9 @@ class SOMJudge(BaseJudge):
 
         # Dual-use gates produce distinct rubric vs evidence text. Legacy
         # prompts without those gates render the same content twice — fall back
-        # to the original SOM question (and fenced trace when available).
+        # to the original SOM question.
         if not question or question == evidence_text:
             question = _DEFAULT_SOM_QUESTION
-            if "trace" in inputs:
-                fenced_trace = (
-                    MessageTemplate(role="user", content_template="{{ trace | fence }}")
-                    .render(trace=inputs["trace"])
-                    .text
-                    or ""
-                )
-                if fenced_trace:
-                    evidence_text = fenced_trace
 
         messages: list[ChatMessage]
         if evidence_text:

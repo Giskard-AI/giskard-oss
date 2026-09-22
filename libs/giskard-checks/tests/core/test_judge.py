@@ -158,4 +158,4 @@ async def test_som_judge_falls_back_when_prompt_has_no_rubric_gates():
     assert "should the agent's behavior pass the check" in question
     evidence = messages[0].text or ""
     assert "Thank you!" in evidence
-    assert "Evaluate whether the agent was polite" not in evidence
+    assert "Evaluate whether the agent was polite" in evidence

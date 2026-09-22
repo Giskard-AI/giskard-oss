@@ -243,7 +243,7 @@ Bundled judge templates are dual-use: wrap evidence in
 evaluation question and the fenced evidence as messages. Custom `LLMJudge`
 prompts should follow the same gates for a clean SOM split; without them SOM
 falls back to the original generic question ("should the agent's behavior pass
-the check?") and still passes any `trace` input as fenced evidence.
+the check?") and uses the full prompt render as messages.
 
 The concrete provider handles authentication, native endpoints and gateways;
 `giskard-checks` owns the evaluation question and verdict conversion.
