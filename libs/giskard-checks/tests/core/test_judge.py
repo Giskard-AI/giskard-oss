@@ -235,6 +235,7 @@ async def test_som_judge_chat_message_prompt_uses_message_as_evidence():
 
     verdict = await judge.judge(prompt, {})
 
+    assert isinstance(verdict, LLMCheckResult)
     assert verdict.passed is True
     messages, question = model._calls[0]
     assert messages == [prompt]

@@ -119,7 +119,7 @@ def test_legacy_generator_is_excluded_from_dump():
     ],
 )
 def test_check_construction_accepts_loose_judge(judge: str):
-    check = LLMJudge(prompt="Evaluate the answer.", judge=judge)
+    check = LLMJudge.model_validate({"prompt": "Evaluate the answer.", "judge": judge})
 
     assert isinstance(check.judge, BaseJudge)
     assert check.judge.kind == "som"

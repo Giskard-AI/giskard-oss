@@ -194,15 +194,15 @@ def test_reset_default_judge_restores_generator_fallback():
     assert judge._generator is generator
 
 
-    @pytest.mark.parametrize(
-        ("model", "message"),
-        [
-            ("llm/typesafe/jev", "Kind prefix must match"),
-            ("som/openai/gpt-4o-mini", "Kind prefix must match"),
-            ("som/jev", "Kind prefix must match"),
-            ("typesafe/", "Specify a SOM model as 'provider/model'"),
-        ],
-    )
+@pytest.mark.parametrize(
+    ("model", "message"),
+    [
+        ("llm/typesafe/jev", "Kind prefix must match"),
+        ("som/openai/gpt-4o-mini", "Kind prefix must match"),
+        ("som/jev", "Kind prefix must match"),
+        ("typesafe/", "Specify a SOM model as 'provider/model'"),
+    ],
+)
 def test_invalid_judge_configuration_preserves_current_default(
     model: str, message: str
 ):

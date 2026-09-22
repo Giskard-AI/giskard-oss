@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Any, ClassVar, Self
 
 from giskard.agents import BaseEmbeddingModel, BaseGenerator
@@ -82,17 +83,17 @@ class WithJudgeMixin(BaseModel):
     def model_copy(
         self,
         *,
-        update: dict[str, Any] | None = None,
+        update: Mapping[str, Any] | None = None,
         deep: bool = False,
     ) -> Self:
         # model_copy does not re-run validators; remigrate generator→judge here.
-        if update and update.get("generator") is not None:
-            update = dict(update)
-            resulting_judge = update["judge"] if "judge" in update else self.judge
+        patch: dict[str, Any] | None = dict(update) if update is not None else None
+        if patch is not None and patch.get("generator") is not None:
+            resulting_judge = patch["judge"] if "judge" in patch else self.judge
             if resulting_judge is not None:
                 raise ValueError("Cannot provide both 'generator' and 'judge'")
-            update["judge"] = BaseJudge.parse(update.pop("generator"))
-        return super().model_copy(update=update, deep=deep)
+            patch["judge"] = BaseJudge.parse(patch.pop("generator"))
+        return super().model_copy(update=patch, deep=deep)
 
     @property
     def _judge(self) -> BaseJudge:
