@@ -96,4 +96,27 @@ class OpenAIChatTranslator:
     def from_openai(
         raw: "ChatCompletion",
     ) -> "CompletionResponse":
-        return CompletionResponse.model_validate(raw.model_dump())
+        """Convert a Chat Completions response to :class:`CompletionResponse`.
+
+        Parameters
+        ----------
+        raw
+            The ``ChatCompletion`` returned by the OpenAI SDK.
+
+        Returns
+        -------
+        CompletionResponse
+            The giskard response, with a moderation stop marked as a refusal.
+        """
+        payload = raw.model_dump()
+        for choice in payload.get("choices") or []:
+            if choice.get("finish_reason") != "content_filter":
+                continue
+            message = choice.get("message")
+            # Chat Completions reports a moderation stop only in ``finish_reason`` and
+            # usually leaves ``message.refusal`` unset. Refusals are detected through
+            # that field or ``is_refusal``, so mark it; the provider's own value stays
+            # in ``finish_reason``.
+            if isinstance(message, dict) and not message.get("refusal"):
+                message["refusal"] = "content_filter"
+        return CompletionResponse.model_validate(payload)
