@@ -2,7 +2,6 @@ from collections.abc import Sequence
 from typing import override
 from unittest.mock import MagicMock
 
-import giskard.agents.som as som_module
 import giskard.checks.settings as settings_module
 import pytest
 from giskard.agents import (
@@ -158,12 +157,8 @@ def test_set_default_judge_accepts_custom_som_model():
     assert judge.model is model
 
 
-def test_set_default_judge_resolves_another_registered_som_provider(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    monkeypatch.setitem(som_module._PROVIDERS, "example", CustomSOM)
-
-    set_default_judge("example/new-som")
+def test_set_default_judge_resolves_another_registered_som_provider():
+    set_default_judge("checks_settings_test_som/new-som")
 
     judge = get_default_judge()
     assert isinstance(judge, SOMJudge)

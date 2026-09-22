@@ -33,7 +33,6 @@ async def _render_prompt(
     *,
     include_evidence: bool = True,
     include_rubric: bool = True,
-    instr_output: Any | None = None,
 ) -> list[ChatMessage]:
     """Render a judge prompt with dual-use template flags.
 
@@ -48,14 +47,17 @@ async def _render_prompt(
         When ``False``, templates should omit fenced evidence blocks.
     include_rubric : bool, optional
         When ``False``, templates should omit rubric / question text.
-    instr_output : optional
-        Structured-output instructions. Omitted when ``None`` so
-        ``{% if _instr_output is defined %}`` stays false under StrictUndefined.
 
     Returns
     -------
     list[ChatMessage]
         Rendered messages.
+
+    Notes
+    -----
+    Structured-output instructions (``_instr_output``) are intentionally
+    omitted so ``{% if _instr_output is defined %}`` stays false under
+    StrictUndefined. LLM judges inject them via ``ChatWorkflow`` instead.
     """
     if isinstance(prompt, ChatMessage):
         return [prompt]
@@ -65,8 +67,6 @@ async def _render_prompt(
         "include_evidence": include_evidence,
         "include_rubric": include_rubric,
     }
-    if instr_output is not None:
-        context["_instr_output"] = instr_output
 
     if isinstance(prompt, str):
         prompt = MessageTemplate(role="user", content_template=prompt)
@@ -180,8 +180,7 @@ class BaseJudge(Discriminated):
                 "Use kind prefix 'som' with a supported SOM provider, "
                 "or 'llm' with an LLM provider"
             )
-        if kind == "som":
-            assert som is not None
+        if som is not None:
             return SOMJudge(model=som)
         return LLMChatJudge(generator=Generator(model=model_id))
 
@@ -190,7 +189,7 @@ class BaseJudge(Discriminated):
         payload = dict(data)
         kind = payload.get("kind")
         if isinstance(kind, str) and kind in cls.kinds():
-            return cls._validate_kind(kind, payload)
+            return cls.model_validate(payload)
         if isinstance(kind, str) and kind in BaseSOM.kinds():
             return SOMJudge(model=BaseSOM.model_validate(payload))
         if isinstance(kind, str) and kind in BaseGenerator.kinds():
@@ -204,15 +203,7 @@ class BaseJudge(Discriminated):
             payload["kind"] = "som"
         else:
             payload["kind"] = "llm"
-        return cls._validate_kind(payload["kind"], payload)
-
-    @classmethod
-    def _validate_kind(cls, kind: str, data: dict[str, Any]) -> "BaseJudge":
-        if kind == "llm":
-            return LLMChatJudge.model_validate(data)
-        if kind == "som":
-            return SOMJudge.model_validate(data)
-        raise ValueError(f"Kind {kind} is not registered for class {cls}")
+        return cls.model_validate(payload)
 
     async def judge(
         self,
@@ -242,7 +233,6 @@ class BaseJudge(Discriminated):
 
 
 # Field annotation that accepts strings / generators / SOMs via ``parse``.
-JudgeInput = Annotated[BaseJudge, BeforeValidator(_coerce_judge)]
 OptionalJudgeInput = Annotated[BaseJudge | None, BeforeValidator(_coerce_judge)]
 
 
@@ -279,11 +269,7 @@ class LLMChatJudge(BaseJudge):
             prompt = MessageTemplate(role="user", content_template=prompt)
 
         workflow = ChatWorkflow(generator=self._generator, messages=[prompt])
-        workflow = workflow.with_inputs(
-            include_evidence=True,
-            include_rubric=True,
-            **inputs,
-        )
+        workflow = workflow.with_inputs(**inputs)
         if output_type is not None:
             workflow = workflow.with_output(output_type)
 
@@ -327,19 +313,19 @@ class SOMJudge(BaseJudge):
                 "Use an LLM judge for custom output schemas."
             )
 
-        question_messages = await _render_prompt(
-            prompt,
-            inputs,
-            include_evidence=False,
-            include_rubric=True,
-            instr_output=None,
-        )
-        evidence_messages = await _render_prompt(
-            prompt,
-            inputs,
-            include_evidence=True,
-            include_rubric=False,
-            instr_output=None,
+        question_messages, evidence_messages = await asyncio.gather(
+            _render_prompt(
+                prompt,
+                inputs,
+                include_evidence=False,
+                include_rubric=True,
+            ),
+            _render_prompt(
+                prompt,
+                inputs,
+                include_evidence=True,
+                include_rubric=False,
+            ),
         )
 
         question = _messages_text(question_messages)
