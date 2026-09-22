@@ -1,3 +1,4 @@
+{% if include_rubric | default(true) %}
 Your role is to evaluate whether an AI agent's answer is factually grounded in a provided reference context.
 
 You will receive:
@@ -31,7 +32,8 @@ Your task is to check if all factual information in the agent's answer is suppor
 Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT ANSWER> indicate where the reference context and agent answer are, respectively. Everything inside a marker belongs to that category.
 
 -------------------
-
+{% endif %}
+{% if include_evidence | default(true) %}
 <AGENT ANSWER>
 {{ answer | fence }}
 </AGENT ANSWER>
@@ -41,11 +43,14 @@ Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT 
 <REFERENCE CONTEXT>
 {{ context | fence }}
 </REFERENCE CONTEXT>
-
+{% endif %}
+{% if include_rubric | default(true) %}
 -------------------
 
 Remember, even small factual details that are not present in the reference context should be considered as incorrect. Synonyms and paraphrases are fine. Explicit refusals, limitations, or scope statements do not need to appear in the reference context.
 Omissions are tolerated, even if missing key information. Never mention omissions in the reason, missing information, paraphrasing or synonyms in the reason field, it is not a reason for failure.
-
+{% endif %}
+{% if _instr_output is defined %}
 **Output Format:**
 {{ _instr_output }}
+{% endif %}

@@ -103,15 +103,15 @@ async def test_custom_generator_preserved_after_serialization_roundtrip() -> Non
     roundtrip_judge = serialization_roundtrip(judge)
 
     # Generator is preserved by roundtrip (no manual re-attachment needed)
-    assert roundtrip_judge.generator is not None
-    assert isinstance(roundtrip_judge.generator, MockGenerator)
-    assert roundtrip_judge.generator.passed is True
-    assert roundtrip_judge.generator.reason == "Preserved reason"
+    assert roundtrip_judge.judge.generator is not None
+    assert isinstance(roundtrip_judge.judge.generator, MockGenerator)
+    assert roundtrip_judge.judge.generator.passed is True
+    assert roundtrip_judge.judge.generator.reason == "Preserved reason"
 
     result = await roundtrip_judge.run(Trace())
     assert result.status == CheckStatus.PASS
     assert result.details["reason"] == "Preserved reason"
-    assert len(roundtrip_judge.generator.calls) == 1
+    assert len(roundtrip_judge.judge.generator.calls) == 1
 
 
 async def test_run_returns_success() -> None:
@@ -128,10 +128,10 @@ async def test_run_returns_success() -> None:
     result = await roundtrip_judge.run(Trace())
     assert result.status == CheckStatus.PASS
     assert result.details["reason"] == "Looks good"
-    assert isinstance(roundtrip_judge.generator, MockGenerator)
+    assert isinstance(roundtrip_judge.judge.generator, MockGenerator)
     # Generator state (including calls) is preserved by roundtrip; one more call from this run
-    assert len(roundtrip_judge.generator.calls) == 2
-    assert roundtrip_judge.generator.calls[-1] == [
+    assert len(roundtrip_judge.judge.generator.calls) == 2
+    assert roundtrip_judge.judge.generator.calls[-1] == [
         UserMessage(content="Evaluate the answer.")
     ]
 
@@ -150,9 +150,9 @@ async def test_run_returns_failure() -> None:
     result = await roundtrip_judge.run(Trace())
     assert result.status == CheckStatus.FAIL
     assert result.details["reason"] == "Looks bad"
-    assert isinstance(roundtrip_judge.generator, MockGenerator)
-    assert len(roundtrip_judge.generator.calls) == 2
-    assert roundtrip_judge.generator.calls[-1] == [
+    assert isinstance(roundtrip_judge.judge.generator, MockGenerator)
+    assert len(roundtrip_judge.judge.generator.calls) == 2
+    assert roundtrip_judge.judge.generator.calls[-1] == [
         UserMessage(content="Evaluate the answer.")
     ]
 
@@ -188,9 +188,9 @@ async def test_run_handle_template_reference() -> None:
     )
     assert result.status == CheckStatus.PASS
     assert result.details["reason"] == "Template rendered"
-    assert isinstance(roundtrip_judge.generator, MockGenerator)
-    assert len(roundtrip_judge.generator.calls) == 2
-    assert roundtrip_judge.generator.calls[-1] == [
+    assert isinstance(roundtrip_judge.judge.generator, MockGenerator)
+    assert len(roundtrip_judge.judge.generator.calls) == 2
+    assert roundtrip_judge.judge.generator.calls[-1] == [
         UserMessage(content="Evaluate the answer: Hello")
     ]
 

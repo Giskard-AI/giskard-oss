@@ -1,3 +1,4 @@
+{% if include_rubric | default(true) %}
 Your role is to evaluate whether an interaction conforms to a given rule or requirement.
 
 You will receive:
@@ -46,12 +47,16 @@ Markers <TRACE>...</TRACE> indicate the trace. Everything inside a marker belong
 {{ rule }}
 
 -------------------
-
+{% endif %}
+{% if include_evidence | default(true) %}
 < TRACE >
 {{ trace | fence }}
 </ TRACE >
-
+{% endif %}
+{% if include_rubric | default(true) %}
 -------------------
-
+{% endif %}
+{% if _instr_output is defined %}
 **Output Format:**
 {{ _instr_output }}
+{% endif %}

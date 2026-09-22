@@ -7,7 +7,6 @@ from giskard.core.utils import get_lib_version
 from giskard.core.welcome import maybe_show_welcome
 
 from . import builtin, judges
-from ._som import SOMJudgeGenerator
 from .builtin import (
     AllOf,
     AnyOf,
@@ -28,6 +27,7 @@ from .builtin import (
     from_fn,
 )
 from .core import (
+    BaseJudge,
     Check,
     CheckResult,
     CheckStatus,
@@ -38,10 +38,12 @@ from .core import (
     Interaction,
     InteractionGenerationError,
     InteractionSpec,
+    LLMChatJudge,
     Metric,
     Scenario,
     ScenarioResult,
     ScenarioStatus,
+    SOMJudge,
     Step,
     SuiteResult,
     Target,
@@ -52,7 +54,7 @@ from .core import (
     Trace,
     resolve,
 )
-from .core.mixin import WithEmbeddingMixin, WithGeneratorMixin
+from .core.mixin import WithEmbeddingMixin, WithGeneratorMixin, WithJudgeMixin
 from .generators.base import BaseLLMGenerator, LLMGenerator
 from .generators.dataset import DatasetInputGenerator
 from .generators.user import UserSimulator
@@ -120,14 +122,17 @@ __all__ = [
     "Interaction",
     "InteractionSpec",
     "WithGeneratorMixin",
+    "WithJudgeMixin",
     "WithEmbeddingMixin",
     # Builtin and LLM-based checks
     "AnswerRelevance",
     "AllOf",
     "AnyOf",
     "Not",
+    "BaseJudge",
     "BaseLLMCheck",
     "LLMCheckResult",
+    "LLMChatJudge",
     "Conformity",
     "Contradiction",
     "Equals",
@@ -144,6 +149,7 @@ __all__ = [
     "LLMJudge",
     "Readability",
     "SemanticSimilarity",
+    "SOMJudge",
     "Toxicity",
     "StringMatching",
     "RegexMatching",
@@ -163,7 +169,6 @@ __all__ = [
     "Suite",
     "ScenarioRunner",
     # Settings
-    "SOMJudgeGenerator",
     "set_default_generator",
     "get_default_generator",
     "set_default_judge",

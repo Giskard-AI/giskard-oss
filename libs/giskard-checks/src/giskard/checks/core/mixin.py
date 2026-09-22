@@ -1,7 +1,14 @@
-from giskard.agents import BaseEmbeddingModel, BaseGenerator
-from pydantic import BaseModel, Field
+from typing import Any
 
-from ..settings import get_default_embedding_model, get_default_generator
+from giskard.agents import BaseEmbeddingModel, BaseGenerator
+from pydantic import BaseModel, Field, model_validator
+
+from ..settings import (
+    get_default_embedding_model,
+    get_default_generator,
+    get_default_judge,
+)
+from .judge import BaseJudge
 
 
 class WithGeneratorMixin(BaseModel):
@@ -14,6 +21,40 @@ class WithGeneratorMixin(BaseModel):
     def _generator(self) -> BaseGenerator:
         """Get the generator. If not set, return the global default generator."""
         return self.generator if self.generator is not None else get_default_generator()
+
+
+class WithJudgeMixin(BaseModel):
+    """Attach a :class:`~giskard.checks.core.judge.BaseJudge` to a check.
+
+    Persisted dumps and constructor kwargs may still pass ``generator``; it is
+    rewritten to ``judge`` before validation so ``extra="forbid"`` stays intact.
+    """
+
+    judge: BaseJudge | None = Field(
+        default=None,
+        description=(
+            "Judge backend for evaluation. Defaults to the global default judge "
+            "when None."
+        ),
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_generator_to_judge(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        if "generator" not in data:
+            return data
+        if "judge" in data and data["judge"] is not None:
+            raise ValueError("Cannot provide both 'generator' and 'judge'")
+        migrated = {key: value for key, value in data.items() if key != "generator"}
+        migrated["judge"] = data["generator"]
+        return migrated
+
+    @property
+    def _judge(self) -> BaseJudge:
+        """Return the configured judge, or the global default."""
+        return self.judge if self.judge is not None else get_default_judge()
 
 
 class WithEmbeddingMixin(BaseModel):

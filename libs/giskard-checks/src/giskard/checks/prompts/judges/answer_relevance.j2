@@ -1,3 +1,4 @@
+{% if include_rubric | default(true) %}
 Your role is to evaluate whether an AI assistant's answer is relevant to the user's question.
 
 You will receive:
@@ -50,7 +51,8 @@ would be relevant to something asked earlier in the conversation.
 5. Provide a concise reason for your decision.
 
 ## Markers
-
+{% endif %}
+{% if include_evidence | default(true) %}
 {# `is defined` is required: the environment uses StrictUndefined, and `history`
    is omitted entirely (not passed empty) when include_history is disabled. #}
 {% if history is defined and history %}
@@ -72,8 +74,11 @@ would be relevant to something asked earlier in the conversation.
 {{ context | fence }}
 </DOMAIN CONTEXT>
 {% endif %}
-
+{% endif %}
+{% if include_rubric | default(true) %}
 ---
-
+{% endif %}
+{% if _instr_output is defined %}
 **Output Format:**
 {{ _instr_output }}
+{% endif %}

@@ -192,10 +192,11 @@ API Overview
 
 **Settings**
 - `set_default_generator` / `get_default_generator`: configure content generation. Accepts a `BaseGenerator` instance or model identifier string.
-- `set_default_judge` / `get_default_judge`: configure judging independently with a model identifier, `BaseGenerator`, or `BaseSOM`. Without a separate judge, checks continue to use the default generator. An explicit `generator=` on a check takes precedence.
+- `set_default_judge` / `get_default_judge`: configure judging independently with a `BaseJudge`, model identifier, `BaseGenerator`, or `BaseSOM`. Without a separate judge, checks wrap the default generator as an `LLMChatJudge`. An explicit `judge=` (or legacy `generator=`) on a check takes precedence.
 - `set_default_embedding_model` / `get_default_embedding_model`: configure embeddings with a `BaseEmbeddingModel` instance or model identifier string. An explicit per-check embedding model takes precedence.
 - Environment variables (or `.env` at the project root), prefixed with `GISKARD_CHECKS_`:
   - `GISKARD_CHECKS_DEFAULT_MODEL` — default LLM model (default: `openai/gpt-4o-mini`).
+  - `GISKARD_CHECKS_DEFAULT_JUDGE` — optional default judge (`provider/model`, optional `llm/` or `som/` prefix, or a JSON judge dump). When unset, judges fall back to the default LLM generator.
   - `GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL` — default embedding model (default: `text-embedding-3-small`).
   - `GISKARD_CHECKS_MAX_REPORTED_FAILURES` — cap on failures shown in suite reports.
   - `GISKARD_CHECKS_DISABLE_RICH_PRETTY` — disable rich REPL pretty-printing.
@@ -217,22 +218,33 @@ set_default_generator("azure_ai/gpt-5.6-luna")
 set_default_judge("typesafe/jev")
 ```
 
-`set_default_judge` infers `model_type="som"` for providers supported by
-`giskard.agents.som` and `model_type="llm"` otherwise. You can specify the type
-explicitly. Existing `quality_scan` calls use the selected judge while scenario
-generation, simulated users and report recommendations continue to use the LLM.
+`set_default_judge` infers `kind="som"` for providers supported by
+`giskard.agents.som` and `kind="llm"` otherwise. Prefix the identifier with
+`llm/` or `som/` when you need to override inference. Existing `quality_scan`
+calls use the selected judge while scenario generation, simulated users and
+report recommendations continue to use the LLM.
 
 SOM provider clients and their connection settings live in `giskard-agents`.
-The checks integration uses a provider-neutral `BaseSOM` contract, so another
-provider can use the same judge adapter. For the TypeSafe example above, configure
-`TYPESAFE_API_KEY` and optionally `TYPESAFE_BASE_URL`; the provider resolves
-`typesafe/jev` to its native `jev-latest` alias.
+Judge backends are a discriminated `BaseJudge` (`LLMChatJudge` / `SOMJudge`).
+For the TypeSafe example above, configure `TYPESAFE_API_KEY` and optionally
+`TYPESAFE_BASE_URL`; the provider resolves `typesafe/jev` to its native
+`jev-latest` alias.
 
-The SOM adapter supports the standard `LLMCheckResult` contract. It passes when
+`SOMJudge` supports the standard `LLMCheckResult` contract. It passes when
 P(pass) is at least 0.5 and reports a probability summary instead of a generated
-rationale. Custom output schemas still require an LLM. Pass a configured
-`BaseSOM` to `set_default_judge` for custom provider settings, or wrap it in
-`SOMJudgeGenerator(model=model, pass_threshold=0.8)` to choose a different threshold.
+rationale. Custom output schemas still require an LLM judge. Pass a configured
+`BaseSOM` to `set_default_judge`, or use
+`SOMJudge(model=model, pass_threshold=0.8)` for a different threshold.
+
+Bundled judge templates are dual-use: wrap evidence in
+`{% if include_evidence | default(true) %}`, rubric text in
+`{% if include_rubric | default(true) %}`, and JSON output instructions in
+`{% if _instr_output is defined %}`. The SOM path renders the rubric as the
+evaluation question and the fenced evidence as messages. Custom `LLMJudge`
+prompts should follow the same gates for a clean SOM split; without them the
+full prompt (minus output schema) is used as the question and any `trace` input
+is still passed as fenced evidence.
+
 The concrete provider handles authentication, native endpoints and gateways;
 `giskard-checks` owns the evaluation question and verdict conversion.
 
@@ -591,7 +603,7 @@ Notes
 -----
 
 - `Trace` captures every interaction; JSONPath keys like `trace.last.outputs` resolve against that structure.
-- Pass a `generator` to individual checks or use `set_default_judge()`; without a separate judge, `set_default_generator()` remains the shared default.
+- Pass a `judge` (or legacy `generator`) to individual checks or use `set_default_judge()`; without a separate judge, `set_default_generator()` remains the shared LLM fallback.
 - Built-in LLM checks rely on templates bundled in `giskard.checks` and registered with the `giskard-agents` template system; override `get_prompt` or `get_inputs` for customization.
 
 Advanced Usage

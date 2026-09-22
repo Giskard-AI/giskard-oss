@@ -1,8 +1,6 @@
 from typing import Any, override
 
 from giskard.agents import (
-    BaseGenerator,
-    ChatWorkflow,
     MessageTemplate,
     TemplateReference,
 )
@@ -12,9 +10,8 @@ from pydantic import BaseModel
 from .._judge_result import LLMCheckResult as LLMCheckResult
 from ..core import Trace
 from ..core.check import Check
-from ..core.mixin import WithGeneratorMixin
+from ..core.mixin import WithJudgeMixin
 from ..core.result import CheckResult
-from ..settings import get_default_judge
 
 
 def format_prompt_text(value: Any) -> str:
@@ -35,25 +32,21 @@ def format_prompt_text(value: Any) -> str:
 
 
 class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Check[InputType, OutputType, TraceType], WithGeneratorMixin
+    Check[InputType, OutputType, TraceType], WithJudgeMixin
 ):
     """Abstract base class for LLM-based checks.
 
-    Provides a framework for creating checks that use Large Language Models
-    to evaluate interactions. Subclasses must implement the `get_prompt` method
-    to define how the LLM should be prompted.
+    Provides a framework for creating checks that use a :class:`BaseJudge`
+    backend (LLM chat or System One Model) to evaluate interactions.
+    Subclasses must implement the `get_prompt` method to define how the
+    evaluation prompt is built.
 
     Attributes
     ----------
-    generator : BaseGenerator
-        Generator for LLM evaluation. Defaults to the global
-        default judge if not specified.
+    judge : BaseJudge or None
+        Judge backend. Defaults to the global default judge when unset.
+        Legacy ``generator=`` kwargs are migrated to ``judge`` automatically.
     """
-
-    @property
-    @override
-    def _generator(self) -> BaseGenerator:
-        return self.generator if self.generator is not None else get_default_judge()
 
     @property
     def output_type(self) -> type[BaseModel] | None:
@@ -73,27 +66,6 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         """
         raise NotImplementedError
 
-    async def _build_workflow(self, trace: TraceType) -> ChatWorkflow[Any]:
-        """Build the workflow for LLM evaluation.
-
-        Parameters
-        ----------
-        trace : Trace
-            The trace to evaluate.
-
-        Returns
-        -------
-        ChatWorkflow[Any]
-            Configured workflow ready for execution.
-        """
-        _ = trace  # Not used in base implementation
-        prompt = self.get_prompt()
-
-        if isinstance(prompt, str):
-            prompt = MessageTemplate(role="user", content_template=prompt)
-
-        return ChatWorkflow(generator=self._generator, messages=[prompt])
-
     @override
     async def run(self, trace: TraceType) -> CheckResult:
         """Execute the LLM-based check.
@@ -110,17 +82,11 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         CheckResult
             The result of the check evaluation.
         """
-        workflow = await self._build_workflow(trace)
-
         inputs = await self.get_inputs(trace)
-        workflow = workflow.with_inputs(**inputs)
-
-        if self.output_type is not None:
-            workflow = workflow.with_output(self.output_type)
-
-        chat = await workflow.run()
-
-        return await self._handle_output(chat.output, inputs, trace)
+        output = await self._judge.judge(
+            self.get_prompt(), inputs, output_type=self.output_type
+        )
+        return await self._handle_output(output, inputs, trace)
 
     async def get_inputs(self, trace: TraceType) -> dict[str, Any]:
         """Get template inputs for the LLM prompt.
