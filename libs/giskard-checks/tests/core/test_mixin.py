@@ -86,6 +86,7 @@ def test_explicit_judge_generator_is_preserved():
     set_default_judge("typesafe/jev")
 
     assert isinstance(check.judge, LLMChatJudge)
+    assert isinstance(check._judge, LLMChatJudge)
     assert check.judge.generator is explicit
     assert check._judge.generator is explicit
 

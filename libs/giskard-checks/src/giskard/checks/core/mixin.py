@@ -26,8 +26,9 @@ class WithGeneratorMixin(BaseModel):
 class WithJudgeMixin(BaseModel):
     """Attach a :class:`~giskard.checks.core.judge.BaseJudge` to a check.
 
-    Persisted dumps and constructor kwargs may still pass ``generator``; it is
-    rewritten to ``judge`` before validation so ``extra="forbid"`` stays intact.
+    ``generator`` remains accepted as a legacy constructor/dump alias and is
+    rewritten to ``judge`` before field validation. It is excluded from
+    serialization so persisted checks store ``judge`` only.
     """
 
     judge: BaseJudge | None = Field(
@@ -37,13 +38,21 @@ class WithJudgeMixin(BaseModel):
             "when None."
         ),
     )
+    generator: BaseGenerator | None = Field(
+        default=None,
+        exclude=True,
+        description=(
+            "Legacy alias for an LLM generator judge. Prefer ``judge=``. "
+            "Migrated to ``judge`` on construction and omitted from dumps."
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod
     def _migrate_generator_to_judge(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
-        if "generator" not in data:
+        if "generator" not in data or data["generator"] is None:
             return data
         if "judge" in data and data["judge"] is not None:
             raise ValueError("Cannot provide both 'generator' and 'judge'")

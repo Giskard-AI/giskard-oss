@@ -13,7 +13,6 @@ from giskard.agents import (
     get_prompts_manager,
     resolve_som,
 )
-from giskard.agents.templates.environment import fence
 from giskard.core import Discriminated, discriminated_base
 from giskard.llm.types import ChatMessage, UserMessage
 from pydantic import BaseModel, ConfigDict, Field, GetCoreSchemaHandler
@@ -323,7 +322,12 @@ class SOMJudge(BaseJudge):
 
         if not evidence_text and "trace" in inputs:
             # Custom prompts without dual-use gates: fall back to fenced trace.
-            evidence_text = str(fence(inputs["trace"]))
+            evidence_text = (
+                MessageTemplate(role="user", content_template="{{ trace | fence }}")
+                .render(trace=inputs["trace"])
+                .text
+                or ""
+            )
             if not question:
                 question = _messages_text(question_messages) or evidence_text
 

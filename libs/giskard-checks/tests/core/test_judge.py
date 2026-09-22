@@ -8,6 +8,7 @@ from giskard.agents import (
     BaseGenerator,
     BaseSOM,
     GenerationParams,
+    Generator,
     SOMResponse,
     TemplateReference,
 )
@@ -92,7 +93,7 @@ def test_dict_without_kind_infers_llm_from_generator():
         {"generator": {"kind": "giskard_llm", "model": "openai/gpt-4o-mini"}}
     )
     assert isinstance(judge, LLMChatJudge)
-    assert judge.generator is not None
+    assert isinstance(judge.generator, Generator)
     assert judge.generator.model == "openai/gpt-4o-mini"
 
 
