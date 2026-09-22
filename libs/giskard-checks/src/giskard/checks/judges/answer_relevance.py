@@ -153,11 +153,12 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
             "question": question,
             "answer": answer,
             "context": self.context if self.context is not MISSING else "",
+            "trace": trace,
         }
 
         # Omitted entirely (rather than passed empty) when disabled, so the
         # template drops the <CONVERSATION HISTORY> section instead of rendering
-        # an empty one.
+        # an empty one. SOM still uses ``trace`` as the shared messages input.
         if self.include_history:
             inputs["history"] = trace
 

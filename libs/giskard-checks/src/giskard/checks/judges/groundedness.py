@@ -1,4 +1,4 @@
-from typing import override
+from typing import Any, override
 
 from giskard.agents import TemplateReference
 from pydantic import Field
@@ -87,7 +87,7 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         return await super().run(trace)
 
     @override
-    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
+    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
         """Build template variables from resolved inputs.
 
         Parameters
@@ -97,8 +97,9 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
 
         Returns
         -------
-        dict[str, str]
-            Template variables with 'answer' and 'context' keys.
+        dict[str, Any]
+            Template variables with ``answer``, ``context``, and ``trace``
+            (``trace`` is the shared SOM conversation input).
         """
         return {
             "answer": format_prompt_text(
@@ -115,4 +116,5 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
                     value=self.context,
                 )
             ),
+            "trace": trace,
         }

@@ -23,8 +23,9 @@ from giskard.checks import AnswerRelevance, CheckResult, CheckStatus, Interactio
 
 from ..testing_utils import MockJudgeGenerator as MockGenerator
 
-_EXPECTED_INPUT_KEYS = frozenset({"question", "answer", "history", "context"})
+_EXPECTED_INPUT_KEYS = frozenset({"question", "answer", "history", "context", "trace"})
 # ``history`` is omitted from template inputs when include_history=False.
+# ``trace`` remains for SOM shared-state groundwork.
 _EXPECTED_INPUT_KEYS_NO_HISTORY = _EXPECTED_INPUT_KEYS - {"history"}
 
 

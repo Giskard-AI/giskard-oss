@@ -1,4 +1,4 @@
-from typing import override
+from typing import Any, override
 
 from giskard.agents import TemplateReference
 from pydantic import Field
@@ -68,7 +68,7 @@ class Contradiction[InputType, OutputType, TraceType: Trace](  # pyright: ignore
         return await super().run(trace)
 
     @override
-    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
+    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
         return {
             "answer": format_prompt_text(
                 provided_or_resolve(trace, key=self.target_key, value=self.answer)
@@ -76,4 +76,5 @@ class Contradiction[InputType, OutputType, TraceType: Trace](  # pyright: ignore
             "context": format_prompt_text(
                 provided_or_resolve(trace, key=self.context_key, value=self.context)
             ),
+            "trace": trace,
         }

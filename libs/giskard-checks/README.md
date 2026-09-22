@@ -237,16 +237,15 @@ rationale. Custom output schemas still require an LLM judge. Pass a configured
 `BaseSOM` to `set_default_judge`, or use
 `SOMJudge(model=model, pass_threshold=0.8)` for a different threshold.
 
-Bundled judge templates are dual-use: wrap evidence in
-`{% if include_evidence | default(true) %}`, rubric text in
-`{% if include_rubric | default(true) %}`, and JSON output instructions in
-`{% if _instr_output is defined %}`. The SOM path renders the rubric as the
-evaluation question and the fenced evidence as messages. Custom `LLMJudge`
-prompts should follow the same gates for a clean SOM split; without them SOM
-falls back to the original generic question ("Using the rubric and evidence in
-the evaluation prompt, should the agent's behavior pass the check?") and uses
-the full prompt render as messages. Empty evidence after a dual-use render fails
-closed instead of scoring a blank context.
+Bundled judge templates share a SOM-friendly shape: rubric and check variables
+are always rendered; gate only the conversation with
+`{% if include_trace | default(true) %}`, and JSON output instructions with
+`{% if _instr_output is defined %}`. The SOM path uses the trace-free render as
+the evaluation **question** and fences `inputs["trace"]` as **messages** (shared
+conversation state). Checks should pass `trace` from `get_inputs()` so one
+conversation can later back many questions in a batch; grouping is not
+implemented yet. Empty or missing `trace` fails closed instead of scoring a
+blank context.
 
 The concrete provider handles authentication, native endpoints and gateways;
 `giskard-checks` owns the evaluation question and verdict conversion.

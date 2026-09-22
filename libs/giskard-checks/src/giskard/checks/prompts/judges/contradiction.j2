@@ -1,4 +1,3 @@
-{% if include_rubric | default(true) %}
 Your role is to evaluate whether an AI agent's answer clearly contradicts a provided reference context.
 
 You will receive:
@@ -28,12 +27,9 @@ Your task is to check whether the agent's answer contains any factual claim that
 
 ## Markers
 Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT ANSWER> indicate where the reference context and agent answer are, respectively. Everything inside a marker belongs to that category.
-{% endif %}
-{% if include_evidence | default(true) %}
-{% if include_rubric | default(true) %}
 
 -------------------
-{% endif %}
+
 <AGENT ANSWER>
 {{ answer | fence }}
 </AGENT ANSWER>
@@ -43,18 +39,14 @@ Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT 
 <REFERENCE CONTEXT>
 {{ context | fence }}
 </REFERENCE CONTEXT>
-{% endif %}
-{% if include_rubric | default(true) %}
 
 -------------------
 
 Remember, the answer passes unless it clearly contradicts the reference context. Omissions and additions are tolerated.
-{% endif %}
 {% if _instr_output is defined %}
-{% if include_rubric | default(true) %}
 
 -------------------
-{% endif %}
+
 **Output Format:**
 {{ _instr_output }}
 {% endif %}

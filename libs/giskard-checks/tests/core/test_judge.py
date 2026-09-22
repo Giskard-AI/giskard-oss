@@ -172,7 +172,7 @@ async def test_llm_judge_keeps_evidence_and_output_instructions():
     assert "JSON" in rendered or "schema" in rendered.lower()
 
 
-async def test_som_judge_splits_question_and_evidence():
+async def test_som_judge_splits_question_and_trace():
     model = RecordingSOM(model="example-v1")
     judge = SOMJudge(model=model)
     trace = Trace(interactions=[Interaction(inputs="Hello", outputs="Thank you!")])
@@ -188,47 +188,13 @@ async def test_som_judge_splits_question_and_evidence():
     assert "Be polite" in question
     assert "JSON" not in question
     assert "schema" not in question.lower()
+    assert "Thank you!" not in question
     evidence = messages[0].text or ""
     assert "Thank you!" in evidence
     assert "Be polite" not in evidence
 
 
-async def test_som_judge_falls_back_when_prompt_has_no_rubric_gates():
-    model = RecordingSOM(model="example-v1")
-    judge = SOMJudge(model=model)
-
-    verdict = await judge.judge(
-        "Evaluate whether the agent was polite.\n\n{{ trace | fence }}",
-        {"trace": "Thank you!"},
-    )
-
-    assert isinstance(verdict, LLMCheckResult)
-    assert verdict.passed is True
-    messages, question = model._calls[0]
-    assert "Using the rubric and evidence in the evaluation prompt" in question
-    assert "should the agent's behavior pass the check" in question
-    evidence = messages[0].text or ""
-    assert "Thank you!" in evidence
-    assert "Evaluate whether the agent was polite" in evidence
-
-
-async def test_som_judge_fails_closed_on_empty_evidence():
-    model = RecordingSOM(model="example-v1", probability=0.99)
-    judge = SOMJudge(model=model)
-    prompt = (
-        "{% if include_rubric | default(true) %}Is the agent polite?{% endif %}"
-        "{% if include_evidence | default(true) %}{% endif %}"
-    )
-
-    verdict = await judge.judge(prompt, {})
-
-    assert isinstance(verdict, LLMCheckResult)
-    assert verdict.passed is False
-    assert "empty evidence" in verdict.reason
-    assert model._calls == []
-
-
-async def test_som_judge_chat_message_prompt_uses_message_as_evidence():
+async def test_som_judge_uses_default_question_for_chat_message_prompt():
     model = RecordingSOM(model="example-v1")
     judge = SOMJudge(model=model)
     prompt = UserMessage(content="Agent said thank you.")
@@ -240,3 +206,38 @@ async def test_som_judge_chat_message_prompt_uses_message_as_evidence():
     messages, question = model._calls[0]
     assert messages == [prompt]
     assert "should the agent's behavior pass the check" in question
+
+
+async def test_som_judge_fails_closed_without_trace():
+    model = RecordingSOM(model="example-v1", probability=0.99)
+    judge = SOMJudge(model=model)
+
+    verdict = await judge.judge(
+        "{% if include_trace | default(true) %}{{ trace | fence }}{% endif %}"
+        "Is the agent polite?",
+        {},
+    )
+
+    assert isinstance(verdict, LLMCheckResult)
+    assert verdict.passed is False
+    assert "inputs['trace']" in verdict.reason
+    assert model._calls == []
+
+
+async def test_som_judge_custom_prompt_still_uses_trace_as_messages():
+    model = RecordingSOM(model="example-v1")
+    judge = SOMJudge(model=model)
+
+    verdict = await judge.judge(
+        "Evaluate whether the agent was polite.\n\n"
+        "{% if include_trace | default(true) %}{{ trace | fence }}{% endif %}",
+        {"trace": "Thank you!"},
+    )
+
+    assert isinstance(verdict, LLMCheckResult)
+    assert verdict.passed is True
+    messages, question = model._calls[0]
+    assert "Evaluate whether the agent was polite" in question
+    assert "Thank you!" not in question
+    evidence = messages[0].text or ""
+    assert "Thank you!" in evidence

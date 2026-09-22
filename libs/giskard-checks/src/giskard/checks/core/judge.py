@@ -1,6 +1,5 @@
 """Discriminated judge backends for LLM and System One Model evaluation."""
 
-import asyncio
 import json
 from typing import Annotated, Any, ClassVar, override
 
@@ -32,10 +31,9 @@ async def _render_prompt(
     prompt: str | ChatMessage | MessageTemplate | TemplateReference,
     inputs: dict[str, Any],
     *,
-    include_evidence: bool = True,
-    include_rubric: bool = True,
+    include_trace: bool = True,
 ) -> list[ChatMessage]:
-    """Render a judge prompt with dual-use template flags.
+    """Render a judge prompt with the shared-trace template flag.
 
     Parameters
     ----------
@@ -44,10 +42,9 @@ async def _render_prompt(
         ignore the Jinja flags.
     inputs : dict
         Template variables (trace, rule, answer, …).
-    include_evidence : bool, optional
-        When ``False``, templates should omit fenced evidence blocks.
-    include_rubric : bool, optional
-        When ``False``, templates should omit rubric / question text.
+    include_trace : bool, optional
+        When ``False``, templates should omit the conversation ``trace`` /
+        history block so the render is usable as a SOM question.
 
     Returns
     -------
@@ -65,8 +62,7 @@ async def _render_prompt(
 
     context: dict[str, Any] = {
         **inputs,
-        "include_evidence": include_evidence,
-        "include_rubric": include_rubric,
+        "include_trace": include_trace,
     }
 
     if isinstance(prompt, str):
@@ -90,6 +86,34 @@ def _messages_text(messages: list[ChatMessage]) -> str:
     return "\n\n".join(
         text for message in messages if (text := message.text) is not None
     ).strip()
+
+
+async def _som_question_from_prompt(
+    prompt: str | ChatMessage | MessageTemplate | TemplateReference,
+    inputs: dict[str, Any],
+) -> str:
+    """Render one SOM question from a check prompt (trace omitted).
+
+    Future batching can call this once per check while sharing the same
+    :func:`_som_messages_from_trace` input across questions.
+    """
+    if isinstance(prompt, ChatMessage):
+        return _DEFAULT_SOM_QUESTION
+    question = _messages_text(await _render_prompt(prompt, inputs, include_trace=False))
+    return question or _DEFAULT_SOM_QUESTION
+
+
+def _som_messages_from_trace(trace: Any) -> list[ChatMessage]:
+    """Fence ``trace`` as the shared SOM conversation state (batch input)."""
+    text = (
+        MessageTemplate(role="user", content_template="{{ trace | fence }}")
+        .render(trace=trace)
+        .text
+        or ""
+    ).strip()
+    if not text:
+        return []
+    return [UserMessage(content=text)]
 
 
 def _coerce_judge(value: Any) -> Any:
@@ -332,13 +356,16 @@ class LLMChatJudge(BaseJudge):
 class SOMJudge(BaseJudge):
     """Judge by scoring a System One Model probability against a threshold.
 
-    Dual-use Jinja templates should gate evidence with
-    ``{% if include_evidence | default(true) %}``, rubric with
-    ``{% if include_rubric | default(true) %}``, and output-schema
-    instructions with ``{% if _instr_output is defined %}``. The SOM path
-    renders the rubric as ``question`` and fenced evidence as ``messages``.
-    Legacy prompts without those gates fall back to
-    :data:`_DEFAULT_SOM_QUESTION`.
+    SOM evaluates a **question** against shared conversation **messages**.
+    Bundled templates gate only the conversation block with
+    ``{% if include_trace | default(true) %}`` and output schema with
+    ``{% if _instr_output is defined %}``. The SOM path renders the prompt
+    with ``include_trace=False`` (check variables filled in) as ``question``,
+    and fences ``inputs["trace"]`` as ``messages``.
+
+    This per-call shape is the groundwork for later batching: one trace can
+    back many questions (e.g. groundedness + answer relevance) without
+    re-sending the conversation. Grouping is not implemented yet.
     """
 
     model: BaseSOM
@@ -362,45 +389,27 @@ class SOMJudge(BaseJudge):
                 "Use an LLM judge for custom output schemas."
             )
 
-        question_messages, evidence_messages = await asyncio.gather(
-            _render_prompt(
-                prompt,
-                inputs,
-                include_evidence=False,
-                include_rubric=True,
-            ),
-            _render_prompt(
-                prompt,
-                inputs,
-                include_evidence=True,
-                include_rubric=False,
-            ),
-        )
+        question = await _som_question_from_prompt(prompt, inputs)
 
-        question = _messages_text(question_messages)
-        evidence_text = _messages_text(evidence_messages)
-
-        # Dual-use gates produce distinct rubric vs evidence text. Legacy
-        # prompts without those gates render the same content twice — fall back
-        # to the original SOM question.
-        if not question or question == evidence_text:
-            question = _DEFAULT_SOM_QUESTION
-
-        messages: list[ChatMessage]
-        if evidence_text:
-            messages = [UserMessage(content=evidence_text)]
+        if "trace" in inputs:
+            messages = _som_messages_from_trace(inputs["trace"])
+            if not messages:
+                return LLMCheckResult(
+                    passed=False,
+                    reason=(
+                        "SOM judge received an empty trace after fencing. "
+                        "Pass a non-empty conversation trace in inputs['trace']."
+                    ),
+                )
         elif isinstance(prompt, ChatMessage):
             messages = [prompt]
         else:
-            # Fail closed: empty evidence must not score as a pass, and the
-            # rubric must not be reused as conversation context.
             return LLMCheckResult(
                 passed=False,
                 reason=(
-                    "SOM judge received empty evidence after rendering the "
-                    "prompt. Dual-use templates should gate evidence with "
-                    "`{% if include_evidence | default(true) %}` and supply "
-                    "trace/answer inputs."
+                    "SOM judge requires inputs['trace'] as the shared conversation "
+                    "state. Check get_inputs() should pass the Trace (batching "
+                    "groundwork: one trace, many questions)."
                 ),
             )
 
