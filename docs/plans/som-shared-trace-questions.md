@@ -36,3 +36,12 @@ Checks that already embed answer/context (groundedness, contradiction) keep thos
 
 - README: document `include_trace` + SOM question/messages split; note batching is future work.
 - Replace dual-render / empty-evidence tests with the new contract.
+
+## Review
+
+Implemented on `cursor/decouple-judge-from-generator-20c5` (`478dc1af3`):
+
+- Templates use `include_trace` + `_instr_output` only
+- `SOMJudge` uses `_som_question_from_prompt` + `_som_messages_from_trace`
+- Groundedness / Contradiction / AnswerRelevance pass `trace` in `get_inputs`
+- Grouping/batching across checks deliberately not implemented yet
