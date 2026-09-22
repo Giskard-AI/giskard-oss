@@ -75,10 +75,10 @@ would be relevant to something asked earlier in the conversation.
 </DOMAIN CONTEXT>
 {% endif %}
 {% endif %}
+{% if _instr_output is defined %}
 {% if include_rubric | default(true) %}
 ---
 {% endif %}
-{% if _instr_output is defined %}
 **Output Format:**
 {{ _instr_output }}
 {% endif %}

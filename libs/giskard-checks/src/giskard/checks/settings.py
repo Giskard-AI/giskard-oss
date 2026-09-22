@@ -150,7 +150,7 @@ def set_default_judge(
     if judge is None:
         _default_judge = None
         return
-    _default_judge = BaseJudge.model_validate(judge)
+    _default_judge = BaseJudge.parse(judge)
 
 
 def get_default_judge() -> BaseJudge:
@@ -167,7 +167,7 @@ def get_default_judge() -> BaseJudge:
         return _default_judge
     configured = get_settings().default_judge
     if configured is not None and configured.strip():
-        return BaseJudge.model_validate(configured)
+        return BaseJudge.parse(configured)
     return LLMChatJudge()
 
 

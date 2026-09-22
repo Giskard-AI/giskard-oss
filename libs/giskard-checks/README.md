@@ -241,9 +241,9 @@ Bundled judge templates are dual-use: wrap evidence in
 `{% if include_rubric | default(true) %}`, and JSON output instructions in
 `{% if _instr_output is defined %}`. The SOM path renders the rubric as the
 evaluation question and the fenced evidence as messages. Custom `LLMJudge`
-prompts should follow the same gates for a clean SOM split; without them the
-full prompt (minus output schema) is used as the question and any `trace` input
-is still passed as fenced evidence.
+prompts should follow the same gates for a clean SOM split; without them SOM
+falls back to the original generic question ("should the agent's behavior pass
+the check?") and still passes any `trace` input as fenced evidence.
 
 The concrete provider handles authentication, native endpoints and gateways;
 `giskard-checks` owns the evaluation question and verdict conversion.

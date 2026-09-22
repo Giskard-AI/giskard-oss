@@ -84,12 +84,12 @@ def test_judge_kinds():
     ],
 )
 def test_string_inference(value: str, expected_kind: str):
-    judge = BaseJudge.model_validate(value)
+    judge = BaseJudge.parse(value)
     assert judge.kind == expected_kind
 
 
 def test_dict_without_kind_infers_llm_from_generator():
-    judge = BaseJudge.model_validate(
+    judge = BaseJudge.parse(
         {"generator": {"kind": "giskard_llm", "model": "openai/gpt-4o-mini"}}
     )
     assert isinstance(judge, LLMChatJudge)
@@ -140,3 +140,22 @@ async def test_som_judge_splits_question_and_evidence():
     evidence = messages[0].text or ""
     assert "Thank you!" in evidence
     assert "Be polite" not in evidence
+
+
+async def test_som_judge_falls_back_when_prompt_has_no_rubric_gates():
+    model = RecordingSOM(model="example-v1")
+    judge = SOMJudge(model=model)
+
+    verdict = await judge.judge(
+        "Evaluate whether the agent was polite.\n\n{{ trace | fence }}",
+        {"trace": "Thank you!"},
+    )
+
+    assert isinstance(verdict, LLMCheckResult)
+    assert verdict.passed is True
+    messages, question = model._calls[0]
+    assert "Using the rubric and evidence in the evaluation prompt" in question
+    assert "should the agent's behavior pass the check" in question
+    evidence = messages[0].text or ""
+    assert "Thank you!" in evidence
+    assert "Evaluate whether the agent was polite" not in evidence

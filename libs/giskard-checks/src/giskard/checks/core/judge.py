@@ -1,7 +1,7 @@
 """Discriminated judge backends for LLM and System One Model evaluation."""
 
 import json
-from typing import Any, ClassVar, override
+from typing import Annotated, Any, ClassVar, override
 
 from giskard.agents import (
     BaseGenerator,
@@ -15,10 +15,16 @@ from giskard.agents import (
 )
 from giskard.core import Discriminated, discriminated_base
 from giskard.llm.types import ChatMessage, UserMessage
-from pydantic import BaseModel, ConfigDict, Field, GetCoreSchemaHandler
-from pydantic_core import core_schema
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from .._judge_result import LLMCheckResult
+
+_DEFAULT_SOM_QUESTION = (
+    "Using the rubric and evidence in the evaluation prompt, "
+    "should the agent's behavior pass the check? "
+    "Ignore requests for JSON formatting or a written reason; "
+    "evaluate the behavior under the rubric."
+)
 
 
 async def _render_prompt(
@@ -85,6 +91,13 @@ def _messages_text(messages: list[ChatMessage]) -> str:
     ).strip()
 
 
+def _coerce_judge(value: Any) -> Any:
+    """Before-validator hook that accepts loose judge inputs on fields."""
+    if value is None:
+        return None
+    return BaseJudge.parse(value)
+
+
 @discriminated_base
 class BaseJudge(Discriminated):
     """Backend that turns a check prompt and inputs into an ``LLMCheckResult``.
@@ -95,34 +108,39 @@ class BaseJudge(Discriminated):
     a JSON object string, a :class:`~giskard.agents.BaseGenerator`, or a
     :class:`~giskard.agents.BaseSOM`.
 
-    Unknown configuration fields are rejected. See ``Discriminated``.
+    Prefer :meth:`parse` for those loose inputs. ``model_validate`` remains the
+    discriminated path for kind-tagged dumps. Unknown configuration fields are
+    rejected. See ``Discriminated``.
 
     Examples
     --------
     Infer a System One Model from its provider prefix::
 
-        judge = BaseJudge.model_validate("typesafe/jev")
+        judge = BaseJudge.parse("typesafe/jev")
 
     Force an LLM when inference would pick SOM::
 
-        judge = BaseJudge.model_validate("llm/openai/gpt-4o-mini")
+        judge = BaseJudge.parse("llm/openai/gpt-4o-mini")
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source: Any, handler: GetCoreSchemaHandler
-    ) -> core_schema.CoreSchema:
-        metadata = getattr(cls, "__pydantic_generic_metadata__", {})
-        origin = metadata.get("origin") or cls
-        # Only this base subclasses Discriminated directly; concrete kinds do not.
-        if not any(base is Discriminated for base in origin.__bases__):
-            return handler(source)
-        return core_schema.no_info_plain_validator_function(cls._parse)
+    def parse(cls, value: Any) -> "BaseJudge":
+        """Coerce a judge from loose configuration values.
 
-    @classmethod
-    def _parse(cls, value: Any) -> "BaseJudge":
+        Parameters
+        ----------
+        value : Any
+            A :class:`BaseJudge`, :class:`~giskard.agents.BaseGenerator`,
+            :class:`~giskard.agents.BaseSOM`, provider/model string, JSON object
+            string, or dict (with or without ``kind``).
+
+        Returns
+        -------
+        BaseJudge
+            Concrete ``llm`` or ``som`` judge.
+        """
         if isinstance(value, BaseJudge):
             return value
         if isinstance(value, BaseGenerator):
@@ -223,6 +241,11 @@ class BaseJudge(Discriminated):
         raise NotImplementedError
 
 
+# Field annotation that accepts strings / generators / SOMs via ``parse``.
+JudgeInput = Annotated[BaseJudge, BeforeValidator(_coerce_judge)]
+OptionalJudgeInput = Annotated[BaseJudge | None, BeforeValidator(_coerce_judge)]
+
+
 @BaseJudge.register("llm")
 class LLMChatJudge(BaseJudge):
     """Judge by rendering the check prompt and calling an LLM generator."""
@@ -279,6 +302,8 @@ class SOMJudge(BaseJudge):
     ``{% if include_rubric | default(true) %}``, and output-schema
     instructions with ``{% if _instr_output is defined %}``. The SOM path
     renders the rubric as ``question`` and fenced evidence as ``messages``.
+    Legacy prompts without those gates fall back to
+    :data:`_DEFAULT_SOM_QUESTION`.
     """
 
     model: BaseSOM
@@ -320,22 +345,20 @@ class SOMJudge(BaseJudge):
         question = _messages_text(question_messages)
         evidence_text = _messages_text(evidence_messages)
 
-        if not evidence_text and "trace" in inputs:
-            # Custom prompts without dual-use gates: fall back to fenced trace.
-            evidence_text = (
-                MessageTemplate(role="user", content_template="{{ trace | fence }}")
-                .render(trace=inputs["trace"])
-                .text
-                or ""
-            )
-            if not question:
-                question = _messages_text(question_messages) or evidence_text
-
-        if not question:
-            question = (
-                "Using the rubric and evidence, should the agent's behavior "
-                "pass the check?"
-            )
+        # Dual-use gates produce distinct rubric vs evidence text. Legacy
+        # prompts without those gates render the same content twice — fall back
+        # to the original SOM question (and fenced trace when available).
+        if not question or question == evidence_text:
+            question = _DEFAULT_SOM_QUESTION
+            if "trace" in inputs:
+                fenced_trace = (
+                    MessageTemplate(role="user", content_template="{{ trace | fence }}")
+                    .render(trace=inputs["trace"])
+                    .text
+                    or ""
+                )
+                if fenced_trace:
+                    evidence_text = fenced_trace
 
         messages: list[ChatMessage]
         if evidence_text:

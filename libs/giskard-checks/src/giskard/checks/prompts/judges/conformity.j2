@@ -41,22 +41,23 @@ Your task is to determine if the outputs and metadata conform to the specified r
 ## Markers
 Markers <TRACE>...</TRACE> indicate the trace. Everything inside a marker belongs to that category.
 
--------------------
-
 **Rule to Evaluate:**
 {{ rule }}
+{% endif %}
+{% if include_evidence | default(true) %}
+{% if include_rubric | default(true) %}
 
 -------------------
 {% endif %}
-{% if include_evidence | default(true) %}
 < TRACE >
 {{ trace | fence }}
 </ TRACE >
 {% endif %}
+{% if _instr_output is defined %}
 {% if include_rubric | default(true) %}
+
 -------------------
 {% endif %}
-{% if _instr_output is defined %}
 **Output Format:**
 {{ _instr_output }}
 {% endif %}

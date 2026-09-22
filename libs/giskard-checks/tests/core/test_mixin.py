@@ -96,7 +96,7 @@ def test_generator_and_judge_together_are_rejected():
         LLMJudge(
             prompt="Evaluate the answer.",
             generator=Generator(model="openai/gpt-4o-mini"),
-            judge=BaseJudge.model_validate("typesafe/jev"),
+            judge=BaseJudge.parse("typesafe/jev"),
         )
 
 

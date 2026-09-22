@@ -8,7 +8,7 @@ from ..settings import (
     get_default_generator,
     get_default_judge,
 )
-from .judge import BaseJudge
+from .judge import BaseJudge, OptionalJudgeInput
 
 
 class WithGeneratorMixin(BaseModel):
@@ -31,7 +31,7 @@ class WithJudgeMixin(BaseModel):
     serialization so persisted checks store ``judge`` only.
     """
 
-    judge: BaseJudge | None = Field(
+    judge: OptionalJudgeInput = Field(
         default=None,
         description=(
             "Judge backend for evaluation. Defaults to the global default judge "
