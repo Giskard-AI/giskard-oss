@@ -3,14 +3,13 @@
 from giskard.agents import (
     BaseEmbeddingModel,
     BaseGenerator,
-    BaseSOM,
     EmbeddingModel,
     Generator,
 )
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .core.judge import BaseJudge, LLMChatJudge
+from .core.judge import BaseJudge, JudgeInput, LLMChatJudge
 
 _default_generator: BaseGenerator | None = None
 _default_judge: BaseJudge | None = None
@@ -126,17 +125,17 @@ def get_default_generator() -> BaseGenerator:
 
 
 def set_default_judge(
-    judge: BaseJudge | BaseGenerator | BaseSOM | str | None,
+    judge: JudgeInput | None,
 ) -> None:
     """Set the default judge independently of content generation.
 
     Parameters
     ----------
-    judge : BaseJudge, BaseGenerator, BaseSOM, str, or None
-        A configured judge, generator, SOM model, or provider/model identifier
-        (optionally prefixed with ``llm/`` or ``som/``). JSON object strings are
-        also accepted. ``None`` clears the runtime override so the environment
-        default or LLM generator fallback is used.
+    judge : JudgeInput or None
+        A configured judge, generator, SOM model, provider/model identifier
+        (optionally prefixed with ``llm/`` or ``som/``), JSON object string, or
+        dict. ``None`` clears the runtime override so the environment default or
+        LLM generator fallback is used.
 
     Examples
     --------

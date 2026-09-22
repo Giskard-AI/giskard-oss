@@ -39,16 +39,18 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         (default: "trace.last.metadata.context").
 
         Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
-    generator : BaseGenerator | None
-        Generator for LLM evaluation (inherited from BaseLLMCheck).
+    judge : BaseJudge or None
+        Judge backend (inherited from BaseLLMCheck). Legacy ``generator=`` is
+        migrated to ``judge`` automatically.
 
     Examples
     --------
     >>> from giskard.agents import Generator
+    >>> from giskard.checks import LLMChatJudge
     >>> check = Groundedness(
     ...     answer="The Eiffel Tower is in Paris.",
     ...     context=["Paris is the capital of France.", "It's located in Europe."],
-    ...     generator=Generator(model="openai/gpt-4o")
+    ...     judge=LLMChatJudge(generator=Generator(model="openai/gpt-4o")),
     ... )
     """
 

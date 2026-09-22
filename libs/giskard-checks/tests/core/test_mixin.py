@@ -100,6 +100,64 @@ def test_generator_and_judge_together_are_rejected():
         )
 
 
+def test_legacy_generator_is_excluded_from_dump():
+    explicit = Generator(model="openai/gpt-4o-mini")
+    check = LLMJudge(prompt="Evaluate the answer.", generator=explicit)
+
+    dumped = check.model_dump()
+
+    assert "generator" not in dumped
+    assert dumped["judge"]["kind"] == "llm"
+    assert dumped["judge"]["generator"]["model"] == "openai/gpt-4o-mini"
+
+
+@pytest.mark.parametrize(
+    "judge",
+    [
+        "typesafe/jev",
+        '{"kind": "som", "model": {"kind": "typesafe", "model": "jev"}}',
+    ],
+)
+def test_check_construction_accepts_loose_judge(judge: str):
+    check = LLMJudge(prompt="Evaluate the answer.", judge=judge)
+
+    assert isinstance(check.judge, BaseJudge)
+    assert check.judge.kind == "som"
+
+
+def test_post_init_generator_assignment_remigrates_to_judge():
+    check = LLMJudge(prompt="Evaluate the answer.")
+    explicit = Generator(model="openai/gpt-4o-mini")
+
+    check.generator = explicit
+
+    assert check.generator is None
+    assert isinstance(check.judge, LLMChatJudge)
+    assert check.judge.generator is explicit
+    assert check._judge is check.judge
+
+
+def test_model_copy_generator_remigrates_to_judge():
+    check = LLMJudge(prompt="Evaluate the answer.")
+    explicit = Generator(model="openai/gpt-4o-mini")
+
+    copied = check.model_copy(update={"generator": explicit})
+
+    assert copied.generator is None
+    assert isinstance(copied.judge, LLMChatJudge)
+    assert copied.judge.generator is explicit
+    assert copied._judge is copied.judge
+
+
+def test_model_copy_generator_rejected_when_judge_already_set():
+    check = LLMJudge(
+        prompt="Evaluate the answer.",
+        judge=BaseJudge.parse("typesafe/jev"),
+    )
+    with pytest.raises(ValueError, match="both 'generator' and 'judge'"):
+        check.model_copy(update={"generator": Generator(model="openai/gpt-4o-mini")})
+
+
 def test_embedding_reflects_global_change_after_instantiation():
     embedding_user = WithEmbeddingMixin()
     embedding = MagicMock(spec=BaseEmbeddingModel)

@@ -220,7 +220,8 @@ set_default_judge("typesafe/jev")
 
 `set_default_judge` infers `kind="som"` for providers supported by
 `giskard.agents.som` and `kind="llm"` otherwise. Prefix the identifier with
-`llm/` or `som/` when you need to override inference. Existing `quality_scan`
+`llm/` or `som/` to confirm that inference (mismatches such as
+`llm/typesafe/jev` raise). Existing `quality_scan`
 calls use the selected judge while scenario generation, simulated users and
 report recommendations continue to use the LLM.
 
@@ -242,8 +243,10 @@ Bundled judge templates are dual-use: wrap evidence in
 `{% if _instr_output is defined %}`. The SOM path renders the rubric as the
 evaluation question and the fenced evidence as messages. Custom `LLMJudge`
 prompts should follow the same gates for a clean SOM split; without them SOM
-falls back to the original generic question ("should the agent's behavior pass
-the check?") and uses the full prompt render as messages.
+falls back to the original generic question ("Using the rubric and evidence in
+the evaluation prompt, should the agent's behavior pass the check?") and uses
+the full prompt render as messages. Empty evidence after a dual-use render fails
+closed instead of scoring a blank context.
 
 The concrete provider handles authentication, native endpoints and gateways;
 `giskard-checks` owns the evaluation question and verdict conversion.

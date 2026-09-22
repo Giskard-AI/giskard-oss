@@ -113,13 +113,19 @@ class BaseJudge(Discriminated):
     discriminated path for kind-tagged dumps. Unknown configuration fields are
     rejected. See ``Discriminated``.
 
+    Kind prefixes (``llm/`` / ``som/``) must match inference: they confirm the
+    backend, they do not force a mismatched provider (e.g. ``llm/typesafe/jev``
+    raises). Leaf ``parse`` methods (``LLMChatJudge.parse``, ``SOMJudge.parse``)
+    only accept values that resolve to that concrete class; use
+    ``BaseJudge.parse`` when the backend may be either kind.
+
     Examples
     --------
     Infer a System One Model from its provider prefix::
 
         judge = BaseJudge.parse("typesafe/jev")
 
-    Force an LLM when inference would pick SOM::
+    Confirm an LLM when the identifier is unambiguous::
 
         judge = BaseJudge.parse("llm/openai/gpt-4o-mini")
     """
@@ -141,30 +147,45 @@ class BaseJudge(Discriminated):
         -------
         BaseJudge
             Concrete ``llm`` or ``som`` judge.
+
+        Raises
+        ------
+        TypeError
+            If ``cls`` is a concrete subclass and ``value`` resolves to a
+            different judge kind.
         """
         if isinstance(value, BaseJudge):
-            return value
-        if isinstance(value, BaseGenerator):
-            return LLMChatJudge(generator=value)
-        if isinstance(value, BaseSOM):
-            return SOMJudge(model=value)
-        if isinstance(value, str):
-            return cls._from_string(value)
-        if isinstance(value, dict):
-            return cls._from_dict(value)
-        raise TypeError(
-            "judge must be a BaseJudge, BaseGenerator, BaseSOM, "
-            "model identifier string, JSON object, or dict"
-        )
+            judge: BaseJudge = value
+        elif isinstance(value, BaseGenerator):
+            judge = LLMChatJudge(generator=value)
+        elif isinstance(value, BaseSOM):
+            judge = SOMJudge(model=value)
+        elif isinstance(value, str):
+            judge = cls._from_string(value)
+        elif isinstance(value, dict):
+            judge = cls._from_dict(value)
+        else:
+            raise TypeError(
+                "judge must be a BaseJudge, BaseGenerator, BaseSOM, "
+                "model identifier string, JSON object, or dict"
+            )
+        if cls is not BaseJudge and not isinstance(judge, cls):
+            raise TypeError(
+                f"{cls.__name__}.parse cannot produce {type(judge).__name__}; "
+                "use BaseJudge.parse when the backend kind is not fixed"
+            )
+        return judge
 
     @classmethod
     def _from_string(cls, value: str) -> "BaseJudge":
         stripped = value.strip()
+        if not stripped:
+            raise ValueError("judge model identifier must be a non-empty string")
         if stripped.startswith("{"):
             return cls._from_dict(json.loads(stripped))
 
         first, sep, rest = stripped.partition("/")
-        if sep and first in cls.kinds() and rest:
+        if sep and first in BaseJudge.kinds() and rest:
             return cls._from_prefixed_model(first, rest)
 
         som = resolve_som(stripped)
@@ -178,8 +199,8 @@ class BaseJudge(Discriminated):
         inferred = "som" if som is not None else "llm"
         if kind != inferred:
             raise ValueError(
-                "Use kind prefix 'som' with a supported SOM provider, "
-                "or 'llm' with an LLM provider"
+                "Kind prefix must match the inferred backend: use 'som' with a "
+                "supported SOM provider, or 'llm' with an LLM provider"
             )
         if som is not None:
             return SOMJudge(model=som)
@@ -189,22 +210,34 @@ class BaseJudge(Discriminated):
     def _from_dict(cls, data: dict[str, Any]) -> "BaseJudge":
         payload = dict(data)
         kind = payload.get("kind")
-        if isinstance(kind, str) and kind in cls.kinds():
+        if isinstance(kind, str) and kind in BaseJudge.kinds():
             return cls.model_validate(payload)
         if isinstance(kind, str) and kind in BaseSOM.kinds():
-            return SOMJudge(model=BaseSOM.model_validate(payload))
+            return cls._som_judge_from_provider_dict(payload)
         if isinstance(kind, str) and kind in BaseGenerator.kinds():
             return LLMChatJudge(generator=BaseGenerator.model_validate(payload))
         if "kind" in payload:
             raise ValueError(f"Kind {kind!r} is not registered for class {cls}")
 
-        if "generator" in payload:
+        if payload.get("generator") is not None:
             payload["kind"] = "llm"
         elif "model" in payload:
             payload["kind"] = "som"
         else:
             payload["kind"] = "llm"
+        if payload.get("generator") is None:
+            payload.pop("generator", None)
         return cls.model_validate(payload)
+
+    @classmethod
+    def _som_judge_from_provider_dict(cls, payload: dict[str, Any]) -> "SOMJudge":
+        """Wrap a top-level SOM provider dump, peeling SOMJudge-only fields."""
+        som_fields = {"pass_threshold", "timeout"}
+        som_payload = {
+            key: value for key, value in payload.items() if key not in som_fields
+        }
+        extras = {key: payload[key] for key in som_fields if key in payload}
+        return SOMJudge(model=BaseSOM.model_validate(som_payload), **extras)
 
     async def judge(
         self,
@@ -233,13 +266,28 @@ class BaseJudge(Discriminated):
         raise NotImplementedError
 
 
-# Field annotation that accepts strings / generators / SOMs via ``parse``.
+# Loose values accepted by ``BaseJudge.parse`` (and ``set_default_judge``).
+type JudgeInput = BaseJudge | BaseGenerator | BaseSOM | str | dict[str, Any]
+# Field annotation: static type is ``BaseJudge | None``; runtime accepts JudgeInput.
 OptionalJudgeInput = Annotated[BaseJudge | None, BeforeValidator(_coerce_judge)]
 
 
 @BaseJudge.register("llm")
 class LLMChatJudge(BaseJudge):
-    """Judge by rendering the check prompt and calling an LLM generator."""
+    """Judge by rendering the check prompt and calling an LLM generator.
+
+    Attributes
+    ----------
+    generator : BaseGenerator or None
+        Generator used for evaluation. When ``None``, the global default
+        generator is resolved at call time via :func:`get_default_generator`.
+
+    Examples
+    --------
+    >>> from giskard.agents import Generator
+    >>> from giskard.checks import LLMChatJudge
+    >>> judge = LLMChatJudge(generator=Generator(model="openai/gpt-4o-mini"))
+    """
 
     generator: BaseGenerator | None = Field(
         default=None,
@@ -344,7 +392,17 @@ class SOMJudge(BaseJudge):
         elif isinstance(prompt, ChatMessage):
             messages = [prompt]
         else:
-            messages = question_messages
+            # Fail closed: empty evidence must not score as a pass, and the
+            # rubric must not be reused as conversation context.
+            return LLMCheckResult(
+                passed=False,
+                reason=(
+                    "SOM judge received empty evidence after rendering the "
+                    "prompt. Dual-use templates should gate evidence with "
+                    "`{% if include_evidence | default(true) %}` and supply "
+                    "trace/answer inputs."
+                ),
+            )
 
         prediction = await self.model.predict(
             messages, question=question, timeout=self.timeout

@@ -25,9 +25,9 @@ class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
     ----------
     rule : str
         The rule statement to evaluate against the trace (literal text).
-
-    generator : BaseGenerator | None
-        Legacy alias migrated to ``judge`` (inherited from BaseLLMCheck).
+    judge : BaseJudge or None
+        Judge backend (inherited from BaseLLMCheck). Legacy ``generator=`` is
+        migrated to ``judge`` automatically.
 
     Examples
     --------

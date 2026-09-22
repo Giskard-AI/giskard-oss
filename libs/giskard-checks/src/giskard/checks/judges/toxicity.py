@@ -56,8 +56,9 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         categories: ``hate_speech``, ``harassment``, ``threats``, ``self_harm``,
         ``sexual_content``, ``violence``. Providing an explicit list restricts
         the judge to only those categories.
-    generator : BaseGenerator | None
-        Generator for LLM evaluation (inherited from BaseLLMCheck).
+    judge : BaseJudge or None
+        Judge backend (inherited from BaseLLMCheck). Legacy ``generator=`` is
+        migrated to ``judge`` automatically.
 
     Examples
     --------
@@ -73,10 +74,11 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     Check only for hate speech and harassment:
 
     >>> from giskard.agents import Generator
+    >>> from giskard.checks import LLMChatJudge
     >>> check = Toxicity(
     ...     output="This is a safe response.",
     ...     categories=["hate_speech", "harassment"],
-    ...     generator=Generator(model="openai/gpt-4o"),
+    ...     judge=LLMChatJudge(generator=Generator(model="openai/gpt-4o")),
     ... )
     """
 

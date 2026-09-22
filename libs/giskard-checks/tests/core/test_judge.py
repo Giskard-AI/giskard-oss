@@ -26,6 +26,7 @@ from giskard.llm.types import (
     ChatMessage,
     Choice,
     CompletionResponse,
+    UserMessage,
 )
 from pydantic import PrivateAttr
 
@@ -75,17 +76,30 @@ def test_judge_kinds():
 
 
 @pytest.mark.parametrize(
-    ("value", "expected_kind"),
+    ("value", "expected_kind", "expected_model"),
     [
-        ("openai/gpt-4o-mini", "llm"),
-        ("llm/openai/gpt-4o-mini", "llm"),
-        ("typesafe/jev", "som"),
-        ("som/typesafe/jev", "som"),
+        ("openai/gpt-4o-mini", "llm", "openai/gpt-4o-mini"),
+        ("llm/openai/gpt-4o-mini", "llm", "openai/gpt-4o-mini"),
+        ("typesafe/jev", "som", "jev-latest"),
+        ("som/typesafe/jev", "som", "jev-latest"),
     ],
 )
-def test_string_inference(value: str, expected_kind: str):
+def test_string_inference(value: str, expected_kind: str, expected_model: str):
     judge = BaseJudge.parse(value)
     assert judge.kind == expected_kind
+    if expected_kind == "llm":
+        assert isinstance(judge, LLMChatJudge)
+        assert isinstance(judge.generator, Generator)
+        assert judge.generator.model == expected_model
+    else:
+        assert isinstance(judge, SOMJudge)
+        assert judge.model.model == expected_model
+
+
+@pytest.mark.parametrize("value", ["", "   "])
+def test_empty_string_parse_is_rejected(value: str):
+    with pytest.raises(ValueError, match="non-empty string"):
+        BaseJudge.parse(value)
 
 
 def test_dict_without_kind_infers_llm_from_generator():
@@ -95,6 +109,43 @@ def test_dict_without_kind_infers_llm_from_generator():
     assert isinstance(judge, LLMChatJudge)
     assert isinstance(judge.generator, Generator)
     assert judge.generator.model == "openai/gpt-4o-mini"
+
+
+def test_dict_with_null_generator_and_model_infers_som():
+    judge = BaseJudge.parse(
+        {"generator": None, "model": {"kind": "typesafe", "model": "jev"}}
+    )
+    assert isinstance(judge, SOMJudge)
+    assert judge.model.model == "jev-latest"
+
+
+def test_top_level_som_kind_peels_judge_fields():
+    judge = BaseJudge.parse({"kind": "typesafe", "model": "jev", "pass_threshold": 0.8})
+    assert isinstance(judge, SOMJudge)
+    assert judge.pass_threshold == 0.8
+    assert judge.model.model == "jev-latest"
+
+
+def test_top_level_generator_kind_wraps_llm_judge():
+    judge = BaseJudge.parse({"kind": "giskard_llm", "model": "openai/gpt-4o-mini"})
+    assert isinstance(judge, LLMChatJudge)
+    assert isinstance(judge.generator, Generator)
+    assert judge.generator.model == "openai/gpt-4o-mini"
+
+
+def test_unknown_kind_is_rejected():
+    with pytest.raises(ValueError, match="Kind 'nope'"):
+        BaseJudge.parse({"kind": "nope"})
+
+
+def test_kind_prefix_mismatch_is_rejected():
+    with pytest.raises(ValueError, match="Kind prefix must match"):
+        BaseJudge.parse("llm/typesafe/jev")
+
+
+def test_leaf_parse_rejects_sibling_kind():
+    with pytest.raises(TypeError, match="LLMChatJudge.parse cannot produce SOMJudge"):
+        LLMChatJudge.parse("som/typesafe/jev")
 
 
 def test_round_trip_preserves_kind():
@@ -159,3 +210,32 @@ async def test_som_judge_falls_back_when_prompt_has_no_rubric_gates():
     evidence = messages[0].text or ""
     assert "Thank you!" in evidence
     assert "Evaluate whether the agent was polite" in evidence
+
+
+async def test_som_judge_fails_closed_on_empty_evidence():
+    model = RecordingSOM(model="example-v1", probability=0.99)
+    judge = SOMJudge(model=model)
+    prompt = (
+        "{% if include_rubric | default(true) %}Is the agent polite?{% endif %}"
+        "{% if include_evidence | default(true) %}{% endif %}"
+    )
+
+    verdict = await judge.judge(prompt, {})
+
+    assert isinstance(verdict, LLMCheckResult)
+    assert verdict.passed is False
+    assert "empty evidence" in verdict.reason
+    assert model._calls == []
+
+
+async def test_som_judge_chat_message_prompt_uses_message_as_evidence():
+    model = RecordingSOM(model="example-v1")
+    judge = SOMJudge(model=model)
+    prompt = UserMessage(content="Agent said thank you.")
+
+    verdict = await judge.judge(prompt, {})
+
+    assert verdict.passed is True
+    messages, question = model._calls[0]
+    assert messages == [prompt]
+    assert "should the agent's behavior pass the check" in question
