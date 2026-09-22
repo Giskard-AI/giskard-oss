@@ -43,6 +43,10 @@ Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT 
 -------------------
 
 Remember, the answer passes unless it clearly contradicts the reference context. Omissions and additions are tolerated.
+{% if _instr_output is defined %}
+
+-------------------
 
 **Output Format:**
 {{ _instr_output }}
+{% endif %}

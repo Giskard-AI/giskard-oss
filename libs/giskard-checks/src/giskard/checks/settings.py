@@ -1,22 +1,18 @@
 """Runtime and environment configuration for giskard-checks."""
 
-from typing import Literal
-
 from giskard.agents import (
     BaseEmbeddingModel,
     BaseGenerator,
-    BaseSOM,
     EmbeddingModel,
     Generator,
-    resolve_som,
 )
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from ._som import SOMJudgeGenerator
+from .core.judge import BaseJudge, JudgeInput, LLMChatJudge
 
 _default_generator: BaseGenerator | None = None
-_default_judge: BaseGenerator | None = None
+_default_judge: BaseJudge | None = None
 _default_embedding_model: BaseEmbeddingModel | None = None
 
 DEFAULT_MODEL = "openai/gpt-4o-mini"
@@ -41,6 +37,14 @@ class GiskardChecksSettings(BaseSettings):
     default_model: str = Field(
         default=DEFAULT_MODEL,
         description="Default model for content generation and judges without a separate default.",
+    )
+    default_judge: str | None = Field(
+        default=None,
+        description=(
+            "Default judge identifier or JSON dump. Supports provider/model "
+            "strings (with optional llm/ or som/ kind prefix) or a JSON object. "
+            "When unset, judges fall back to the default LLM generator."
+        ),
     )
     default_embedding_model: str = Field(
         default=DEFAULT_EMBEDDING_MODEL,
@@ -120,37 +124,18 @@ def get_default_generator() -> BaseGenerator:
     return Generator(model=get_settings().default_model)
 
 
-def _create_judge_generator(
-    model: str, model_type: Literal["llm", "som"] | None
-) -> BaseGenerator:
-    som = resolve_som(model)
-    inferred_type = "som" if som is not None else "llm"
-    if model_type not in (None, inferred_type):
-        raise ValueError(
-            "Use model_type='som' with a supported SOM provider, "
-            "or 'llm' with an LLM provider"
-        )
-    return SOMJudgeGenerator(model=som) if som is not None else Generator(model=model)
-
-
 def set_default_judge(
-    judge: BaseGenerator | BaseSOM | str | None,
-    *,
-    model_type: Literal["llm", "som"] | None = None,
+    judge: JudgeInput | None,
 ) -> None:
     """Set the default judge independently of content generation.
 
     Parameters
     ----------
-    judge : BaseGenerator, BaseSOM, str, or None
-        A configured generator, SOM model, or provider/model identifier.
-        SOM models are adapted to pass/fail verdicts. ``None`` clears the
-        runtime override, restoring the default generator.
-    model_type : {"llm", "som"} or None, optional
-        Model type for string identifiers. When omitted, providers supported
-        by giskard.agents.som select a System One Model; other identifiers
-        select an LLM. Explicit types must match the provider's capability.
-        Configured models and ``None`` must omit this argument.
+    judge : JudgeInput or None
+        A configured judge, generator, SOM model, provider/model identifier
+        (optionally prefixed with ``llm/`` or ``som/``), JSON object string, or
+        dict. ``None`` clears the runtime override so the environment default or
+        LLM generator fallback is used.
 
     Examples
     --------
@@ -161,23 +146,28 @@ def set_default_judge(
         set_default_judge("typesafe/jev")
     """
     global _default_judge
-    if isinstance(judge, str):
-        _default_judge = _create_judge_generator(judge, model_type)
+    if judge is None:
+        _default_judge = None
         return
-    if model_type is not None:
-        raise ValueError("model_type is only supported with a model identifier string")
-    if isinstance(judge, BaseSOM):
-        judge = SOMJudgeGenerator(model=judge)
-    if judge is not None and not isinstance(judge, BaseGenerator):
-        raise TypeError(
-            "judge must be a BaseGenerator, BaseSOM, model identifier string, or None"
-        )
-    _default_judge = judge
+    _default_judge = BaseJudge.parse(judge)
 
 
-def get_default_judge() -> BaseGenerator:
-    """Return the configured judge, falling back to the default generator."""
-    return _default_judge if _default_judge is not None else get_default_generator()
+def get_default_judge() -> BaseJudge:
+    """Return the configured judge, falling back to the default LLM generator.
+
+    Resolution order:
+
+    1. Runtime override from :func:`set_default_judge`
+    2. :envvar:`GISKARD_CHECKS_DEFAULT_JUDGE` when set
+    3. An :class:`~giskard.checks.core.judge.LLMChatJudge` that tracks the
+       default generator
+    """
+    if _default_judge is not None:
+        return _default_judge
+    configured = get_settings().default_judge
+    if configured is not None and configured.strip():
+        return BaseJudge.parse(configured)
+    return LLMChatJudge()
 
 
 def set_default_embedding_model(model: BaseEmbeddingModel | str | None) -> None:

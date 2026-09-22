@@ -1,20 +1,19 @@
 from collections.abc import Sequence
-from typing import Literal, override
+from typing import override
 from unittest.mock import MagicMock
 
-import giskard.agents.som as som_module
 import giskard.checks.settings as settings_module
 import pytest
 from giskard.agents import (
     BaseEmbeddingModel,
-    BaseGenerator,
     BaseSOM,
     EmbeddingModel,
     Generator,
     SOMResponse,
 )
 from giskard.checks import (
-    SOMJudgeGenerator,
+    LLMChatJudge,
+    SOMJudge,
     get_default_embedding_model,
     get_default_judge,
     set_default_embedding_model,
@@ -84,7 +83,11 @@ def test_default_judge_falls_back_to_default_generator():
     generator = Generator(model="azure_ai/gpt-5.6-luna")
     set_default_generator(generator)
 
-    assert get_default_judge() is generator
+    judge = get_default_judge()
+
+    assert isinstance(judge, LLMChatJudge)
+    assert judge.generator is None
+    assert judge._generator is generator
 
 
 def test_default_judge_falls_back_to_generator_environment(
@@ -94,43 +97,53 @@ def test_default_judge_falls_back_to_generator_environment(
 
     judge = get_default_judge()
 
-    assert isinstance(judge, Generator)
-    assert judge.model == "google/gemini-3.5-flash"
+    assert isinstance(judge, LLMChatJudge)
+    assert isinstance(judge._generator, Generator)
+    assert judge._generator.model == "google/gemini-3.5-flash"
+
+
+def test_default_judge_uses_environment_override(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_JUDGE", "typesafe/jev")
+
+    judge = get_default_judge()
+
+    assert isinstance(judge, SOMJudge)
+    assert judge.model.model == "jev-latest"
 
 
 def test_set_default_judge_preserves_custom_backend():
-    judge = MagicMock(spec=BaseGenerator)
+    judge = LLMChatJudge(generator=Generator(model="openai/gpt-4o-mini"))
 
     set_default_judge(judge)
 
     assert get_default_judge() is judge
 
 
-@pytest.mark.parametrize("model_type", [None, "llm"])
-def test_set_default_judge_accepts_llm_model_string(
-    model_type: Literal["llm", "som"] | None,
-):
-    set_default_judge("openai/gpt-4o-mini", model_type=model_type)
+@pytest.mark.parametrize("model", ["openai/gpt-4o-mini", "llm/openai/gpt-4o-mini"])
+def test_set_default_judge_accepts_llm_model_string(model: str):
+    set_default_judge(model)
 
     judge = get_default_judge()
 
-    assert isinstance(judge, Generator)
-    assert judge.model == "openai/gpt-4o-mini"
+    assert isinstance(judge, LLMChatJudge)
+    assert isinstance(judge.generator, Generator)
+    assert judge.generator.model == "openai/gpt-4o-mini"
 
 
-@pytest.mark.parametrize("model_type", [None, "som"])
 @pytest.mark.parametrize(
     ("model", "native_model"),
-    [("typesafe/jev", "jev-latest"), ("typesafe/jev-preview", "jev-preview")],
+    [
+        ("typesafe/jev", "jev-latest"),
+        ("typesafe/jev-preview", "jev-preview"),
+        ("som/typesafe/jev", "jev-latest"),
+    ],
 )
-def test_set_default_judge_accepts_typesafe_model_string(
-    model: str, native_model: str, model_type: Literal["llm", "som"] | None
-):
-    set_default_judge(model, model_type=model_type)
+def test_set_default_judge_accepts_typesafe_model_string(model: str, native_model: str):
+    set_default_judge(model)
 
     judge = get_default_judge()
 
-    assert isinstance(judge, SOMJudgeGenerator)
+    assert isinstance(judge, SOMJudge)
     assert judge.model.model == native_model
 
 
@@ -140,27 +153,22 @@ def test_set_default_judge_accepts_custom_som_model():
     set_default_judge(model)
 
     judge = get_default_judge()
-    assert isinstance(judge, SOMJudgeGenerator)
+    assert isinstance(judge, SOMJudge)
     assert judge.model is model
 
 
-@pytest.mark.parametrize("model_type", [None, "som"])
-def test_set_default_judge_resolves_another_registered_som_provider(
-    monkeypatch: pytest.MonkeyPatch, model_type: Literal["llm", "som"] | None
-):
-    monkeypatch.setitem(som_module._PROVIDERS, "example", CustomSOM)
-
-    set_default_judge("example/new-som", model_type=model_type)
+def test_set_default_judge_resolves_another_registered_som_provider():
+    set_default_judge("checks_settings_test_som/new-som")
 
     judge = get_default_judge()
-    assert isinstance(judge, SOMJudgeGenerator)
+    assert isinstance(judge, SOMJudge)
     assert isinstance(judge.model, CustomSOM)
     assert judge.model.model == "new-som"
 
 
 def test_default_judge_and_generator_are_independent():
     generation = Generator(model="azure_ai/gpt-5.6-luna")
-    judge = Generator(model="openai/gpt-4o-mini")
+    judge = LLMChatJudge(generator=Generator(model="openai/gpt-4o-mini"))
     set_default_generator(generation)
     set_default_judge(judge)
 
@@ -181,42 +189,30 @@ def test_reset_default_judge_restores_generator_fallback():
 
     set_default_judge(None)
 
-    assert get_default_judge() is generator
+    judge = get_default_judge()
+    assert isinstance(judge, LLMChatJudge)
+    assert judge._generator is generator
 
 
 @pytest.mark.parametrize(
-    ("model", "model_type", "message"),
+    ("model", "message"),
     [
-        ("typesafe/jev", "llm", "Use model_type="),
-        ("openai/gpt-4o-mini", "som", "Use model_type="),
-        ("jev", "som", "Use model_type="),
-        ("typesafe/", "som", "Specify a SOM model as 'provider/model'"),
-        ("openai/gpt-4o-mini", "unknown", "Use model_type="),
+        ("llm/typesafe/jev", "Kind prefix must match"),
+        ("som/openai/gpt-4o-mini", "Kind prefix must match"),
+        ("som/jev", "Kind prefix must match"),
+        ("typesafe/", "Specify a SOM model as 'provider/model'"),
     ],
 )
 def test_invalid_judge_configuration_preserves_current_default(
-    model: str, model_type: Literal["llm", "som"], message: str
+    model: str, message: str
 ):
-    original = Generator(model="openai/gpt-4o-mini")
+    original = LLMChatJudge(generator=Generator(model="openai/gpt-4o-mini"))
     set_default_judge(original)
 
     with pytest.raises(ValueError, match=message):
-        set_default_judge(model, model_type=model_type)
+        set_default_judge(model)
 
     assert get_default_judge() is original
-
-
-@pytest.mark.parametrize(
-    "judge",
-    [None, Generator(model="openai/gpt-4o-mini"), CustomSOM(model="example-v1")],
-)
-def test_set_default_judge_rejects_model_type_without_model_string(
-    judge: BaseGenerator | BaseSOM | None,
-):
-    with pytest.raises(
-        ValueError, match="only supported with a model identifier string"
-    ):
-        set_default_judge(judge, model_type="llm")
 
 
 def test_default_embedding_model_uses_settings(monkeypatch: pytest.MonkeyPatch):
@@ -291,7 +287,7 @@ def test_reset_default_embedding_model_restores_builtin_default():
 
 def test_default_embedding_is_independent_of_generator_and_judge():
     generator = Generator(model="azure_ai/gpt-5.6-luna")
-    judge = Generator(model="openai/gpt-4o-mini")
+    judge = LLMChatJudge(generator=Generator(model="openai/gpt-4o-mini"))
     embedding = MagicMock(spec=BaseEmbeddingModel)
     set_default_generator(generator)
     set_default_judge(judge)

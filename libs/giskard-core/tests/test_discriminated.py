@@ -76,6 +76,15 @@ def test_discriminated_missing_kind():
         Animal.model_validate(data)
 
 
+def test_discriminated_kinds():
+    """Registered kind strings are exposed via Discriminated.kinds()."""
+    assert Animal.kinds() == frozenset({"tigger", "cat", "dog"})
+    # Intermediate and concrete classes resolve to the same base registry.
+    assert Pet.kinds() == Animal.kinds()
+    assert Cat.kinds() == Animal.kinds()
+    assert "elephant" not in Animal.kinds()
+
+
 T = TypeVar("T")
 
 

@@ -1,4 +1,4 @@
-from typing import override
+from typing import Any, override
 
 from giskard.agents import TemplateReference
 from pydantic import Field
@@ -39,16 +39,18 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         (default: "trace.last.metadata.context").
 
         Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
-    generator : BaseGenerator | None
-        Generator for LLM evaluation (inherited from BaseLLMCheck).
+    judge : BaseJudge or None
+        Judge backend (inherited from BaseLLMCheck). Legacy ``generator=`` is
+        migrated to ``judge`` automatically.
 
     Examples
     --------
     >>> from giskard.agents import Generator
+    >>> from giskard.checks import LLMChatJudge
     >>> check = Groundedness(
     ...     answer="The Eiffel Tower is in Paris.",
     ...     context=["Paris is the capital of France.", "It's located in Europe."],
-    ...     generator=Generator(model="openai/gpt-4o")
+    ...     judge=LLMChatJudge(generator=Generator(model="openai/gpt-4o")),
     ... )
     """
 
@@ -85,7 +87,7 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         return await super().run(trace)
 
     @override
-    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
+    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
         """Build template variables from resolved inputs.
 
         Parameters
@@ -95,8 +97,9 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
 
         Returns
         -------
-        dict[str, str]
-            Template variables with 'answer' and 'context' keys.
+        dict[str, Any]
+            Template variables with ``answer``, ``context``, and ``trace``
+            (``trace`` is the shared SOM conversation input).
         """
         return {
             "answer": format_prompt_text(
@@ -113,4 +116,5 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
                     value=self.context,
                 )
             ),
+            "trace": trace,
         }

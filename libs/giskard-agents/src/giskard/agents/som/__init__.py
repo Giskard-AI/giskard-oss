@@ -3,8 +3,6 @@
 from .base import BaseSOM, SOMResponse
 from .typesafe import TypeSafeSOM
 
-_PROVIDERS: dict[str, type[BaseSOM]] = {"typesafe": TypeSafeSOM}
-
 
 def resolve_som(model: str) -> BaseSOM | None:
     """Resolve a supported ``provider/model`` name, or return ``None``.
@@ -13,12 +11,11 @@ def resolve_som(model: str) -> BaseSOM | None:
     routing. A supported provider with a missing model raises ``ValueError``.
     """
     provider, _, name = model.partition("/")
-    model_class = _PROVIDERS.get(provider)
-    if model_class is None:
+    if provider not in BaseSOM.kinds():
         return None
     if not name.strip():
         raise ValueError("Specify a SOM model as 'provider/model'.")
-    return model_class(model=name)
+    return BaseSOM.model_validate({"kind": provider, "model": name})
 
 
 __all__ = [
