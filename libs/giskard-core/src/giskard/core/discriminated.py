@@ -126,6 +126,25 @@ class Discriminated(BaseModel):
         return data
 
     @classmethod
+    def kinds(cls) -> frozenset[str]:
+        """Return the kind strings registered for this discriminated family.
+
+        Resolves to the ``@discriminated_base`` ancestor so calling
+        ``kinds()`` on an intermediate or concrete subclass returns the same
+        set as on the base.
+
+        Returns
+        -------
+        frozenset[str]
+            Registered discriminator values. Empty if ``cls`` is not part of
+            a discriminated registry.
+        """
+        base_cls = _REGISTRY._get_base_cls(cls)
+        if base_cls is None:
+            return frozenset()
+        return frozenset(_REGISTRY._subclasses.get(base_cls, {}))
+
+    @classmethod
     def register(cls, kind: str) -> Callable[[type[T]], type[T]]:
         def decorator(subclass: type[T]) -> type[T]:
             _REGISTRY.register_subclass(cls, subclass, kind)
