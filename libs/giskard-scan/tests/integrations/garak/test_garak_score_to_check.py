@@ -34,30 +34,31 @@ def test_none_score_skips(detector: Any) -> None:
 
 def test_nan_score_skips_instead_of_passing(detector: Any) -> None:
     # Regression test for #2840: NaN fails every comparison, so without the
-    # non-finite guard it fell through to a PASS.
+    # invalid-score guard it fell through to a PASS.
     result = _score_to_check("fake.Detector", math.nan, detector)
     assert result.skipped
     assert not result.passed
-    assert "non-finite" in (result.message or "")
+    assert "invalid" in (result.message or "")
 
 
-@pytest.mark.parametrize("score", [math.inf, -math.inf])
-def test_infinite_scores_skip(score: float, detector: Any) -> None:
+@pytest.mark.parametrize("score", [math.inf, -math.inf, -1.0, 2.0])
+def test_invalid_scores_skip(score: float, detector: Any) -> None:
     # Same indeterminate class as NaN: out-of-contract scores carry no valid
-    # result. (-inf previously graded PASS, +inf graded FAIL, both silently.)
+    # result. (-inf previously graded PASS, +inf graded FAIL, -1.0 graded
+    # PASS, 2.0 graded FAIL — all silently.)
     result = _score_to_check("fake.Detector", score, detector)
     assert result.skipped
     assert not result.passed
     assert not result.failed
 
 
-def test_nan_score_logs_warning(
+def test_invalid_score_logs_warning(
     detector: Any, caplog: pytest.LogCaptureFixture
 ) -> None:
     with caplog.at_level(logging.WARNING, logger=_adapter.logger.name):
         _score_to_check("fake.Detector", math.nan, detector)
     assert any(
-        "fake.Detector" in record.getMessage() and "non-finite" in record.getMessage()
+        "fake.Detector" in record.getMessage() and "invalid" in record.getMessage()
         for record in caplog.records
     )
 

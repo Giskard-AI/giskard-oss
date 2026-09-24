@@ -382,23 +382,25 @@ def _score_to_check(
     """Map one detector score for one conversation onto a CheckResult.
 
     ``None`` means the detector produced no score at all; a non-finite score
-    (NaN, +/-inf) likewise carries no valid result — NaN fails every comparison,
-    so without the guard below it would silently grade as PASS. Both are
-    skipped rather than passed or failed: a missing score is evidence of neither
-    a hit nor a clean run, and grading it as a failure would manufacture false
-    positives.
+    (NaN, +/-inf) or a finite score outside garak's [0, 1] score contract
+    likewise carries no valid result — NaN fails every comparison, so without
+    the guard below it would silently grade as PASS, and out-of-range scores
+    like -1.0 or 2.0 would silently grade as PASS / hit respectively. All are
+    skipped rather than passed or failed: an invalid score is evidence of
+    neither a hit nor a clean run, and grading it as a failure would
+    manufacture false positives.
     """
     details = _detector_details(detector_label)
     if score is None:
         return CheckResult.skip(message="detector returned no score", details=details)
-    if not math.isfinite(score):
+    if not math.isfinite(score) or not 0.0 <= score <= 1.0:
         logger.warning(
-            "Detector %s returned non-finite score %r; skipping check",
+            "Detector %s returned invalid score %r; skipping check",
             detector_label,
             score,
         )
         return CheckResult.skip(
-            message="detector returned a non-finite score", details=details
+            message="detector returned an invalid score", details=details
         )
 
     metrics = [Metric(name=detector_label, value=score)]
