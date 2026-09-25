@@ -670,6 +670,17 @@ class SuiteResult(BaseResult, frozen=True):
 
         return to_junit_xml(self, path=path)
 
+    def to_sarif(self, path: str | Path | None = None) -> str:
+        """Convert the suite result into a SARIF 2.1.0 JSON document.
+
+        The returned string can be uploaded to GitHub code scanning via the
+        ``github/codeql-action/upload-sarif`` action. Only failing and
+        erroring checks become SARIF results.
+        """
+        from ..export.sarif import to_sarif
+
+        return to_sarif(self, path=path)
+
     def to_hub_format(self) -> dict[str, Any]:
         """Convert the suite result into a JSON-serializable Giskard Hub payload.
 
