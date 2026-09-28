@@ -86,6 +86,7 @@ def test_explicit_judge_generator_is_preserved():
     set_default_judge("typesafe/jev")
 
     assert isinstance(check.judge, LLMChatJudge)
+    assert check.generator is explicit
     assert isinstance(check._judge, LLMChatJudge)
     assert check.judge.generator is explicit
     assert check._judge.generator is explicit
@@ -131,7 +132,7 @@ def test_post_init_generator_assignment_remigrates_to_judge():
 
     check.generator = explicit
 
-    assert check.generator is None
+    assert check.generator is explicit
     assert isinstance(check.judge, LLMChatJudge)
     assert check.judge.generator is explicit
     assert check._judge is check.judge
@@ -143,19 +144,45 @@ def test_model_copy_generator_remigrates_to_judge():
 
     copied = check.model_copy(update={"generator": explicit})
 
-    assert copied.generator is None
+    assert copied.generator is explicit
     assert isinstance(copied.judge, LLMChatJudge)
     assert copied.judge.generator is explicit
     assert copied._judge is copied.judge
 
 
-def test_model_copy_generator_rejected_when_judge_already_set():
+def test_model_copy_generator_replaces_existing_judge():
     check = LLMJudge(
         prompt="Evaluate the answer.",
         judge=BaseJudge.parse("typesafe/jev"),
     )
+
+    explicit = Generator(model="openai/gpt-4o-mini")
+    copied = check.model_copy(update={"generator": explicit})
+
+    assert copied.generator is explicit
+    assert isinstance(copied.judge, LLMChatJudge)
+    assert copied.judge.generator is explicit
+
+
+def test_model_copy_parses_loose_judge_update():
+    copied = LLMJudge(prompt="Evaluate the answer.").model_copy(
+        update={"judge": "typesafe/jev"}
+    )
+
+    assert isinstance(copied.judge, BaseJudge)
+    assert copied.judge.kind == "som"
+
+
+def test_model_copy_rejects_explicit_generator_and_judge():
+    check = LLMJudge(prompt="Evaluate the answer.")
+
     with pytest.raises(ValueError, match="both 'generator' and 'judge'"):
-        check.model_copy(update={"generator": Generator(model="openai/gpt-4o-mini")})
+        check.model_copy(
+            update={
+                "generator": Generator(model="openai/gpt-4o-mini"),
+                "judge": "typesafe/jev",
+            }
+        )
 
 
 def test_embedding_reflects_global_change_after_instantiation():

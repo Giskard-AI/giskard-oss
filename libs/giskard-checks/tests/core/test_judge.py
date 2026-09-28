@@ -224,6 +224,21 @@ async def test_som_judge_fails_closed_without_trace():
     assert model._calls == []
 
 
+async def test_som_judge_fails_closed_with_empty_trace():
+    model = RecordingSOM(model="example-v1", probability=0.99)
+    judge = SOMJudge(model=model)
+
+    verdict = await judge.judge(
+        "Is the agent polite?",
+        {"trace": Trace()},
+    )
+
+    assert isinstance(verdict, LLMCheckResult)
+    assert verdict.passed is False
+    assert "empty trace" in verdict.reason
+    assert model._calls == []
+
+
 async def test_som_judge_custom_prompt_still_uses_trace_as_messages():
     model = RecordingSOM(model="example-v1")
     judge = SOMJudge(model=model)

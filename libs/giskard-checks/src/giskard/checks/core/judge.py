@@ -18,6 +18,7 @@ from giskard.llm.types import ChatMessage, UserMessage
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from .._judge_result import LLMCheckResult
+from .interaction.trace import Trace
 
 _DEFAULT_SOM_QUESTION = (
     "Using the rubric and evidence in the evaluation prompt, "
@@ -105,6 +106,9 @@ async def _som_question_from_prompt(
 
 def _som_messages_from_trace(trace: Any) -> list[ChatMessage]:
     """Fence ``trace`` as the shared SOM conversation state (batch input)."""
+    if isinstance(trace, Trace) and not trace.interactions:
+        return []
+
     text = (
         MessageTemplate(role="user", content_template="{{ trace | fence }}")
         .render(trace=trace)

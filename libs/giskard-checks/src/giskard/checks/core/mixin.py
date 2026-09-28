@@ -27,9 +27,9 @@ class WithGeneratorMixin(BaseModel):
 class WithJudgeMixin(BaseModel):
     """Attach a :class:`~giskard.checks.core.judge.BaseJudge` to a check.
 
-    ``generator`` remains accepted as a legacy constructor/dump alias and is
-    rewritten to ``judge`` before field validation. It is excluded from
-    serialization so persisted checks store ``judge`` only. Assignment and
+    ``generator`` remains accepted as a legacy constructor alias and readable
+    compatibility property. It is rewritten to ``judge`` before validation,
+    while persisted checks store ``judge`` only. Assignment and
     ``model_copy(update={"generator": ...})`` also remigrate so ``_judge``
     never silently falls back to the default while a live generator is set.
     """
@@ -66,18 +66,14 @@ class WithJudgeMixin(BaseModel):
         return migrated
 
     @model_validator(mode="after")
-    def _consume_legacy_generator_field(self) -> Self:
+    def _synchronize_legacy_generator_field(self) -> Self:
         # validate_assignment re-applies the assigned ``generator`` after the
         # before-validator remaps it onto ``judge``, and may leave ``judge`` as
         # a raw ``BaseGenerator`` without running OptionalJudgeInput coercion.
-        if self.generator is None:
-            return self
-        if isinstance(self.judge, BaseJudge):
-            object.__setattr__(self, "generator", None)
-            return self
-        raw = self.judge if self.judge is not None else self.generator
-        object.__setattr__(self, "judge", BaseJudge.parse(raw))
-        object.__setattr__(self, "generator", None)
+        if self.generator is not None and not isinstance(self.judge, BaseJudge):
+            raw = self.judge if self.judge is not None else self.generator
+            object.__setattr__(self, "judge", BaseJudge.parse(raw))
+        object.__setattr__(self, "generator", getattr(self.judge, "generator", None))
         return self
 
     def model_copy(
@@ -88,11 +84,17 @@ class WithJudgeMixin(BaseModel):
     ) -> Self:
         # model_copy does not re-run validators; remigrate generator→judge here.
         patch: dict[str, Any] | None = dict(update) if update is not None else None
-        if patch is not None and patch.get("generator") is not None:
-            resulting_judge = patch["judge"] if "judge" in patch else self.judge
-            if resulting_judge is not None:
+        if patch is not None:
+            if patch.get("generator") is not None and patch.get("judge") is not None:
                 raise ValueError("Cannot provide both 'generator' and 'judge'")
-            patch["judge"] = BaseJudge.parse(patch.pop("generator"))
+            if patch.get("generator") is not None:
+                patch["judge"] = patch.pop("generator")
+            else:
+                patch.pop("generator", None)
+            if patch.get("judge") is not None:
+                patch["judge"] = BaseJudge.parse(patch["judge"])
+            if "judge" in patch:
+                patch["generator"] = getattr(patch["judge"], "generator", None)
         return super().model_copy(update=patch, deep=deep)
 
     @property
