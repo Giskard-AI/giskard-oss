@@ -320,10 +320,19 @@ class AnthropicChatTranslator:
     @staticmethod
     def block_content_to_giskard(
         block: "ContentBlock",
-    ) -> CompletionContent | ToolCall:
+    ) -> CompletionContent | ToolCall | None:
+        """Map one Anthropic content block to Giskard content or a tool call.
+
+        ``thinking`` / ``redacted_thinking`` and other non-text blocks have no
+        Giskard equivalent. They are dropped (debug log) instead of raising so
+        a successful Messages API call is not discarded. Claude 5+ models emit
+        thinking blocks by default even when the client omits ``thinking``.
+        Thinking text is never mapped as ``TextContent`` so evals see only the
+        visible answer.
+        """
         if block.type == "text":
             return TextContent(text=block.text)
-        elif block.type == "tool_use":
+        if block.type == "tool_use":
             return ToolCall(
                 id=block.id,
                 type="function",
@@ -332,16 +341,21 @@ class AnthropicChatTranslator:
                     arguments=deserialize_arguments(block.input),
                 ),
             )
-        else:
-            raise ValueError(f"Unsupported content block type: {block.type}")
+        logger.debug(
+            "%s provider: dropping unsupported content block type: %s",
+            _PROVIDER_NAME,
+            block.type,
+        )
+        return None
 
     @staticmethod
     def blocks_to_giskard(
         blocks: "Sequence[ContentBlock]",
     ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
-        content_and_tool_calls = [
+        mapped_blocks = [
             AnthropicChatTranslator.block_content_to_giskard(block) for block in blocks
         ]
+        content_and_tool_calls = [item for item in mapped_blocks if item is not None]
         content = [
             content
             for content in content_and_tool_calls
