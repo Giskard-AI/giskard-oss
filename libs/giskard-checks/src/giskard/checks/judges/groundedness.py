@@ -1,4 +1,4 @@
-from typing import override
+from typing import Any, override
 
 from giskard.agents import TemplateReference
 from pydantic import Field
@@ -9,7 +9,7 @@ from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
 from ..core.result import CheckResult
 from ._inputs import error_if_unresolved_answer_or_context
-from .base import BaseLLMCheck, format_prompt_text
+from .base import BaseLLMCheck, format_prompt_text, trace_with_current_turn
 
 
 @Check.register("groundedness")
@@ -39,16 +39,18 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         (default: "trace.last.metadata.context").
 
         Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath expressions.
-    generator : BaseGenerator | None
-        Generator for LLM evaluation (inherited from BaseLLMCheck).
+    judge : BaseJudge or None
+        Judge backend (inherited from BaseLLMCheck). Legacy ``generator=`` is
+        migrated to ``judge`` automatically.
 
     Examples
     --------
     >>> from giskard.agents import Generator
+    >>> from giskard.checks import LLMChatJudge
     >>> check = Groundedness(
     ...     answer="The Eiffel Tower is in Paris.",
     ...     context=["Paris is the capital of France.", "It's located in Europe."],
-    ...     generator=Generator(model="openai/gpt-4o")
+    ...     judge=LLMChatJudge(generator=Generator(model="openai/gpt-4o")),
     ... )
     """
 
@@ -85,7 +87,7 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         return await super().run(trace)
 
     @override
-    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, str]:
+    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
         """Build template variables from resolved inputs.
 
         Parameters
@@ -95,22 +97,26 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
 
         Returns
         -------
-        dict[str, str]
-            Template variables with 'answer' and 'context' keys.
+        dict[str, Any]
+            Template variables with ``answer``, ``context``, and ``trace``
+            (``trace`` is the shared SOM conversation input).
         """
+        answer = format_prompt_text(
+            provided_or_resolve(trace, key=self.target_key, value=self.answer)
+        )
+        context = format_prompt_text(
+            provided_or_resolve(trace, key=self.context_key, value=self.context)
+        )
         return {
-            "answer": format_prompt_text(
-                provided_or_resolve(
-                    trace,
-                    key=self.target_key,
-                    value=self.answer,
-                )
-            ),
-            "context": format_prompt_text(
-                provided_or_resolve(
-                    trace,
-                    key=self.context_key,
-                    value=self.context,
-                )
-            ),
+            "answer": answer,
+            "context": context,
+            "trace": trace,
         }
+
+    @override
+    def get_som_trace(
+        self, trace: TraceType, inputs: dict[str, Any]
+    ) -> Trace[Any, Any]:
+        return trace_with_current_turn(
+            trace, inputs=inputs["context"], outputs=inputs["answer"]
+        )

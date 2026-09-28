@@ -265,9 +265,7 @@ def test_model_configuration_requires_model_and_rejects_unknown_fields():
         TypeSafeSOM.model_validate({"model": "jev", "model_name": "other"})
 
 
-async def test_another_provider_uses_the_same_interface(monkeypatch):
-    from giskard.agents.som import _PROVIDERS
-
+async def test_another_provider_uses_the_same_interface():
     @BaseSOM.register("test_som_provider")
     class OtherSOM(BaseSOM):
         @override
@@ -280,8 +278,7 @@ async def test_another_provider_uses_the_same_interface(monkeypatch):
         ) -> SOMResponse:
             return SOMResponse(probability=0.75, model=self.model)
 
-    monkeypatch.setitem(_PROVIDERS, "other", OtherSOM)
-    provider = resolve_som("other/a-model")
+    provider = resolve_som("test_som_provider/a-model")
     assert isinstance(provider, OtherSOM)
     restored = BaseSOM.model_validate_json(provider.model_dump_json())
 
