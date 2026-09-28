@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
@@ -8,6 +9,11 @@ from xml.etree import ElementTree as ET
 from rich.console import Console
 
 from ..core.result import CheckResult, ScenarioResult, SuiteResult
+
+# Characters XML 1.0 does not allow, even escaped (e.g. ANSI escape codes in
+# model output). Left in place they make the whole report unparseable, so they
+# are replaced with a visible "#xNN" marker.
+_ILLEGAL_XML_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
 
 
 def _seconds(duration_ms: int) -> str:
@@ -160,6 +166,18 @@ def _append_status_node(testcase_el: ET.Element, scenario: ScenarioResult[Any]) 
         node.text = _build_detail_text(scenario, matches)
 
 
+def _escape_illegal_xml_chars(value: str) -> str:
+    return _ILLEGAL_XML_CHARS.sub(lambda m: f"#x{ord(m.group()):02X}", value)
+
+
+def _sanitize_tree(root: ET.Element) -> None:
+    for element in root.iter():
+        if element.text:
+            element.text = _escape_illegal_xml_chars(element.text)
+        for name, value in list(element.attrib.items()):
+            element.set(name, _escape_illegal_xml_chars(value))
+
+
 def _render_scenario_report(scenario: ScenarioResult[Any]) -> str:
     buffer = StringIO()
     console = Console(
@@ -215,6 +233,7 @@ def to_junit_xml(result: SuiteResult, path: str | Path | None = None) -> str:
         _append_status_node(testcase_el, scenario)
         _append_system_out(testcase_el, scenario)
 
+    _sanitize_tree(root)
     tree = ET.ElementTree(root)
     ET.indent(tree, space="  ")
 

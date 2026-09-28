@@ -244,3 +244,40 @@ def test_failed_scenario_with_mixed_check_statuses_is_still_a_failure() -> None:
     assert system_out.text.strip() != ""
     assert "final_trace=" not in system_out.text
     assert "step_1=" not in system_out.text
+
+
+def test_to_junit_xml_escapes_characters_illegal_in_xml(tmp_path: Path) -> None:
+    from giskard.checks import TestCaseResult
+
+    suite_result = SuiteResult(
+        results=[
+            ScenarioResult(
+                scenario_name="scenario_ansi",
+                steps=[
+                    TestCaseResult(
+                        results=[
+                            CheckResult(
+                                status=CheckStatus.FAIL,
+                                message="got \x1b[31mred\x1b[0m",
+                                details={"check_name": "CheckA"},
+                            ),
+                        ],
+                        duration_ms=50,
+                    )
+                ],
+                duration_ms=50,
+                final_trace=Trace(),
+            )
+        ],
+        duration_ms=50,
+        suite=Suite(name="test"),
+    )
+    output_path = tmp_path / "test-results.xml"
+
+    root = ET.fromstring(to_junit_xml(suite_result, path=output_path))
+    ET.parse(output_path)
+
+    failure = root.find("testcase/failure")
+    assert failure is not None
+    assert failure.attrib["message"] == "got #x1B[31mred#x1B[0m"
+    assert "#x1B[31mred" in (failure.text or "")
