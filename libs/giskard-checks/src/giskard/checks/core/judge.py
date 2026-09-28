@@ -102,7 +102,9 @@ async def _som_question_from_prompt(
     Future batching can call this once per check while sharing the same
     :func:`_som_messages_from_trace` input across questions.
     """
-    if isinstance(prompt, ChatMessage):
+    # Without a separate trace, the rendered message serves as the evidence.
+    # With a trace, its text is the check's rubric and must remain the question.
+    if isinstance(prompt, ChatMessage) and "trace" not in inputs:
         return _DEFAULT_SOM_QUESTION
     question = _messages_text(await _render_prompt(prompt, inputs, include_trace=False))
     return question or _DEFAULT_SOM_QUESTION

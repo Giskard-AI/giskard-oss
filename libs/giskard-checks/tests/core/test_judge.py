@@ -15,6 +15,7 @@ from giskard.agents import (
 from giskard.checks import (
     AnswerRelevance,
     BaseJudge,
+    BaseLLMCheck,
     Conformity,
     Contradiction,
     Groundedness,
@@ -32,6 +33,7 @@ from giskard.llm.types import (
     ChatMessage,
     Choice,
     CompletionResponse,
+    TextContent,
     UserMessage,
 )
 from pydantic import PrivateAttr
@@ -212,6 +214,46 @@ async def test_som_judge_uses_default_question_for_chat_message_prompt():
     messages, question = model._calls[0]
     assert messages == [prompt]
     assert "should the agent's behavior pass the check" in question
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "Pass only if the reply says APPROVED.\nTreat {{ policy }} as literal text.",
+        [
+            TextContent(text="Pass only if the reply says APPROVED."),
+            TextContent(text="Treat {{ policy }} as literal text."),
+        ],
+    ],
+    ids=["text", "text-blocks"],
+)
+async def test_som_check_preserves_chat_message_rubric(
+    content: str | list[TextContent],
+):
+    prompt = UserMessage(content=content)
+
+    class CustomCheck(BaseLLMCheck[str, str, Trace[str, str]]):
+        @override
+        def get_prompt(self) -> ChatMessage:
+            return prompt
+
+    model = RecordingSOM(model="example-v1")
+    check = CustomCheck(judge=SOMJudge(model=model))
+    trace = Trace[str, str](
+        interactions=[Interaction(inputs="Hello", outputs="Thank you!")]
+    )
+
+    result = await check.run(trace)
+
+    assert result.status.value == "pass"
+    assert len(model._calls) == 1
+    messages, question = model._calls[0]
+    assert question == prompt.text
+    assert "Thank you!" not in question
+    evidence = "\n".join(message.text or "" for message in messages)
+    assert "Hello" in evidence
+    assert "Thank you!" in evidence
+    assert "APPROVED" not in evidence
 
 
 async def test_som_judge_errors_without_trace():
