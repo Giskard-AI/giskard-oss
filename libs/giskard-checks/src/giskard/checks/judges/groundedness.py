@@ -9,7 +9,7 @@ from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
 from ..core.result import CheckResult
 from ._inputs import error_if_unresolved_answer_or_context
-from .base import BaseLLMCheck, format_prompt_text
+from .base import BaseLLMCheck, format_prompt_text, trace_with_current_turn
 
 
 @Check.register("groundedness")
@@ -101,20 +101,22 @@ class Groundedness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             Template variables with ``answer``, ``context``, and ``trace``
             (``trace`` is the shared SOM conversation input).
         """
+        answer = format_prompt_text(
+            provided_or_resolve(trace, key=self.target_key, value=self.answer)
+        )
+        context = format_prompt_text(
+            provided_or_resolve(trace, key=self.context_key, value=self.context)
+        )
         return {
-            "answer": format_prompt_text(
-                provided_or_resolve(
-                    trace,
-                    key=self.target_key,
-                    value=self.answer,
-                )
-            ),
-            "context": format_prompt_text(
-                provided_or_resolve(
-                    trace,
-                    key=self.context_key,
-                    value=self.context,
-                )
-            ),
+            "answer": answer,
+            "context": context,
             "trace": trace,
         }
+
+    @override
+    def get_som_trace(
+        self, trace: TraceType, inputs: dict[str, Any]
+    ) -> Trace[Any, Any]:
+        return trace_with_current_turn(
+            trace, inputs=inputs["context"], outputs=inputs["answer"]
+        )

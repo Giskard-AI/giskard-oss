@@ -9,7 +9,7 @@ from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
 from ..core.result import CheckResult
 from ._inputs import ResolvableInput, error_if_unresolved
-from .base import BaseLLMCheck
+from .base import BaseLLMCheck, trace_with_current_turn
 
 
 @Check.register("answer_relevance")
@@ -169,3 +169,11 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
             inputs["history"] = trace
 
         return inputs
+
+    @override
+    def get_som_trace(
+        self, trace: TraceType, inputs: dict[str, Any]
+    ) -> Trace[Any, Any]:
+        return trace_with_current_turn(
+            inputs["trace"], inputs=inputs["question"], outputs=inputs["answer"]
+        )

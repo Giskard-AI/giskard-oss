@@ -28,6 +28,10 @@ _DEFAULT_SOM_QUESTION = (
 )
 
 
+class MissingJudgeEvidenceError(ValueError):
+    """Raised when a judge cannot evaluate because required evidence is absent."""
+
+
 async def _render_prompt(
     prompt: str | ChatMessage | MessageTemplate | TemplateReference,
     inputs: dict[str, Any],
@@ -398,23 +402,17 @@ class SOMJudge(BaseJudge):
         if "trace" in inputs:
             messages = _som_messages_from_trace(inputs["trace"])
             if not messages:
-                return LLMCheckResult(
-                    passed=False,
-                    reason=(
-                        "SOM judge received an empty trace after fencing. "
-                        "Pass a non-empty conversation trace in inputs['trace']."
-                    ),
+                raise MissingJudgeEvidenceError(
+                    "SOM judge received an empty trace after fencing. "
+                    "Pass a non-empty conversation trace in inputs['trace']."
                 )
         elif isinstance(prompt, ChatMessage):
             messages = [prompt]
         else:
-            return LLMCheckResult(
-                passed=False,
-                reason=(
-                    "SOM judge requires inputs['trace'] as the shared conversation "
-                    "state. Check get_inputs() should pass the Trace (batching "
-                    "groundwork: one trace, many questions)."
-                ),
+            raise MissingJudgeEvidenceError(
+                "SOM judge requires inputs['trace'] as the shared conversation "
+                "state. Check get_inputs() should pass the Trace (batching "
+                "groundwork: one trace, many questions)."
             )
 
         prediction = await self.model.predict(

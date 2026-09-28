@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import giskard.checks.settings as settings
 import pytest
 from giskard.agents import BaseEmbeddingModel, BaseGenerator, Generator
-from giskard.checks import BaseJudge, LLMChatJudge, LLMGenerator, LLMJudge
+from giskard.checks import BaseJudge, LLMChatJudge, LLMGenerator, LLMJudge, SOMJudge
 from giskard.checks.core.mixin import WithEmbeddingMixin, WithGeneratorMixin
 from giskard.checks.settings import (
     set_default_embedding_model,
@@ -101,6 +101,13 @@ def test_generator_and_judge_together_are_rejected():
         )
 
 
+def test_explicit_none_generator_is_accepted():
+    check = LLMJudge(prompt="Evaluate the answer.", generator=None)
+
+    assert check.generator is None
+    assert check.judge is None
+
+
 def test_legacy_generator_is_excluded_from_dump():
     explicit = Generator(model="openai/gpt-4o-mini")
     check = LLMJudge(prompt="Evaluate the answer.", generator=explicit)
@@ -138,6 +145,68 @@ def test_post_init_generator_assignment_remigrates_to_judge():
     assert check._judge is check.judge
 
 
+def test_judge_assignment_replaces_legacy_generator_judge():
+    check = LLMJudge(
+        prompt="Evaluate the answer.",
+        generator=Generator(model="openai/gpt-4o-mini"),
+    )
+
+    check.judge = BaseJudge.parse("typesafe/jev")
+
+    assert isinstance(check.judge, SOMJudge)
+    assert check.generator is None
+
+
+def test_generator_assignment_replaces_existing_generator():
+    check = LLMJudge(
+        prompt="Evaluate the answer.",
+        generator=Generator(model="openai/gpt-4o-mini"),
+    )
+    replacement = Generator(model="azure_ai/gpt-5.6-luna")
+
+    check.generator = replacement
+
+    assert check.generator is replacement
+    assert isinstance(check.judge, LLMChatJudge)
+    assert check.judge.generator is replacement
+
+
+def test_generator_assignment_replaces_som_judge():
+    check = LLMJudge(
+        prompt="Evaluate the answer.", judge=BaseJudge.parse("typesafe/jev")
+    )
+    replacement = Generator(model="openai/gpt-4o-mini")
+
+    check.generator = replacement
+
+    assert check.generator is replacement
+    assert isinstance(check.judge, LLMChatJudge)
+
+
+def test_clearing_generator_clears_explicit_judge():
+    check = LLMJudge(
+        prompt="Evaluate the answer.",
+        generator=Generator(model="openai/gpt-4o-mini"),
+    )
+
+    check.generator = None
+
+    assert check.generator is None
+    assert check.judge is None
+
+
+def test_clearing_judge_clears_legacy_generator_view():
+    check = LLMJudge(
+        prompt="Evaluate the answer.",
+        generator=Generator(model="openai/gpt-4o-mini"),
+    )
+
+    check.judge = None
+
+    assert check.generator is None
+    assert check.judge is None
+
+
 def test_model_copy_generator_remigrates_to_judge():
     check = LLMJudge(prompt="Evaluate the answer.")
     explicit = Generator(model="openai/gpt-4o-mini")
@@ -164,6 +233,30 @@ def test_model_copy_generator_replaces_existing_judge():
     assert copied.judge.generator is explicit
 
 
+def test_model_copy_generator_none_clears_explicit_judge():
+    check = LLMJudge(
+        prompt="Evaluate the answer.",
+        generator=Generator(model="openai/gpt-4o-mini"),
+    )
+
+    copied = check.model_copy(update={"generator": None})
+
+    assert copied.generator is None
+    assert copied.judge is None
+
+
+def test_model_copy_judge_none_clears_legacy_generator_view():
+    check = LLMJudge(
+        prompt="Evaluate the answer.",
+        generator=Generator(model="openai/gpt-4o-mini"),
+    )
+
+    copied = check.model_copy(update={"judge": None})
+
+    assert copied.generator is None
+    assert copied.judge is None
+
+
 def test_model_copy_parses_loose_judge_update():
     copied = LLMJudge(prompt="Evaluate the answer.").model_copy(
         update={"judge": "typesafe/jev"}
@@ -183,6 +276,13 @@ def test_model_copy_rejects_explicit_generator_and_judge():
                 "judge": "typesafe/jev",
             }
         )
+
+
+def test_model_copy_rejects_generator_none_with_judge():
+    check = LLMJudge(prompt="Evaluate the answer.")
+
+    with pytest.raises(ValueError, match="both 'generator' and 'judge'"):
+        check.model_copy(update={"generator": None, "judge": "typesafe/jev"})
 
 
 def test_embedding_reflects_global_change_after_instantiation():

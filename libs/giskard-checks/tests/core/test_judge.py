@@ -13,13 +13,19 @@ from giskard.agents import (
     TemplateReference,
 )
 from giskard.checks import (
+    AnswerRelevance,
     BaseJudge,
     Conformity,
+    Contradiction,
+    Groundedness,
     Interaction,
     LLMChatJudge,
+    Not,
     SOMJudge,
+    Toxicity,
     Trace,
 )
+from giskard.checks.core.judge import MissingJudgeEvidenceError
 from giskard.checks.judges.base import LLMCheckResult
 from giskard.llm.types import (
     AssistantMessage,
@@ -208,35 +214,61 @@ async def test_som_judge_uses_default_question_for_chat_message_prompt():
     assert "should the agent's behavior pass the check" in question
 
 
-async def test_som_judge_fails_closed_without_trace():
+async def test_som_judge_errors_without_trace():
     model = RecordingSOM(model="example-v1", probability=0.99)
     judge = SOMJudge(model=model)
 
-    verdict = await judge.judge(
-        "{% if include_trace | default(true) %}{{ trace | fence }}{% endif %}"
-        "Is the agent polite?",
-        {},
-    )
-
-    assert isinstance(verdict, LLMCheckResult)
-    assert verdict.passed is False
-    assert "inputs['trace']" in verdict.reason
+    with pytest.raises(MissingJudgeEvidenceError, match=r"inputs\['trace'\]"):
+        await judge.judge(
+            "{% if include_trace | default(true) %}{{ trace | fence }}{% endif %}"
+            "Is the agent polite?",
+            {},
+        )
     assert model._calls == []
 
 
-async def test_som_judge_fails_closed_with_empty_trace():
+async def test_som_judge_errors_with_empty_trace():
     model = RecordingSOM(model="example-v1", probability=0.99)
     judge = SOMJudge(model=model)
 
-    verdict = await judge.judge(
-        "Is the agent polite?",
-        {"trace": Trace()},
-    )
-
-    assert isinstance(verdict, LLMCheckResult)
-    assert verdict.passed is False
-    assert "empty trace" in verdict.reason
+    with pytest.raises(MissingJudgeEvidenceError, match="empty trace"):
+        await judge.judge(
+            "Is the agent polite?",
+            {"trace": Trace()},
+        )
     assert model._calls == []
+
+
+async def test_not_does_not_invert_missing_som_evidence():
+    model = RecordingSOM(model="example-v1", probability=0.99)
+    check = Not(check=Conformity(rule="Be polite", judge=SOMJudge(model=model)))
+
+    result = await check.run(Trace())
+
+    assert result.status.value == "error"
+    assert "empty trace" in (result.message or "")
+    assert model._calls == []
+
+
+@pytest.mark.parametrize(
+    "check",
+    [
+        AnswerRelevance(question="What is Python?", answer="A language."),
+        Contradiction(answer="Paris is in France.", context="Paris is in France."),
+        Groundedness(answer="Paris is in France.", context="Paris is in France."),
+        Toxicity(output="Have a nice day."),
+    ],
+)
+async def test_direct_values_supply_som_evidence(check):
+    model = RecordingSOM(model="example-v1", probability=0.99)
+    check.judge = SOMJudge(model=model)
+
+    result = await check.run(Trace())
+
+    assert result.status.value == "pass"
+    assert len(model._calls) == 1
+    messages, _ = model._calls[0]
+    assert messages
 
 
 async def test_som_judge_custom_prompt_still_uses_trace_as_messages():

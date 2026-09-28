@@ -8,8 +8,9 @@ from giskard.llm.types import ChatMessage
 from pydantic import BaseModel
 
 from .._judge_result import LLMCheckResult as LLMCheckResult
-from ..core import Trace
+from ..core import Interaction, Trace
 from ..core.check import Check
+from ..core.judge import MissingJudgeEvidenceError, SOMJudge
 from ..core.mixin import WithJudgeMixin
 from ..core.result import CheckResult
 
@@ -82,10 +83,16 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         CheckResult
             The result of the check evaluation.
         """
+        judge = self._judge
         inputs = await self.get_inputs(trace)
-        output = await self._judge.judge(
-            self.get_prompt(), inputs, output_type=self.output_type
-        )
+        if isinstance(judge, SOMJudge):
+            inputs["trace"] = self.get_som_trace(trace, inputs)
+        try:
+            output = await judge.judge(
+                self.get_prompt(), inputs, output_type=self.output_type
+            )
+        except MissingJudgeEvidenceError as error:
+            return CheckResult.error(message=str(error), details={"inputs": inputs})
         return await self._handle_output(output, inputs, trace)
 
     async def get_inputs(self, trace: TraceType) -> dict[str, Any]:
@@ -104,6 +111,13 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             to access properties like `trace.interactions` and `trace.last`.
         """
         return {"trace": trace}
+
+    def get_som_trace(
+        self, trace: TraceType, inputs: dict[str, Any]
+    ) -> Trace[Any, Any]:
+        """Return the conversation evidence to send to a SOM judge."""
+        candidate = inputs.get("trace", trace)
+        return candidate if isinstance(candidate, Trace) else trace
 
     async def _handle_output(
         self,
@@ -152,3 +166,12 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         raise NotImplementedError(
             f"Custom output type {type(output_value)} requires overriding _handle_output"
         )
+
+
+def trace_with_current_turn(
+    trace: Trace[Any, Any], *, inputs: Any, outputs: Any
+) -> Trace[Any, Any]:
+    """Use existing evidence or build a minimal current-turn trace."""
+    if trace.interactions:
+        return trace
+    return Trace(interactions=[Interaction(inputs=inputs, outputs=outputs)])

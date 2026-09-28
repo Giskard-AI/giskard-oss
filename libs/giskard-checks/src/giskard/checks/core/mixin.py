@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, ClassVar, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 from giskard.agents import BaseEmbeddingModel, BaseGenerator
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -9,7 +9,7 @@ from ..settings import (
     get_default_generator,
     get_default_judge,
 )
-from .judge import BaseJudge, OptionalJudgeInput
+from .judge import BaseJudge, LLMChatJudge, OptionalJudgeInput
 
 
 class WithGeneratorMixin(BaseModel):
@@ -27,11 +27,9 @@ class WithGeneratorMixin(BaseModel):
 class WithJudgeMixin(BaseModel):
     """Attach a :class:`~giskard.checks.core.judge.BaseJudge` to a check.
 
-    ``generator`` remains accepted as a legacy constructor alias and readable
-    compatibility property. It is rewritten to ``judge`` before validation,
-    while persisted checks store ``judge`` only. Assignment and
-    ``model_copy(update={"generator": ...})`` also remigrate so ``_judge``
-    never silently falls back to the default while a live generator is set.
+    ``generator`` remains accepted as a legacy constructor alias and mutable
+    compatibility property. It is backed by ``judge`` so there is only one
+    stored source of truth.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(validate_assignment=True)
@@ -43,38 +41,38 @@ class WithJudgeMixin(BaseModel):
             "when None."
         ),
     )
-    generator: BaseGenerator | None = Field(
-        default=None,
-        exclude=True,
-        description=(
-            "Legacy alias for an LLM generator judge. Prefer ``judge=``. "
-            "Migrated to ``judge`` on construction and omitted from dumps."
-        ),
-    )
 
     @model_validator(mode="before")
     @classmethod
     def _migrate_generator_to_judge(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
-        if "generator" not in data or data["generator"] is None:
+        if "generator" not in data:
             return data
-        if "judge" in data and data["judge"] is not None:
+        if "judge" in data:
             raise ValueError("Cannot provide both 'generator' and 'judge'")
         migrated = {key: value for key, value in data.items() if key != "generator"}
-        migrated["judge"] = data["generator"]
+        if data["generator"] is not None:
+            migrated["judge"] = data["generator"]
         return migrated
 
-    @model_validator(mode="after")
-    def _synchronize_legacy_generator_field(self) -> Self:
-        # validate_assignment re-applies the assigned ``generator`` after the
-        # before-validator remaps it onto ``judge``, and may leave ``judge`` as
-        # a raw ``BaseGenerator`` without running OptionalJudgeInput coercion.
-        if self.generator is not None and not isinstance(self.judge, BaseJudge):
-            raw = self.judge if self.judge is not None else self.generator
-            object.__setattr__(self, "judge", BaseJudge.parse(raw))
-        object.__setattr__(self, "generator", getattr(self.judge, "generator", None))
-        return self
+    if TYPE_CHECKING:
+        # Keep the legacy constructor/assignment API visible to static tooling
+        # without creating a second Pydantic field at runtime.
+        generator: BaseGenerator | None = None
+    else:
+
+        @property
+        def generator(self) -> BaseGenerator | None:
+            """Legacy generator view backed by the configured LLM judge."""
+            if isinstance(self.judge, LLMChatJudge):
+                return self.judge.generator
+            return None
+
+        @generator.setter
+        def generator(self, value: BaseGenerator | None) -> None:
+            """Replace or clear the configured judge through the legacy API."""
+            self.judge = None if value is None else BaseJudge.parse(value)
 
     def model_copy(
         self,
@@ -85,16 +83,12 @@ class WithJudgeMixin(BaseModel):
         # model_copy does not re-run validators; remigrate generator→judge here.
         patch: dict[str, Any] | None = dict(update) if update is not None else None
         if patch is not None:
-            if patch.get("generator") is not None and patch.get("judge") is not None:
+            if "generator" in patch and "judge" in patch:
                 raise ValueError("Cannot provide both 'generator' and 'judge'")
-            if patch.get("generator") is not None:
+            if "generator" in patch:
                 patch["judge"] = patch.pop("generator")
-            else:
-                patch.pop("generator", None)
             if patch.get("judge") is not None:
                 patch["judge"] = BaseJudge.parse(patch["judge"])
-            if "judge" in patch:
-                patch["generator"] = getattr(patch["judge"], "generator", None)
         return super().model_copy(update=patch, deep=deep)
 
     @property

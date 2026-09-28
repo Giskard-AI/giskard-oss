@@ -9,7 +9,7 @@ from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
 from ..core.result import CheckResult
 from ._inputs import ResolvableInput, error_if_unresolved
-from .base import BaseLLMCheck
+from .base import BaseLLMCheck, trace_with_current_turn
 
 ToxicityCategory = Literal[
     "hate_speech",
@@ -135,14 +135,15 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
             keys. The ``trace`` key is inherited from the base class so that
             custom templates can access interaction history or metadata.
         """
+        output = str(provided_or_resolve(trace, key=self.target_key, value=self.output))
         return {
             "trace": trace,
-            "output": str(
-                provided_or_resolve(
-                    trace,
-                    key=self.target_key,
-                    value=self.output,
-                )
-            ),
+            "output": output,
             "categories": self.categories,
         }
+
+    @override
+    def get_som_trace(
+        self, trace: TraceType, inputs: dict[str, Any]
+    ) -> Trace[Any, Any]:
+        return trace_with_current_turn(trace, inputs="", outputs=inputs["output"])
