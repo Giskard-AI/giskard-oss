@@ -146,13 +146,20 @@ def test_required_class_level_generator_remains_required():
         generator=(BaseGenerator | None, ...),
     )
 
-    with pytest.raises(ValidationError, match="judge"):
+    with pytest.raises(ValidationError, match="generator"):
         required_generator_judge(prompt="Evaluate the answer.")
 
     explicit = Generator(model="openai/gpt-4o-mini")
     check = required_generator_judge(prompt="Evaluate the answer.", generator=explicit)
 
     assert check.generator is explicit
+
+    som_check = required_generator_judge(
+        prompt="Evaluate the answer.", judge=BaseJudge.parse("typesafe/jev")
+    )
+
+    assert isinstance(som_check.judge, SOMJudge)
+    assert som_check.generator is None
 
 
 def test_class_level_generator_factory_is_migrated_to_judge():
@@ -165,19 +172,19 @@ def test_class_level_generator_factory_is_migrated_to_judge():
 
 
 def test_class_level_data_factory_is_rejected_clearly():
-    with pytest.raises(TypeError, match="takes validated data"):
-        create_model(
-            "DataFactoryGeneratorLLMJudge",
-            __base__=LLMJudge[Any, Any, Trace[Any, Any]],
-            generator=(
-                BaseGenerator | None,
-                Field(
-                    default_factory=lambda data: Generator(
-                        model=f"openai/{data['prompt']}"
-                    )
-                ),
+    data_factory_judge = create_model(
+        "DataFactoryGeneratorLLMJudge",
+        __base__=LLMJudge[Any, Any, Trace[Any, Any]],
+        generator=(
+            BaseGenerator | None,
+            Field(
+                default_factory=lambda data: Generator(model=f"openai/{data['prompt']}")
             ),
-        )
+        ),
+    )
+
+    with pytest.raises(TypeError, match="takes validated data"):
+        data_factory_judge(prompt="gpt-4o-mini")
 
 
 def test_generator_and_judge_together_are_rejected():

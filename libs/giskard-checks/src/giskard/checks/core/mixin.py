@@ -1,8 +1,15 @@
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Self, cast
+from typing import Any, ClassVar, Self
 
 from giskard.agents import BaseEmbeddingModel, BaseGenerator
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    model_serializer,
+    model_validator,
+)
 from pydantic_core import PydanticUndefined
 
 from ..settings import (
@@ -42,73 +49,62 @@ class WithJudgeMixin(BaseModel):
             "when None."
         ),
     )
+    generator: BaseGenerator | None = Field(default=None, exclude=True)
 
+    @model_validator(mode="before")
     @classmethod
-    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
-        super().__pydantic_init_subclass__(**kwargs)
+    def _migrate_generator_to_judge(cls, data: Any, info: ValidationInfo) -> Any:
+        if not isinstance(data, dict):
+            return data
+        if info.field_name is not None:
+            return data
+        if "generator" in data and "judge" in data:
+            raise ValueError("Cannot provide both 'generator' and 'judge'")
 
-        if "generator" not in cls.__annotations__:
-            return
+        migrated = dict(data)
+        if "judge" in migrated:
+            migrated["generator"] = None
+            return migrated
 
-        generator_field = cls.model_fields.pop("generator")
-        judge_field = cls.model_fields["judge"]
-        judge_field.default = PydanticUndefined
-        judge_field.default_factory = None
-        if generator_field.default_factory is not None:
+        if "generator" in migrated:
+            generator = migrated["generator"]
+        else:
+            generator_field = cls.model_fields["generator"]
             if generator_field.default_factory_takes_validated_data:
                 raise TypeError(
                     "WithJudgeMixin cannot migrate a generator default_factory "
                     "that takes validated data; use a fixed default or a "
                     "zero-argument factory"
                 )
-            generator_factory = generator_field.default_factory
-            plain_factory = cast(Callable[[], BaseGenerator | None], generator_factory)
-
-            def judge_factory() -> BaseJudge | None:
-                generator = plain_factory()
-                return None if generator is None else BaseJudge.parse(generator)
-
-            judge_field.default_factory = judge_factory
-        elif generator_field.default is not PydanticUndefined and not isinstance(
-            generator_field.default, property
-        ):
-            judge_field.default = (
-                None
-                if generator_field.default is None
-                else BaseJudge.parse(generator_field.default)
+            generator = generator_field.get_default(
+                call_default_factory=True, validated_data=migrated
             )
-        cls.model_rebuild(force=True)
+            if generator is PydanticUndefined:
+                return migrated
+            migrated["generator"] = generator
 
-    @model_validator(mode="before")
-    @classmethod
-    def _migrate_generator_to_judge(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-        if "generator" not in data:
-            return data
-        if "judge" in data:
-            raise ValueError("Cannot provide both 'generator' and 'judge'")
-        migrated = {key: value for key, value in data.items() if key != "generator"}
-        migrated["judge"] = data["generator"]
+        migrated["judge"] = generator
         return migrated
 
-    if TYPE_CHECKING:
-        # Keep the legacy constructor/assignment API visible to static tooling
-        # without creating a second Pydantic field at runtime.
-        generator: BaseGenerator | None = None
-    else:
+    @model_validator(mode="after")
+    def _sync_generator_from_judge(self) -> Self:
+        generator = (
+            self.judge.generator if isinstance(self.judge, LLMChatJudge) else None
+        )
+        object.__setattr__(self, "generator", generator)
+        return self
 
-        @property
-        def generator(self) -> BaseGenerator | None:
-            """Legacy generator view backed by the configured LLM judge."""
-            if isinstance(self.judge, LLMChatJudge):
-                return self.judge.generator
-            return None
+    @model_serializer(mode="wrap")
+    def _serialize_without_legacy_generator(self, handler: Any) -> dict[str, Any]:
+        serialized = handler(self)
+        serialized.pop("generator", None)
+        return serialized
 
-        @generator.setter
-        def generator(self, value: BaseGenerator | None) -> None:
-            """Replace or clear the configured judge through the legacy API."""
-            self.judge = None if value is None else BaseJudge.parse(value)
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "generator":
+            name = "judge"
+            value = None if value is None else BaseJudge.parse(value)
+        super().__setattr__(name, value)
 
     def model_copy(
         self,
@@ -125,7 +121,12 @@ class WithJudgeMixin(BaseModel):
                 patch["judge"] = patch.pop("generator")
             if patch.get("judge") is not None:
                 patch["judge"] = BaseJudge.parse(patch["judge"])
-        return super().model_copy(update=patch, deep=deep)
+        copied = super().model_copy(update=patch, deep=deep)
+        generator = (
+            copied.judge.generator if isinstance(copied.judge, LLMChatJudge) else None
+        )
+        object.__setattr__(copied, "generator", generator)
+        return copied
 
     @property
     def _judge(self) -> BaseJudge:
