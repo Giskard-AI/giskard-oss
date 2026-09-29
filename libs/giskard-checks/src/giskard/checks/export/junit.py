@@ -13,7 +13,9 @@ from ..core.result import CheckResult, ScenarioResult, SuiteResult
 # Characters XML 1.0 does not allow, even escaped (e.g. ANSI escape codes in
 # model output). Left in place they make the whole report unparseable, so they
 # are replaced with a visible "#xNN" marker.
-_ILLEGAL_XML_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
+_ILLEGAL_XML_CHARS = re.compile(
+    r"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]"
+)
 
 
 def _seconds(duration_ms: int) -> str:

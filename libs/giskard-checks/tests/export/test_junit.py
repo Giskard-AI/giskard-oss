@@ -258,7 +258,7 @@ def test_to_junit_xml_escapes_characters_illegal_in_xml(tmp_path: Path) -> None:
                         results=[
                             CheckResult(
                                 status=CheckStatus.FAIL,
-                                message="got \x1b[31mred\x1b[0m",
+                                message="got \x1b[31mred\x1b[0m\ud800",
                                 details={"check_name": "CheckA"},
                             ),
                         ],
@@ -279,5 +279,5 @@ def test_to_junit_xml_escapes_characters_illegal_in_xml(tmp_path: Path) -> None:
 
     failure = root.find("testcase/failure")
     assert failure is not None
-    assert failure.attrib["message"] == "got #x1B[31mred#x1B[0m"
+    assert failure.attrib["message"] == "got #x1B[31mred#x1B[0m#xD800"
     assert "#x1B[31mred" in (failure.text or "")
