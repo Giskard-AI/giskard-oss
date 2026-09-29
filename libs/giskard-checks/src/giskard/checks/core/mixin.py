@@ -1,8 +1,9 @@
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Self, cast
 
 from giskard.agents import BaseEmbeddingModel, BaseGenerator
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic_core import PydanticUndefined
 
 from ..settings import (
     get_default_embedding_model,
@@ -42,6 +43,42 @@ class WithJudgeMixin(BaseModel):
         ),
     )
 
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
+        super().__pydantic_init_subclass__(**kwargs)
+
+        if "generator" not in cls.__annotations__:
+            return
+
+        generator_field = cls.model_fields.pop("generator")
+        judge_field = cls.model_fields["judge"]
+        judge_field.default = PydanticUndefined
+        judge_field.default_factory = None
+        if generator_field.default_factory is not None:
+            if generator_field.default_factory_takes_validated_data:
+                raise TypeError(
+                    "WithJudgeMixin cannot migrate a generator default_factory "
+                    "that takes validated data; use a fixed default or a "
+                    "zero-argument factory"
+                )
+            generator_factory = generator_field.default_factory
+            plain_factory = cast(Callable[[], BaseGenerator | None], generator_factory)
+
+            def judge_factory() -> BaseJudge | None:
+                generator = plain_factory()
+                return None if generator is None else BaseJudge.parse(generator)
+
+            judge_field.default_factory = judge_factory
+        elif generator_field.default is not PydanticUndefined and not isinstance(
+            generator_field.default, property
+        ):
+            judge_field.default = (
+                None
+                if generator_field.default is None
+                else BaseJudge.parse(generator_field.default)
+            )
+        cls.model_rebuild(force=True)
+
     @model_validator(mode="before")
     @classmethod
     def _migrate_generator_to_judge(cls, data: Any) -> Any:
@@ -52,8 +89,7 @@ class WithJudgeMixin(BaseModel):
         if "judge" in data:
             raise ValueError("Cannot provide both 'generator' and 'judge'")
         migrated = {key: value for key, value in data.items() if key != "generator"}
-        if data["generator"] is not None:
-            migrated["judge"] = data["generator"]
+        migrated["judge"] = data["generator"]
         return migrated
 
     if TYPE_CHECKING:

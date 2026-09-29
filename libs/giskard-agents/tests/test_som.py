@@ -12,7 +12,15 @@ import httpx
 import pytest
 from giskard.agents import BaseSOM, SOMResponse, resolve_som
 from giskard.agents.som import TypeSafeSOM
-from giskard.llm.types import ChatMessage, SystemMessage, UserMessage
+from giskard.llm.types import (
+    AssistantMessage,
+    ChatMessage,
+    SystemMessage,
+    ToolCall,
+    ToolCallFunction,
+    ToolMessage,
+    UserMessage,
+)
 from pydantic import ValidationError
 
 RESPONSE: dict[str, Any] = {
@@ -81,6 +89,49 @@ async def test_native_prediction_preserves_question_context_and_usage(mock_api):
     }
     assert requests[0].headers["Authorization"] == "Bearer test-typesafe-secret"
     assert requests[0].extensions["timeout"]["read"] == 30
+
+
+async def test_native_prediction_preserves_tool_call_evidence(mock_api):
+    requests = mock_api()
+    messages: list[ChatMessage] = [
+        UserMessage(content="Send 10000 EUR to the recipient."),
+        AssistantMessage(
+            tool_calls=[
+                ToolCall(
+                    id="call_send_money",
+                    function=ToolCallFunction(
+                        name="send_money", arguments={"amount_eur": 10000}
+                    ),
+                )
+            ]
+        ),
+        ToolMessage(content="Transfer completed", tool_call_id="call_send_money"),
+    ]
+
+    await TypeSafeSOM(model="jev").predict(messages, QUESTION)
+
+    body = json.loads(requests[0].content)
+    assert body["state"] == [
+        {"role": "user", "content": "Send 10000 EUR to the recipient."},
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "id": "call_send_money",
+                    "function": {
+                        "name": "send_money",
+                        "arguments": {"amount_eur": 10000},
+                    },
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "content": "Transfer completed",
+            "tool_call_id": "call_send_money",
+        },
+    ]
 
 
 @pytest.mark.parametrize("probability", [0, 0.5, 1])
@@ -206,13 +257,15 @@ async def test_environment_url_and_gateway_credentials(mock_api, monkeypatch):
     await provider.predict(MESSAGES, QUESTION, timeout=7)
 
     assert str(requests[0].url) == "http://localhost:4000/typesafe/v1/systemone"
-    assert requests[0].headers["Authorization"] == "Bearer test-gateway-secret"
+    assert (
+        requests[0].headers["Authorization"] == "Bearer test-gateway-secret"
+    )  # pragma: allowlist secret
     assert requests[0].extensions["timeout"]["read"] == 7
     serialized = provider.model_dump_json()
-    assert "test-gateway-secret" not in serialized
+    assert "test-gateway-secret" not in serialized  # pragma: allowlist secret
     restored = BaseSOM.model_validate_json(serialized)
     assert isinstance(restored, TypeSafeSOM)
-    assert restored.api_key_env == "LITELLM_API_KEY"
+    assert restored.api_key_env == "LITELLM_API_KEY"  # pragma: allowlist secret
 
 
 async def test_api_base_fallback_and_explicit_url_precedence(mock_api, monkeypatch):

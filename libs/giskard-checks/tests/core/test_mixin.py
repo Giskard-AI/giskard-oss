@@ -1,19 +1,38 @@
+from typing import Any
 from unittest.mock import MagicMock
 
 import giskard.checks.settings as settings
 import pytest
 from giskard.agents import BaseEmbeddingModel, BaseGenerator, Generator
-from giskard.checks import BaseJudge, LLMChatJudge, LLMGenerator, LLMJudge, SOMJudge
+from giskard.checks import (
+    BaseJudge,
+    LLMChatJudge,
+    LLMGenerator,
+    LLMJudge,
+    SOMJudge,
+    Trace,
+)
 from giskard.checks.core.mixin import WithEmbeddingMixin, WithGeneratorMixin
 from giskard.checks.settings import (
     set_default_embedding_model,
     set_default_generator,
     set_default_judge,
 )
+from pydantic import Field, ValidationError, create_model
 
 
 class ConcreteCheck(WithGeneratorMixin):
     pass
+
+
+class CustomGeneratorLLMJudge(LLMJudge[Any, Any, Trace[Any, Any]]):
+    generator: BaseGenerator | None = Generator(model="openai/gpt-4o-mini")
+
+
+class FactoryGeneratorLLMJudge(LLMJudge[Any, Any, Trace[Any, Any]]):
+    generator: BaseGenerator | None = Field(
+        default_factory=lambda: Generator(model="openai/gpt-4o-mini")
+    )
 
 
 def test_generator_reflects_global_change_after_instantiation():
@@ -90,6 +109,75 @@ def test_explicit_judge_generator_is_preserved():
     assert isinstance(check._judge, LLMChatJudge)
     assert check.judge.generator is explicit
     assert check._judge.generator is explicit
+
+
+def test_class_level_generator_default_is_migrated_to_judge():
+    check = CustomGeneratorLLMJudge(prompt="Evaluate the answer.")
+
+    assert isinstance(check.judge, LLMChatJudge)
+    assert check.generator is check.judge.generator
+    assert isinstance(check.generator, Generator)
+    assert check.generator.model == "openai/gpt-4o-mini"
+
+    dumped = check.model_dump()
+
+    assert "generator" not in dumped
+    assert dumped["judge"]["generator"]["model"] == "openai/gpt-4o-mini"
+
+    loaded = CustomGeneratorLLMJudge.model_validate(dumped)
+
+    assert isinstance(loaded.judge, LLMChatJudge)
+    assert loaded.generator is loaded.judge.generator
+    assert isinstance(loaded.generator, Generator)
+    assert loaded.generator.model == "openai/gpt-4o-mini"
+
+
+def test_explicit_none_clears_class_level_generator_default():
+    check = CustomGeneratorLLMJudge(prompt="Evaluate the answer.", generator=None)
+
+    assert check.generator is None
+    assert check.judge is None
+
+
+def test_required_class_level_generator_remains_required():
+    required_generator_judge = create_model(
+        "RequiredGeneratorLLMJudge",
+        __base__=LLMJudge[Any, Any, Trace[Any, Any]],
+        generator=(BaseGenerator | None, ...),
+    )
+
+    with pytest.raises(ValidationError, match="judge"):
+        required_generator_judge(prompt="Evaluate the answer.")
+
+    explicit = Generator(model="openai/gpt-4o-mini")
+    check = required_generator_judge(prompt="Evaluate the answer.", generator=explicit)
+
+    assert check.generator is explicit
+
+
+def test_class_level_generator_factory_is_migrated_to_judge():
+    first = FactoryGeneratorLLMJudge(prompt="Evaluate the answer.")
+    second = FactoryGeneratorLLMJudge(prompt="Evaluate the answer.")
+
+    assert isinstance(first.generator, Generator)
+    assert first.generator.model == "openai/gpt-4o-mini"
+    assert first.generator is not second.generator
+
+
+def test_class_level_data_factory_is_rejected_clearly():
+    with pytest.raises(TypeError, match="takes validated data"):
+        create_model(
+            "DataFactoryGeneratorLLMJudge",
+            __base__=LLMJudge[Any, Any, Trace[Any, Any]],
+            generator=(
+                BaseGenerator | None,
+                Field(
+                    default_factory=lambda data: Generator(
+                        model=f"openai/{data['prompt']}"
+                    )
+                ),
+            ),
+        )
 
 
 def test_generator_and_judge_together_are_rejected():

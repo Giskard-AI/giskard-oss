@@ -88,7 +88,7 @@ class TypeSafeSOM(BaseSOM):
                 json={
                     "model": self.model,
                     "state": [
-                        {"role": message.role, "content": message.text}
+                        message.model_dump(mode="json", exclude_none=True)
                         for message in messages
                     ],
                     "questions": {
