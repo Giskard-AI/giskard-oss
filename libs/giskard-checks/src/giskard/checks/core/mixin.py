@@ -92,6 +92,9 @@ class WithJudgeMixin(WithGeneratorMixin):
             if generator is PydanticUndefined:
                 return migrated
             migrated["generator"] = generator
+            if generator is None:
+                # An omitted default is not an explicit judge override.
+                return migrated
 
         migrated["judge"] = generator
         return migrated

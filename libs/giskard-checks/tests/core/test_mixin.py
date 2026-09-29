@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -18,6 +19,7 @@ from giskard.checks import (
     LLMChatJudge,
     LLMGenerator,
     LLMJudge,
+    Scenario,
     SOMJudge,
     Trace,
 )
@@ -343,6 +345,68 @@ def test_legacy_generator_is_excluded_from_dump():
     assert "generator" not in dumped
     assert dumped["judge"]["kind"] == "llm"
     assert dumped["judge"]["generator"]["model"] == "openai/gpt-4o-mini"
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        {"kind": "conformity", "rule": "Be helpful."},
+        {"kind": "groundedness"},
+        {"kind": "llm_judge", "prompt": "Evaluate the answer."},
+    ],
+)
+@pytest.mark.parametrize("json_mode", [False, True])
+def test_scenario_partial_dump_preserves_omitted_judge(
+    spec: dict[str, str], json_mode: bool
+):
+    scenario = Scenario.model_validate({"steps": [{"checks": [spec]}]})
+
+    dumped = (
+        json.loads(scenario.model_dump_json(exclude_unset=True))
+        if json_mode
+        else scenario.model_dump(mode="json", exclude_unset=True)
+    )
+
+    assert dumped["steps"][0]["checks"] == [spec]
+    check = scenario.steps[0].checks[0]
+    assert check.model_dump(mode="json", exclude_unset=True) == spec
+    assert check.model_dump()["judge"] is None
+
+
+@pytest.mark.parametrize("field", ["judge", "generator"])
+@pytest.mark.parametrize("update_method", ["constructor", "assignment", "copy"])
+def test_partial_dump_preserves_explicit_judge_reset(field: str, update_method: str):
+    if update_method == "constructor":
+        check = CustomGeneratorLLMJudge.model_validate(
+            {"prompt": "Evaluate the answer.", field: None}
+        )
+    else:
+        check = CustomGeneratorLLMJudge(prompt="Evaluate the answer.")
+        if update_method == "assignment":
+            setattr(check, field, None)
+        else:
+            check = check.model_copy(update={field: None})
+
+    dumped = check.model_dump(mode="json", exclude_unset=True)
+
+    assert dumped["judge"] is None
+    assert "generator" not in dumped
+    assert check.generator is None
+
+
+def test_none_generator_factory_is_evaluated_once_without_setting_judge():
+    factory = MagicMock(return_value=None)
+    configured_judge = create_model(
+        "NoneFactoryGeneratorLLMJudge",
+        __base__=LLMJudge[Any, Any, Trace[Any, Any]],
+        generator=(BaseGenerator | None, Field(default_factory=factory)),
+    )
+
+    check = configured_judge(prompt="Evaluate the answer.")
+
+    factory.assert_called_once_with()
+    assert check.generator is None
+    assert "judge" not in check.model_dump(exclude_unset=True)
 
 
 @pytest.mark.parametrize(
