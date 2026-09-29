@@ -263,6 +263,13 @@ class LidarScanAdapter:
 
         if attempt.error is not None:
             return CheckResult.error(message=attempt.reason, details=details)
+        # A missing verdict is a missing verdict, not a clean probe. Branch on
+        # identity rather than truthiness so only an explicit True/False maps to a
+        # definite outcome, matching the deepteam and garak adapters.
+        if attempt.successful is None:
+            return CheckResult.skip(
+                message=attempt.reason or "lidar returned no verdict", details=details
+            )
         # Polarity flip: lidar "successful" means the ATTACK succeeded, which is a
         # vulnerability => scan failure.
         if attempt.successful:
