@@ -63,7 +63,14 @@ class WithJudgeMixin(BaseModel):
 
         migrated = dict(data)
         if "judge" in migrated:
-            migrated["generator"] = None
+            judge = migrated["judge"]
+            if judge is not None:
+                judge = BaseJudge.parse(judge)
+                migrated["judge"] = judge
+            # Serialized LLM judges must satisfy non-nullable legacy fields too.
+            migrated["generator"] = (
+                judge.generator if isinstance(judge, LLMChatJudge) else None
+            )
             return migrated
 
         if "generator" in migrated:

@@ -3,9 +3,16 @@ from unittest.mock import MagicMock
 
 import giskard.checks.settings as settings
 import pytest
-from giskard.agents import BaseEmbeddingModel, BaseGenerator, Generator
+from giskard.agents import (
+    BaseEmbeddingModel,
+    BaseGenerator,
+    GenerationParams,
+    Generator,
+)
 from giskard.checks import (
     BaseJudge,
+    Check,
+    Conformity,
     LLMChatJudge,
     LLMGenerator,
     LLMJudge,
@@ -130,6 +137,73 @@ def test_class_level_generator_default_is_migrated_to_judge():
     assert loaded.generator is loaded.judge.generator
     assert isinstance(loaded.generator, Generator)
     assert loaded.generator.model == "openai/gpt-4o-mini"
+
+
+@pytest.mark.parametrize("default_kind", ["value", "factory", "required"])
+@pytest.mark.parametrize("override", [False, True])
+@pytest.mark.parametrize("json_mode", [False, True])
+def test_nonnullable_generator_round_trip(
+    default_kind: str, override: bool, json_mode: bool
+):
+    default = Generator(model="openai/gpt-4o-mini")
+    factory = MagicMock(return_value=default)
+    generator_field = {
+        "value": default,
+        "factory": Field(default_factory=factory),
+        "required": ...,
+    }[default_kind]
+    configured_judge = create_model(
+        "NonNullableGeneratorLLMJudge",
+        __base__=LLMJudge[Any, Any, Trace[Any, Any]],
+        generator=(BaseGenerator, generator_field),
+    )
+    selected = (
+        Generator(
+            model="openai/gpt-4o",
+            params=GenerationParams(temperature=0.2, max_tokens=321),
+        )
+        if override
+        else default
+    )
+    if override or default_kind == "required":
+        check = configured_judge(prompt="Evaluate the answer.", generator=selected)
+    else:
+        check = configured_judge(prompt="Evaluate the answer.")
+    factory.reset_mock()
+
+    if json_mode:
+        loaded = configured_judge.model_validate_json(check.model_dump_json())
+    else:
+        dumped = check.model_dump()
+        loaded = configured_judge.model_validate(dumped)
+        assert "generator" not in dumped
+
+    assert isinstance(loaded.judge, LLMChatJudge)
+    assert isinstance(loaded.generator, BaseGenerator)
+    assert loaded.generator is loaded.judge.generator
+    assert loaded.generator.model_dump() == selected.model_dump()
+    assert loaded.model_dump() == check.model_dump()
+    factory.assert_not_called()
+
+
+def test_nonnullable_generator_round_trip_through_check_registry():
+    configured_check = Check.register("nonnullable_generator_round_trip")(
+        create_model(
+            "NonNullableGeneratorConformity",
+            __base__=Conformity,
+            generator=(BaseGenerator, Generator(model="openai/gpt-4o-mini")),
+        )
+    )
+    check = configured_check(rule="Be helpful.")
+
+    for loaded in (
+        Check.model_validate(check.model_dump()),
+        Check.model_validate_json(check.model_dump_json()),
+    ):
+        assert isinstance(loaded, configured_check)
+        assert loaded.model_dump() == check.model_dump()
+        assert isinstance(loaded.judge, LLMChatJudge)
+        assert loaded.generator is loaded.judge.generator
 
 
 def test_explicit_none_clears_class_level_generator_default():
