@@ -32,12 +32,15 @@ class WithGeneratorMixin(BaseModel):
         return self.generator if self.generator is not None else get_default_generator()
 
 
-class WithJudgeMixin(BaseModel):
+class WithJudgeMixin(WithGeneratorMixin):
     """Attach a :class:`~giskard.checks.core.judge.BaseJudge` to a check.
 
     ``generator`` remains accepted as a legacy constructor alias and mutable
     compatibility property. It is backed by ``judge`` so there is only one
     stored source of truth.
+
+    Preserve ``WithGeneratorMixin`` inheritance and its ``_generator`` accessor
+    for existing consumers that identify and inject generators through them.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(validate_assignment=True)
@@ -125,8 +128,14 @@ class WithJudgeMixin(BaseModel):
             if "generator" in patch and "judge" in patch:
                 raise ValueError("Cannot provide both 'generator' and 'judge'")
             if "generator" in patch:
-                patch["judge"] = patch.pop("generator")
-            if patch.get("judge") is not None:
+                generator = patch.pop("generator")
+                # Legacy model_copy updates are trusted, just like BaseModel's.
+                patch["judge"] = (
+                    LLMChatJudge.model_construct(generator=generator)
+                    if generator is not None
+                    else None
+                )
+            elif patch.get("judge") is not None:
                 patch["judge"] = BaseJudge.parse(patch["judge"])
         copied = super().model_copy(update=patch, deep=deep)
         generator = (

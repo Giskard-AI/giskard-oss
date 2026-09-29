@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -11,6 +12,7 @@ from giskard.agents import (
 )
 from giskard.checks import (
     BaseJudge,
+    BaseLLMCheck,
     Check,
     Conformity,
     LLMChatJudge,
@@ -116,6 +118,61 @@ def test_explicit_judge_generator_is_preserved():
     assert isinstance(check._judge, LLMChatJudge)
     assert check.judge.generator is explicit
     assert check._judge.generator is explicit
+    assert check._generator is explicit
+
+
+def test_llm_checks_preserve_generator_mixin_inheritance():
+    assert issubclass(BaseLLMCheck, WithGeneratorMixin)
+    check = Conformity(rule="Be helpful.")
+    assert isinstance(check, WithGeneratorMixin)
+
+
+def test_legacy_generator_accessor_preserves_runtime_injection():
+    check = Conformity(rule="Be helpful.")
+    injected = Generator(model="openai/gpt-4o-mini")
+
+    # Consumers use this mixin to identify checks that need runtime injection.
+    if isinstance(check, WithGeneratorMixin):
+        check = check.model_copy(update={"generator": injected})
+
+    assert check._generator is injected
+    assert isinstance(check.judge, LLMChatJudge)
+    assert check.judge.generator is injected
+
+
+def test_legacy_generator_accessor_resolves_updated_global_default():
+    check = Conformity(rule="Be helpful.")
+    first = Generator(model="openai/gpt-4o-mini")
+    second = Generator(model="openai/gpt-4o")
+
+    set_default_generator(first)
+    assert check._generator is first
+    set_default_generator(second)
+    assert check._generator is second
+    assert check.generator is None
+
+
+@pytest.mark.parametrize("deep", [False, True])
+def test_model_copy_preserves_trusted_legacy_generator_updates(deep: bool):
+    check = Conformity(rule="Be helpful.")
+    replacement = SimpleNamespace(template=MagicMock())
+
+    # Like BaseModel.model_copy, legacy updates are trusted rather than validated.
+    copied = check.model_copy(update={"generator": replacement}, deep=deep)
+
+    assert copied.generator is replacement
+    assert copied._generator is replacement
+    assert isinstance(copied.judge, LLMChatJudge)
+    assert copied.judge.generator is replacement
+    assert check.generator is None
+    assert check.judge is None
+
+
+def test_construction_still_validates_legacy_generator():
+    with pytest.raises(TypeError, match="judge must be"):
+        Conformity.model_validate(
+            {"rule": "Be helpful.", "generator": SimpleNamespace(template=MagicMock())}
+        )
 
 
 def test_class_level_generator_default_is_migrated_to_judge():
