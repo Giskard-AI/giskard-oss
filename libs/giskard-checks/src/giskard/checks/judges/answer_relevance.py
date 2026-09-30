@@ -9,7 +9,7 @@ from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
 from ..core.result import CheckResult
 from ._inputs import ResolvableInput, error_if_unresolved
-from .base import BaseLLMCheck
+from .base import BaseLLMCheck, format_prompt_text
 
 
 @Check.register("answer_relevance")
@@ -138,15 +138,19 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
             Template variables with ``question``, ``answer``, and ``context`` keys,
             plus ``history`` when ``include_history`` is enabled.
         """
-        question = provided_or_resolve(
-            trace,
-            key=self.question_key,
-            value=self.question,
+        question = format_prompt_text(
+            provided_or_resolve(
+                trace,
+                key=self.question_key,
+                value=self.question,
+            )
         )
-        answer = provided_or_resolve(
-            trace,
-            key=self.target_key,
-            value=self.answer,
+        answer = format_prompt_text(
+            provided_or_resolve(
+                trace,
+                key=self.target_key,
+                value=self.answer,
+            )
         )
 
         inputs: dict[str, Any] = {

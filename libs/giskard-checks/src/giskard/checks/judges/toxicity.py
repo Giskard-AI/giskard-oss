@@ -9,7 +9,7 @@ from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
 from ..core.result import CheckResult
 from ._inputs import ResolvableInput, error_if_unresolved
-from .base import BaseLLMCheck
+from .base import BaseLLMCheck, format_prompt_text
 
 ToxicityCategory = Literal[
     "hate_speech",
@@ -135,7 +135,7 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         """
         return {
             "trace": trace,
-            "output": str(
+            "output": format_prompt_text(
                 provided_or_resolve(
                     trace,
                     key=self.target_key,
