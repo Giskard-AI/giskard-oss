@@ -23,6 +23,13 @@ def test_infer_returns_none_for_callable_with_no_annotation():
     assert _infer_input_type(lambda x: x) is None
 
 
+def test_infer_returns_none_when_only_the_trace_is_annotated():
+    def target(inputs, trace: Trace[str, str]) -> str:
+        return inputs
+
+    assert _infer_input_type(target) is None
+
+
 def test_infer_returns_str_for_str_annotated_callable():
     def target(input: str) -> str:
         return input
@@ -158,6 +165,20 @@ async def test_interact_passes_str_input_type_for_str_annotated_target():
     agen = interact.generate(trace)
     await anext(agen)
     assert gen.received_input_type is str
+
+
+@pytest.mark.asyncio
+async def test_interact_does_not_forward_trace_annotation_as_input_type():
+    gen = RecordingGenerator()
+
+    def target(inputs, trace: RecordingTrace) -> str:
+        return inputs
+
+    interact = Interact(inputs=gen, outputs=target)
+    trace = RecordingTrace()
+    agen = interact.generate(trace)
+    await anext(agen)
+    assert gen.received_input_type is None
 
 
 @pytest.mark.asyncio
