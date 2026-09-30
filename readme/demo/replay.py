@@ -11,6 +11,11 @@ Usage::
 Optional speed control::
 
     GISKARD_DEMO_DELAY_SCALE=0.5 GISKARD_QUIET=1 uv run python readme/demo/replay.py
+
+Set ``GISKARD_DEMO_COMPACT=0`` for a single scrolling session with the typed
+quickstart snippet (useful for longer video tutorials). Compact mode (default)
+clears between phases so README GIFs can show generation → progress → report
+without content scrolling off-screen.
 """
 
 from __future__ import annotations
@@ -27,9 +32,12 @@ from giskard.checks.core.result import (
     STATUS_MAPPING,
     ScenarioStatus,
     SuiteResult,
+    format_status_count_parts,
     format_status_count_text,
 )
 from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -38,9 +46,13 @@ from rich.progress import (
     TextColumn,
     TimeElapsedColumn,
 )
+from rich.rule import Rule
+from rich.table import Table
 from rich.text import Text
 
-FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "vulnerability_scan_suite.json"
+FIXTURE_PATH = (
+    Path(__file__).resolve().parent / "fixtures" / "vulnerability_scan_suite.json"
+)
 
 # Snippet mirrors the README quickstart (fake agent kept offline).
 DEMO_SNIPPET = """\
@@ -57,7 +69,7 @@ async def main() -> None:
         target=shopbot,
         description="A customer support chatbot for an e-commerce platform.",
         languages=["en"],
-        max_scenarios=12,
+        max_scenarios=8,
         group_by="threat-type",
     )
 
@@ -72,6 +84,10 @@ def _delay_scale() -> float:
         return max(float(raw), 0.0)
     except ValueError:
         return 1.0
+
+
+def _compact_mode() -> bool:
+    return os.getenv("GISKARD_DEMO_COMPACT", "1") not in {"0", "false", "False"}
 
 
 def _sleep(seconds: float, scale: float) -> None:
@@ -110,11 +126,11 @@ def _load_suite_result() -> SuiteResult:
 
 def _scenario_delay_seconds(duration_ms: int) -> float:
     """Map recorded duration to a short on-screen delay (capped)."""
-    # Real scans take seconds per scenario; compress to ~0.25–0.7s for the GIF.
-    return min(0.7, max(0.22, duration_ms / 2500.0))
+    # Real scans take seconds per scenario; compress to ~0.4–1.0s for the GIF.
+    return min(1.0, max(0.4, duration_ms / 2000.0))
 
 
-def _replay_progress(result: SuiteResult, *, scale: float) -> None:
+def _replay_progress(console: Console, result: SuiteResult, *, scale: float) -> None:
     """Animate a suite-like progress bar from saved scenario timings/outcomes."""
     scenarios = result.results
     counts = {"pass": 0, "fail": 0, "error": 0, "skip": 0}
@@ -124,6 +140,7 @@ def _replay_progress(result: SuiteResult, *, scale: float) -> None:
         BarColumn(),
         MofNCompleteColumn(),
         TimeElapsedColumn(),
+        console=console,
         transient=False,
     ) as progress:
         overall = progress.add_task("Running scenarios", total=len(scenarios))
@@ -135,10 +152,10 @@ def _replay_progress(result: SuiteResult, *, scale: float) -> None:
             progress.remove_task(row)
             counts[ScenarioStatus(scenario.status).value] += 1
             progress.advance(overall)
-        _sleep(0.55, scale)
+        _sleep(0.8, scale)
     summary = format_status_count_text(counts, prefix="  ")
     if summary is not None:
-        Console().print(summary)
+        console.print(summary)
 
 
 def _print_generation_phase(console: Console, *, scale: float, n: int) -> None:
@@ -151,41 +168,87 @@ def _print_generation_phase(console: Console, *, scale: float, n: int) -> None:
     steps = [
         "Sampling Prompt Injection generators…",
         "Sampling Harmful Content + Jailbreak generators…",
-        "Sampling Stereotypes, Misinformation, Prompt Leakage…",
+        "Sampling Misinformation + Excessive Agency…",
         "Building Scenario objects and checks…",
     ]
     for step in steps:
         console.print(f"  • {step}")
-        _sleep(0.35, scale)
+        _sleep(0.45, scale)
     console.print()
 
 
-async def _run() -> None:
-    scale = _delay_scale()
-    console = Console(force_terminal=True, color_system="truecolor", width=100)
+def _print_compact_report(
+    console: Console, result: SuiteResult, *, group_by: str
+) -> None:
+    """Print a GIF-friendly suite report: dots, summary, group table, recommendation.
 
+    Skips failure panels so the whole report fits in a short terminal window.
+    """
+    console.print(Rule("Suite Results", style="bold blue"))
+    console.print(
+        "".join(
+            f"[{STATUS_MAPPING[r.status]['color']}]"
+            f"{STATUS_MAPPING[r.status]['symbol']}"
+            f"[/{STATUS_MAPPING[r.status]['color']}]"
+            for r in result.results
+        )
+    )
     console.print()
-    console.print(Text("$ python scan_shopbot.py", style="bold green"))
-    console.print()
-    _sleep(0.35, scale)
+    console.print(Rule(style="bold blue"))
 
-    # Show the script being “reviewed” before execution (tutorial framing).
-    console.print(Text("# scan_shopbot.py", style="dim"))
-    _typewrite(console, DEMO_SNIPPET, scale=scale, cps=90.0)
-    console.print()
-    _sleep(0.4, scale)
+    count_parts = [
+        (
+            f"[{STATUS_MAPPING['total']['color']} bold]{len(result.results)} total"
+            f"[/{STATUS_MAPPING['total']['color']} bold]"
+        )
+    ]
+    count_parts.extend(
+        format_status_count_parts(
+            {
+                "error": result.errored_count,
+                "fail": result.failed_count,
+                "skip": result.skipped_count,
+                "pass": result.passed_count,
+            }
+        )
+    )
+    pass_rate = f"{result.pass_rate:.1%}" if result.pass_rate is not None else "—"
+    console.print(
+        "Summary: "
+        + ", ".join(count_parts)
+        + f" | Pass Rate: [default bold]{pass_rate}[/default bold]"
+        + f" | Total Duration: {result.duration_ms}ms"
+    )
 
-    result = _load_suite_result()
-    _print_generation_phase(console, scale=scale, n=len(result.results))
+    grouped = result.group_by(group_by)
+    table = Table(title=f"Results by {group_by}")
+    table.add_column(group_by, style="bold")
+    table.add_column("Pass Rate", justify="right")
+    for group_value, stats in grouped.groups.items():
+        if group_value is None:
+            display_name = "(untagged)"
+        elif group_value == "":
+            display_name = "true"
+        else:
+            display_name = group_value
+        rate = (
+            f"{stats.passed} / {stats.non_skipped}"
+            if stats.pass_rate is not None
+            else "—"
+        )
+        table.add_row(display_name, rate)
+    console.print(table)
+    if result.recommendation and result.recommendation.strip():
+        console.print(
+            Panel(
+                Markdown(result.recommendation),
+                title="Recommendation",
+                border_style="blue",
+            )
+        )
 
-    console.print(Text("Running suite", style="bold cyan"))
-    _replay_progress(result, scale=scale)
-    console.print()
 
-    # Match vulnerability_scan default grouping.
-    result.print_report(console=console, group_by="threat-type")
-    console.print()
-
+def _print_footer(console: Console, result: SuiteResult) -> None:
     symbols = "".join(STATUS_MAPPING[r.status]["symbol"] for r in result.results)
     counts = format_status_count_text(
         {
@@ -206,6 +269,69 @@ async def _run() -> None:
                 counts,
             )
         )
+
+
+def _hold(console: Console, seconds: float, scale: float) -> None:
+    _sleep(seconds, scale)
+
+
+async def _run_compact(console: Console, scale: float) -> None:
+    """Phased demo: clear between sections so each fits in a README GIF frame."""
+    result = _load_suite_result()
+
+    console.clear()
+    console.print(Text("$ python scan_shopbot.py", style="bold green"))
+    console.print()
+    _print_generation_phase(console, scale=scale, n=len(result.results))
+    _hold(console, 1.6, scale)
+
+    console.clear()
+    console.print(Text("$ python scan_shopbot.py", style="bold green"))
+    console.print()
+    console.print(Text("Running suite", style="bold cyan"))
+    _replay_progress(console, result, scale=scale)
+    _hold(console, 1.4, scale)
+
+    console.clear()
+    console.print(Text("$ python scan_shopbot.py", style="bold green"))
+    console.print()
+    _print_compact_report(console, result, group_by="threat-type")
+    console.print()
+    _print_footer(console, result)
+    _hold(console, 2.5, scale)
+
+
+async def _run_full(console: Console, scale: float) -> None:
+    """Single scrolling session with optional typed quickstart snippet."""
+    console.print()
+    console.print(Text("$ python scan_shopbot.py", style="bold green"))
+    console.print()
+    _sleep(0.45, scale)
+
+    console.print(Text("# scan_shopbot.py", style="dim"))
+    _typewrite(console, DEMO_SNIPPET, scale=scale, cps=90.0)
+    console.print()
+    _sleep(0.4, scale)
+
+    result = _load_suite_result()
+    _print_generation_phase(console, scale=scale, n=len(result.results))
+
+    console.print(Text("Running suite", style="bold cyan"))
+    _replay_progress(console, result, scale=scale)
+    console.print()
+
+    result.print_report(console=console, group_by="threat-type")
+    console.print()
+    _print_footer(console, result)
+
+
+async def _run() -> None:
+    scale = _delay_scale()
+    console = Console(force_terminal=True, color_system="truecolor", width=88)
+    if _compact_mode():
+        await _run_compact(console, scale)
+    else:
+        await _run_full(console, scale)
 
 
 def main() -> None:
