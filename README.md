@@ -159,6 +159,14 @@ asyncio.run(main())
 
 Scan generators also need an LLM provider extra and API key (same as Checks judges above).
 
+The terminal session below is a recorded replay of a realistic vulnerability scan
+(suite progress + grouped report). Regenerate it offline with
+[`readme/demo/`](readme/demo/README.md).
+
+<p align="center">
+  <img src="readme/vulnerability_scan.gif" alt="Vulnerability scan suite output" width="800">
+</p>
+
 ## Looking for Giskard v2?
 
 Giskard v2 included **Scan** (automatic vulnerability detection) and **RAGET** (RAG evaluation test set generation).
