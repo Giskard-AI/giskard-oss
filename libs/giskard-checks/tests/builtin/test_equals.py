@@ -6,6 +6,8 @@ Tests cover different types (str, number, bool) and various comparison scenarios
 - Same value, different type (should fail)
 """
 
+from collections import namedtuple
+
 from giskard.checks import CheckStatus, Equals, Interaction, Trace
 from giskard.checks.core.extraction import NoMatch
 
@@ -864,3 +866,22 @@ class TestEqualsUnicodeNormalization:
         assert result.passed
         assert result.details["actual_value"] == [{"content": text}]
         assert result.details["expected_value"] == [{"content": text}]
+
+
+class TestEqualsNamedTuple:
+    """Test Equals check with named tuple values."""
+
+    async def test_namedtuple_output_is_compared(self):
+        """Test that a named tuple output is normalized and compared, not crashed on."""
+        Answer = namedtuple("Answer", ["city", "country"])
+        trace = await Trace.from_interactions(
+            Interaction(inputs="test", outputs=Answer("Paris", "France"))
+        )
+        check = Equals(
+            expected_value=Answer("Paris", "France"),
+            target_key="trace.interactions[-1].outputs",
+        )
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
