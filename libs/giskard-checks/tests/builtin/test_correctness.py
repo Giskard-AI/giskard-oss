@@ -36,7 +36,7 @@ async def test_run_returns_failure() -> None:
 
 
 async def test_inputs_from_trace() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     correctness = Correctness(generator=generator)
     interaction = Interaction(
         inputs="Capital of France?",
@@ -52,7 +52,7 @@ async def test_inputs_from_trace() -> None:
     result = await correctness.run(trace)
 
     assert result.status == CheckStatus.PASS
-    assert result.details["reason"] is None
+    assert result.details["reason"] == "Mock reason."
 
     assert len(generator.calls) == 1
     prompt = generator.calls[0][0].transcript
