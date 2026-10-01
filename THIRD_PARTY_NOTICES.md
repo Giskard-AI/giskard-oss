@@ -451,7 +451,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### litellm-1.89.3
+### litellm-1.89.7
 
 - HomePage:
 - Author: BerriAI
@@ -731,7 +731,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### urllib3-2.7.0
+### urllib3-2.8.0
 
 - HomePage:
 - Author: Andrey Petrov
