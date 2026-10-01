@@ -1,11 +1,12 @@
 from .base import BaseEmbeddingModel
-from .litellm_embedding_model import LitellmEmbeddingModel
+from .giskard_llm_embedding_model import GiskardLLMEmbeddingModel
+from .litellm_embedding_model import LiteLLMEmbeddingModel
 
-# Default embedding model uses Litellm
-EmbeddingModel = LitellmEmbeddingModel
+EmbeddingModel = GiskardLLMEmbeddingModel
 
 __all__ = [
     "BaseEmbeddingModel",
-    "LitellmEmbeddingModel",
+    "GiskardLLMEmbeddingModel",
+    "LiteLLMEmbeddingModel",
     "EmbeddingModel",
 ]

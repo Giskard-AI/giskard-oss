@@ -15,7 +15,15 @@ from .errors import (
 )
 from .providers.base import CompletionProvider, EmbeddingProvider, ResponseProvider
 from .retry import should_retry
-from .routing import LLMClient, acompletion, aembedding, aresponse, configure, reset
+from .routing import (
+    LLMClient,
+    acompletion,
+    aembedding,
+    aresponse,
+    configure,
+    reset,
+    supports_native,
+)
 from .types import (
     ChatMessageParam,
     Choice,
@@ -47,6 +55,7 @@ __all__ = [
     "aresponse",
     "configure",
     "reset",
+    "supports_native",
     "should_retry",
     # Client
     "LLMClient",
