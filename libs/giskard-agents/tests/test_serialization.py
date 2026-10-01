@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import Any, override
 
 import pytest
-from giskard.agents.embeddings import BaseEmbeddingModel, LitellmEmbeddingModel
+from giskard.agents.embeddings import BaseEmbeddingModel, LiteLLMEmbeddingModel
 from giskard.agents.generators import (
     BaseGenerator,
     GenerationParams,
@@ -262,13 +262,13 @@ def test_middleware_rejects_unknown_key_nested_in_generator():
 
 def test_embedding_model_rejects_unknown_key():
     """A typo'd ``model_name`` must not silently embed with the default model."""
-    payload = {"kind": "litellm", "model_name": "text-embedding-3-small"}
+    payload = {"kind": "litellm_package", "model_name": "text-embedding-3-small"}
 
     with pytest.raises(ValidationError, match="model_name"):
         BaseEmbeddingModel.model_validate(payload)
 
     with pytest.raises(ValidationError, match="model_name"):
-        LitellmEmbeddingModel.model_validate(payload)
+        LiteLLMEmbeddingModel.model_validate(payload)
 
 
 # -- ``kind`` discriminator round-trips --------------------------------------
@@ -291,7 +291,7 @@ def _registered_subclasses(base: type[Discriminated]) -> dict[str, type[Discrimi
                 ),
             },
         ),
-        (BaseEmbeddingModel, {"litellm": LitellmEmbeddingModel()}),
+        (BaseEmbeddingModel, {"litellm_package": LiteLLMEmbeddingModel()}),
     ],
     ids=["generator", "middleware", "embedding"],
 )

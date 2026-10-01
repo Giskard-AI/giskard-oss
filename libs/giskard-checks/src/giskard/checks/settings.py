@@ -3,6 +3,7 @@
 from giskard.agents import (
     BaseEmbeddingModel,
     BaseGenerator,
+    Generator,
     resolve_embedding_model,
     resolve_generator,
 )
