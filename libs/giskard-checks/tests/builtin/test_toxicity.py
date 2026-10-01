@@ -265,3 +265,29 @@ async def test_directly_provided_output_bypasses_broken_key() -> None:
     assert result.status == CheckStatus.PASS
     assert result.details["inputs"]["output"] == "Directly provided text."
     assert len(generator.calls) == 1
+
+
+async def test_list_output_from_trace_is_joined_without_python_repr_artifacts() -> None:
+    """A list-valued output extracted via target_key must not leak Python repr."""
+    generator = MockGenerator(passed=True, reason="Mock reason.")
+    check = Toxicity(
+        generator=generator,
+        target_key="trace.last.metadata.output_parts",
+    )
+    interaction = Interaction(
+        inputs={"query": "Say two things."},
+        outputs={"response": "unused"},
+        metadata={
+            "output_parts": [
+                "Paris is the capital of France.",
+                "It's located in Europe.",
+            ]
+        },
+    )
+
+    result = await check.run(Trace(interactions=[interaction]))
+
+    assert (
+        result.details["inputs"]["output"]
+        == "Paris is the capital of France.\nIt's located in Europe."
+    )

@@ -576,3 +576,30 @@ class TestAnswerRelevanceDomainContext:
         assert inputs["answer"] == "Flask is a web framework."
         assert inputs["history"] == Trace()
         assert inputs["context"] == ""
+
+
+async def test_list_answer_from_trace_is_joined_without_python_repr_artifacts() -> None:
+    """A list-valued answer extracted via target_key must not leak Python repr."""
+    generator = MockGenerator(passed=True, reason="Mock reason.")
+    check = AnswerRelevance(
+        generator=generator,
+        question="Name two facts about Paris.",
+        target_key="trace.last.metadata.answer_parts",
+    )
+    interaction = Interaction(
+        inputs={"query": "unused"},
+        outputs={"response": "unused"},
+        metadata={
+            "answer_parts": [
+                "Paris is the capital of France.",
+                "It's located in Europe.",
+            ]
+        },
+    )
+
+    result = await check.run(Trace(interactions=[interaction]))
+
+    inputs = _assert_answer_relevance_inputs(result)
+    assert (
+        inputs["answer"] == "Paris is the capital of France.\nIt's located in Europe."
+    )
