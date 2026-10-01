@@ -27,12 +27,13 @@ Speed control via `GISKARD_DEMO_DELAY_SCALE` (default `1`).
 
 ## Render the README GIF
 
-Needs optional tooling (`cairosvg`, `pillow`) — not part of package deps:
+Needs optional tooling (`pillow`) and `fonts-dejavu-mono` — not part of package deps:
 
 ```bash
-uv pip install cairosvg pillow
+uv pip install pillow
 GISKARD_QUIET=1 uv run python readme/demo/render_gif.py
 ```
 
-Writes `readme/vulnerability_scan.gif` (800px wide) from Rich SVG frames of the
-saved suite fixture.
+Writes `readme/vulnerability_scan.gif` (800px wide). Frames come from Rich
+`export_svg()` text layout, rasterized with DejaVu Sans Mono so box-drawing
+glyphs render (instead of tofu/squares).
