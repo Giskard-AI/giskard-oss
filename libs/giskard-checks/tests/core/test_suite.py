@@ -346,6 +346,17 @@ def test_suite_result_rich_console_renders_markup_like_text_literally(field: str
     assert "[/INST] [bold]leak" in console.export_text()
 
 
+def test_grouped_suite_result_rich_console_renders_markup_like_key_literally():
+    # The grouping key is used as the table title and column header.
+    console = Console(record=True, width=200)
+
+    console.print(SuiteResult(results=[], duration_ms=0).group_by("[/INST]"))
+
+    output = console.export_text()
+    assert "Results by [/INST]" in output
+    assert output.count("[/INST]") == 2
+
+
 @pytest.mark.asyncio
 async def test_suite_parallel_preserves_result_order():
     delays = {"first": 0.09, "second": 0.01, "third": 0.05}

@@ -874,8 +874,9 @@ class GroupedSuiteResult(BaseResult, frozen=True):
     ) -> RenderResult:
         yield from _suite_report_renderables(self.suite_result, console, options)
 
-        table = Table(title=f"Results by {self.key}")
-        table.add_column(self.key, style="bold")
+        key = escape(self.key)
+        table = Table(title=f"Results by {key}")
+        table.add_column(key, style="bold")
         table.add_column("Pass Rate", justify="right")
 
         for group_value, stats in self.groups.items():
