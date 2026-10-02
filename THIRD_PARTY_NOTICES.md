@@ -45,12 +45,15 @@ Find a list of packages below
 |✔|griffecli|
 |✔|griffelib|
 |✔|h11|
+|✔|h2|
 |✔|hf-xet|
+|✔|hpack|
 |✔|httpcore|
 |✔|httpcore2|
 |✔|httpx|
 |✔|httpx2|
 |✔|huggingface-hub|
+|✔|hyperframe|
 |✔|idna|
 |✔|importlib-metadata|
 |✔|jinja2|
@@ -140,7 +143,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### anyio-4.14.0
+### anyio-4.14.2
 
 - HomePage:
 - Author: Alex Grönholm
@@ -322,11 +325,25 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
+### h2-4.4.1
+
+- HomePage:
+- Author: Cory Benfield
+- License: MIT
+- Compatible: True
+
 ### hf-xet-1.5.1
 
 - HomePage:
 - Author:
 - License: Apache-2.0
+- Compatible: True
+
+### hpack-4.2.0
+
+- HomePage:
+- Author: Cory Benfield
+- License: MIT
 - Compatible: True
 
 ### httpcore-1.0.9
@@ -362,6 +379,13 @@ Find a list of packages below
 - HomePage: https://github.com/huggingface/huggingface_hub
 - Author: Hugging Face, Inc.
 - License: Apache Software License
+- Compatible: True
+
+### hyperframe-6.1.0
+
+- HomePage:
+- Author: Cory Benfield
+- License: MIT License
 - Compatible: True
 
 ### idna-3.18
@@ -427,7 +451,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### litellm-1.89.3
+### litellm-1.89.7
 
 - HomePage:
 - Author: BerriAI
@@ -707,7 +731,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### urllib3-2.7.0
+### urllib3-2.8.0
 
 - HomePage:
 - Author: Andrey Petrov
