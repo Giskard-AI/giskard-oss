@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.markdown import Markdown
+from rich.markup import escape
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
@@ -252,12 +253,17 @@ class CheckResult(BaseResult, frozen=True):
     ) -> RenderResult:
         status = STATUS_MAPPING[self.status]
 
-        name = self.details.get("check_name", "[dim italic]Unnamed check[/dim italic]")
+        name = (
+            escape(str(self.details["check_name"]))
+            if "check_name" in self.details
+            else "[dim italic]Unnamed check[/dim italic]"
+        )
 
         if self.status == CheckStatus.FAIL or self.status == CheckStatus.ERROR:
             details = (
-                self.message
-                or "[dim italic]No specific error message provided[/dim italic]"
+                escape(self.message)
+                if self.message
+                else "[dim italic]No specific error message provided[/dim italic]"
             )
         else:
             details = ""
@@ -416,7 +422,7 @@ class TestCaseError(BaseModel, frozen=True):
         return (
             f"[{color} bold]Test case[/{color} bold]\t"
             f"[{color}]ERROR[/{color}]\t"
-            f"{self.summary()}"
+            f"{escape(self.summary())}"
         )
 
 
@@ -770,7 +776,7 @@ def _suite_report_renderables(
         for f in reported_failures:
             yield Panel(
                 f,
-                title=f.scenario_name,
+                title=escape(f.scenario_name),
                 border_style=f"{STATUS_MAPPING[f.status]['color']} bold",
             )
         if n_hidden > 0:
@@ -780,7 +786,7 @@ def _suite_report_renderables(
         yield Rule("SUMMARY", characters="=", style="grey")
         for f in reported_failures:
             status = STATUS_MAPPING[f.status]
-            yield f"[{status['color']} bold]{f.scenario_name}[/{status['color']} bold]\t[{status['color']}]{f.status.value.upper()}[/{status['color']}]"
+            yield f"[{status['color']} bold]{escape(f.scenario_name)}[/{status['color']} bold]\t[{status['color']}]{f.status.value.upper()}[/{status['color']}]"
             for tc in f.failures_and_errors:
                 for c in tc.failures_and_errors:
                     yield from (
@@ -868,8 +874,9 @@ class GroupedSuiteResult(BaseResult, frozen=True):
     ) -> RenderResult:
         yield from _suite_report_renderables(self.suite_result, console, options)
 
-        table = Table(title=f"Results by {self.key}")
-        table.add_column(self.key, style="bold")
+        key = escape(self.key)
+        table = Table(title=f"Results by {key}")
+        table.add_column(key, style="bold")
         table.add_column("Pass Rate", justify="right")
 
         for group_value, stats in self.groups.items():
@@ -878,7 +885,7 @@ class GroupedSuiteResult(BaseResult, frozen=True):
             elif group_value == "":
                 display_name = "true"
             else:
-                display_name = group_value
+                display_name = escape(group_value)
             rate = (
                 f"{stats.passed} / {stats.non_skipped}"
                 if stats.pass_rate is not None
