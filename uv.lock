@@ -1485,7 +1485,7 @@ requires-dist = [
 
 [[package]]
 name = "giskard-llm"
-version = "1.0.0"
+version = "1.0.1"
 source = { editable = "libs/giskard-llm" }
 dependencies = [
     { name = "giskard-core" },
