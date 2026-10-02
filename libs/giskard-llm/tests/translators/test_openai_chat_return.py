@@ -114,6 +114,39 @@ def test_from_openai_assistant_refusal():
     assert msg.refusal == "I'm sorry, I can't assist with that."
 
 
+def test_from_openai_content_filter_without_refusal_field():
+    """A moderation stop is a refusal even when OpenAI leaves ``message.refusal`` unset.
+
+    Chat Completions reports it only through ``finish_reason="content_filter"``. Callers
+    detect a policy refusal through ``finish_reason == "refusal"`` or
+    :attr:`AssistantMessage.is_refusal` (``giskard.agents.workflow`` raises
+    ``ModelRefusalError`` on either), so a bare ``content_filter`` matches neither and the
+    filtered reply is consumed as a normal answer.
+    """
+    raw = ChatCompletion(
+        id="chatcmpl-moderated",
+        choices=[
+            Choice(
+                index=0,
+                finish_reason="content_filter",
+                message=ChatCompletionMessage(
+                    role="assistant",
+                    content="Sure, here is a partial a",
+                ),
+            )
+        ],
+        created=0,
+        model=_MODEL,
+        object="chat.completion",
+    )
+    out = OpenAIChatTranslator.from_openai(raw)
+    ch = out.choices[0]
+    # the provider's own value stays visible; the refusal is marked on the message
+    assert ch.finish_reason == "content_filter"
+    assert ch.message.refusal == "content_filter"
+    assert ch.message.is_refusal is True
+
+
 def test_from_openai_assistant_text_and_tool_calls():
     """Assistant `message` may include both `content` and `tool_calls` (e.g. a short preamble)."""
     raw = ChatCompletion(
