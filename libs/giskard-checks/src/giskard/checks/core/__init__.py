@@ -2,6 +2,7 @@ from .check import Check
 from .exceptions import InputGenerationException, InteractionGenerationError
 from .extraction import resolve
 from .interaction import Interact, Interaction, InteractionSpec, Trace
+from .judge import BaseJudge, JudgeInput, LLMChatJudge, SOMJudge
 from .result import (
     CheckResult,
     CheckStatus,
@@ -43,4 +44,8 @@ __all__ = [
     "InputGenerationException",
     "InteractionGenerationError",
     "resolve",
+    "BaseJudge",
+    "JudgeInput",
+    "LLMChatJudge",
+    "SOMJudge",
 ]
