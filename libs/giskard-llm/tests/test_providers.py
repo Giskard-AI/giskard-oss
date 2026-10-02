@@ -20,6 +20,7 @@ from giskard.llm.providers.base import (
     EmbeddingProvider,
     ResponseProvider,
 )
+from giskard.llm.providers.edenai import EdenAIProvider
 from giskard.llm.providers.google import GoogleProvider
 from giskard.llm.providers.openai import OpenAIProvider
 from giskard.llm.types import (
@@ -287,6 +288,47 @@ def test_openai_provider_supports_azure_foundry_v1_base_url():
     assert kwargs["api_key"] == "k"
     assert kwargs["base_url"] == "https://example.openai.azure.com/openai/v1/"
     assert "api_version" not in kwargs
+
+
+def test_edenai_provider_defaults_base_url_and_env_key(monkeypatch):
+    monkeypatch.setenv("EDENAI_API_KEY", "eden-key")  # pragma: allowlist secret
+
+    with patch("giskard.llm.providers.openai._import_openai") as mock_import:
+        sdk = MagicMock()
+        mock_import.return_value = sdk
+
+        EdenAIProvider()
+
+    kwargs = sdk.AsyncOpenAI.call_args.kwargs
+    assert kwargs["api_key"] == "eden-key"  # pragma: allowlist secret
+    assert kwargs["base_url"] == "https://api.edenai.run/v3"
+
+
+def test_edenai_provider_eu_endpoint(monkeypatch):
+    monkeypatch.setenv("EDENAI_API_KEY", "eden-key")  # pragma: allowlist secret
+
+    with patch("giskard.llm.providers.openai._import_openai") as mock_import:
+        sdk = MagicMock()
+        mock_import.return_value = sdk
+
+        EdenAIProvider(eu=True)
+
+    kwargs = sdk.AsyncOpenAI.call_args.kwargs
+    assert kwargs["base_url"] == "https://api.eu.edenai.run/v3"
+
+
+def test_edenai_provider_respects_explicit_kwargs(monkeypatch):
+    monkeypatch.setenv("EDENAI_API_KEY", "eden-key")  # pragma: allowlist secret
+
+    with patch("giskard.llm.providers.openai._import_openai") as mock_import:
+        sdk = MagicMock()
+        mock_import.return_value = sdk
+
+        EdenAIProvider(api_key="explicit", base_url="https://proxy.test/v3")
+
+    kwargs = sdk.AsyncOpenAI.call_args.kwargs
+    assert kwargs["api_key"] == "explicit"  # pragma: allowlist secret
+    assert kwargs["base_url"] == "https://proxy.test/v3"
 
 
 def test_azure_openai_provider_forwards_transport_config(monkeypatch):
