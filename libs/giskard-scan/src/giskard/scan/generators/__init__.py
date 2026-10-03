@@ -6,6 +6,7 @@ from .crescendo import CrescendoAttackScenarioGenerator
 from .gcg import GCGInjectionScenarioGenerator
 from .goat import GOATAttackScenarioGenerator
 from .huggingface import HuggingFaceDatasetScenarioGenerator
+from .insecure_output_handling import InsecureOutputHandlingScenarioGenerator
 from .knowledge_base import (
     HallucinationScenarioGenerator,
     KnowledgeBaseScenarioGenerator,
@@ -24,6 +25,7 @@ __all__ = [
     "GOATAttackScenarioGenerator",
     "HallucinationScenarioGenerator",
     "HuggingFaceDatasetScenarioGenerator",
+    "InsecureOutputHandlingScenarioGenerator",
     "KnowledgeBaseScenarioGenerator",
     "MultiTopicScenarioGenerator",
     "OutOfScopeScenarioGenerator",
