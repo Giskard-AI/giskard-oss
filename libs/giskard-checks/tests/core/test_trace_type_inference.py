@@ -39,6 +39,13 @@ def test_infer_trace_type_returns_subclass_when_second_param_is_trace_subclass()
     assert _infer_trace_type(target) is MyTrace
 
 
+def test_infer_trace_type_when_first_param_is_unannotated():
+    def target(inputs, trace: MyTrace) -> str:
+        return inputs
+
+    assert _infer_trace_type(target) is MyTrace
+
+
 def test_infer_trace_type_returns_base_trace_when_second_param_is_base_trace():
     def target(inputs: str, trace: Trace[str, str]) -> str:
         return inputs
@@ -131,6 +138,20 @@ async def test_runner_instantiates_inferred_trace_type():
     from giskard.checks.scenarios.runner import ScenarioRunner
 
     def target(inputs: str, trace: MyTrace) -> str:
+        return "pong"
+
+    scenario = Scenario("s").interact("ping")
+    runner = ScenarioRunner()
+    result = await runner.run(scenario, target=target)
+
+    assert isinstance(result.final_trace, MyTrace)
+
+
+@pytest.mark.asyncio
+async def test_runner_instantiates_inferred_trace_type_with_unannotated_inputs():
+    from giskard.checks.scenarios.runner import ScenarioRunner
+
+    def target(inputs, trace: MyTrace) -> str:
         return "pong"
 
     scenario = Scenario("s").interact("ping")
