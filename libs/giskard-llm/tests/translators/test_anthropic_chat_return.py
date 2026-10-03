@@ -163,3 +163,89 @@ def test_from_anthropic_refusal_category_only():
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
     assert msg.refusal == "bio"
     assert msg.is_refusal
+
+
+def test_from_anthropic_thinking_block_is_dropped_not_content():
+    """Claude 5+ prepends a ``thinking`` block by default.
+
+    That must not raise, and must not become ``TextContent`` /
+    ``AssistantMessage.text`` (the string Equals/Contains/judges evaluate).
+    """
+    raw = _message(
+        {
+            "content": [
+                {
+                    "type": "thinking",
+                    "thinking": "The user asked for the capital. Answer: Paris.",
+                    "signature": "sig_sum",
+                },
+                {"type": "text", "text": "Paris."},
+            ],
+        }
+    )
+    msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    assert msg.content == [TextContent(text="Paris.")]
+    assert msg.text == "Paris."
+    assert msg.tool_calls is None
+
+
+def test_from_anthropic_empty_thinking_does_not_crash():
+    """Claude 5 default ``display: omitted`` still sends a thinking block with empty text."""
+    raw = _message(
+        {
+            "content": [
+                {"type": "thinking", "thinking": "", "signature": "sig_omit"},
+                {"type": "text", "text": "Hello from Claude."},
+            ],
+        }
+    )
+    msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    assert msg.content == [TextContent(text="Hello from Claude.")]
+    assert msg.text == "Hello from Claude."
+
+
+def test_from_anthropic_redacted_thinking_is_dropped():
+    """Safety-redacted thinking blocks are skipped like other unsupported types."""
+    raw = _message(
+        {
+            "content": [
+                {"type": "redacted_thinking", "data": "encrypted"},
+                {"type": "text", "text": "I can help with that."},
+            ],
+        }
+    )
+    msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    assert msg.content == [TextContent(text="I can help with that.")]
+    assert msg.text == "I can help with that."
+
+
+def test_from_anthropic_thinking_then_tool_use():
+    """Thinking before ``tool_use`` must not abort conversion or drop the tool call."""
+    raw = _message(
+        {
+            "content": [
+                {
+                    "type": "thinking",
+                    "thinking": "I should call a tool.",
+                    "signature": "sig_tool",
+                },
+                {
+                    "type": "tool_use",
+                    "id": "toolu_01",
+                    "name": "get_weather",
+                    "input": {"city": "Paris"},
+                },
+            ],
+            "stop_reason": "tool_use",
+        }
+    )
+    ch = AnthropicChatTranslator.from_anthropic(raw).choices[0]
+    assert ch.finish_reason == "tool_calls"
+    msg = ch.message
+    assert msg.content is None
+    assert msg.text is None
+    assert msg.tool_calls is not None
+    assert len(msg.tool_calls) == 1
+    assert msg.tool_calls[0].id == "toolu_01"
+    assert msg.tool_calls[0].function.name == "get_weather"
+    assert msg.tool_calls[0].function.arguments == {"city": "Paris"}
