@@ -16,6 +16,8 @@ from giskard.llm.types import (
     DeveloperMessage,
     FunctionMessage,
     RefusalContent,
+    ResponseReasoningItem,
+    ResponseReasoningSummary,
     SystemMessage,
     TextContent,
     ToolCall,
@@ -422,6 +424,41 @@ def test_assistant_text_thought_signature_is_replayed():
                     "text": "Thinking about it.",
                     "thought_signature": b"text-signature-bytes",
                 }
+            ],
+        },
+    ]
+    validate_google_contents(payload["contents"])
+
+
+def test_assistant_reasoning_is_replayed_as_thought_part():
+    """OpenAI-shaped ``reasoning`` items serialize as Gemini ``thought`` parts."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="Hi."),
+        AssistantMessage(
+            content=[TextContent(text="42")],
+            reasoning=[
+                ResponseReasoningItem(
+                    id="rsn_1_0",
+                    summary=[
+                        ResponseReasoningSummary(text="Hmm, let me reason privately.")
+                    ],
+                    encrypted_content="c2ln",  # b64("sig")
+                )
+            ],
+        ),
+    ]
+    payload = GoogleChatTranslator.to_google(_MODEL, messages)
+    assert payload["contents"] == [
+        {"role": "user", "parts": [{"text": "Hi."}]},
+        {
+            "role": "model",
+            "parts": [
+                {
+                    "thought": True,
+                    "text": "Hmm, let me reason privately.",
+                    "thought_signature": b"sig",
+                },
+                {"text": "42"},
             ],
         },
     ]

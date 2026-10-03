@@ -43,6 +43,9 @@ from .response import (
     ResponseOutputMessageContent,
     ResponseOutputRefusal,
     ResponseOutputText,
+    ResponseReasoningItem,
+    ResponseReasoningSummary,
+    ResponseReasoningText,
 )
 from .response_param import (
     FunctionCallOutputParam,
@@ -55,6 +58,9 @@ from .response_param import (
     ResponseOutputMessageContentParam,
     ResponseOutputMessageParam,
     ResponseOutputTextBlockParam,
+    ResponseReasoningItemParam,
+    ResponseReasoningSummaryParam,
+    ResponseReasoningTextParam,
     ResponseRefusalParam,
 )
 from .response_result import (
@@ -106,6 +112,12 @@ __all__ = [
     "ResponseOutputRefusal",
     "ResponseOutputText",
     "ResponseOutputTextBlockParam",
+    "ResponseReasoningItem",
+    "ResponseReasoningItemParam",
+    "ResponseReasoningSummary",
+    "ResponseReasoningSummaryParam",
+    "ResponseReasoningText",
+    "ResponseReasoningTextParam",
     "ResponseRefusalParam",
     "ResponseResult",
     "SystemMessage",

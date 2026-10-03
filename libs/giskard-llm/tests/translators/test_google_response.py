@@ -27,6 +27,8 @@ from giskard.llm.types import (
     ResponseOutputMessage,
     ResponseOutputRefusal,
     ResponseOutputText,
+    ResponseReasoningItem,
+    ResponseReasoningSummary,
 )
 
 from .sdk_payload_validation import validate_google_interaction_params
@@ -337,4 +339,28 @@ def test_response_format_pydantic_class_becomes_text_response_format():
         "mime_type": "application/json",
         "schema": Answer.model_json_schema(),
     }
+    validate_google_interaction_params(payload)
+
+
+def test_reasoning_item_becomes_thought_step():
+    """OpenAI ``reasoning`` items serialize as Gemini Interactions ``thought`` steps."""
+    items: list[ResponseInputItem] = [
+        ResponseEasyInputMessage(role="user", content="Why?"),
+        ResponseReasoningItem(
+            id="rsn_0",
+            summary=[ResponseReasoningSummary(text="Because 2+2=4.")],
+            encrypted_content="sig",
+        ),
+        ResponseOutputMessage(content=[ResponseOutputText(text="4")]),
+    ]
+    payload = GoogleResponseTranslator.to_google(_MODEL, items)
+    assert payload["input"] == [
+        _msg_step("user_input", "Why?"),
+        {
+            "type": "thought",
+            "summary": [{"type": "text", "text": "Because 2+2=4."}],
+            "signature": "sig",
+        },
+        _msg_step("model_output", "4"),
+    ]
     validate_google_interaction_params(payload)

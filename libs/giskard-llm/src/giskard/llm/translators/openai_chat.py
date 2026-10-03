@@ -9,7 +9,7 @@ from giskard.llm.types import (
 )
 from giskard.llm.types._base import _BaseModel
 from giskard.llm.utils import sanitize_schema_name
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, SerializationInfo, field_serializer, field_validator
 
 if TYPE_CHECKING:
     from openai.types.chat.chat_completion import ChatCompletion
@@ -59,6 +59,20 @@ class OpenAIChatParams(_BaseModel):
                 },
             }
         return v
+
+    @field_serializer("messages")
+    def _serialize_messages(
+        self, value: Sequence[ChatMessage], info: SerializationInfo
+    ) -> Any:
+        # Chat Completions has no reasoning field; OpenAI-shaped reasoning lives
+        # on AssistantMessage for adapters (Gemini) and is stripped here.
+        messages: list[Any] = []
+        for message in value:
+            dumped = message.model_dump(context=info.context)
+            if isinstance(dumped, dict):
+                dumped.pop("reasoning", None)
+            messages.append(dumped)
+        return messages
 
 
 class OpenAIChatTranslator:
