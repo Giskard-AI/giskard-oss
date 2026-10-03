@@ -68,6 +68,48 @@ make test      # pytest for packages under libs/
 
 Run `make help` for other targets (for example scoped tests with `PACKAGE=giskard-checks`).
 
+### Docstrings
+
+Public APIs (exported modules, classes, functions, and methods) use **NumPy-style** docstrings: a one-line summary, a `Parameters` section with types and descriptions, `Returns` when applicable, and an `Examples` section for non-obvious usage.
+
+```python
+async def vulnerability_scan(
+    target: Target,
+    description: str,
+    languages: list[str],
+    max_scenarios: int | None = None,
+) -> SuiteResult:
+    """Generate and run the standard vulnerability scan suite.
+
+    Parameters
+    ----------
+    target : Target
+        System under test (sync or async callable).
+    description : str
+        Natural-language description of the agent under test.
+    languages : list of str
+        BCP-47 language codes the agent is expected to handle.
+    max_scenarios : int, optional
+        Upper bound on scenarios across generators. ``None`` uses the
+        active preset / per-generator defaults.
+
+    Returns
+    -------
+    SuiteResult
+        Completed suite result (the grouped report is also printed).
+
+    Examples
+    --------
+    >>> async def echo(inputs: str) -> str:
+    ...     return inputs
+    >>> result = await vulnerability_scan(
+    ...     echo, "A demo agent", ["en"], max_scenarios=5
+    ... )
+    >>> isinstance(result.pass_rate, float)
+    True
+    """
+```
+
 See also [`.cursor/rules/documentation.mdc`](.cursor/rules/documentation.mdc) for module-level and inline comment guidance.
 
 ### Public examples
