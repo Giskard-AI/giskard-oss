@@ -21,6 +21,17 @@ async def test_past_tense_generator_returns_default_objectives():
     assert scenarios[0].annotations["goal"] == DEFAULT_PAST_TENSE_OBJECTIVES[first_name]
 
 
+async def test_past_tense_generator_defaults_empty_languages_to_english():
+    context = ScenarioContext(description="A safety chatbot", languages=[])
+    scenarios = await PastTenseAttackScenarioGenerator().generate_scenario(
+        context, max_scenarios=1
+    )
+
+    assert len(scenarios) == 1
+    assert scenarios[0].annotations["language"] == "en"
+    assert context.languages == []
+
+
 async def test_past_tense_generator_budget_subsamples_reproducibly():
     gen = PastTenseAttackScenarioGenerator()
 

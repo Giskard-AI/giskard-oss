@@ -74,6 +74,7 @@ class PastTenseAttackScenarioGenerator(ScenarioGenerator):
         rng: np.random.Generator | None,
     ) -> list[tuple[str, str, str]]:
         assignments = list(DEFAULT_PAST_TENSE_OBJECTIVES.items())
+        languages = languages or ["en"]
         selected_assignments: list[tuple[str, str]]
         rng = rng or np.random.default_rng()
 
