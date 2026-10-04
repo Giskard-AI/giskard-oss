@@ -216,6 +216,26 @@ class TestTestCaseNormalCases:
         assert "name" not in spec
         assert "description" not in spec
 
+    async def test_parametrized_check_keeps_kind_in_result_details(self):
+        """A check built with explicit type arguments still reports its kind.
+
+        ``Equals[str, str, Trace[str, str], str]`` is a distinct class created by
+        pydantic; it used to report ``kind=None``, so ``check_kind`` was ``None``
+        and ``check_spec`` had no ``kind`` at all.
+        """
+        trace = await Trace.from_interactions(
+            Interaction(inputs="input", outputs="output")
+        )
+        check = Equals[str, str, Trace[str, str], str](expected_value="output")
+        test_case = TestCase(trace=trace, checks=[check])
+
+        result = await test_case.run()
+
+        details = result.results[0].details
+        assert details["check_kind"] == "equals"
+        assert details["check_spec"]["kind"] == "equals"
+        assert Check.model_validate(check.model_dump()) == check
+
 
 class TestTestCaseResult:
     """Test TestCaseResult properties and methods."""
