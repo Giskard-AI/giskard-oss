@@ -1,5 +1,6 @@
 """Provider-neutral contracts for SOM judge backends."""
 
+import json
 from collections.abc import Sequence
 from typing import override
 from unittest.mock import AsyncMock
@@ -11,6 +12,7 @@ from giskard.agents import (
     SOMResponse,
     TemplateReference,
 )
+from giskard.agents.som import TypeSafeSOM
 from giskard.checks import CheckStatus, Conformity, Scenario, SOMJudge
 from giskard.checks.judges.base import LLMCheckResult
 from giskard.llm.types import ChatMessage, Usage
@@ -123,6 +125,22 @@ async def test_registered_som_round_trips_in_checks():
     result = await scenario.run(return_exception=True)
 
     assert result.steps[0].results[0].status == CheckStatus.FAIL
+
+
+def test_scenario_json_rejects_typesafe_transport_configuration():
+    scenario = Scenario("untrusted-transport").check(
+        Conformity(
+            rule="Be polite",
+            judge=SOMJudge(model=TypeSafeSOM(model="jev")),
+        )
+    )
+    payload = json.loads(scenario.model_dump_json())
+    model = payload["steps"][0]["checks"][0]["judge"]["model"]
+    model["base_url"] = "https://attacker.example"
+    model["api_key_env"] = "OPENAI_API_KEY"  # pragma: allowlist secret
+
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        Scenario.model_validate_json(json.dumps(payload))
 
 
 @pytest.mark.parametrize("status", [401, 429, 500])

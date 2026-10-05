@@ -36,18 +36,15 @@ class TypeSafeSOM(BaseSOM):
     """Predict a probability with TypeSafe's native API.
 
     ``model`` is the native model name; ``jev`` expands to ``jev-latest``.
-    ``base_url`` accepts an API origin, a ``/v1`` base, or the complete
-    ``/v1/systemone`` endpoint. Its default is ``TYPESAFE_BASE_URL``, then
-    ``TYPESAFE_API_BASE``, then TypeSafe's public API.
+    The API endpoint is configured locally through ``TYPESAFE_BASE_URL`` or
+    ``TYPESAFE_API_BASE`` and defaults to TypeSafe's public API.
 
     A LiteLLM pass-through base such as ``http://localhost:4000/typesafe``
-    also works. Set ``api_key_env`` to the gateway key's environment variable
-    in that case. Credentials are read only when making a request and are
-    never stored in the model.
+    also works. Credentials are read from ``TYPESAFE_API_KEY`` only when making
+    a request and are never stored in the model. Keeping transport configuration
+    out of the model prevents serialized scenarios from selecting a destination
+    or a different environment variable containing a secret.
     """
-
-    base_url: str | None = None
-    api_key_env: str = Field(default="TYPESAFE_API_KEY", min_length=1)
 
     @field_validator("model")
     @classmethod
@@ -56,8 +53,7 @@ class TypeSafeSOM(BaseSOM):
 
     def _endpoint(self) -> str:
         base = (
-            self.base_url
-            or os.environ.get("TYPESAFE_BASE_URL")
+            os.environ.get("TYPESAFE_BASE_URL")
             or os.environ.get("TYPESAFE_API_BASE")
             or "https://api.typesafe.ai"
         ).rstrip("/")
@@ -73,11 +69,9 @@ class TypeSafeSOM(BaseSOM):
         *,
         timeout: float | int | None = None,
     ) -> SOMResponse:
-        api_key = os.environ.get(self.api_key_env)
+        api_key = os.environ.get("TYPESAFE_API_KEY")
         if not api_key:
-            raise ValueError(
-                f"Set {self.api_key_env} to use the TypeSafe SOM provider."
-            )
+            raise ValueError("Set TYPESAFE_API_KEY to use the TypeSafe SOM provider.")
 
         async with httpx.AsyncClient(
             timeout=timeout if timeout is not None else 30.0
