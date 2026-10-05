@@ -239,10 +239,13 @@ async def test_missing_credentials_fail_only_when_called(mock_api, monkeypatch):
         ),
     ],
 )
-async def test_direct_and_gateway_endpoint_shapes(mock_api, base, endpoint):
+async def test_direct_and_gateway_endpoint_shapes(
+    mock_api, monkeypatch, base, endpoint
+):
     requests = mock_api()
+    monkeypatch.setenv("TYPESAFE_BASE_URL", base)
 
-    await TypeSafeSOM(model="jev", base_url=base).predict(MESSAGES, QUESTION)
+    await TypeSafeSOM(model="jev").predict(MESSAGES, QUESTION)
 
     assert str(requests[0].url) == endpoint
 
@@ -251,8 +254,8 @@ async def test_environment_url_and_gateway_credentials(mock_api, monkeypatch):
     requests = mock_api()
     monkeypatch.setenv("TYPESAFE_API_BASE", "https://api.typesafe.ai")
     monkeypatch.setenv("TYPESAFE_BASE_URL", "http://localhost:4000/typesafe/v1")
-    monkeypatch.setenv("LITELLM_API_KEY", "test-gateway-secret")
-    provider = TypeSafeSOM(model="jev", api_key_env="LITELLM_API_KEY")
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-gateway-secret")
+    provider = TypeSafeSOM(model="jev")
 
     await provider.predict(MESSAGES, QUESTION, timeout=7)
 
@@ -265,20 +268,18 @@ async def test_environment_url_and_gateway_credentials(mock_api, monkeypatch):
     assert "test-gateway-secret" not in serialized  # pragma: allowlist secret
     restored = BaseSOM.model_validate_json(serialized)
     assert isinstance(restored, TypeSafeSOM)
-    assert restored.api_key_env == "LITELLM_API_KEY"  # pragma: allowlist secret
+    assert restored.model_dump() == {"kind": "typesafe", "model": "jev-latest"}
 
 
-async def test_api_base_fallback_and_explicit_url_precedence(mock_api, monkeypatch):
+async def test_base_url_environment_precedence(mock_api, monkeypatch):
     requests = mock_api()
     monkeypatch.setenv("TYPESAFE_API_BASE", "https://fallback.example/v1")
     await TypeSafeSOM(model="jev").predict(MESSAGES, QUESTION)
     monkeypatch.setenv("TYPESAFE_BASE_URL", "https://environment.example/v1")
-    await TypeSafeSOM(model="jev", base_url="https://explicit.example/v1").predict(
-        MESSAGES, QUESTION
-    )
+    await TypeSafeSOM(model="jev").predict(MESSAGES, QUESTION)
 
     assert str(requests[0].url) == "https://fallback.example/v1/systemone"
-    assert str(requests[1].url) == "https://explicit.example/v1/systemone"
+    assert str(requests[1].url) == "https://environment.example/v1/systemone"
 
 
 @pytest.mark.parametrize("model", ["jev-latest", "jev-1.13.0", "future-model"])
@@ -316,6 +317,20 @@ def test_model_configuration_requires_model_and_rejects_unknown_fields():
 
     with pytest.raises(ValidationError, match="extra_forbidden"):
         TypeSafeSOM.model_validate({"model": "jev", "model_name": "other"})
+
+
+@pytest.mark.parametrize(
+    "transport_field, value",
+    [
+        ("base_url", "https://attacker.example"),
+        ("api_key_env", "OPENAI_API_KEY"),
+    ],
+)
+def test_serialized_transport_configuration_is_rejected(transport_field, value):
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        BaseSOM.model_validate(
+            {"kind": "typesafe", "model": "jev", transport_field: value}
+        )
 
 
 async def test_another_provider_uses_the_same_interface():
