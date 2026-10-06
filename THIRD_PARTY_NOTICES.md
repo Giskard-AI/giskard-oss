@@ -276,11 +276,11 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2025.3.0
+### fsspec-2026.9.0
 
 - HomePage:
 - Author:
-- License: BSD License
+- License: BSD-3-Clause
 - Compatible: True
 
 ### google-auth-2.55.0
@@ -486,7 +486,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### multidict-6.7.1
+### multidict-6.9.1
 
 - HomePage: https://github.com/aio-libs/multidict
 - Author: Andrew Svetlov
