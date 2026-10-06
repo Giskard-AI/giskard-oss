@@ -78,9 +78,11 @@ Configure ``schema_mutation`` on the provider (via ``LLMClient.configure``). It 
 
 | Value | Behavior |
 |---|---|
-| ``warn`` (default) | Apply normalization; log **once per model and profile** when changes are *lossy* (not when only adding ``additionalProperties: false``). |
-| ``raise`` | ``BadRequestError`` if lossy normalization would be required. |
+| ``warn`` (default) | Apply normalization; log **once per model and profile** when changes are *lossy* (see below). |
+| ``raise`` | ``BadRequestError`` if lossy normalization would be required (message lists paths/keywords). |
 | ``ignore`` | Normalize silently. |
+
+**Lossy** means validation-relevant schema content changed: removed constraints (``pattern``, ``minimum``, …), stripped ``$ref`` siblings, dropped ``properties`` / ``$defs`` entries, etc. **Not lossy**: removing metadata-only keywords (``default``, ``title``, ``description``, … — Pydantic still parses and applies defaults) or adding ``additionalProperties: false`` alone.
 
 Supported on ``openai``, ``anthropic``, ``google``, ``azure``, and ``azure_ai`` providers.
 

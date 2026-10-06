@@ -31,6 +31,10 @@ class _ModelWithDefaultField(BaseModel):
     value: str = Field(default="hello")
 
 
+class _ModelWithPatternField(BaseModel):
+    value: str = Field(pattern=r"^[a-z]+$")
+
+
 def test_normalize_openai_nested_sets_additional_properties_on_defs():
     schema = normalize_pydantic_json_schema(
         NestedOutputModel,
@@ -82,7 +86,7 @@ def test_google_strip_preserves_property_and_def_names():
     assert is_lossy_schema_mutation(original, normalized, "google") is False
 
 
-def test_google_strip_removes_unsupported_keywords_is_lossy(caplog):
+def test_google_strip_default_metadata_is_not_lossy(caplog):
     original = _ModelWithDefaultField.model_json_schema()
     assert "default" in str(original)
     reset_schema_mutation_warnings_for_tests()
@@ -93,17 +97,59 @@ def test_google_strip_removes_unsupported_keywords_is_lossy(caplog):
             provider="google",
             mode="warn",
         )
+    assert not any("lossily normalized" in r.message for r in caplog.records)
+    assert (
+        is_lossy_schema_mutation(
+            original,
+            normalize_pydantic_json_schema(
+                _ModelWithDefaultField,
+                profile="google",
+                provider="google",
+                mode="ignore",
+            ),
+            "google",
+        )
+        is False
+    )
+
+
+def test_google_strip_validation_keyword_is_lossy(caplog):
+    reset_schema_mutation_warnings_for_tests()
+    with caplog.at_level(logging.WARNING):
+        normalize_pydantic_json_schema(
+            _ModelWithPatternField,
+            profile="google",
+            provider="google",
+            mode="warn",
+        )
     assert any("lossily normalized" in r.message for r in caplog.records)
+    assert "pattern" in caplog.records[-1].message
 
 
 def test_schema_mutation_raise_blocks_lossy_google_normalization():
     with pytest.raises(BadRequestError, match="lossily normalized"):
         normalize_pydantic_json_schema(
-            _ModelWithDefaultField,
+            _ModelWithPatternField,
             profile="google",
             provider="google",
             mode="raise",
         )
+
+
+def test_schema_mutation_raise_allows_models_with_field_defaults():
+    normalize_pydantic_json_schema(
+        _ModelWithDefaultField,
+        profile="google",
+        provider="google",
+        mode="raise",
+    )
+    pytest.importorskip("anthropic")
+    normalize_pydantic_json_schema(
+        _ModelWithDefaultField,
+        profile="anthropic",
+        provider="anthropic",
+        mode="raise",
+    )
 
 
 def test_schema_mutation_raise_allows_openai_additional_properties_only():
@@ -155,14 +201,14 @@ def test_schema_mutation_warn_only_on_lossy_and_dedupes(caplog):
             mode="warn",
         )
         normalize_pydantic_json_schema(
-            _ModelWithDefaultField,
+            _ModelWithPatternField,
             profile="google",
             provider="google",
             mode="warn",
         )
         for _ in range(6):
             normalize_pydantic_json_schema(
-                _ModelWithDefaultField,
+                _ModelWithPatternField,
                 profile="google",
                 provider="google",
                 mode="warn",
@@ -175,7 +221,7 @@ def test_schema_mutation_ignore_is_silent(caplog):
     reset_schema_mutation_warnings_for_tests()
     with caplog.at_level(logging.WARNING):
         normalize_pydantic_json_schema(
-            _ModelWithDefaultField,
+            _ModelWithPatternField,
             profile="google",
             provider="google",
             mode="ignore",

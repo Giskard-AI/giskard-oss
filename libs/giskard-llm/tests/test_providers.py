@@ -332,6 +332,33 @@ async def test_azure_openai_complete_forwards_configured_schema_mutation(
     assert mock_to_openai.call_args.kwargs["schema_mutation"] == "raise"
 
 
+@pytest.mark.azure
+@patch("openai.AsyncAzureOpenAI")
+async def test_azure_openai_complete_nested_response_format_preserves_schema(
+    mock_client_cls,
+):
+    from .translators.nested_schema_models import NestedOutputModel
+
+    create = mock_client_cls.return_value.chat.completions.create = AsyncMock(
+        return_value=_make_openai_response("Azure hi")
+    )
+    provider = AzureOpenAIProvider(
+        api_key="k",
+        base_url="https://azure.test",
+        api_version="2024-10-21",
+        schema_mutation="ignore",
+    )
+    await provider.complete(
+        "gpt-4o",
+        [{"role": "user", "content": "Hi"}],
+        response_format=NestedOutputModel,
+    )
+    kwargs = create.call_args.kwargs
+    schema = kwargs["response_format"]["json_schema"]["schema"]
+    assert schema["properties"]["inner"]["$ref"] == "#/$defs/NestedInnerModel"
+    assert "value" in schema["$defs"]["NestedInnerModel"]["properties"]
+
+
 @pytest.mark.azure_ai
 @patch("openai.AsyncAzureOpenAI")
 async def test_azure_ai_provider_complete(mock_client_cls):
@@ -367,6 +394,32 @@ async def test_azure_ai_complete_forwards_configured_schema_mutation(
     )
     await provider.complete("gpt-4o", [{"role": "user", "content": "Hi"}])
     assert mock_to_openai.call_args.kwargs["schema_mutation"] == "ignore"
+
+
+@pytest.mark.azure_ai
+@patch("openai.AsyncAzureOpenAI")
+async def test_azure_ai_complete_nested_response_format_preserves_schema(
+    mock_client_cls,
+):
+    from .translators.nested_schema_models import NestedOutputModel
+
+    create = mock_client_cls.return_value.chat.completions.create = AsyncMock(
+        return_value=_make_openai_response("Foundry hi")
+    )
+    provider = AzureAIProvider(
+        api_key="k",
+        base_url="https://dev.services.ai.azure.com",
+        schema_mutation="ignore",
+    )
+    await provider.complete(
+        "gpt-4o",
+        [{"role": "user", "content": "Hi"}],
+        response_format=NestedOutputModel,
+    )
+    kwargs = create.call_args.kwargs
+    schema = kwargs["response_format"]["json_schema"]["schema"]
+    assert schema["properties"]["inner"]["$ref"] == "#/$defs/NestedInnerModel"
+    assert "value" in schema["$defs"]["NestedInnerModel"]["properties"]
 
 
 def test_azure_openai_provider_forwards_transport_config(monkeypatch):

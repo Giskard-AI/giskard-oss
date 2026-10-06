@@ -511,8 +511,8 @@ def test_response_format_nested_pydantic_uses_response_json_schema():
 
     from .nested_schema_models import NestedOutputModel
 
-    class _ModelWithDefaultForGoogle(BaseModel):
-        value: str = Field(default="hello")
+    class _ModelWithPatternForGoogle(BaseModel):
+        value: str = Field(pattern=r"^[a-z]+$")
 
     payload = GoogleChatTranslator.to_google(
         _MODEL, [UserMessage(content="Hello.")], response_format=NestedOutputModel
@@ -528,6 +528,6 @@ def test_response_format_nested_pydantic_uses_response_json_schema():
         GoogleChatTranslator.to_google(
             _MODEL,
             [UserMessage(content="Hello.")],
-            response_format=_ModelWithDefaultForGoogle,
+            response_format=_ModelWithPatternForGoogle,
             schema_mutation="raise",
         )

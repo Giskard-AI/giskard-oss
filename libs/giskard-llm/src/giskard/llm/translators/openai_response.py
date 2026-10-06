@@ -14,6 +14,7 @@ from ..errors import BadRequestError
 from ..structured_output import (
     DEFAULT_SCHEMA_MUTATION,
     SchemaMutationMode,
+    normalize_json_schema,
     normalize_pydantic_json_schema,
     pop_schema_mutation,
 )
@@ -46,6 +47,8 @@ def tool_def_to_openai(tool: ToolDef, _info: SerializationInfo) -> "ToolParam":
 
 def _text_config_from_response_format_dict(
     response_format: dict[str, Any],
+    *,
+    mode: SchemaMutationMode,
 ) -> dict[str, Any]:
     """Map OpenAI-shaped ``response_format`` dict to Responses ``text`` config."""
     rf_type = response_format.get("type")
@@ -66,6 +69,13 @@ def _text_config_from_response_format_dict(
                     "response_format json_schema must include string name and object schema",
                     PROVIDER,
                 )
+            schema = normalize_json_schema(
+                schema,
+                profile="openai",
+                provider=PROVIDER,
+                mode=mode,
+                schema_label=name,
+            )
             fmt: dict[str, Any] = {
                 "type": "json_schema",
                 "name": name,
@@ -77,7 +87,20 @@ def _text_config_from_response_format_dict(
         if isinstance(response_format.get("name"), str) and isinstance(
             response_format.get("schema"), dict
         ):
-            return {"format": response_format}
+            name = response_format["name"]
+            schema = normalize_json_schema(
+                cast(dict[str, Any], response_format["schema"]),
+                profile="openai",
+                provider=PROVIDER,
+                mode=mode,
+                schema_label=name,
+            )
+            return {
+                "format": {
+                    **response_format,
+                    "schema": schema,
+                }
+            }
         raise BadRequestError(
             400,
             "response_format type json_schema must use Chat Completions "
@@ -126,7 +149,9 @@ class OpenAIResponseParams(_BaseModel):
                 }
             }
         elif isinstance(response_format, dict):
-            v["text"] = _text_config_from_response_format_dict(response_format)
+            v["text"] = _text_config_from_response_format_dict(
+                response_format, mode=mode
+            )
         elif response_format is not None:
             raise BadRequestError(
                 400,

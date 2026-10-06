@@ -4,6 +4,7 @@ import copy
 import logging
 import threading
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -16,6 +17,20 @@ StructuredOutputProfile = Literal["anthropic", "openai", "google"]
 logger = logging.getLogger(__name__)
 
 DEFAULT_SCHEMA_MUTATION: SchemaMutationMode = "warn"
+
+# Keywords removed only for provider/API compatibility; Pydantic still applies
+# defaults and parses the same payload when these are absent from the sent schema.
+_METADATA_ONLY_KEYWORDS = frozenset(
+    {
+        "default",
+        "title",
+        "description",
+        "examples",
+        "deprecated",
+        "$comment",
+        "$schema",
+    }
+)
 
 # Gemini ``response_json_schema`` accepts this subset of JSON Schema keywords
 # (see ``GenerateContentConfig.response_json_schema`` in google-genai). Keys
@@ -53,6 +68,15 @@ _SCHEMA_NAME_MAP_KEYS = frozenset(
 
 _warned_lossy_mutations: set[tuple[str, str, StructuredOutputProfile]] = set()
 _warn_lock = threading.Lock()
+
+
+@dataclass(frozen=True)
+class SchemaKeywordChange:
+    """One keyword-level schema edit from normalization."""
+
+    path: str
+    keyword: str
+    action: Literal["removed", "added", "modified"]
 
 
 def coerce_schema_mutation(value: Any) -> SchemaMutationMode:
@@ -113,6 +137,112 @@ def object_schema_paths_missing_additional_properties_false(
                 )
             )
     return missing
+
+
+def _is_lossy_change(change: SchemaKeywordChange) -> bool:
+    if change.action == "added" and change.keyword == "additionalProperties":
+        return False
+    if change.action == "removed" and change.keyword in _METADATA_ONLY_KEYWORDS:
+        return False
+    if change.action == "removed" and change.keyword == "$ref":
+        return False
+    if change.action == "modified" and change.keyword in _METADATA_ONLY_KEYWORDS:
+        return False
+    return True
+
+
+def _compare_schema_mutation(
+    original: object,
+    normalized: object,
+    *,
+    path: str,
+    changes: list[SchemaKeywordChange],
+) -> None:
+    if isinstance(original, dict) and isinstance(normalized, dict):
+        for key, orig_val in original.items():
+            if key in _SCHEMA_NAME_MAP_KEYS:
+                if not isinstance(orig_val, dict):
+                    continue
+                norm_map = normalized.get(key)
+                if not isinstance(norm_map, dict):
+                    for name in orig_val:
+                        changes.append(
+                            SchemaKeywordChange(f"{path}.{key}.{name}", name, "removed")
+                        )
+                    continue
+                for name, orig_child in orig_val.items():
+                    if name not in norm_map:
+                        changes.append(
+                            SchemaKeywordChange(f"{path}.{key}.{name}", name, "removed")
+                        )
+                    else:
+                        _compare_schema_mutation(
+                            orig_child,
+                            norm_map[name],
+                            path=f"{path}.{key}.{name}",
+                            changes=changes,
+                        )
+                continue
+
+            if key not in normalized:
+                if key == "$ref" and any(
+                    k in normalized for k in ("type", "properties", "items", "anyOf")
+                ):
+                    continue
+                changes.append(SchemaKeywordChange(path, key, "removed"))
+                continue
+
+            norm_val = normalized[key]
+            if orig_val == norm_val:
+                continue
+            if key == "additionalProperties" and norm_val is False:
+                changes.append(SchemaKeywordChange(path, key, "added"))
+                continue
+            if isinstance(orig_val, dict) and isinstance(norm_val, dict):
+                _compare_schema_mutation(
+                    orig_val, norm_val, path=f"{path}.{key}", changes=changes
+                )
+            else:
+                changes.append(SchemaKeywordChange(path, key, "modified"))
+        return
+
+    if original != normalized and path != "$":
+        changes.append(SchemaKeywordChange(path, "<value>", "modified"))
+
+
+def analyze_schema_mutation(
+    original: dict[str, Any],
+    normalized: dict[str, Any],
+    profile: StructuredOutputProfile,
+) -> list[SchemaKeywordChange]:
+    """Return keyword-level edits between Pydantic JSON Schema and normalized output."""
+    del profile
+    changes: list[SchemaKeywordChange] = []
+    _compare_schema_mutation(original, normalized, path="$", changes=changes)
+    return changes
+
+
+def is_lossy_schema_mutation(
+    original: dict[str, Any],
+    normalized: dict[str, Any],
+    profile: StructuredOutputProfile,
+) -> bool:
+    """True when normalization removes or alters validation-relevant schema keywords."""
+    return any(
+        _is_lossy_change(c)
+        for c in analyze_schema_mutation(original, normalized, profile)
+    )
+
+
+def _format_lossy_changes(changes: list[SchemaKeywordChange]) -> str:
+    lossy = [c for c in changes if _is_lossy_change(c)]
+    if not lossy:
+        return ""
+    parts = [
+        f"{change.action} {change.path} ({change.keyword})" for change in lossy[:12]
+    ]
+    suffix = f" (+{len(lossy) - 12} more)" if len(lossy) > 12 else ""
+    return "; ".join(parts) + suffix
 
 
 def _set_additional_properties_false_recursive(schema: dict[str, Any]) -> None:
@@ -183,16 +313,33 @@ def _normalize_anthropic(model: type[BaseModel]) -> dict[str, Any]:
     return transform_schema(model)
 
 
-def is_lossy_schema_mutation(
+def _apply_schema_mutation_policy(
+    *,
+    label: str,
+    profile: StructuredOutputProfile,
+    provider: str,
+    mode: SchemaMutationMode,
     original: dict[str, Any],
     normalized: dict[str, Any],
-    profile: StructuredOutputProfile,
-) -> bool:
-    """True when normalization changes more than adding ``additionalProperties: false``."""
-    del profile  # lossy definition is the same across profiles
-    if normalized == original:
-        return False
-    return normalized != _normalize_openai(original)
+    warn_key: tuple[str, str, StructuredOutputProfile],
+) -> None:
+    changes = analyze_schema_mutation(original, normalized, profile)
+    if not any(_is_lossy_change(c) for c in changes):
+        return
+    detail = _format_lossy_changes(changes)
+    message = (
+        f"Structured output schema for {label} was lossily normalized for {profile} "
+        f"compatibility: {detail}"
+    )
+    if mode == "raise":
+        raise BadRequestError(400, message, provider)
+    if mode == "warn":
+        with _warn_lock:
+            is_new = warn_key not in _warned_lossy_mutations
+            if is_new:
+                _warned_lossy_mutations.add(warn_key)
+        if is_new:
+            logger.warning("%s provider: %s", provider, message)
 
 
 _PROFILE_NORMALIZERS: dict[
@@ -204,6 +351,37 @@ _PROFILE_NORMALIZERS: dict[
 }
 
 
+def normalize_json_schema(
+    schema: dict[str, Any],
+    *,
+    profile: StructuredOutputProfile,
+    provider: str,
+    mode: SchemaMutationMode = DEFAULT_SCHEMA_MUTATION,
+    schema_label: str = "schema",
+) -> dict[str, Any]:
+    """Normalize a raw JSON Schema dict (non-Anthropic profiles only)."""
+    if profile == "anthropic":
+        raise ValueError(
+            "normalize_json_schema does not support profile='anthropic'; use a Pydantic model"
+        )
+    original = copy.deepcopy(schema)
+    if profile == "openai":
+        normalized = _normalize_openai(original)
+    else:
+        normalized = _normalize_google(original)
+    warn_key = ("", schema_label, profile)
+    _apply_schema_mutation_policy(
+        label=schema_label,
+        profile=profile,
+        provider=provider,
+        mode=mode,
+        original=original,
+        normalized=normalized,
+        warn_key=warn_key,
+    )
+    return normalized
+
+
 def normalize_pydantic_json_schema(
     model: type[BaseModel],
     *,
@@ -213,43 +391,25 @@ def normalize_pydantic_json_schema(
 ) -> dict[str, Any]:
     """Return a provider-ready JSON Schema for a Pydantic ``response_format`` model.
 
-    Parameters
-    ----
-    model
-        Pydantic model class passed as ``response_format``.
-    profile
-        Provider-specific normalization rules (``anthropic`` uses the Anthropic SDK
-        ``transform_schema`` helper).
-    provider
-        Provider id for errors and log messages.
-    mode
-        ``warn`` (default): log once per model when normalization is *lossy*
-        (not for ``additionalProperties: false`` alone).
-        ``raise``: refuse on lossy normalization.
-        ``ignore``: apply normalization silently.
+    **Lossy normalization** means validation-relevant keywords or object properties
+    were removed or changed (constraints, ``pattern``, ``format``, ``enum``,
+    ``$ref`` siblings, missing ``properties`` / ``$defs`` entries, etc.). It does
+    **not** include metadata-only removals (``default``, ``title``, ``description``,
+    …) or adding ``additionalProperties: false`` alone.
     """
     original = model.model_json_schema()
     normalizer = _PROFILE_NORMALIZERS[profile]
     normalized = normalizer(model, original)
-
-    if is_lossy_schema_mutation(original, normalized, profile):
-        message = (
-            f"Structured output schema for {model.__name__} was lossily normalized "
-            f"for {profile} compatibility (e.g. removed unsupported keywords, "
-            "stripped $ref siblings, or other changes beyond "
-            "``additionalProperties: false``)."
-        )
-        if mode == "raise":
-            raise BadRequestError(400, message, provider)
-        if mode == "warn":
-            warn_key = (model.__module__, model.__qualname__, profile)
-            with _warn_lock:
-                is_new = warn_key not in _warned_lossy_mutations
-                if is_new:
-                    _warned_lossy_mutations.add(warn_key)
-            if is_new:
-                logger.warning("%s provider: %s", provider, message)
-
+    warn_key = (model.__module__, model.__qualname__, profile)
+    _apply_schema_mutation_policy(
+        label=model.__name__,
+        profile=profile,
+        provider=provider,
+        mode=mode,
+        original=original,
+        normalized=normalized,
+        warn_key=warn_key,
+    )
     return normalized
 
 

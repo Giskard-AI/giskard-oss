@@ -299,18 +299,18 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
 def test_response_format_pydantic_maps_to_text_format():
     from typing import Any, cast
 
-    from pydantic import BaseModel
-
-    class Answer(BaseModel):
-        value: int
+    from .nested_schema_models import NestedOutputModel
 
     payload = OpenAIResponseTranslator.to_openai(
-        _MODEL, "Hello.", response_format=Answer
+        _MODEL, "Hello.", response_format=NestedOutputModel
     )
     text = cast(dict[str, Any], cast(object, payload.get("text")))
+    schema = text["format"]["schema"]
     assert text["format"]["type"] == "json_schema"
-    assert text["format"]["name"] == "Answer"
-    assert text["format"]["schema"]["additionalProperties"] is False
+    assert text["format"]["name"] == "NestedOutputModel"
+    assert schema["properties"]["inner"]["$ref"] == "#/$defs/NestedInnerModel"
+    assert "value" in schema["$defs"]["NestedInnerModel"]["properties"]
+    assert schema["additionalProperties"] is False
     assert "response_format" not in payload
     validate_openai_response_params(payload)
 
@@ -318,26 +318,31 @@ def test_response_format_pydantic_maps_to_text_format():
 def test_response_format_chat_json_schema_dict_maps_to_text_format():
     from typing import Any, cast
 
+    inner_def = {
+        "type": "object",
+        "properties": {"value": {"type": "string"}},
+        "required": ["value"],
+        "additionalProperties": False,
+    }
     schema = {
         "type": "object",
-        "properties": {"x": {"type": "string"}},
-        "required": ["x"],
-        "additionalProperties": False,
+        "properties": {
+            "inner": {"$ref": "#/$defs/NestedInnerModel"},
+        },
+        "required": ["inner"],
+        "$defs": {"NestedInnerModel": inner_def},
     }
     response_format = {
         "type": "json_schema",
-        "json_schema": {"name": "MySchema", "schema": schema},
+        "json_schema": {"name": "NestedDict", "schema": schema},
     }
     payload = OpenAIResponseTranslator.to_openai(
         _MODEL, "Hello.", response_format=response_format
     )
     text = cast(dict[str, Any], cast(object, payload.get("text")))
-    assert text == {
-        "format": {
-            "type": "json_schema",
-            "name": "MySchema",
-            "schema": schema,
-        }
-    }
+    out_schema = text["format"]["schema"]
+    assert out_schema["properties"]["inner"]["$ref"] == "#/$defs/NestedInnerModel"
+    assert "value" in out_schema["$defs"]["NestedInnerModel"]["properties"]
+    assert out_schema["additionalProperties"] is False
     assert "response_format" not in payload
     validate_openai_response_params(payload)

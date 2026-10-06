@@ -362,8 +362,8 @@ def test_response_format_nested_pydantic_schema_valid_for_google_response():
 
     from .nested_schema_models import NestedOutputModel
 
-    class _ModelWithDefaultForGoogle(BaseModel):
-        value: str = Field(default="hello")
+    class _ModelWithPatternForGoogle(BaseModel):
+        value: str = Field(pattern=r"^[a-z]+$")
 
     payload = GoogleResponseTranslator.to_google(
         _MODEL, "Hello.", response_format=NestedOutputModel
@@ -381,6 +381,6 @@ def test_response_format_nested_pydantic_schema_valid_for_google_response():
         GoogleResponseTranslator.to_google(
             _MODEL,
             "Hello.",
-            response_format=_ModelWithDefaultForGoogle,
+            response_format=_ModelWithPatternForGoogle,
             schema_mutation="raise",
         )
