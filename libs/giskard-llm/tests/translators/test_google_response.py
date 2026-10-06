@@ -323,16 +323,13 @@ def test_response_format_pydantic_class_becomes_text_response_format():
     dict (``type``/``mime_type``/``schema``), mirroring the openai/anthropic translators,
     instead of being passed through as a raw, unserializable class."""
     from giskard.llm.structured_output import (
-        normalize_pydantic_json_schema,
         object_schema_paths_missing_additional_properties_false,
     )
-    from pydantic import BaseModel
 
-    class Answer(BaseModel):
-        value: int
+    from .nested_schema_models import FlatOutputModel
 
     payload = GoogleResponseTranslator.to_google(
-        _MODEL, "Hello.", response_format=Answer
+        _MODEL, "Hello.", response_format=FlatOutputModel
     )
 
     assert payload.get("response_mime_type") == "application/json"
@@ -342,9 +339,16 @@ def test_response_format_pydantic_class_becomes_text_response_format():
     assert payload.get("response_format") == {
         "type": "text",
         "mime_type": "application/json",
-        "schema": normalize_pydantic_json_schema(
-            Answer, profile="google", provider="google", mode="ignore"
-        ),
+        "schema": {
+            "properties": {
+                "value": {"title": "Value", "type": "integer"},
+                "count": {"title": "Count", "type": "integer"},
+            },
+            "required": ["value", "count"],
+            "title": "FlatOutputModel",
+            "type": "object",
+            "additionalProperties": False,
+        },
     }
     validate_google_interaction_params(payload)
 
@@ -354,8 +358,12 @@ def test_response_format_nested_pydantic_schema_valid_for_google_response():
     from giskard.llm.structured_output import (
         object_schema_paths_missing_additional_properties_false,
     )
+    from pydantic import BaseModel, Field
 
     from .nested_schema_models import NestedOutputModel
+
+    class _ModelWithDefaultForGoogle(BaseModel):
+        value: str = Field(default="hello")
 
     payload = GoogleResponseTranslator.to_google(
         _MODEL, "Hello.", response_format=NestedOutputModel
@@ -363,12 +371,16 @@ def test_response_format_nested_pydantic_schema_valid_for_google_response():
     response_format = cast(dict[str, Any], payload.get("response_format"))
     schema = response_format["schema"]
     assert object_schema_paths_missing_additional_properties_false(schema) == []
+    assert schema["properties"]["inner"]["$ref"] == "#/$defs/NestedInnerModel"
+    assert (
+        schema["$defs"]["NestedInnerModel"]["properties"]["value"]["type"] == "string"
+    )
     validate_google_interaction_params(payload)
 
-    with pytest.raises(BadRequestError, match="normalized"):
+    with pytest.raises(BadRequestError, match="lossily normalized"):
         GoogleResponseTranslator.to_google(
             _MODEL,
             "Hello.",
-            response_format=NestedOutputModel,
+            response_format=_ModelWithDefaultForGoogle,
             schema_mutation="raise",
         )

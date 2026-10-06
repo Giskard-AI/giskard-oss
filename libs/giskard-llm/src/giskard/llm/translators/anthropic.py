@@ -10,7 +10,12 @@ from pydantic import (
     model_validator,
 )
 
-from ..structured_output import normalize_pydantic_json_schema, pop_schema_mutation
+from ..structured_output import (
+    DEFAULT_SCHEMA_MUTATION,
+    SchemaMutationMode,
+    normalize_pydantic_json_schema,
+    pop_schema_mutation,
+)
 from ..types import (
     AssistantMessage,
     ChatMessage,
@@ -67,7 +72,6 @@ KNOWN_COMPLETION_PARAMS = frozenset(
         "system",
         "output_config",
         "response_format",
-        "schema_mutation",
     }
 )
 
@@ -295,6 +299,7 @@ class AnthropicChatTranslator:
         messages: Sequence[ChatMessage],
         *,
         tools: Sequence[ToolDef] | None = None,
+        schema_mutation: SchemaMutationMode = DEFAULT_SCHEMA_MUTATION,
         **params: Any,
     ) -> "CompletionCreateParams":
         unknown = set(params) - KNOWN_COMPLETION_PARAMS
@@ -305,11 +310,14 @@ class AnthropicChatTranslator:
                 sorted(unknown),
             )
 
-        anthropic_params = AnthropicChatConfigParams(
-            model=model,
-            messages=messages,
-            tools=tools,
-            **params,
+        anthropic_params = AnthropicChatConfigParams.model_validate(
+            {
+                "model": model,
+                "messages": messages,
+                "tools": tools,
+                "schema_mutation": schema_mutation,
+                **params,
+            }
         )
 
         payload = cast(

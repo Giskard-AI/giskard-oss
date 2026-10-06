@@ -28,6 +28,8 @@ Provider-specific kwargs:
     - ``base_url``: Azure endpoint URL
     - ``http_client``: caller-owned async HTTP client passed to the SDK; not closed by giskard-llm
     - ``default_headers``: extra headers merged into every SDK request
+    - ``schema_mutation``: ``warn`` (default), ``raise``, or ``ignore`` when normalizing
+      structured-output JSON schemas (same as OpenAI provider)
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false, reportMissingSuperCall=false
@@ -38,6 +40,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from ..errors import ProviderNotAvailableError
+from ..structured_output import DEFAULT_SCHEMA_MUTATION, coerce_schema_mutation
 from ..utils.compact import compact
 from .openai import OpenAIProvider
 
@@ -60,6 +63,7 @@ class AzureOpenAIProvider(OpenAIProvider):
         timeout: float | None = None,
         http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
+        schema_mutation: str = DEFAULT_SCHEMA_MUTATION,
         **_kwargs: Any,
     ) -> None:
         try:
@@ -72,6 +76,7 @@ class AzureOpenAIProvider(OpenAIProvider):
                 "%s provider: ignoring unknown kwargs: %s", PROVIDER, sorted(_kwargs)
             )
 
+        self._schema_mutation = coerce_schema_mutation(schema_mutation)
         resolved_key = api_key or os.environ.get("AZURE_API_KEY")
         resolved_base = base_url or os.environ.get("AZURE_API_BASE")
         resolved_version = api_version or os.environ.get(

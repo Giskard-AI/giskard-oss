@@ -16,7 +16,11 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_SCHEMA_MUTATION: SchemaMutationMode = "warn"
 
-_GOOGLE_JSON_SCHEMA_KEYS = frozenset(
+# Gemini ``response_json_schema`` accepts this subset of JSON Schema keywords
+# (see ``GenerateContentConfig.response_json_schema`` in google-genai). Keys
+# in ``properties``, ``$defs``, ``patternProperties``, etc. are user-defined
+# names and must never be filtered.
+_GOOGLE_JSON_SCHEMA_KEYWORDS = frozenset(
     {
         "$id",
         "$defs",
@@ -42,6 +46,12 @@ _GOOGLE_JSON_SCHEMA_KEYS = frozenset(
     }
 )
 
+_SCHEMA_NAME_MAP_KEYS = frozenset(
+    {"properties", "$defs", "definitions", "patternProperties", "dependentSchemas"}
+)
+
+_warned_lossy_mutations: set[tuple[str, str]] = set()
+
 
 def coerce_schema_mutation(value: Any) -> SchemaMutationMode:
     """Validate configure-time ``schema_mutation`` values."""
@@ -53,9 +63,19 @@ def coerce_schema_mutation(value: Any) -> SchemaMutationMode:
 
 
 def pop_schema_mutation(params: dict[str, Any]) -> SchemaMutationMode:
-    """Remove ``schema_mutation`` from completion params (provider-internal)."""
+    """Remove internal ``schema_mutation`` set by provider translators (not public API)."""
     raw = params.pop("schema_mutation", DEFAULT_SCHEMA_MUTATION)
     return coerce_schema_mutation(raw)
+
+
+def reject_user_schema_mutation_param(params: dict[str, Any]) -> None:
+    """Drop ``schema_mutation`` if passed on ``acompletion`` / ``aresponse`` (configure-time only)."""
+    if "schema_mutation" in params:
+        logger.warning(
+            "schema_mutation is configure-time only (LLMClient.configure); "
+            "ignoring completion/response param"
+        )
+        params.pop("schema_mutation")
 
 
 def _iter_schema_nodes(node: object) -> Iterator[dict[str, Any]]:
@@ -108,12 +128,37 @@ def _strip_ref_siblings(schema: dict[str, Any]) -> None:
 
 
 def _strip_unsupported_google_keywords(schema: dict[str, Any]) -> None:
-    for node in _iter_schema_nodes(schema):
+    """Strip keywords Gemini rejects. Property / ``$defs`` names are never removed."""
+
+    def visit(node: dict[str, Any], *, in_name_map: bool) -> None:
+        if in_name_map:
+            for value in node.values():
+                if isinstance(value, dict):
+                    visit(value, in_name_map=False)
+            return
+
         for key in list(node.keys()):
+            if key in _SCHEMA_NAME_MAP_KEYS:
+                sub = node[key]
+                if isinstance(sub, dict):
+                    visit(sub, in_name_map=True)
+                continue
             if key.startswith("$"):
                 continue
-            if key not in _GOOGLE_JSON_SCHEMA_KEYS:
+            if key not in _GOOGLE_JSON_SCHEMA_KEYWORDS:
                 del node[key]
+
+        for key, value in list(node.items()):
+            if key in _SCHEMA_NAME_MAP_KEYS:
+                continue
+            if isinstance(value, dict):
+                visit(value, in_name_map=False)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        visit(item, in_name_map=False)
+
+    visit(schema, in_name_map=False)
 
 
 def _normalize_openai(schema: dict[str, Any]) -> dict[str, Any]:
@@ -134,6 +179,18 @@ def _normalize_anthropic(model: type[BaseModel]) -> dict[str, Any]:
     from anthropic import transform_schema
 
     return transform_schema(model)
+
+
+def is_lossy_schema_mutation(
+    original: dict[str, Any],
+    normalized: dict[str, Any],
+    profile: StructuredOutputProfile,
+) -> bool:
+    """True when normalization changes more than adding ``additionalProperties: false``."""
+    del profile  # lossy definition is the same across profiles
+    if normalized == original:
+        return False
+    return normalized != _normalize_openai(original)
 
 
 _PROFILE_NORMALIZERS: dict[
@@ -164,23 +221,32 @@ def normalize_pydantic_json_schema(
     provider
         Provider id for errors and log messages.
     mode
-        ``warn`` (default): apply normalization and log when the schema changes.
-        ``raise``: refuse when normalization would alter the raw Pydantic schema.
+        ``warn`` (default): log once per model when normalization is *lossy*
+        (not for ``additionalProperties: false`` alone).
+        ``raise``: refuse on lossy normalization.
         ``ignore``: apply normalization silently.
     """
     original = model.model_json_schema()
     normalizer = _PROFILE_NORMALIZERS[profile]
     normalized = normalizer(model, original)
 
-    if original != normalized:
+    if is_lossy_schema_mutation(original, normalized, profile):
         message = (
-            f"Structured output schema for {model.__name__} was normalized for "
-            f"{profile} compatibility (nested objects, $defs, additionalProperties, "
-            "or unsupported keywords)."
+            f"Structured output schema for {model.__name__} was lossily normalized "
+            f"for {profile} compatibility (e.g. nested/$defs inlining, removed "
+            "keywords, or stripped $ref siblings)."
         )
         if mode == "raise":
             raise BadRequestError(400, message, provider)
         if mode == "warn":
-            logger.warning("%s provider: %s", provider, message)
+            warn_key = (model.__module__, model.__qualname__)
+            if warn_key not in _warned_lossy_mutations:
+                _warned_lossy_mutations.add(warn_key)
+                logger.warning("%s provider: %s", provider, message)
 
     return normalized
+
+
+def reset_schema_mutation_warnings_for_tests() -> None:
+    """Clear dedupe state (for unit tests only)."""
+    _warned_lossy_mutations.clear()

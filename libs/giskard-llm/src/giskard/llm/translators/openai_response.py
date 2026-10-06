@@ -8,7 +8,15 @@ from giskard.llm.types import (
     ToolDef,
 )
 from giskard.llm.types._base import _BaseModel
-from pydantic import Field, SerializationInfo
+from pydantic import BaseModel, Field, SerializationInfo, model_validator
+
+from ..structured_output import (
+    DEFAULT_SCHEMA_MUTATION,
+    SchemaMutationMode,
+    normalize_pydantic_json_schema,
+    pop_schema_mutation,
+)
+from ..utils import sanitize_schema_name
 
 if TYPE_CHECKING:
     from openai.types.responses.response import Response
@@ -17,7 +25,7 @@ if TYPE_CHECKING:
     )
     from openai.types.responses.tool_param import ToolParam
 
-KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "max_tokens"})
+KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "max_tokens", "response_format"})
 
 logger = logging.getLogger(__name__)
 PROVIDER = "openai"
@@ -43,6 +51,33 @@ class OpenAIResponseParams(_BaseModel):
     tools: Sequence[ToolDef] | None
     temperature: float | None = None
     max_output_tokens: int | None = Field(default=None, validation_alias="max_tokens")
+    text: dict[str, Any] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_response_format(cls, v: Any) -> Any:
+        if not isinstance(v, dict):
+            return v
+        v = v.copy()
+        mode = pop_schema_mutation(v)
+        response_format = v.pop("response_format", None)
+        if isinstance(response_format, type) and issubclass(response_format, BaseModel):
+            schema = normalize_pydantic_json_schema(
+                response_format,
+                profile="openai",
+                provider=PROVIDER,
+                mode=mode,
+            )
+            v["text"] = {
+                "format": {
+                    "type": "json_schema",
+                    "name": sanitize_schema_name(response_format.__name__),
+                    "schema": schema,
+                }
+            }
+        elif response_format is not None:
+            v["response_format"] = response_format
+        return v
 
 
 class OpenAIResponseTranslator:
@@ -54,6 +89,7 @@ class OpenAIResponseTranslator:
         instructions: str | None = None,
         previous_id: str | None = None,
         tools: Sequence[ToolDef] | None = None,
+        schema_mutation: SchemaMutationMode = DEFAULT_SCHEMA_MUTATION,
         **params: Any,
     ) -> "ResponseCreateParamsNonStreaming":
         unknown = set(params) - KNOWN_RESPONSE_PARAMS
@@ -71,6 +107,7 @@ class OpenAIResponseTranslator:
                 "instructions": instructions,
                 "previous_response_id": previous_id,
                 "tools": tools,
+                "schema_mutation": schema_mutation,
                 **params,
             }
         )

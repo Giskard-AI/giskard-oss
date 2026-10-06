@@ -9,3 +9,8 @@ class NestedInnerModel(BaseModel):
 
 class NestedOutputModel(BaseModel):
     inner: NestedInnerModel
+
+
+class FlatOutputModel(BaseModel):
+    value: int
+    count: int

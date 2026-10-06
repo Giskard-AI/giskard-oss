@@ -474,13 +474,45 @@ def test_function_message_raises():
         GoogleChatTranslator.to_google(_MODEL, messages)
 
 
+def test_response_format_flat_pydantic_uses_response_json_schema():
+    from giskard.llm.structured_output import (
+        object_schema_paths_missing_additional_properties_false,
+    )
+
+    from .nested_schema_models import FlatOutputModel
+
+    payload = GoogleChatTranslator.to_google(
+        _MODEL,
+        [UserMessage(content="Hello.")],
+        response_format=FlatOutputModel,
+    )
+    config = cast(dict[str, Any], cast(object, payload.get("config")))
+    schema = config["response_json_schema"]
+    assert config["response_mime_type"] == "application/json"
+    assert object_schema_paths_missing_additional_properties_false(schema) == []
+    assert schema == {
+        "properties": {
+            "value": {"title": "Value", "type": "integer"},
+            "count": {"title": "Count", "type": "integer"},
+        },
+        "required": ["value", "count"],
+        "title": "FlatOutputModel",
+        "type": "object",
+        "additionalProperties": False,
+    }
+
+
 def test_response_format_nested_pydantic_uses_response_json_schema():
     from giskard.llm.errors import BadRequestError
     from giskard.llm.structured_output import (
         object_schema_paths_missing_additional_properties_false,
     )
+    from pydantic import BaseModel, Field
 
     from .nested_schema_models import NestedOutputModel
+
+    class _ModelWithDefaultForGoogle(BaseModel):
+        value: str = Field(default="hello")
 
     payload = GoogleChatTranslator.to_google(
         _MODEL, [UserMessage(content="Hello.")], response_format=NestedOutputModel
@@ -489,11 +521,13 @@ def test_response_format_nested_pydantic_uses_response_json_schema():
     schema = config["response_json_schema"]
     assert config["response_mime_type"] == "application/json"
     assert object_schema_paths_missing_additional_properties_false(schema) == []
+    assert schema["properties"]["inner"]["$ref"] == "#/$defs/NestedInnerModel"
+    assert "value" in schema["$defs"]["NestedInnerModel"]["properties"]
 
-    with pytest.raises(BadRequestError, match="normalized"):
+    with pytest.raises(BadRequestError, match="lossily normalized"):
         GoogleChatTranslator.to_google(
             _MODEL,
             [UserMessage(content="Hello.")],
-            response_format=NestedOutputModel,
+            response_format=_ModelWithDefaultForGoogle,
             schema_mutation="raise",
         )

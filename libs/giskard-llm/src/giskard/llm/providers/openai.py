@@ -63,7 +63,12 @@ from ..errors import (
     RateLimitError,
     ServerError,
 )
-from ..structured_output import DEFAULT_SCHEMA_MUTATION, coerce_schema_mutation
+from ..structured_output import (
+    DEFAULT_SCHEMA_MUTATION,
+    SchemaMutationMode,
+    coerce_schema_mutation,
+    reject_user_schema_mutation_param,
+)
 from ..translators.openai_chat import OpenAIChatTranslator
 from ..translators.openai_response import OpenAIResponseTranslator
 from ..types import (
@@ -115,7 +120,7 @@ class OpenAIProvider:
         timeout: float | None = None,
         http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
-        schema_mutation: str = DEFAULT_SCHEMA_MUTATION,
+        schema_mutation: SchemaMutationMode | str = DEFAULT_SCHEMA_MUTATION,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:
@@ -123,7 +128,9 @@ class OpenAIProvider:
                 "%s provider: ignoring unknown kwargs: %s", PROVIDER, sorted(_kwargs)
             )
         openai = _import_openai()
-        self._schema_mutation = coerce_schema_mutation(schema_mutation)
+        self._schema_mutation: SchemaMutationMode = coerce_schema_mutation(
+            schema_mutation
+        )
         self._client = openai.AsyncOpenAI(
             **compact(
                 api_key=api_key,
@@ -167,12 +174,14 @@ class OpenAIProvider:
 
             self._validate_messages(messages_models)
 
+            completion_params = dict(params)
+            reject_user_schema_mutation_param(completion_params)
             kwargs = OpenAIChatTranslator.to_openai(
                 model,
                 messages_models,
                 tools=tools_models,
                 schema_mutation=self._schema_mutation,
-                **params,
+                **completion_params,
             )
         except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e
@@ -266,13 +275,16 @@ class OpenAIProvider:
             input_models = _RESPONSE_INPUT_ITEMS_TYPE_ADAPTER.validate_python(input)
             tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
 
+            response_params = dict(params)
+            reject_user_schema_mutation_param(response_params)
             kwargs = OpenAIResponseTranslator.to_openai(
                 model,
                 input_models,
                 instructions=instructions,
                 previous_id=previous_id,
                 tools=tools_models,
-                **params,
+                schema_mutation=self._schema_mutation,
+                **response_params,
             )
         except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e

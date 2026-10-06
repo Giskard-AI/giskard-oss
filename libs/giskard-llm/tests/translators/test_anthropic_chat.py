@@ -8,7 +8,6 @@ import logging
 from typing import Any, Literal, cast
 
 import pytest
-from giskard.llm.errors import BadRequestError
 from giskard.llm.structured_output import (
     object_schema_paths_missing_additional_properties_false,
 )
@@ -490,15 +489,15 @@ def test_response_format_nested_pydantic_schema_valid_for_anthropic():
     validate_anthropic_message_create(payload)
 
 
-def test_response_format_nested_schema_mutation_raise():
+def test_response_format_nested_schema_mutation_raise_allows_ap_only():
     msg = UserMessage(content="hi")
-    with pytest.raises(BadRequestError, match="normalized"):
-        AnthropicChatTranslator.to_anthropic(
-            _MODEL,
-            [msg],
-            response_format=NestedOutputModel,
-            schema_mutation="raise",
-        )
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL,
+        [msg],
+        response_format=NestedOutputModel,
+        schema_mutation="raise",
+    )
+    validate_anthropic_message_create(payload)
 
 
 def test_response_format_nested_model_round_trip_from_anthropic():

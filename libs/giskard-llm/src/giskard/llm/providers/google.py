@@ -42,7 +42,7 @@ Error mapping (Interactions API ``google.genai._interactions``):
 Supported features:
     - Completion: yes
     - Embeddings: yes
-    - Structured output (response_format): yes, via ``response_schema``
+    - Structured output (response_format): yes, via ``response_json_schema``
 
 Provider-specific kwargs:
     - ``safety_settings``: override default safety settings
@@ -72,7 +72,12 @@ from ..errors import (
     RateLimitError,
     ServerError,
 )
-from ..structured_output import DEFAULT_SCHEMA_MUTATION, coerce_schema_mutation
+from ..structured_output import (
+    DEFAULT_SCHEMA_MUTATION,
+    SchemaMutationMode,
+    coerce_schema_mutation,
+    reject_user_schema_mutation_param,
+)
 from ..translators.google_chat import GoogleChatTranslator
 from ..translators.google_response import GoogleResponseTranslator
 from ..types import (
@@ -194,7 +199,7 @@ class GoogleProvider:
         http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
         http_options: "HttpOptionsOrDict | None" = None,
-        schema_mutation: str = DEFAULT_SCHEMA_MUTATION,
+        schema_mutation: SchemaMutationMode | str = DEFAULT_SCHEMA_MUTATION,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:
@@ -202,7 +207,9 @@ class GoogleProvider:
                 "%s provider: ignoring unknown kwargs: %s", PROVIDER, sorted(_kwargs)
             )
         genai = _import_genai()
-        self._schema_mutation = coerce_schema_mutation(schema_mutation)
+        self._schema_mutation: SchemaMutationMode = coerce_schema_mutation(
+            schema_mutation
+        )
         resolved_key = (
             api_key
             or os.environ.get("GEMINI_API_KEY")
@@ -280,12 +287,14 @@ class GoogleProvider:
 
             self._validate_messages(messages_models)
 
+            completion_params = dict(params)
+            reject_user_schema_mutation_param(completion_params)
             kwargs = GoogleChatTranslator.to_google(
                 model,
                 messages_models,
                 tools=tools_models,
                 schema_mutation=self._schema_mutation,
-                **params,
+                **completion_params,
             )
         except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e
@@ -375,6 +384,8 @@ class GoogleProvider:
             input_models = _RESPONSE_INPUT_ITEMS_TYPE_ADAPTER.validate_python(input)
             tools_models = _TOOL_DEFS_TYPE_ADAPTER.validate_python(tools)
 
+            response_params = dict(params)
+            reject_user_schema_mutation_param(response_params)
             kwargs = GoogleResponseTranslator.to_google(
                 model,
                 input_models,
@@ -382,7 +393,7 @@ class GoogleProvider:
                 previous_id=previous_id,
                 tools=tools_models,
                 schema_mutation=self._schema_mutation,
-                **params,
+                **response_params,
             )
         except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e

@@ -292,6 +292,32 @@ def test_openai_provider_supports_azure_foundry_v1_base_url():
     assert "api_version" not in kwargs
 
 
+@pytest.mark.azure
+@patch("openai.AsyncAzureOpenAI")
+async def test_azure_openai_provider_complete(mock_client_cls):
+    mock_client_cls.return_value.chat.completions.create = AsyncMock(
+        return_value=_make_openai_response("Azure hi")
+    )
+    provider = AzureOpenAIProvider(
+        api_key="k", base_url="https://azure.test", api_version="2024-10-21"
+    )
+    resp = await provider.complete("gpt-4o", [{"role": "user", "content": "Hi"}])
+    assert resp.choices[0].message.content == "Azure hi"
+
+
+@pytest.mark.azure_ai
+@patch("openai.AsyncAzureOpenAI")
+async def test_azure_ai_provider_complete(mock_client_cls):
+    mock_client_cls.return_value.chat.completions.create = AsyncMock(
+        return_value=_make_openai_response("Foundry hi")
+    )
+    provider = AzureAIProvider(
+        api_key="k", base_url="https://dev.services.ai.azure.com"
+    )
+    resp = await provider.complete("gpt-4o", [{"role": "user", "content": "Hi"}])
+    assert resp.choices[0].message.content == "Foundry hi"
+
+
 def test_azure_openai_provider_forwards_transport_config(monkeypatch):
     http_client = object()
     default_headers = {"x-test": "1"}

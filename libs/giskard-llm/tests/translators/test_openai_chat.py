@@ -414,7 +414,6 @@ def test_response_format_pydantic_model_json_schema_without_strict():
 
 
 def test_response_format_nested_pydantic_schema_has_additional_properties_on_defs():
-    from giskard.llm.errors import BadRequestError
     from giskard.llm.structured_output import (
         object_schema_paths_missing_additional_properties_false,
     )
@@ -430,10 +429,15 @@ def test_response_format_nested_pydantic_schema_has_additional_properties_on_def
     assert object_schema_paths_missing_additional_properties_false(schema) == []
     validate_openai_completion_params(payload_raw)
 
-    with pytest.raises(BadRequestError, match="normalized"):
-        OpenAIChatTranslator.to_openai(
-            _MODEL,
-            [msg],
-            response_format=NestedOutputModel,
-            schema_mutation="raise",
-        )
+
+def test_response_format_nested_openai_schema_mutation_raise_allows_ap_only():
+    from .nested_schema_models import NestedOutputModel
+
+    msg = UserMessage(content="Hi.")
+    payload_raw = OpenAIChatTranslator.to_openai(
+        _MODEL,
+        [msg],
+        response_format=NestedOutputModel,
+        schema_mutation="raise",
+    )
+    validate_openai_completion_params(payload_raw)

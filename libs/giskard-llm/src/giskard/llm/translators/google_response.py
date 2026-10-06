@@ -5,7 +5,12 @@ from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 from giskard.llm.types._base import _BaseModel
 from pydantic import BaseModel, SerializationInfo, field_serializer, model_validator
 
-from ..structured_output import normalize_pydantic_json_schema, pop_schema_mutation
+from ..structured_output import (
+    DEFAULT_SCHEMA_MUTATION,
+    SchemaMutationMode,
+    normalize_pydantic_json_schema,
+    pop_schema_mutation,
+)
 from ..types import (
     ResponseEasyInputMessage,
     ResponseFunctionCallOutput,
@@ -51,9 +56,7 @@ else:
 
 _PROVIDER = "google/response"
 PROVIDER = "google"
-KNOWN_RESPONSE_PARAMS = frozenset(
-    {"temperature", "timeout", "response_format", "schema_mutation"}
-)
+KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "timeout", "response_format"})
 
 
 logger = logging.getLogger(__name__)
@@ -256,6 +259,7 @@ class GoogleResponseTranslator:
         instructions: str | None = None,
         previous_id: str | None = None,
         tools: Sequence[ToolDef] | None = None,
+        schema_mutation: SchemaMutationMode = DEFAULT_SCHEMA_MUTATION,
         **params: Any,
     ) -> "InteractionCreateParams":
         unknown = set(params) - KNOWN_RESPONSE_PARAMS
@@ -273,6 +277,7 @@ class GoogleResponseTranslator:
                 "system_instruction": instructions,
                 "previous_interaction_id": previous_id,
                 "tools": tools,
+                "schema_mutation": schema_mutation,
                 **params,
             }
         )

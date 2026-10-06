@@ -12,6 +12,7 @@ from pydantic import (
 
 from ..structured_output import (
     DEFAULT_SCHEMA_MUTATION,
+    SchemaMutationMode,
     normalize_pydantic_json_schema,
     pop_schema_mutation,
 )
@@ -60,7 +61,6 @@ KNOWN_COMPLETION_PARAMS = frozenset(
         "tools",
         "response_format",
         "safety_settings",
-        "schema_mutation",
     }
 )
 
@@ -317,6 +317,7 @@ class GoogleChatTranslator:
         messages: Sequence[ChatMessage],
         *,
         tools: Sequence[ToolDef] | None = None,
+        schema_mutation: SchemaMutationMode = DEFAULT_SCHEMA_MUTATION,
         **params: Any,
     ) -> "GenerateContentParams":
         unknown = set(params) - KNOWN_COMPLETION_PARAMS
@@ -329,7 +330,6 @@ class GoogleChatTranslator:
 
         params_copy = dict(params)
         config_base = dict(params_copy.pop("config", {}))
-        schema_mutation = params_copy.pop("schema_mutation", DEFAULT_SCHEMA_MUTATION)
         google_params = GoogleChatParams.model_validate(
             {
                 "model": model,
