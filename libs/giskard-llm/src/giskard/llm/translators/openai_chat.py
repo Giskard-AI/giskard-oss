@@ -11,12 +11,7 @@ from giskard.llm.types._base import _BaseModel
 from giskard.llm.utils import sanitize_schema_name
 from pydantic import BaseModel, model_validator
 
-from ..structured_output import (
-    DEFAULT_SCHEMA_MUTATION,
-    SchemaMutationMode,
-    normalize_pydantic_json_schema,
-    pop_schema_mutation,
-)
+from ..types._serialization import close_object_schemas
 
 if TYPE_CHECKING:
     from openai.types.chat.chat_completion import ChatCompletion
@@ -62,15 +57,9 @@ class OpenAIChatParams(_BaseModel):
         if not isinstance(v, dict):
             return v
         v = v.copy()
-        mode = pop_schema_mutation(v)
         response_format = v.get("response_format")
         if isinstance(response_format, type) and issubclass(response_format, BaseModel):
-            schema = normalize_pydantic_json_schema(
-                response_format,
-                profile="openai",
-                provider=PROVIDER,
-                mode=mode,
-            )
+            schema = close_object_schemas(response_format.model_json_schema())
             v["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
@@ -88,7 +77,6 @@ class OpenAIChatTranslator:
         messages: Sequence[ChatMessage],
         *,
         tools: Sequence[ToolDef] | None = None,
-        schema_mutation: SchemaMutationMode = DEFAULT_SCHEMA_MUTATION,
         **params: Any,
     ) -> "CompletionCreateParamsWithTimeout":
         unknown = set(params) - KNOWN_COMPLETION_PARAMS
@@ -104,7 +92,6 @@ class OpenAIChatTranslator:
                 "model": model,
                 "messages": messages,
                 "tools": tools,
-                "schema_mutation": schema_mutation,
                 **params,
             }
         )

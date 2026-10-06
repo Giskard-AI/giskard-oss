@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Sequence
+from copy import deepcopy
 from typing import TYPE_CHECKING, Any, cast
 
 from giskard.llm.types import (
@@ -11,13 +12,7 @@ from giskard.llm.types._base import _BaseModel
 from pydantic import BaseModel, Field, SerializationInfo, model_validator
 
 from ..errors import BadRequestError
-from ..structured_output import (
-    DEFAULT_SCHEMA_MUTATION,
-    SchemaMutationMode,
-    normalize_json_schema,
-    normalize_pydantic_json_schema,
-    pop_schema_mutation,
-)
+from ..types._serialization import close_object_schemas
 from ..utils import sanitize_schema_name
 
 if TYPE_CHECKING:
@@ -47,8 +42,6 @@ def tool_def_to_openai(tool: ToolDef, _info: SerializationInfo) -> "ToolParam":
 
 def _text_config_from_response_format_dict(
     response_format: dict[str, Any],
-    *,
-    mode: SchemaMutationMode,
 ) -> dict[str, Any]:
     """Map OpenAI-shaped ``response_format`` dict to Responses ``text`` config."""
     rf_type = response_format.get("type")
@@ -69,13 +62,7 @@ def _text_config_from_response_format_dict(
                     "response_format json_schema must include string name and object schema",
                     PROVIDER,
                 )
-            schema = normalize_json_schema(
-                schema,
-                profile="openai",
-                provider=PROVIDER,
-                mode=mode,
-                schema_label=name,
-            )
+            schema = close_object_schemas(deepcopy(schema))
             fmt: dict[str, Any] = {
                 "type": "json_schema",
                 "name": name,
@@ -88,12 +75,8 @@ def _text_config_from_response_format_dict(
             response_format.get("schema"), dict
         ):
             name = response_format["name"]
-            schema = normalize_json_schema(
-                cast(dict[str, Any], response_format["schema"]),
-                profile="openai",
-                provider=PROVIDER,
-                mode=mode,
-                schema_label=name,
+            schema = close_object_schemas(
+                deepcopy(cast(dict[str, Any], response_format["schema"]))
             )
             return {
                 "format": {
@@ -132,15 +115,9 @@ class OpenAIResponseParams(_BaseModel):
         if not isinstance(v, dict):
             return v
         v = v.copy()
-        mode = pop_schema_mutation(v)
         response_format = v.pop("response_format", None)
         if isinstance(response_format, type) and issubclass(response_format, BaseModel):
-            schema = normalize_pydantic_json_schema(
-                response_format,
-                profile="openai",
-                provider=PROVIDER,
-                mode=mode,
-            )
+            schema = close_object_schemas(response_format.model_json_schema())
             v["text"] = {
                 "format": {
                     "type": "json_schema",
@@ -149,9 +126,7 @@ class OpenAIResponseParams(_BaseModel):
                 }
             }
         elif isinstance(response_format, dict):
-            v["text"] = _text_config_from_response_format_dict(
-                response_format, mode=mode
-            )
+            v["text"] = _text_config_from_response_format_dict(response_format)
         elif response_format is not None:
             raise BadRequestError(
                 400,
@@ -170,7 +145,6 @@ class OpenAIResponseTranslator:
         instructions: str | None = None,
         previous_id: str | None = None,
         tools: Sequence[ToolDef] | None = None,
-        schema_mutation: SchemaMutationMode = DEFAULT_SCHEMA_MUTATION,
         **params: Any,
     ) -> "ResponseCreateParamsNonStreaming":
         unknown = set(params) - KNOWN_RESPONSE_PARAMS
@@ -188,7 +162,6 @@ class OpenAIResponseTranslator:
                 "instructions": instructions,
                 "previous_response_id": previous_id,
                 "tools": tools,
-                "schema_mutation": schema_mutation,
                 **params,
             }
         )

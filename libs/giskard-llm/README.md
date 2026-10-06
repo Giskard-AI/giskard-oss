@@ -51,7 +51,6 @@ client.configure(
     provider="anthropic",
     api_key="os.environ/ANTHROPIC_API_KEY",  # pragma: allowlist secret
     merge_system=True,
-    schema_mutation="ignore",  # warn (default) | raise | ignore for structured-output schema changes
 )
 
 response = await client.acompletion("azure-prod/gpt-4o", messages)
@@ -64,27 +63,19 @@ response = await client.acompletion(
 
 | Prefix | SDK | Auth env var | Completion | Embeddings | Notable kwargs |
 |---|---|---|---|---|---|
-| `google/` | `google-genai` | `GOOGLE_API_KEY` / `GEMINI_API_KEY` | yes | yes | `schema_mutation`, `http_client`, `default_headers`, `http_options` |
-| `openai/` (default) | `openai` | `OPENAI_API_KEY` | yes | yes | `base_url`, `timeout`, `schema_mutation`, `http_client`, `default_headers` |
-| `anthropic/` | `anthropic` | `ANTHROPIC_API_KEY` | yes | no | `merge_system`, `schema_mutation`, `timeout`, `http_client` (`httpx2`, see below), `default_headers` |
-| `azure/` | `openai` | `AZURE_API_KEY`, `AZURE_API_BASE` | yes | yes | `api_version`, `base_url`, `schema_mutation`, `http_client`, `default_headers` |
-| `azure_ai/` | `openai` | `AZURE_AI_API_KEY`, `AZURE_AI_ENDPOINT` | yes | model-dependent | `base_url`, `schema_mutation`, `http_client`, `default_headers` |
+| `openai/` (default) | `openai` | `OPENAI_API_KEY` | yes | yes | `base_url`, `timeout`, `http_client`, `default_headers` |
+| `google/` | `google-genai` | `GOOGLE_API_KEY` / `GEMINI_API_KEY` | yes | yes | `http_client`, `default_headers`, `http_options` |
+| `anthropic/` | `anthropic` | `ANTHROPIC_API_KEY` | yes | no | `merge_system`, `timeout`, `http_client` (`httpx2`, see below), `default_headers` |
+| `azure/` | `openai` | `AZURE_API_KEY`, `AZURE_API_BASE` | yes | yes | `api_version`, `base_url`, `http_client`, `default_headers` |
+| `azure_ai/` | `openai` | `AZURE_AI_API_KEY`, `AZURE_AI_ENDPOINT` | yes | model-dependent | `base_url`, `http_client`, `default_headers` |
 
-### Structured output (`response_format`)
+### Structured output schemas
 
-Pass a Pydantic model as ``response_format`` on ``acompletion`` / ``aresponse`` (OpenAI-shaped API). Providers normalize JSON Schema before calling the SDK (nested ``$defs``, ``additionalProperties``, provider-specific keyword rules).
-
-Configure ``schema_mutation`` on the provider (via ``LLMClient.configure``). It is **not** accepted on ``acompletion`` / ``aresponse`` kwargs (unknown params are stripped with a warning).
-
-| Value | Behavior |
-|---|---|
-| ``warn`` (default) | Apply normalization; log **once per model and profile** when changes are *lossy* (see below). |
-| ``raise`` | ``BadRequestError`` if lossy normalization would be required (message lists paths/keywords). |
-| ``ignore`` | Normalize silently. |
-
-**Lossy** means validation-relevant schema content changed: removed constraints (``pattern``, ``minimum``, …), stripped ``$ref`` siblings, dropped ``properties`` / ``$defs`` entries, etc. **Not lossy**: removing metadata-only keywords (``default``, ``title``, ``description``, … — Pydantic still parses and applies defaults) or adding ``additionalProperties: false`` alone.
-
-Supported on ``openai``, ``anthropic``, ``google``, ``azure``, and ``azure_ai`` providers.
+Pydantic `response_format` models are converted in each provider's translator.
+OpenAI and Azure close object schemas recursively while preserving explicit
+`additionalProperties` schemas on `dict[str, X]` fields. Anthropic uses its SDK's
+`transform_schema`; that SDK converts `dict[str, X]` fields to closed objects with
+no declared properties, so avoid map fields in Anthropic structured output models.
 
 
 ## Azure Foundry OpenAI v1

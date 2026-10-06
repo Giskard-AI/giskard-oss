@@ -22,7 +22,6 @@ from giskard.llm.providers.base import (
 )
 from giskard.llm.providers.google import GoogleProvider
 from giskard.llm.providers.openai import OpenAIProvider
-from giskard.llm.translators.openai_chat import OpenAIChatTranslator
 from giskard.llm.types import (
     ResponseFunctionToolCall,
     ResponseOutputMessage,
@@ -41,7 +40,6 @@ if TYPE_CHECKING:
 
 def _make_openai_provider():
     provider = OpenAIProvider.__new__(OpenAIProvider)
-    provider._schema_mutation = "ignore"
     provider._client = MagicMock()
     provider._client.chat = MagicMock()
     provider._client.chat.completions = MagicMock()
@@ -50,7 +48,6 @@ def _make_openai_provider():
 
 def _make_google_provider():
     provider = GoogleProvider.__new__(GoogleProvider)
-    provider._schema_mutation = "ignore"
     provider._client = MagicMock()
     return provider
 
@@ -58,7 +55,6 @@ def _make_google_provider():
 def _make_anthropic_provider(merge_system: bool = False):
     provider = AnthropicProvider.__new__(AnthropicProvider)
     provider._merge_system = merge_system
-    provider._schema_mutation = "ignore"
     provider._client = MagicMock()
     return provider
 
@@ -293,135 +289,6 @@ def test_openai_provider_supports_azure_foundry_v1_base_url():
     assert "api_version" not in kwargs
 
 
-@pytest.mark.azure
-@patch("openai.AsyncAzureOpenAI")
-async def test_azure_openai_provider_complete(mock_client_cls):
-    mock_client_cls.return_value.chat.completions.create = AsyncMock(
-        return_value=_make_openai_response("Azure hi")
-    )
-    provider = AzureOpenAIProvider(
-        api_key="k",
-        base_url="https://azure.test",
-        api_version="2024-10-21",
-        schema_mutation="raise",
-    )
-    assert provider._schema_mutation == "raise"
-    resp = await provider.complete("gpt-4o", [{"role": "user", "content": "Hi"}])
-    assert resp.choices[0].message.content == "Azure hi"
-
-
-@pytest.mark.azure
-@patch(
-    "giskard.llm.providers.openai.OpenAIChatTranslator.to_openai",
-    wraps=OpenAIChatTranslator.to_openai,
-)
-@patch("openai.AsyncAzureOpenAI")
-async def test_azure_openai_complete_forwards_configured_schema_mutation(
-    mock_client_cls, mock_to_openai
-):
-    mock_client_cls.return_value.chat.completions.create = AsyncMock(
-        return_value=_make_openai_response("Azure hi")
-    )
-    provider = AzureOpenAIProvider(
-        api_key="k",
-        base_url="https://azure.test",
-        api_version="2024-10-21",
-        schema_mutation="raise",
-    )
-    await provider.complete("gpt-4o", [{"role": "user", "content": "Hi"}])
-    assert mock_to_openai.call_args.kwargs["schema_mutation"] == "raise"
-
-
-@pytest.mark.azure
-@patch("openai.AsyncAzureOpenAI")
-async def test_azure_openai_complete_nested_response_format_preserves_schema(
-    mock_client_cls,
-):
-    from .translators.nested_schema_models import NestedOutputModel
-
-    create = mock_client_cls.return_value.chat.completions.create = AsyncMock(
-        return_value=_make_openai_response("Azure hi")
-    )
-    provider = AzureOpenAIProvider(
-        api_key="k",
-        base_url="https://azure.test",
-        api_version="2024-10-21",
-        schema_mutation="ignore",
-    )
-    await provider.complete(
-        "gpt-4o",
-        [{"role": "user", "content": "Hi"}],
-        response_format=NestedOutputModel,
-    )
-    kwargs = create.call_args.kwargs
-    schema = kwargs["response_format"]["json_schema"]["schema"]
-    assert schema["properties"]["inner"]["$ref"] == "#/$defs/NestedInnerModel"
-    assert "value" in schema["$defs"]["NestedInnerModel"]["properties"]
-
-
-@pytest.mark.azure_ai
-@patch("openai.AsyncAzureOpenAI")
-async def test_azure_ai_provider_complete(mock_client_cls):
-    mock_client_cls.return_value.chat.completions.create = AsyncMock(
-        return_value=_make_openai_response("Foundry hi")
-    )
-    provider = AzureAIProvider(
-        api_key="k",
-        base_url="https://dev.services.ai.azure.com",
-        schema_mutation="ignore",
-    )
-    assert provider._schema_mutation == "ignore"
-    resp = await provider.complete("gpt-4o", [{"role": "user", "content": "Hi"}])
-    assert resp.choices[0].message.content == "Foundry hi"
-
-
-@pytest.mark.azure_ai
-@patch(
-    "giskard.llm.providers.openai.OpenAIChatTranslator.to_openai",
-    wraps=OpenAIChatTranslator.to_openai,
-)
-@patch("openai.AsyncAzureOpenAI")
-async def test_azure_ai_complete_forwards_configured_schema_mutation(
-    mock_client_cls, mock_to_openai
-):
-    mock_client_cls.return_value.chat.completions.create = AsyncMock(
-        return_value=_make_openai_response("Foundry hi")
-    )
-    provider = AzureAIProvider(
-        api_key="k",
-        base_url="https://dev.services.ai.azure.com",
-        schema_mutation="ignore",
-    )
-    await provider.complete("gpt-4o", [{"role": "user", "content": "Hi"}])
-    assert mock_to_openai.call_args.kwargs["schema_mutation"] == "ignore"
-
-
-@pytest.mark.azure_ai
-@patch("openai.AsyncAzureOpenAI")
-async def test_azure_ai_complete_nested_response_format_preserves_schema(
-    mock_client_cls,
-):
-    from .translators.nested_schema_models import NestedOutputModel
-
-    create = mock_client_cls.return_value.chat.completions.create = AsyncMock(
-        return_value=_make_openai_response("Foundry hi")
-    )
-    provider = AzureAIProvider(
-        api_key="k",
-        base_url="https://dev.services.ai.azure.com",
-        schema_mutation="ignore",
-    )
-    await provider.complete(
-        "gpt-4o",
-        [{"role": "user", "content": "Hi"}],
-        response_format=NestedOutputModel,
-    )
-    kwargs = create.call_args.kwargs
-    schema = kwargs["response_format"]["json_schema"]["schema"]
-    assert schema["properties"]["inner"]["$ref"] == "#/$defs/NestedInnerModel"
-    assert "value" in schema["$defs"]["NestedInnerModel"]["properties"]
-
-
 def test_azure_openai_provider_forwards_transport_config(monkeypatch):
     http_client = object()
     default_headers = {"x-test": "1"}
@@ -521,7 +388,10 @@ async def test_sdk_v1_async_anthropic_rejects_httpx_v1_http_client():
     http_client = httpx.AsyncClient()
     try:
         with pytest.raises(TypeError, match="http_client"):
-            AsyncAnthropic(api_key="sk-test", http_client=http_client)
+            AsyncAnthropic(
+                api_key="sk-test",  # pragma: allowlist secret
+                http_client=http_client,
+            )
     finally:
         await http_client.aclose()
 

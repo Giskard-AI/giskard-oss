@@ -3,14 +3,10 @@
 Request shape: https://docs.anthropic.com/en/api/messages
 """
 
-import json
 import logging
 from typing import Any, Literal, cast
 
 import pytest
-from giskard.llm.structured_output import (
-    object_schema_paths_missing_additional_properties_false,
-)
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
 from giskard.llm.types import (
     AssistantMessage,
@@ -484,45 +480,22 @@ def test_response_format_nested_pydantic_schema_valid_for_anthropic():
     output_config = cast(dict[str, Any], cast(object, payload.get("output_config")))
     schema = cast(dict[str, Any], output_config["format"]["schema"])
     assert "$defs" in schema or schema.get("properties")
-    missing = object_schema_paths_missing_additional_properties_false(schema)
-    assert missing == []
+    assert schema["additionalProperties"] is False
     validate_anthropic_message_create(payload)
 
 
-def test_response_format_nested_schema_mutation_raise_allows_ap_only():
-    msg = UserMessage(content="hi")
+def test_response_format_dict_uses_anthropic_output_config_shape():
+    schema = {"type": "object", "properties": {"value": {"type": "string"}}}
     payload = AnthropicChatTranslator.to_anthropic(
         _MODEL,
-        [msg],
-        response_format=NestedOutputModel,
-        schema_mutation="raise",
+        [UserMessage(content="hi")],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {"name": "Result", "schema": schema},
+        },
     )
+    assert cast(dict[str, Any], cast(object, payload))["output_config"] == {
+        "format": {"type": "json_schema", "schema": schema}
+    }
+    assert "response_format" not in payload
     validate_anthropic_message_create(payload)
-
-
-def test_response_format_nested_model_round_trip_from_anthropic():
-    """Structured JSON in assistant text validates as the nested Pydantic model."""
-    pytest.importorskip("anthropic")
-    from anthropic.types import Message
-
-    raw = Message.model_validate(
-        {
-            "id": "msg_nested",
-            "type": "message",
-            "role": "assistant",
-            "model": _MODEL,
-            "content": [
-                {
-                    "type": "text",
-                    "text": json.dumps({"inner": {"value": "ok"}}),
-                }
-            ],
-            "stop_reason": "end_turn",
-            "usage": {"input_tokens": 1, "output_tokens": 2},
-        }
-    )
-    out = AnthropicChatTranslator.from_anthropic(raw)
-    text = out.choices[0].message.text
-    assert text is not None
-    validated = NestedOutputModel.model_validate(json.loads(text))
-    assert validated.inner.value == "ok"

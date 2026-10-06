@@ -10,12 +10,6 @@ from pydantic import (
     model_validator,
 )
 
-from ..structured_output import (
-    DEFAULT_SCHEMA_MUTATION,
-    SchemaMutationMode,
-    normalize_pydantic_json_schema,
-    pop_schema_mutation,
-)
 from ..types import (
     AssistantMessage,
     ChatMessage,
@@ -55,13 +49,7 @@ _PROVIDER = "google/chat"
 PROVIDER = "google"
 
 KNOWN_COMPLETION_PARAMS = frozenset(
-    {
-        "temperature",
-        "max_tokens",
-        "tools",
-        "response_format",
-        "safety_settings",
-    }
+    {"temperature", "max_tokens", "tools", "response_format", "safety_settings"}
 )
 
 # Sentinel that skips Gemini 3 thought-signature validation when we have no real
@@ -222,7 +210,7 @@ class GoogleChatConfigParams(_BaseModel):
     temperature: float | None = None
     max_output_tokens: int | None = Field(default=None, validation_alias="max_tokens")
     response_mime_type: Literal["application/json"] | None = None
-    response_json_schema: dict[str, Any] | None = None
+    response_schema: type[BaseModel] | None = None
 
 
 class GoogleChatParams(_BaseModel):
@@ -259,8 +247,6 @@ class GoogleChatParams(_BaseModel):
 
         v = v.copy()
 
-        mode = pop_schema_mutation(v)
-
         v["config"] = v.get("config", {})
 
         # Extract system instruction from messages
@@ -279,14 +265,8 @@ class GoogleChatParams(_BaseModel):
             and isinstance(v["config"]["response_format"], type)
             and issubclass(v["config"]["response_format"], BaseModel)
         ):
-            model = v["config"].pop("response_format")
             v["config"]["response_mime_type"] = "application/json"
-            v["config"]["response_json_schema"] = normalize_pydantic_json_schema(
-                model,
-                profile="google",
-                provider=PROVIDER,
-                mode=mode,
-            )
+            v["config"]["response_schema"] = v["config"].pop("response_format")
 
         return v
 
@@ -317,7 +297,6 @@ class GoogleChatTranslator:
         messages: Sequence[ChatMessage],
         *,
         tools: Sequence[ToolDef] | None = None,
-        schema_mutation: SchemaMutationMode = DEFAULT_SCHEMA_MUTATION,
         **params: Any,
     ) -> "GenerateContentParams":
         unknown = set(params) - KNOWN_COMPLETION_PARAMS
@@ -334,7 +313,6 @@ class GoogleChatTranslator:
             {
                 "model": model,
                 "contents": messages,
-                "schema_mutation": schema_mutation,
                 "config": {
                     "tools": tools,
                     **config_base,

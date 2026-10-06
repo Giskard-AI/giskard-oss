@@ -5,12 +5,6 @@ from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 from giskard.llm.types._base import _BaseModel
 from pydantic import BaseModel, SerializationInfo, field_serializer, model_validator
 
-from ..structured_output import (
-    DEFAULT_SCHEMA_MUTATION,
-    SchemaMutationMode,
-    normalize_pydantic_json_schema,
-    pop_schema_mutation,
-)
 from ..types import (
     ResponseEasyInputMessage,
     ResponseFunctionCallOutput,
@@ -213,8 +207,6 @@ class GoogleResponseParams(_BaseModel):
 
         v = v.copy()
 
-        mode = pop_schema_mutation(v)
-
         # Extract system instruction from input and merge with instructions
         instructions_parts = [
             v.get("system_instruction"),
@@ -234,17 +226,11 @@ class GoogleResponseParams(_BaseModel):
             and isinstance(v["response_format"], type)
             and issubclass(v["response_format"], BaseModel)
         ):
-            model = v["response_format"]
             v["response_mime_type"] = "application/json"
             v["response_format"] = {
                 "type": "text",
                 "mime_type": "application/json",
-                "schema": normalize_pydantic_json_schema(
-                    model,
-                    profile="google",
-                    provider=PROVIDER,
-                    mode=mode,
-                ),
+                "schema": v["response_format"].model_json_schema(),
             }
 
         return v
@@ -259,7 +245,6 @@ class GoogleResponseTranslator:
         instructions: str | None = None,
         previous_id: str | None = None,
         tools: Sequence[ToolDef] | None = None,
-        schema_mutation: SchemaMutationMode = DEFAULT_SCHEMA_MUTATION,
         **params: Any,
     ) -> "InteractionCreateParams":
         unknown = set(params) - KNOWN_RESPONSE_PARAMS
@@ -277,7 +262,6 @@ class GoogleResponseTranslator:
                 "system_instruction": instructions,
                 "previous_interaction_id": previous_id,
                 "tools": tools,
-                "schema_mutation": schema_mutation,
                 **params,
             }
         )

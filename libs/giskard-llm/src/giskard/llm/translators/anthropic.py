@@ -10,12 +10,6 @@ from pydantic import (
     model_validator,
 )
 
-from ..structured_output import (
-    DEFAULT_SCHEMA_MUTATION,
-    SchemaMutationMode,
-    normalize_pydantic_json_schema,
-    pop_schema_mutation,
-)
 from ..types import (
     AssistantMessage,
     ChatMessage,
@@ -247,8 +241,6 @@ class AnthropicChatConfigParams(_BaseModel):
 
         v = v.copy()
 
-        mode = pop_schema_mutation(v)
-
         # Extract system instruction from messages
         system = _extract_system_instruction(v["messages"])
         if system:
@@ -264,20 +256,34 @@ class AnthropicChatConfigParams(_BaseModel):
             if isinstance(v["response_format"], type) and issubclass(
                 v["response_format"], BaseModel
             ):
-                schema = normalize_pydantic_json_schema(
-                    v["response_format"],
-                    profile="anthropic",
-                    provider=_PROVIDER_NAME,
-                    mode=mode,
-                )
+                from anthropic import transform_schema
+
+                schema = transform_schema(v["response_format"])
                 v["output_config"] = {
                     "format": {
                         "type": "json_schema",
                         "schema": schema,
                     }
                 }
-            else:
-                v["output_config"] = v["response_format"]
+            elif isinstance(v["response_format"], dict):
+                response_format = v["response_format"]
+                if "format" in response_format:
+                    v["output_config"] = response_format
+                elif response_format.get("type") == "json_schema":
+                    schema = response_format.get("schema")
+                    if schema is None and isinstance(
+                        response_format.get("json_schema"), dict
+                    ):
+                        schema = response_format["json_schema"].get("schema")
+                    if not isinstance(schema, dict):
+                        raise ValueError(
+                            "response_format json_schema must contain a schema object"
+                        )
+                    v["output_config"] = {
+                        "format": {"type": "json_schema", "schema": schema}
+                    }
+                else:
+                    raise ValueError("unsupported Anthropic response_format dict")
             v.pop("response_format", None)
 
         return v
@@ -299,7 +305,6 @@ class AnthropicChatTranslator:
         messages: Sequence[ChatMessage],
         *,
         tools: Sequence[ToolDef] | None = None,
-        schema_mutation: SchemaMutationMode = DEFAULT_SCHEMA_MUTATION,
         **params: Any,
     ) -> "CompletionCreateParams":
         unknown = set(params) - KNOWN_COMPLETION_PARAMS
@@ -315,7 +320,6 @@ class AnthropicChatTranslator:
                 "model": model,
                 "messages": messages,
                 "tools": tools,
-                "schema_mutation": schema_mutation,
                 **params,
             }
         )

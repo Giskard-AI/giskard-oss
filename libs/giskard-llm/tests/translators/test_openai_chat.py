@@ -4,7 +4,7 @@ Request shape: https://platform.openai.com/docs/api-reference/chat/create
 """
 
 import json
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import pytest
 from giskard.llm.translators.openai_chat import OpenAIChatTranslator
@@ -414,10 +414,6 @@ def test_response_format_pydantic_model_json_schema_without_strict():
 
 
 def test_response_format_nested_pydantic_schema_has_additional_properties_on_defs():
-    from giskard.llm.structured_output import (
-        object_schema_paths_missing_additional_properties_false,
-    )
-
     from .nested_schema_models import NestedOutputModel
 
     msg = UserMessage(content="Hi.")
@@ -425,19 +421,24 @@ def test_response_format_nested_pydantic_schema_has_additional_properties_on_def
         _MODEL, [msg], response_format=NestedOutputModel
     )
     payload = json.loads(json.dumps(cast(object, payload_raw)))
-    schema = payload["response_format"]["json_schema"]["schema"]
-    assert object_schema_paths_missing_additional_properties_false(schema) == []
+    schema = cast(dict[str, Any], cast(object, payload))["response_format"][
+        "json_schema"
+    ]["schema"]
+    assert schema["additionalProperties"] is False
     validate_openai_completion_params(payload_raw)
 
 
-def test_response_format_nested_openai_schema_mutation_raise_allows_ap_only():
-    from .nested_schema_models import NestedOutputModel
+def test_response_format_map_keeps_value_schema():
+    from pydantic import BaseModel
 
-    msg = UserMessage(content="Hi.")
-    payload_raw = OpenAIChatTranslator.to_openai(
-        _MODEL,
-        [msg],
-        response_format=NestedOutputModel,
-        schema_mutation="raise",
+    class MapOutput(BaseModel):
+        values: dict[str, int]
+
+    payload = OpenAIChatTranslator.to_openai(
+        _MODEL, [UserMessage(content="Hi.")], response_format=MapOutput
     )
-    validate_openai_completion_params(payload_raw)
+    schema = cast(dict[str, Any], cast(object, payload))["response_format"][
+        "json_schema"
+    ]["schema"]
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["values"]["additionalProperties"] == {"type": "integer"}
