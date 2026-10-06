@@ -50,6 +50,8 @@ Provider-specific kwargs:
     - ``default_headers``: extra headers passed through ``HttpOptions``
     - ``http_options``: advanced ``google.genai.types.HttpOptions`` override;
       explicit fields are preserved over convenience kwargs
+    - ``schema_mutation``: ``warn`` (default), ``raise``, or ``ignore`` when normalizing
+      structured-output JSON schemas for provider compatibility
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
@@ -70,6 +72,7 @@ from ..errors import (
     RateLimitError,
     ServerError,
 )
+from ..structured_output import DEFAULT_SCHEMA_MUTATION, coerce_schema_mutation
 from ..translators.google_chat import GoogleChatTranslator
 from ..translators.google_response import GoogleResponseTranslator
 from ..types import (
@@ -191,6 +194,7 @@ class GoogleProvider:
         http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
         http_options: "HttpOptionsOrDict | None" = None,
+        schema_mutation: str = DEFAULT_SCHEMA_MUTATION,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:
@@ -198,6 +202,7 @@ class GoogleProvider:
                 "%s provider: ignoring unknown kwargs: %s", PROVIDER, sorted(_kwargs)
             )
         genai = _import_genai()
+        self._schema_mutation = coerce_schema_mutation(schema_mutation)
         resolved_key = (
             api_key
             or os.environ.get("GEMINI_API_KEY")
@@ -276,7 +281,11 @@ class GoogleProvider:
             self._validate_messages(messages_models)
 
             kwargs = GoogleChatTranslator.to_google(
-                model, messages_models, tools=tools_models, **params
+                model,
+                messages_models,
+                tools=tools_models,
+                schema_mutation=self._schema_mutation,
+                **params,
             )
         except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e
@@ -372,6 +381,7 @@ class GoogleProvider:
                 instructions=instructions,
                 previous_id=previous_id,
                 tools=tools_models,
+                schema_mutation=self._schema_mutation,
                 **params,
             )
         except ValidationError as e:

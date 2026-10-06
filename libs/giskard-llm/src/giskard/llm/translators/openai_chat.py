@@ -9,7 +9,9 @@ from giskard.llm.types import (
 )
 from giskard.llm.types._base import _BaseModel
 from giskard.llm.utils import sanitize_schema_name
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, model_validator
+
+from ..structured_output import normalize_pydantic_json_schema, pop_schema_mutation
 
 if TYPE_CHECKING:
     from openai.types.chat.chat_completion import ChatCompletion
@@ -28,7 +30,15 @@ logger = logging.getLogger(__name__)
 PROVIDER = "openai"
 _PROVIDER = "openai/chat"
 KNOWN_COMPLETION_PARAMS = frozenset(
-    {"temperature", "max_tokens", "timeout", "tools", "response_format", "metadata"}
+    {
+        "temperature",
+        "max_tokens",
+        "timeout",
+        "tools",
+        "response_format",
+        "metadata",
+        "schema_mutation",
+    }
 )
 
 
@@ -42,19 +52,25 @@ class OpenAIChatParams(_BaseModel):
     metadata: dict[str, str] | None = None
     response_format: dict[str, Any] | None = None
 
-    @field_validator("response_format", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def _coerce_response_format(
-        cls,
-        v: Any,
-    ) -> Any:
-        if isinstance(v, type) and issubclass(v, BaseModel):
-            schema = v.model_json_schema()
-            schema["additionalProperties"] = False
-            return {
+    def _coerce_response_format_and_strip_internal(cls, v: Any) -> Any:
+        if not isinstance(v, dict):
+            return v
+        v = v.copy()
+        mode = pop_schema_mutation(v)
+        response_format = v.get("response_format")
+        if isinstance(response_format, type) and issubclass(response_format, BaseModel):
+            schema = normalize_pydantic_json_schema(
+                response_format,
+                profile="openai",
+                provider=PROVIDER,
+                mode=mode,
+            )
+            v["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": sanitize_schema_name(v.__name__),
+                    "name": sanitize_schema_name(response_format.__name__),
                     "schema": schema,
                 },
             }

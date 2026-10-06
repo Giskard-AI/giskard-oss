@@ -39,6 +39,8 @@ Supported features:
 
 Provider-specific kwargs (configure-time):
     - ``merge_system``: if True, concatenate multiple system messages instead of raising
+    - ``schema_mutation``: ``warn`` (default), ``raise``, or ``ignore`` when normalizing
+      structured-output JSON schemas for provider compatibility
     - ``base_url``: custom API endpoint
     - ``timeout``: request timeout in seconds
     - ``http_client``: caller-owned ``httpx2.AsyncClient`` passed to the SDK; not closed by giskard-llm.
@@ -63,6 +65,7 @@ from ..errors import (
     RateLimitError,
     ServerError,
 )
+from ..structured_output import DEFAULT_SCHEMA_MUTATION, coerce_schema_mutation
 from ..translators.anthropic import AnthropicChatTranslator
 from ..types import (
     ChatMessage,
@@ -105,6 +108,7 @@ class AnthropicProvider:
         base_url: str | None = None,
         timeout: float | None = None,
         merge_system: bool = False,
+        schema_mutation: str = DEFAULT_SCHEMA_MUTATION,
         http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
         **_kwargs: Any,
@@ -115,6 +119,7 @@ class AnthropicProvider:
             )
         anthropic = _import_anthropic()
         self._merge_system = merge_system
+        self._schema_mutation = coerce_schema_mutation(schema_mutation)
         self._client = anthropic.AsyncAnthropic(
             **compact(
                 api_key=api_key,
@@ -161,7 +166,11 @@ class AnthropicProvider:
             self._validate_messages(messages_models)
 
             kwargs = AnthropicChatTranslator.to_anthropic(
-                model, messages_models, tools=tools_models, **params
+                model,
+                messages_models,
+                tools=tools_models,
+                schema_mutation=self._schema_mutation,
+                **params,
             )
         except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e

@@ -3,10 +3,15 @@
 Request shape: https://docs.anthropic.com/en/api/messages
 """
 
+import json
 import logging
-from typing import Literal
+from typing import Any, Literal, cast
 
 import pytest
+from giskard.llm.errors import BadRequestError
+from giskard.llm.structured_output import (
+    object_schema_paths_missing_additional_properties_false,
+)
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
 from giskard.llm.types import (
     AssistantMessage,
@@ -19,6 +24,7 @@ from giskard.llm.types import (
     UserMessage,
 )
 
+from .nested_schema_models import NestedOutputModel
 from .sdk_payload_validation import validate_anthropic_message_create
 from .tool_turn_fixtures import (
     ASSISTANT_TEXT_WITH_PARALLEL_TOOLS,
@@ -467,3 +473,57 @@ def test_httpx2_timeout_passes_through():
         _MODEL, [UserMessage(content="Hello.")], timeout=original
     )
     assert payload.get("timeout") is original
+
+
+def test_response_format_nested_pydantic_schema_valid_for_anthropic():
+    """Nested ``$defs`` get ``additionalProperties: false`` on every object (#2859)."""
+    pytest.importorskip("anthropic")
+    msg = UserMessage(content="hi")
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL, [msg], response_format=NestedOutputModel
+    )
+    output_config = cast(dict[str, Any], cast(object, payload.get("output_config")))
+    schema = cast(dict[str, Any], output_config["format"]["schema"])
+    assert "$defs" in schema or schema.get("properties")
+    missing = object_schema_paths_missing_additional_properties_false(schema)
+    assert missing == []
+    validate_anthropic_message_create(payload)
+
+
+def test_response_format_nested_schema_mutation_raise():
+    msg = UserMessage(content="hi")
+    with pytest.raises(BadRequestError, match="normalized"):
+        AnthropicChatTranslator.to_anthropic(
+            _MODEL,
+            [msg],
+            response_format=NestedOutputModel,
+            schema_mutation="raise",
+        )
+
+
+def test_response_format_nested_model_round_trip_from_anthropic():
+    """Structured JSON in assistant text validates as the nested Pydantic model."""
+    pytest.importorskip("anthropic")
+    from anthropic.types import Message
+
+    raw = Message.model_validate(
+        {
+            "id": "msg_nested",
+            "type": "message",
+            "role": "assistant",
+            "model": _MODEL,
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps({"inner": {"value": "ok"}}),
+                }
+            ],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 1, "output_tokens": 2},
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    text = out.choices[0].message.text
+    assert text is not None
+    validated = NestedOutputModel.model_validate(json.loads(text))
+    assert validated.inner.value == "ok"

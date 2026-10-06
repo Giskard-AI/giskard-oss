@@ -10,6 +10,7 @@ from pydantic import (
     model_validator,
 )
 
+from ..structured_output import normalize_pydantic_json_schema, pop_schema_mutation
 from ..types import (
     AssistantMessage,
     ChatMessage,
@@ -66,6 +67,7 @@ KNOWN_COMPLETION_PARAMS = frozenset(
         "system",
         "output_config",
         "response_format",
+        "schema_mutation",
     }
 )
 
@@ -241,6 +243,8 @@ class AnthropicChatConfigParams(_BaseModel):
 
         v = v.copy()
 
+        mode = pop_schema_mutation(v)
+
         # Extract system instruction from messages
         system = _extract_system_instruction(v["messages"])
         if system:
@@ -256,8 +260,12 @@ class AnthropicChatConfigParams(_BaseModel):
             if isinstance(v["response_format"], type) and issubclass(
                 v["response_format"], BaseModel
             ):
-                schema = v["response_format"].model_json_schema()
-                schema["additionalProperties"] = False
+                schema = normalize_pydantic_json_schema(
+                    v["response_format"],
+                    profile="anthropic",
+                    provider=_PROVIDER_NAME,
+                    mode=mode,
+                )
                 v["output_config"] = {
                     "format": {
                         "type": "json_schema",
@@ -266,6 +274,7 @@ class AnthropicChatConfigParams(_BaseModel):
                 }
             else:
                 v["output_config"] = v["response_format"]
+            v.pop("response_format", None)
 
         return v
 

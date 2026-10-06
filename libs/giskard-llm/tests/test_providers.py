@@ -40,6 +40,7 @@ if TYPE_CHECKING:
 
 def _make_openai_provider():
     provider = OpenAIProvider.__new__(OpenAIProvider)
+    provider._schema_mutation = "ignore"
     provider._client = MagicMock()
     provider._client.chat = MagicMock()
     provider._client.chat.completions = MagicMock()
@@ -48,6 +49,7 @@ def _make_openai_provider():
 
 def _make_google_provider():
     provider = GoogleProvider.__new__(GoogleProvider)
+    provider._schema_mutation = "ignore"
     provider._client = MagicMock()
     return provider
 
@@ -55,6 +57,7 @@ def _make_google_provider():
 def _make_anthropic_provider(merge_system: bool = False):
     provider = AnthropicProvider.__new__(AnthropicProvider)
     provider._merge_system = merge_system
+    provider._schema_mutation = "ignore"
     provider._client = MagicMock()
     return provider
 

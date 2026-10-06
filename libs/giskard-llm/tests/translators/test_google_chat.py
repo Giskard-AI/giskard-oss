@@ -3,7 +3,7 @@
 Content shape: https://ai.google.dev/api/generate-content#Content
 """
 
-from typing import Literal
+from typing import Any, Literal, cast
 
 import pytest
 from giskard.llm.translators.google_chat import (
@@ -472,3 +472,28 @@ def test_function_message_raises():
     ]
     with pytest.raises(ValueError, match="Unsupported message role"):
         GoogleChatTranslator.to_google(_MODEL, messages)
+
+
+def test_response_format_nested_pydantic_uses_response_json_schema():
+    from giskard.llm.errors import BadRequestError
+    from giskard.llm.structured_output import (
+        object_schema_paths_missing_additional_properties_false,
+    )
+
+    from .nested_schema_models import NestedOutputModel
+
+    payload = GoogleChatTranslator.to_google(
+        _MODEL, [UserMessage(content="Hello.")], response_format=NestedOutputModel
+    )
+    config = cast(dict[str, Any], cast(object, payload.get("config")))
+    schema = config["response_json_schema"]
+    assert config["response_mime_type"] == "application/json"
+    assert object_schema_paths_missing_additional_properties_false(schema) == []
+
+    with pytest.raises(BadRequestError, match="normalized"):
+        GoogleChatTranslator.to_google(
+            _MODEL,
+            [UserMessage(content="Hello.")],
+            response_format=NestedOutputModel,
+            schema_mutation="raise",
+        )
