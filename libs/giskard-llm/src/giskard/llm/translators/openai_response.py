@@ -10,6 +10,7 @@ from giskard.llm.types import (
 from giskard.llm.types._base import _BaseModel
 from pydantic import BaseModel, Field, SerializationInfo, model_validator
 
+from ..errors import BadRequestError
 from ..structured_output import (
     DEFAULT_SCHEMA_MUTATION,
     SchemaMutationMode,
@@ -41,6 +42,55 @@ def tool_def_to_openai(tool: ToolDef, _info: SerializationInfo) -> "ToolParam":
         "parameters": tool.function.parameters,
         "strict": None,
     }
+
+
+def _text_config_from_response_format_dict(
+    response_format: dict[str, Any],
+) -> dict[str, Any]:
+    """Map OpenAI-shaped ``response_format`` dict to Responses ``text`` config."""
+    rf_type = response_format.get("type")
+    if rf_type == "json_schema":
+        if "json_schema" in response_format:
+            inner = response_format["json_schema"]
+            if not isinstance(inner, dict):
+                raise BadRequestError(
+                    400,
+                    "response_format json_schema must be an object",
+                    PROVIDER,
+                )
+            name = inner.get("name")
+            schema = inner.get("schema")
+            if not isinstance(name, str) or not isinstance(schema, dict):
+                raise BadRequestError(
+                    400,
+                    "response_format json_schema must include string name and object schema",
+                    PROVIDER,
+                )
+            fmt: dict[str, Any] = {
+                "type": "json_schema",
+                "name": name,
+                "schema": schema,
+            }
+            if "strict" in inner:
+                fmt["strict"] = inner["strict"]
+            return {"format": fmt}
+        if isinstance(response_format.get("name"), str) and isinstance(
+            response_format.get("schema"), dict
+        ):
+            return {"format": response_format}
+        raise BadRequestError(
+            400,
+            "response_format type json_schema must use Chat Completions "
+            "(json_schema.name/schema) or Responses (name/schema) shape",
+            PROVIDER,
+        )
+    if rf_type in ("json_object", "text"):
+        return {"format": response_format}
+    raise BadRequestError(
+        400,
+        f"Unsupported response_format type {rf_type!r} for OpenAI Responses API",
+        PROVIDER,
+    )
 
 
 class OpenAIResponseParams(_BaseModel):
@@ -75,8 +125,14 @@ class OpenAIResponseParams(_BaseModel):
                     "schema": schema,
                 }
             }
+        elif isinstance(response_format, dict):
+            v["text"] = _text_config_from_response_format_dict(response_format)
         elif response_format is not None:
-            v["response_format"] = response_format
+            raise BadRequestError(
+                400,
+                "response_format must be a Pydantic model class or a dict",
+                PROVIDER,
+            )
         return v
 
 

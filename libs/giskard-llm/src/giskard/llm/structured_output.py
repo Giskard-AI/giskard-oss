@@ -2,6 +2,7 @@
 
 import copy
 import logging
+import threading
 from collections.abc import Callable, Iterator
 from typing import Any, Literal
 
@@ -50,7 +51,8 @@ _SCHEMA_NAME_MAP_KEYS = frozenset(
     {"properties", "$defs", "definitions", "patternProperties", "dependentSchemas"}
 )
 
-_warned_lossy_mutations: set[tuple[str, str]] = set()
+_warned_lossy_mutations: set[tuple[str, str, StructuredOutputProfile]] = set()
+_warn_lock = threading.Lock()
 
 
 def coerce_schema_mutation(value: Any) -> SchemaMutationMode:
@@ -233,15 +235,19 @@ def normalize_pydantic_json_schema(
     if is_lossy_schema_mutation(original, normalized, profile):
         message = (
             f"Structured output schema for {model.__name__} was lossily normalized "
-            f"for {profile} compatibility (e.g. nested/$defs inlining, removed "
-            "keywords, or stripped $ref siblings)."
+            f"for {profile} compatibility (e.g. removed unsupported keywords, "
+            "stripped $ref siblings, or other changes beyond "
+            "``additionalProperties: false``)."
         )
         if mode == "raise":
             raise BadRequestError(400, message, provider)
         if mode == "warn":
-            warn_key = (model.__module__, model.__qualname__)
-            if warn_key not in _warned_lossy_mutations:
-                _warned_lossy_mutations.add(warn_key)
+            warn_key = (model.__module__, model.__qualname__, profile)
+            with _warn_lock:
+                is_new = warn_key not in _warned_lossy_mutations
+                if is_new:
+                    _warned_lossy_mutations.add(warn_key)
+            if is_new:
                 logger.warning("%s provider: %s", provider, message)
 
     return normalized

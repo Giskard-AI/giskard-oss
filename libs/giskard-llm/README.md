@@ -78,7 +78,7 @@ Configure ``schema_mutation`` on the provider (via ``LLMClient.configure``). It 
 
 | Value | Behavior |
 |---|---|
-| ``warn`` (default) | Apply normalization; log **once per model** when changes are *lossy* (e.g. Anthropic ``$defs`` inlining, stripped unsupported keywords)—not when only adding ``additionalProperties: false``. |
+| ``warn`` (default) | Apply normalization; log **once per model and profile** when changes are *lossy* (not when only adding ``additionalProperties: false``). |
 | ``raise`` | ``BadRequestError`` if lossy normalization would be required. |
 | ``ignore`` | Normalize silently. |
 

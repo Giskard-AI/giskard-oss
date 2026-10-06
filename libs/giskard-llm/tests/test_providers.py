@@ -22,6 +22,7 @@ from giskard.llm.providers.base import (
 )
 from giskard.llm.providers.google import GoogleProvider
 from giskard.llm.providers.openai import OpenAIProvider
+from giskard.llm.translators.openai_chat import OpenAIChatTranslator
 from giskard.llm.types import (
     ResponseFunctionToolCall,
     ResponseOutputMessage,
@@ -299,10 +300,36 @@ async def test_azure_openai_provider_complete(mock_client_cls):
         return_value=_make_openai_response("Azure hi")
     )
     provider = AzureOpenAIProvider(
-        api_key="k", base_url="https://azure.test", api_version="2024-10-21"
+        api_key="k",
+        base_url="https://azure.test",
+        api_version="2024-10-21",
+        schema_mutation="raise",
     )
+    assert provider._schema_mutation == "raise"
     resp = await provider.complete("gpt-4o", [{"role": "user", "content": "Hi"}])
     assert resp.choices[0].message.content == "Azure hi"
+
+
+@pytest.mark.azure
+@patch(
+    "giskard.llm.providers.openai.OpenAIChatTranslator.to_openai",
+    wraps=OpenAIChatTranslator.to_openai,
+)
+@patch("openai.AsyncAzureOpenAI")
+async def test_azure_openai_complete_forwards_configured_schema_mutation(
+    mock_client_cls, mock_to_openai
+):
+    mock_client_cls.return_value.chat.completions.create = AsyncMock(
+        return_value=_make_openai_response("Azure hi")
+    )
+    provider = AzureOpenAIProvider(
+        api_key="k",
+        base_url="https://azure.test",
+        api_version="2024-10-21",
+        schema_mutation="raise",
+    )
+    await provider.complete("gpt-4o", [{"role": "user", "content": "Hi"}])
+    assert mock_to_openai.call_args.kwargs["schema_mutation"] == "raise"
 
 
 @pytest.mark.azure_ai
@@ -312,10 +339,34 @@ async def test_azure_ai_provider_complete(mock_client_cls):
         return_value=_make_openai_response("Foundry hi")
     )
     provider = AzureAIProvider(
-        api_key="k", base_url="https://dev.services.ai.azure.com"
+        api_key="k",
+        base_url="https://dev.services.ai.azure.com",
+        schema_mutation="ignore",
     )
+    assert provider._schema_mutation == "ignore"
     resp = await provider.complete("gpt-4o", [{"role": "user", "content": "Hi"}])
     assert resp.choices[0].message.content == "Foundry hi"
+
+
+@pytest.mark.azure_ai
+@patch(
+    "giskard.llm.providers.openai.OpenAIChatTranslator.to_openai",
+    wraps=OpenAIChatTranslator.to_openai,
+)
+@patch("openai.AsyncAzureOpenAI")
+async def test_azure_ai_complete_forwards_configured_schema_mutation(
+    mock_client_cls, mock_to_openai
+):
+    mock_client_cls.return_value.chat.completions.create = AsyncMock(
+        return_value=_make_openai_response("Foundry hi")
+    )
+    provider = AzureAIProvider(
+        api_key="k",
+        base_url="https://dev.services.ai.azure.com",
+        schema_mutation="ignore",
+    )
+    await provider.complete("gpt-4o", [{"role": "user", "content": "Hi"}])
+    assert mock_to_openai.call_args.kwargs["schema_mutation"] == "ignore"
 
 
 def test_azure_openai_provider_forwards_transport_config(monkeypatch):
