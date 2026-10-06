@@ -61,7 +61,8 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
             "How to apply the comparison when the resolved actual value is a collection. "
             "When omitted, the resolved value is compared directly. "
             "'any' passes if at least one item matches, 'all' if every item matches, "
-            "'none' if no item matches. Requires a list, set, or tuple."
+            "'none' if no item matches. Requires a list, set, or tuple. "
+            "Returns skip when the resolved collection is empty."
         ),
     )
 
@@ -168,6 +169,15 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
             )
 
         collection: MatchCollection[Any] = actual_value
+        if len(collection) == 0:
+            return CheckResult.skip(
+                message=(
+                    f"No values to compare at key '{self.target_key}': "
+                    "resolved collection is empty."
+                ),
+                details=details,
+            )
+
         normalized_expected = normalize_data(expected_value, self.normalization_form)
         comparison_results: list[bool | None] = []
         matched_items: list[Any] = []
