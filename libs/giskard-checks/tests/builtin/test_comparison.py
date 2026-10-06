@@ -1076,9 +1076,15 @@ class TestComparisonMatchMode:
         assert "Expected a list, set, or tuple" in result.message
 
     @pytest.mark.parametrize(
-        "match", ["all", "none", "any"], ids=["all", "none", "any"]
+        ("match", "expected_status"),
+        [
+            ("all", CheckStatus.SKIP),
+            ("any", CheckStatus.SKIP),
+            ("none", CheckStatus.PASS),
+        ],
+        ids=["all", "any", "none"],
     )
-    async def test_empty_collection_skips_for_all_match_modes(self, match):
+    async def test_empty_collection_match_modes(self, match, expected_status):
         trace = await self._tool_calls_trace(tool_calls=[])
         check = Equals(
             expected_value="search",
@@ -1088,10 +1094,13 @@ class TestComparisonMatchMode:
 
         result = await check.run(trace)
 
-        assert result.status == CheckStatus.SKIP
-        assert result.skipped
-        assert isinstance(result.message, str)
-        assert "empty" in result.message.lower()
+        assert result.status == expected_status
+        if expected_status == CheckStatus.SKIP:
+            assert result.skipped
+            assert isinstance(result.message, str)
+            assert "empty" in result.message.lower()
+        else:
+            assert result.passed
 
     async def test_match_any_works_with_tuple(self):
         trace = await Trace.from_interactions(

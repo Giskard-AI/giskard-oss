@@ -62,7 +62,8 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
             "When omitted, the resolved value is compared directly. "
             "'any' passes if at least one item matches, 'all' if every item matches, "
             "'none' if no item matches. Requires a list, set, or tuple. "
-            "Returns skip when the resolved collection is empty."
+            "When the resolved collection is empty, 'all' and 'any' skip (nothing to "
+            "evaluate); 'none' passes (no item matched)."
         ),
     )
 
@@ -170,6 +171,13 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
 
         collection: MatchCollection[Any] = actual_value
         if len(collection) == 0:
+            if self.match == "none":
+                return CheckResult.success(
+                    message=self._collection_match_message(
+                        True, actual_value, expected_value
+                    ),
+                    details=details,
+                )
             return CheckResult.skip(
                 message=(
                     f"No values to compare at key '{self.target_key}': "
