@@ -58,6 +58,10 @@ full = ["giskard[all-llms,all-checks,scan,litellm]"]
 "Mastodon" = "https://fosstodon.org/@Giskard"
 "Twitter" = "https://twitter.com/giskard_ai"
 
+[tool.uv]
+# garak caps datasets<4; datasets 3.6.0 caps fsspec<=2025.3.0 (CVE-2026-104851 fix: 2026.6.0).
+override-dependencies = ["fsspec>=2026.6.0"]
+
 [tool.uv.workspace]
 members = [
     "libs/*",
