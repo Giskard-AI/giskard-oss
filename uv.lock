@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -1238,7 +1238,7 @@ wheels = [
 
 [[package]]
 name = "giskard"
-version = "3.0.0"
+version = "3.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "giskard-checks" },
@@ -1369,12 +1369,13 @@ test = [
 
 [[package]]
 name = "giskard-agents"
-version = "1.0.2"
+version = "1.0.3"
 source = { editable = "libs/giskard-agents" }
 dependencies = [
     { name = "giskard-core" },
     { name = "giskard-llm" },
     { name = "griffe" },
+    { name = "httpx" },
     { name = "jinja2" },
     { name = "logfire-api" },
     { name = "numpy" },
@@ -1409,6 +1410,7 @@ requires-dist = [
     { name = "giskard-llm", extras = ["google"], marker = "extra == 'google'", editable = "libs/giskard-llm" },
     { name = "giskard-llm", extras = ["openai"], marker = "extra == 'openai'", editable = "libs/giskard-llm" },
     { name = "griffe", specifier = ">=1.7.0,<3" },
+    { name = "httpx", specifier = ">=0.28.1,<1" },
     { name = "jinja2", specifier = ">=3.1.6,<4" },
     { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.83.0,<2" },
     { name = "logfire-api", specifier = ">=3.22.0,<5" },
@@ -1421,7 +1423,7 @@ provides-extras = ["openai", "google", "anthropic", "litellm", "all"]
 
 [[package]]
 name = "giskard-checks"
-version = "1.0.4"
+version = "1.0.5"
 source = { editable = "libs/giskard-checks" }
 dependencies = [
     { name = "giskard-agents" },
@@ -1468,7 +1470,7 @@ provides-extras = ["readability", "regorus", "all"]
 
 [[package]]
 name = "giskard-core"
-version = "1.0.1"
+version = "1.0.2"
 source = { editable = "libs/giskard-core" }
 dependencies = [
     { name = "posthog" },
@@ -1483,7 +1485,7 @@ requires-dist = [
 
 [[package]]
 name = "giskard-llm"
-version = "1.0.0"
+version = "1.0.1"
 source = { editable = "libs/giskard-llm" }
 dependencies = [
     { name = "giskard-core" },
@@ -1523,7 +1525,7 @@ provides-extras = ["openai", "google", "anthropic", "azure", "all"]
 
 [[package]]
 name = "giskard-scan"
-version = "1.0.0"
+version = "1.0.1"
 source = { editable = "libs/giskard-scan" }
 dependencies = [
     { name = "giskard-agents" },

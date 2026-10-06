@@ -9,7 +9,7 @@ from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
 from ..core.result import CheckResult
 from ._inputs import ResolvableInput, error_if_unresolved
-from .base import BaseLLMCheck
+from .base import BaseLLMCheck, trace_with_current_turn
 
 ToxicityCategory = Literal[
     "hate_speech",
@@ -56,8 +56,9 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         categories: ``hate_speech``, ``harassment``, ``threats``, ``self_harm``,
         ``sexual_content``, ``violence``. Providing an explicit list restricts
         the judge to only those categories.
-    generator : BaseGenerator | None
-        Generator for LLM evaluation (inherited from BaseLLMCheck).
+    judge : BaseJudge or None
+        Judge backend (inherited from BaseLLMCheck). Legacy ``generator=`` is
+        migrated to ``judge`` automatically.
 
     Examples
     --------
@@ -73,10 +74,11 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     Check only for hate speech and harassment:
 
     >>> from giskard.agents import Generator
+    >>> from giskard.checks import LLMChatJudge
     >>> check = Toxicity(
     ...     output="This is a safe response.",
     ...     categories=["hate_speech", "harassment"],
-    ...     generator=Generator(model="openai/gpt-4o"),
+    ...     judge=LLMChatJudge(generator=Generator(model="openai/gpt-4o")),
     ... )
     """
 
@@ -133,14 +135,15 @@ class Toxicity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
             keys. The ``trace`` key is inherited from the base class so that
             custom templates can access interaction history or metadata.
         """
+        output = str(provided_or_resolve(trace, key=self.target_key, value=self.output))
         return {
             "trace": trace,
-            "output": str(
-                provided_or_resolve(
-                    trace,
-                    key=self.target_key,
-                    value=self.output,
-                )
-            ),
+            "output": output,
             "categories": self.categories,
         }
+
+    @override
+    def get_som_trace(
+        self, trace: TraceType, inputs: dict[str, Any]
+    ) -> Trace[Any, Any]:
+        return trace_with_current_turn(trace, inputs="", outputs=inputs["output"])
