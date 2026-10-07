@@ -22,11 +22,14 @@ Find a list of packages below
 |✔|anyio|
 |✔|attrs|
 |✔|backoff|
+|✔|boto3|
+|✔|botocore|
 |✔|celine-regorus|
 |✔|certifi|
 |✔|cffi|
 |✔|charset-normalizer|
 |✔|click|
+|✔|cloudpickle|
 |✔|colorama|
 |✔|cryptography|
 |✔|defusedxml|
@@ -42,14 +45,20 @@ Find a list of packages below
 |✔|griffecli|
 |✔|griffelib|
 |✔|h11|
+|✔|h2|
 |✔|hf-xet|
+|✔|hpack|
 |✔|httpcore|
+|✔|httpcore2|
 |✔|httpx|
+|✔|httpx2|
 |✔|huggingface-hub|
+|✔|hyperframe|
 |✔|idna|
 |✔|importlib-metadata|
 |✔|jinja2|
 |✔|jiter|
+|✔|jmespath|
 |✔|joblib|
 |✔|jsonpath-ng|
 |✔|jsonschema|
@@ -74,6 +83,7 @@ Find a list of packages below
 |✔|pydantic-settings|
 |✔|pygments|
 |✔|pyphen|
+|✔|python-dateutil|
 |✔|python-dotenv|
 |✔|pyyaml|
 |✔|referencing|
@@ -81,13 +91,16 @@ Find a list of packages below
 |✔|requests|
 |✔|rich|
 |✔|rpds-py|
+|✔|s3transfer|
 |✔|setuptools|
+|✔|six|
 |✔|sniffio|
 |✔|tenacity|
 |✔|textstat|
 |✔|tiktoken|
 |✔|tokenizers|
 |✔|tqdm|
+|✔|truststore|
 |✔|typing-extensions|
 |✔|typing-inspection|
 |✔|urllib3|
@@ -123,14 +136,14 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### anthropic-0.111.0
+### anthropic-1.2.0
 
 - HomePage:
 - Author: Anthropic
 - License: MIT License
 - Compatible: True
 
-### anyio-4.14.0
+### anyio-4.14.2
 
 - HomePage:
 - Author: Alex Grönholm
@@ -149,6 +162,20 @@ Find a list of packages below
 - HomePage: https://github.com/litl/backoff
 - Author: Bob Green
 - License: MIT License
+- Compatible: True
+
+### boto3-1.43.38
+
+- HomePage: https://github.com/boto/boto3
+- Author: Amazon Web Services
+- License: Apache-2.0
+- Compatible: True
+
+### botocore-1.43.38
+
+- HomePage: https://github.com/boto/botocore
+- Author: Amazon Web Services
+- License: Apache-2.0
 - Compatible: True
 
 ### celine-regorus-0.9.1.post20260227075446
@@ -184,6 +211,13 @@ Find a list of packages below
 - HomePage:
 - Author:
 - License: BSD-3-Clause
+- Compatible: True
+
+### cloudpickle-3.1.2
+
+- HomePage: https://github.com/cloudpipe/cloudpickle
+- Author: The cloudpickle developer team
+- License: BSD License
 - Compatible: True
 
 ### colorama-0.4.6
@@ -242,11 +276,11 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2025.3.0
+### fsspec-2026.9.0
 
 - HomePage:
 - Author:
-- License: BSD License
+- License: BSD-3-Clause
 - Compatible: True
 
 ### google-auth-2.55.0
@@ -291,6 +325,13 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
+### h2-4.4.1
+
+- HomePage:
+- Author: Cory Benfield
+- License: MIT
+- Compatible: True
+
 ### hf-xet-1.5.1
 
 - HomePage:
@@ -298,7 +339,21 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
+### hpack-4.2.0
+
+- HomePage:
+- Author: Cory Benfield
+- License: MIT
+- Compatible: True
+
 ### httpcore-1.0.9
+
+- HomePage:
+- Author: Tom Christie
+- License: BSD-3-Clause
+- Compatible: True
+
+### httpcore2-2.12.0
 
 - HomePage:
 - Author: Tom Christie
@@ -312,11 +367,25 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
+### httpx2-2.12.0
+
+- HomePage:
+- Author: Tom Christie
+- License: BSD-3-Clause
+- Compatible: True
+
 ### huggingface-hub-1.16.1
 
 - HomePage: https://github.com/huggingface/huggingface_hub
 - Author: Hugging Face, Inc.
 - License: Apache Software License
+- Compatible: True
+
+### hyperframe-6.1.0
+
+- HomePage:
+- Author: Cory Benfield
+- License: MIT License
 - Compatible: True
 
 ### idna-3.18
@@ -347,6 +416,13 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
+### jmespath-1.1.0
+
+- HomePage: https://github.com/jmespath/jmespath.py
+- Author: James Saryerwinnie
+- License: MIT License
+- Compatible: True
+
 ### joblib-1.5.3
 
 - HomePage:
@@ -375,7 +451,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### litellm-1.89.3
+### litellm-1.89.7
 
 - HomePage:
 - Author: BerriAI
@@ -410,14 +486,14 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### multidict-6.7.1
+### multidict-6.9.1
 
 - HomePage: https://github.com/aio-libs/multidict
 - Author: Andrew Svetlov
 - License: Apache License 2.0
 - Compatible: True
 
-### nltk-3.10.0
+### nltk-3.10.3
 
 - HomePage: https://www.nltk.org/
 - Author: NLTK Team
@@ -431,7 +507,7 @@ Find a list of packages below
 - License: 0BSD;; BSD-3-Clause;; CC0-1.0;; MIT;; Zlib
 - Compatible: True
 
-### openai-2.43.0
+### openai-2.54.0
 
 - HomePage:
 - Author: OpenAI
@@ -515,6 +591,13 @@ Find a list of packages below
 - License: GNU General Public License v2;; GNU Lesser General Public License v2;; Mozilla Public License 1.1 _MPL 1.1_;; later _GPLv2__;; later _LGPLv2__
 - Compatible: True
 
+### python-dateutil-2.9.0.post0
+
+- HomePage: https://github.com/dateutil/dateutil
+- Author: Gustavo Niemeyer
+- License: Apache Software License;; BSD License
+- Compatible: True
+
 ### python-dotenv-1.2.2
 
 - HomePage:
@@ -564,11 +647,25 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
+### s3transfer-0.19.0
+
+- HomePage: https://github.com/boto/s3transfer
+- Author: Amazon Web Services
+- License: Apache Software License
+- Compatible: True
+
 ### setuptools-83.0.0
 
 - HomePage:
 - Author: Python Packaging Authority
 - License: MIT
+- Compatible: True
+
+### six-1.17.0
+
+- HomePage: https://github.com/benjaminp/six
+- Author: Benjamin Peterson
+- License: MIT License
 - Compatible: True
 
 ### sniffio-1.3.1
@@ -613,6 +710,13 @@ Find a list of packages below
 - License: MIT;; MPL-2.0
 - Compatible: True
 
+### truststore-0.10.4
+
+- HomePage:
+- Author: Seth Michael Larson
+- License: MIT
+- Compatible: True
+
 ### typing-extensions-4.15.0
 
 - HomePage:
@@ -627,7 +731,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### urllib3-2.7.0
+### urllib3-2.8.0
 
 - HomePage:
 - Author: Andrey Petrov

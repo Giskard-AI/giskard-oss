@@ -41,7 +41,7 @@ _MODEL = "gpt-4o-mini"
 def _usage(input_tokens: int, output_tokens: int, total_tokens: int) -> ResponseUsage:
     return ResponseUsage(
         input_tokens=input_tokens,
-        input_tokens_details=InputTokensDetails(cached_tokens=0),
+        input_tokens_details=InputTokensDetails(cached_tokens=0, cache_write_tokens=0),
         output_tokens=output_tokens,
         output_tokens_details=OutputTokensDetails(reasoning_tokens=0),
         total_tokens=total_tokens,

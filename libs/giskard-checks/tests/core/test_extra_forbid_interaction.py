@@ -216,12 +216,9 @@ def test_interaction_spec_round_trip_direct(
 ) -> None:
     """``kind`` is a computed_field: it appears in the dump but is not a field.
 
-    Compares dumps rather than instances: ``InteractionSpec`` subclasses carry
-    private attrs (``Interact._output_injectable`` and friends) holding freshly
-    built, non-comparable objects, which pydantic's ``__eq__`` includes. Two
-    equivalent instances are therefore never ``==``, independently of the
-    ``extra`` policy. (Checks and input generators have no such attrs and are
-    compared by instance elsewhere in this suite.)
+    Compares dumps rather than instances so the assertion stays independent of
+    whether a subclass carries non-comparable runtime helpers. (Checks and
+    input generators are compared by instance elsewhere in this suite.)
     """
     payload = spec.model_dump()
     assert payload["kind"] is not None

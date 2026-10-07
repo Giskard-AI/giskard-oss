@@ -411,9 +411,59 @@ def test_unknown_completion_params_warn(caplog):
         payload = AnthropicChatTranslator.to_anthropic(
             _MODEL, [msg], top_p=0.5, stop_sequences=["STOP"], temperature=0.2
         )
-    assert payload.get("temperature") == 0.2
+    assert "temperature" not in payload
+    assert payload.get("extra_body") == {"temperature": 0.2}
     assert "top_p" not in payload
-    assert "stop_sequences" not in payload
+    assert payload.get("stop_sequences") == ["STOP"]
     joined = " ".join(r.message for r in caplog.records)
     assert "top_p" in joined
-    assert "stop_sequences" in joined
+    assert "stop_sequences" not in joined
+
+
+def test_sdk_v1_messages_create_accepts_translator_payload():
+    """Unmocked SDK check: v1 rejects top-level temperature but accepts extra_body."""
+    pytest.importorskip("anthropic")
+    import inspect
+
+    from anthropic.resources.messages.messages import AsyncMessages
+
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL,
+        [UserMessage(content="Hello.")],
+        temperature=0.2,
+        stop_sequences=["STOP"],
+    )
+    assert "temperature" not in payload
+    assert payload.get("extra_body") == {"temperature": 0.2}
+    assert payload.get("stop_sequences") == ["STOP"]
+    inspect.signature(AsyncMessages.create).bind_partial(**payload)
+
+
+def test_httpx_v1_timeout_converted_to_httpx2():
+    """An httpx (v1) Timeout is converted, not mis-parsed as a scalar by httpx2."""
+    httpx = pytest.importorskip("httpx")
+    pytest.importorskip("httpx2")
+    from httpx2 import Timeout
+
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL,
+        [UserMessage(content="Hello.")],
+        timeout=httpx.Timeout(5.0, connect=2.0),
+    )
+    timeout = payload.get("timeout")
+    assert isinstance(timeout, Timeout)
+    assert timeout.connect == 2.0
+    assert timeout.read == 5.0
+    assert timeout.write == 5.0
+    assert timeout.pool == 5.0
+
+
+def test_httpx2_timeout_passes_through():
+    """A native httpx2 Timeout is forwarded untouched."""
+    httpx2 = pytest.importorskip("httpx2")
+
+    original = httpx2.Timeout(5.0, connect=2.0)
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL, [UserMessage(content="Hello.")], timeout=original
+    )
+    assert payload.get("timeout") is original

@@ -6,7 +6,6 @@ methods return a `TestCaseResult` summarizing the outcomes.
 """
 
 from collections.abc import Sequence
-from typing import Any, overload
 
 from pydantic import BaseModel, Field
 
@@ -49,24 +48,12 @@ class TestCase[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         runner = get_runner()
         return await runner.run(self, return_exception)
 
-    @overload
-    def run_sync(self, return_exception: bool, /) -> TestCaseResult: ...
+    def run_sync(self, return_exception: bool = False) -> TestCaseResult:
+        """Blocking version of :meth:`run`, with the same argument and result.
 
-    @overload
-    def run_sync(self, *, return_exception: bool = False) -> TestCaseResult: ...
-
-    def run_sync(self, *args: Any, **kwargs: Any) -> TestCaseResult:
-        """Execute the test case synchronously.
-
-        Parameters
-        ----------
-        return_exception : bool, default False
-            If True, return results when exceptions occur instead of raising.
-
-        Returns
-        -------
-        TestCaseResult
-            The test case execution result.
+        Each call creates a new event loop. Checks that retain loop-bound state,
+        such as asyncio semaphores, cannot reuse that state across calls. Use
+        one async context and :meth:`run` for such objects.
 
         Raises
         ------
@@ -74,7 +61,7 @@ class TestCase[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             If called while an asyncio event loop is already running. In that
             case, use ``await test_case.run(...)`` instead.
         """
-        return _run_sync(self.run, *args, **kwargs)
+        return _run_sync(self.run, return_exception)
 
     async def assert_passed(self) -> None:
         """Run the test case and assert that it passed.

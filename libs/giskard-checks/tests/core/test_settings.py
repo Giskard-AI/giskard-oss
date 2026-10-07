@@ -1,14 +1,45 @@
+from collections.abc import Sequence
+from typing import override
+from unittest.mock import MagicMock
+
 import giskard.checks.settings as settings_module
 import pytest
-from giskard.agents import EmbeddingModel, Generator
+from giskard.agents import (
+    BaseEmbeddingModel,
+    BaseSOM,
+    EmbeddingModel,
+    Generator,
+    SOMResponse,
+)
+from giskard.checks import (
+    LLMChatJudge,
+    SOMJudge,
+    get_default_embedding_model,
+    get_default_judge,
+    set_default_embedding_model,
+    set_default_judge,
+)
 from giskard.checks.settings import (
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_MODEL,
-    get_default_embedding_model,
     get_default_generator,
     get_settings,
     set_default_generator,
 )
+from giskard.llm.types import ChatMessage
+
+
+@BaseSOM.register("checks_settings_test_som")
+class CustomSOM(BaseSOM):
+    @override
+    async def predict(
+        self,
+        messages: Sequence[ChatMessage],
+        question: str,
+        *,
+        timeout: float | int | None = None,
+    ) -> SOMResponse:
+        return SOMResponse(model=self.model, probability=0.9)
 
 
 def test_default_generator_uses_settings_model(monkeypatch: pytest.MonkeyPatch):
@@ -38,6 +69,152 @@ def test_set_default_generator_overrides_settings(monkeypatch: pytest.MonkeyPatc
     assert get_default_generator() is explicit
 
 
+def test_set_default_generator_accepts_model_string(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "google/gemini-3.5-flash")
+
+    set_default_generator("azure/gpt-5.6-luna")
+
+    generator = get_default_generator()
+    assert isinstance(generator, Generator)
+    assert generator.model == "azure/gpt-5.6-luna"
+
+
+def test_default_judge_falls_back_to_default_generator():
+    generator = Generator(model="azure_ai/gpt-5.6-luna")
+    set_default_generator(generator)
+
+    judge = get_default_judge()
+
+    assert isinstance(judge, LLMChatJudge)
+    assert judge.generator is None
+    assert judge._generator is generator
+
+
+def test_default_judge_falls_back_to_generator_environment(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "google/gemini-3.5-flash")
+
+    judge = get_default_judge()
+
+    assert isinstance(judge, LLMChatJudge)
+    assert isinstance(judge._generator, Generator)
+    assert judge._generator.model == "google/gemini-3.5-flash"
+
+
+def test_default_judge_uses_environment_override(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_JUDGE", "typesafe/jev")
+
+    judge = get_default_judge()
+
+    assert isinstance(judge, SOMJudge)
+    assert judge.model.model == "jev-latest"
+
+
+def test_set_default_judge_preserves_custom_backend():
+    judge = LLMChatJudge(generator=Generator(model="openai/gpt-4o-mini"))
+
+    set_default_judge(judge)
+
+    assert get_default_judge() is judge
+
+
+@pytest.mark.parametrize("model", ["openai/gpt-4o-mini", "llm/openai/gpt-4o-mini"])
+def test_set_default_judge_accepts_llm_model_string(model: str):
+    set_default_judge(model)
+
+    judge = get_default_judge()
+
+    assert isinstance(judge, LLMChatJudge)
+    assert isinstance(judge.generator, Generator)
+    assert judge.generator.model == "openai/gpt-4o-mini"
+
+
+@pytest.mark.parametrize(
+    ("model", "native_model"),
+    [
+        ("typesafe/jev", "jev-latest"),
+        ("typesafe/jev-preview", "jev-preview"),
+        ("som/typesafe/jev", "jev-latest"),
+    ],
+)
+def test_set_default_judge_accepts_typesafe_model_string(model: str, native_model: str):
+    set_default_judge(model)
+
+    judge = get_default_judge()
+
+    assert isinstance(judge, SOMJudge)
+    assert judge.model.model == native_model
+
+
+def test_set_default_judge_accepts_custom_som_model():
+    model = CustomSOM(model="example-v1")
+
+    set_default_judge(model)
+
+    judge = get_default_judge()
+    assert isinstance(judge, SOMJudge)
+    assert judge.model is model
+
+
+def test_set_default_judge_resolves_another_registered_som_provider():
+    set_default_judge("checks_settings_test_som/new-som")
+
+    judge = get_default_judge()
+    assert isinstance(judge, SOMJudge)
+    assert isinstance(judge.model, CustomSOM)
+    assert judge.model.model == "new-som"
+
+
+def test_default_judge_and_generator_are_independent():
+    generation = Generator(model="azure_ai/gpt-5.6-luna")
+    judge = LLMChatJudge(generator=Generator(model="openai/gpt-4o-mini"))
+    set_default_generator(generation)
+    set_default_judge(judge)
+
+    assert get_default_generator() is generation
+    assert get_default_judge() is judge
+
+    updated_generation = Generator(model="google/gemini-3.5-flash")
+    set_default_generator(updated_generation)
+
+    assert get_default_generator() is updated_generation
+    assert get_default_judge() is judge
+
+
+def test_reset_default_judge_restores_generator_fallback():
+    generator = Generator(model="azure_ai/gpt-5.6-luna")
+    set_default_generator(generator)
+    set_default_judge("typesafe/jev")
+
+    set_default_judge(None)
+
+    judge = get_default_judge()
+    assert isinstance(judge, LLMChatJudge)
+    assert judge._generator is generator
+
+
+@pytest.mark.parametrize(
+    ("model", "message"),
+    [
+        ("llm/typesafe/jev", "Kind prefix must match"),
+        ("som/openai/gpt-4o-mini", "Kind prefix must match"),
+        ("som/jev", "Kind prefix must match"),
+        ("typesafe/", "Specify a SOM model as 'provider/model'"),
+    ],
+)
+def test_invalid_judge_configuration_preserves_current_default(
+    model: str, message: str
+):
+    original = LLMChatJudge(generator=Generator(model="openai/gpt-4o-mini"))
+    set_default_judge(original)
+
+    with pytest.raises(ValueError, match=message):
+        set_default_judge(model)
+
+    assert get_default_judge() is original
+
+
 def test_default_embedding_model_uses_settings(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv(
         "GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL", "google/gemini-embedding-001"
@@ -54,6 +231,77 @@ def test_default_embedding_model_falls_back_to_builtin_default():
 
     assert isinstance(embedding_model, EmbeddingModel)
     assert embedding_model.model == DEFAULT_EMBEDDING_MODEL
+
+
+def test_set_default_embedding_model_accepts_model_string(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(
+        "GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL", "google/gemini-embedding-001"
+    )
+
+    set_default_embedding_model("text-embedding-3-large")
+
+    embedding = get_default_embedding_model()
+    assert isinstance(embedding, EmbeddingModel)
+    assert embedding.model == "text-embedding-3-large"
+
+
+def test_set_default_embedding_model_preserves_custom_backend(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(
+        "GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL", "google/gemini-embedding-001"
+    )
+    embedding = MagicMock(spec=BaseEmbeddingModel)
+
+    set_default_embedding_model(embedding)
+
+    assert get_default_embedding_model() is embedding
+
+
+def test_reset_default_embedding_model_restores_environment(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv(
+        "GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL", "google/gemini-embedding-001"
+    )
+    set_default_embedding_model("text-embedding-3-large")
+
+    set_default_embedding_model(None)
+
+    embedding = get_default_embedding_model()
+    assert isinstance(embedding, EmbeddingModel)
+    assert embedding.model == "google/gemini-embedding-001"
+
+
+def test_reset_default_embedding_model_restores_builtin_default():
+    set_default_embedding_model("text-embedding-3-large")
+
+    set_default_embedding_model(None)
+
+    embedding = get_default_embedding_model()
+    assert isinstance(embedding, EmbeddingModel)
+    assert embedding.model == DEFAULT_EMBEDDING_MODEL
+
+
+def test_default_embedding_is_independent_of_generator_and_judge():
+    generator = Generator(model="azure_ai/gpt-5.6-luna")
+    judge = LLMChatJudge(generator=Generator(model="openai/gpt-4o-mini"))
+    embedding = MagicMock(spec=BaseEmbeddingModel)
+    set_default_generator(generator)
+    set_default_judge(judge)
+
+    set_default_embedding_model(embedding)
+
+    assert get_default_generator() is generator
+    assert get_default_judge() is judge
+    assert get_default_embedding_model() is embedding
+
+    set_default_generator("google/gemini-3.5-flash")
+    set_default_judge("typesafe/jev")
+
+    assert get_default_embedding_model() is embedding
 
 
 def test_settings_max_reported_failures_validation(monkeypatch: pytest.MonkeyPatch):

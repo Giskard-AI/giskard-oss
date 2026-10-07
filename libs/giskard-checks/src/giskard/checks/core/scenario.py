@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Self, overload
+from typing import Any, ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.experimental.missing_sentinel import MISSING
@@ -326,40 +326,17 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         self.tags = tags
         return self
 
-    @overload
     def run_sync(
         self,
-        target: Target[InputType, OutputType, TraceType] | MISSING,
-        /,
-        return_exception: bool = False,
-        multiple_runs: int | None = None,
-    ) -> ScenarioResult[TraceType]: ...
-
-    @overload
-    def run_sync(
-        self,
-        *,
         target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
         return_exception: bool = False,
         multiple_runs: int | None = None,
-    ) -> ScenarioResult[TraceType]: ...
+    ) -> ScenarioResult[TraceType]:
+        """Blocking version of :meth:`run`, with the same arguments and result.
 
-    def run_sync(self, *args: Any, **kwargs: Any) -> ScenarioResult[TraceType]:
-        """Execute the scenario synchronously.
-
-        Parameters
-        ----------
-        target : Target | MISSING, optional
-            SUT used to replace ``MISSING`` outputs on ``Interact`` specs.
-        return_exception : bool, default False
-            If True, return results when exceptions occur instead of raising.
-        multiple_runs : int | None, optional
-            Optional override for the maximum number of scenario executions.
-
-        Returns
-        -------
-        ScenarioResult[TraceType]
-            The scenario execution result.
+        Each call creates a new event loop. Targets and checks that retain
+        loop-bound state, such as asyncio semaphores, cannot reuse that state
+        across calls. Use one async context and :meth:`run` for such objects.
 
         Raises
         ------
@@ -367,7 +344,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             If called while an asyncio event loop is already running. In that
             case, use ``await scenario.run(...)`` instead.
         """
-        return _run_sync(self.run, *args, **kwargs)
+        return _run_sync(self.run, target, return_exception, multiple_runs)
 
     async def run(
         self,

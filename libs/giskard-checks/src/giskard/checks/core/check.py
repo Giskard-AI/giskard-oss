@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from giskard.core import Discriminated, discriminated_base
 from pydantic import ConfigDict, Field
@@ -30,6 +30,15 @@ class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
 
     name: str | None = Field(default=None, description="Check name")
     description: str | None = Field(default=None, description="Check description")
+
+    def to_spec(self) -> dict[str, Any]:
+        """Return the check configuration in the Giskard Hub wire format."""
+        return self.model_dump(
+            mode="json",
+            exclude={"name", "description"},
+            exclude_none=True,
+            fallback=str,
+        )
 
     async def run(self, trace: TraceType) -> "CheckResult":
         """Execute the check against the provided trace.

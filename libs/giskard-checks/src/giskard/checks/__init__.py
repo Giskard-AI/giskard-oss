@@ -4,6 +4,7 @@ from pathlib import Path
 
 from giskard.agents import add_prompts_path
 from giskard.core.utils import get_lib_version
+from giskard.core.welcome import maybe_show_welcome
 
 from . import builtin, judges
 from .builtin import (
@@ -26,6 +27,7 @@ from .builtin import (
     from_fn,
 )
 from .core import (
+    BaseJudge,
     Check,
     CheckResult,
     CheckStatus,
@@ -36,10 +38,12 @@ from .core import (
     Interaction,
     InteractionGenerationError,
     InteractionSpec,
+    LLMChatJudge,
     Metric,
     Scenario,
     ScenarioResult,
     ScenarioStatus,
+    SOMJudge,
     Step,
     SuiteResult,
     Target,
@@ -50,7 +54,7 @@ from .core import (
     Trace,
     resolve,
 )
-from .core.mixin import WithEmbeddingMixin, WithGeneratorMixin
+from .core.mixin import WithEmbeddingMixin, WithGeneratorMixin, WithJudgeMixin
 from .generators.base import BaseLLMGenerator, LLMGenerator
 from .generators.dataset import DatasetInputGenerator
 from .generators.user import UserSimulator
@@ -66,7 +70,15 @@ from .judges import (
 )
 from .scenarios.runner import ScenarioRunner
 from .scenarios.suite import Suite
-from .settings import get_default_generator, get_settings, set_default_generator
+from .settings import (
+    get_default_embedding_model,
+    get_default_generator,
+    get_default_judge,
+    get_settings,
+    set_default_embedding_model,
+    set_default_generator,
+    set_default_judge,
+)
 from .testing import WithSpy
 from .testing.runner import TestCaseRunner
 
@@ -79,6 +91,7 @@ if not get_settings().disable_rich_pretty:
     install()
 
 add_prompts_path(str(Path(__file__).parent / "prompts"), "giskard.checks")
+maybe_show_welcome()
 
 
 __all__ = [
@@ -109,14 +122,17 @@ __all__ = [
     "Interaction",
     "InteractionSpec",
     "WithGeneratorMixin",
+    "WithJudgeMixin",
     "WithEmbeddingMixin",
     # Builtin and LLM-based checks
     "AnswerRelevance",
     "AllOf",
     "AnyOf",
     "Not",
+    "BaseJudge",
     "BaseLLMCheck",
     "LLMCheckResult",
+    "LLMChatJudge",
     "Conformity",
     "Contradiction",
     "Equals",
@@ -133,6 +149,7 @@ __all__ = [
     "LLMJudge",
     "Readability",
     "SemanticSimilarity",
+    "SOMJudge",
     "Toxicity",
     "StringMatching",
     "RegexMatching",
@@ -154,4 +171,8 @@ __all__ = [
     # Settings
     "set_default_generator",
     "get_default_generator",
+    "set_default_judge",
+    "get_default_judge",
+    "set_default_embedding_model",
+    "get_default_embedding_model",
 ]

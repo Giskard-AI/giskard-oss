@@ -412,6 +412,19 @@ async def test_configure_explicit(provider: str):
     assert resp.choices[0].message.text
 
 
+# -- Provider-specific parameter scenarios ------------------------------------
+
+
+@pytest.mark.anthropic
+async def test_anthropic_temperature_accepted():
+    """SDK v1 forwards temperature via extra_body; the live API must accept it."""
+    client, model = _make_client("anthropic")
+    resp = await client.acompletion(
+        model, [{"role": "user", "content": "Say hello"}], temperature=0.2
+    )
+    assert resp.choices[0].message.text
+
+
 # -- Error handling scenarios --------------------------------------------------
 
 
