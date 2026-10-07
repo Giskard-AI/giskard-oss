@@ -180,6 +180,22 @@ def _extract_system_instruction(
     return system_blocks if system_blocks else None
 
 
+def _restore_supported_constraints(original: Any, transformed: Any) -> None:
+    """Keep API-supported constraints that the SDK moves into descriptions."""
+    if isinstance(original, dict) and isinstance(transformed, dict):
+        for key, value in original.items():
+            # Existing keys can be property names; retain their SDK conversion.
+            if key in ("const", "pattern") and key not in transformed:
+                transformed[key] = value
+            target = transformed.get(key)
+            if key == "oneOf" and target is None and "anyOf" not in original:
+                target = transformed.get("anyOf")
+            _restore_supported_constraints(value, target)
+    elif isinstance(original, list) and isinstance(transformed, list):
+        for value, target in zip(original, transformed):
+            _restore_supported_constraints(value, target)
+
+
 class SystemTextBlock(_BaseModel):
     text: str
     type: Literal["text"] = "text"
@@ -258,7 +274,9 @@ class AnthropicChatConfigParams(_BaseModel):
             ):
                 from anthropic import transform_schema
 
-                schema = transform_schema(v["response_format"])
+                original_schema = v["response_format"].model_json_schema()
+                schema = transform_schema(original_schema)
+                _restore_supported_constraints(original_schema, schema)
                 v["output_config"] = {
                     "format": {
                         "type": "json_schema",

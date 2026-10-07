@@ -484,6 +484,33 @@ def test_response_format_nested_pydantic_schema_valid_for_anthropic():
     validate_anthropic_message_create(payload)
 
 
+def test_response_format_preserves_const_and_pattern_constraints():
+    pytest.importorskip("anthropic")
+    from pydantic import BaseModel, Field
+
+    class Input(BaseModel):
+        language: Literal["en"]
+        ticket: str = Field(pattern=r"^TICKET-[0-9]+$", min_length=1)
+
+    class Output(BaseModel):
+        inputs: list[Input]
+        done: Literal[False]
+
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL, [UserMessage(content="hi")], response_format=Output
+    )
+    output = cast(dict[str, Any], cast(object, payload))
+    schema = output["output_config"]["format"]["schema"]
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["done"]["const"] is False
+    inner = schema["$defs"]["Input"]
+    assert inner["additionalProperties"] is False
+    assert inner["properties"]["language"]["const"] == "en"
+    assert inner["properties"]["ticket"]["pattern"] == r"^TICKET-[0-9]+$"
+    assert "minLength" not in inner["properties"]["ticket"]
+    validate_anthropic_message_create(payload)
+
+
 def test_response_format_dict_uses_anthropic_output_config_shape():
     schema = {"type": "object", "properties": {"value": {"type": "string"}}}
     payload = AnthropicChatTranslator.to_anthropic(
