@@ -61,12 +61,38 @@ def _should_disable_geoip() -> bool:
     )
 
 
-ENV_INFORMATION: dict[str, str] = {}
+ENV_INFORMATION: dict[str, str | bool] = {}
+
+# Provider-specific variables, checked in order. Generic ``CI``/``TF_BUILD``
+# flags only say "some CI" and are handled as a fallback.
+_CI_PROVIDER_ENV_VARS: tuple[tuple[str, str], ...] = (
+    ("GITHUB_ACTIONS", "github_actions"),
+    ("GITLAB_CI", "gitlab"),
+    ("JENKINS_URL", "jenkins"),
+    ("CIRCLECI", "circleci"),
+    ("TRAVIS", "travis"),
+    ("BUILDKITE", "buildkite"),
+    ("TF_BUILD", "azure_pipelines"),
+    ("BITBUCKET_BUILD_NUMBER", "bitbucket"),
+    ("TEAMCITY_VERSION", "teamcity"),
+    ("CODEBUILD_BUILD_ID", "aws_codebuild"),
+    ("DRONE", "drone"),
+)
+
+
+def _get_ci_provider() -> str | None:
+    """Name of the CI provider, ``"other"`` for an unknown one, ``None`` outside CI."""
+    for env_var, provider in _CI_PROVIDER_ENV_VARS:
+        if os.environ.get(env_var):
+            return provider
+    if is_true_env_str(os.getenv("CI")):
+        return "other"
+    return None
 
 
 def _get_environment_info() -> str:
     # Detect CI (standard across GH Actions, GitLab, Jenkins, etc.)
-    is_ci = is_true_env_str(os.getenv("CI")) or is_true_env_str(os.getenv("TF_BUILD"))
+    is_ci = _get_ci_provider() is not None
 
     # Detect Colab
     is_colab = "google.colab" in sys.modules
@@ -83,7 +109,7 @@ def _get_environment_info() -> str:
     return "local"
 
 
-def _get_env_information() -> dict[str, str]:
+def _get_env_information() -> dict[str, str | bool]:
     if not ENV_INFORMATION:
         ENV_INFORMATION.update(
             {
@@ -92,8 +118,13 @@ def _get_env_information() -> dict[str, str]:
                     for lib, lib_version in GISKARD_LIBS_VERSIONS.items()
                 },
                 "environment": _get_environment_info(),
+                # Lets analytics drop pytest runs, including downstream users' own suites.
+                "is_test_run": "pytest" in sys.modules,
             }
         )
+        ci_provider = _get_ci_provider()
+        if ci_provider is not None:
+            ENV_INFORMATION["ci_provider"] = ci_provider
     return ENV_INFORMATION
 
 
@@ -192,6 +223,18 @@ _in_telemetry_scope: contextvars.ContextVar[bool] = contextvars.ContextVar(
 )
 
 
+def telemetry_outcome(exc: BaseException) -> str:
+    """Classify the exception that ended an operation for ``outcome`` properties.
+
+    ``cancelled`` for a cancelled task or Ctrl-C, ``error`` for anything else.
+    ``CancelledError`` and ``KeyboardInterrupt`` do not derive from ``Exception``,
+    so call sites must catch ``BaseException`` to report them.
+    """
+    if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)):
+        return "cancelled"
+    return "error"
+
+
 def telemetry_capture(
     event: str, *, properties: dict[str, object] | None = None
 ) -> None:
@@ -213,6 +256,27 @@ def telemetry_capture(
     if telemetry.disabled or not _in_telemetry_scope.get():
         return
     _ = telemetry.capture(event, properties=properties)
+
+
+@contextmanager
+def telemetry_finished(
+    event: str, properties: dict[str, object]
+) -> Iterator[dict[str, object]]:
+    """Guarantee one ``event`` for an operation, however it ends.
+
+    Yields a dict the caller fills with completion properties (set
+    ``outcome="completed"`` on success). It defaults to ``outcome="error"``, or
+    ``"cancelled"`` for ``CancelledError`` / ``KeyboardInterrupt``, which skip
+    ``except Exception`` and so are caught here as ``BaseException``.
+    """
+    finished: dict[str, object] = {"outcome": "error"}
+    try:
+        yield finished
+    except BaseException as exc:
+        finished["outcome"] = telemetry_outcome(exc)
+        raise
+    finally:
+        telemetry_capture(event, properties={**properties, **finished})
 
 
 @contextmanager
