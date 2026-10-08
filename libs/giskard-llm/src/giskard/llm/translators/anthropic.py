@@ -383,26 +383,16 @@ class AnthropicChatTranslator:
     def blocks_to_giskard(
         blocks: "Sequence[ContentBlock]", *, ignore_unsupported_content: bool = False
     ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
-        content_and_tool_calls = [
-            converted
-            for block in blocks
-            if (
-                converted := AnthropicChatTranslator.block_content_to_giskard(
-                    block, ignore_unsupported_content=ignore_unsupported_content
-                )
+        content: list[CompletionContent] = []
+        tool_calls: list[ToolCall] = []
+        for block in blocks:
+            converted = AnthropicChatTranslator.block_content_to_giskard(
+                block, ignore_unsupported_content=ignore_unsupported_content
             )
-            is not None
-        ]
-        content = [
-            content
-            for content in content_and_tool_calls
-            if not isinstance(content, ToolCall)
-        ]
-        tool_calls = [
-            tool_call
-            for tool_call in content_and_tool_calls
-            if isinstance(tool_call, ToolCall)
-        ]
+            if isinstance(converted, ToolCall):
+                tool_calls.append(converted)
+            elif converted is not None:
+                content.append(converted)
         return content, tool_calls
 
     @staticmethod
