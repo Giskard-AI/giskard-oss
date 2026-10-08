@@ -16,6 +16,40 @@ class RefusalContentParam(TypedDict, total=False):
 
 CompletionContentParam = TextContentParam | RefusalContentParam
 
+# -- Reasoning details --------------------------------------------------------------
+
+
+class ReasoningTextDetailParam(TypedDict, total=False):
+    type: Required[Literal["reasoning.text"]]
+    text: Required[str]
+    signature: str | None
+    id: str | None
+    format: str
+    index: int
+
+
+class ReasoningSummaryDetailParam(TypedDict, total=False):
+    type: Required[Literal["reasoning.summary"]]
+    summary: Required[str]
+    id: str | None
+    format: str
+    index: int
+
+
+class ReasoningEncryptedDetailParam(TypedDict, total=False):
+    type: Required[Literal["reasoning.encrypted"]]
+    data: Required[str]
+    id: str | None
+    format: str
+    index: int
+
+
+ReasoningDetailParam = (
+    ReasoningTextDetailParam
+    | ReasoningSummaryDetailParam
+    | ReasoningEncryptedDetailParam
+)
+
 # -- Chat Message types -------------------------------------------------------------
 
 
@@ -51,6 +85,7 @@ class AssistantMessageParam(TypedDict, total=False):
     refusal: str
     tool_calls: list[ToolCallParam]
     reasoning: str
+    reasoning_details: list[ReasoningDetailParam]
 
 
 class ToolMessageParam(TypedDict, total=False):

@@ -36,6 +36,8 @@ Provider-specific kwargs:
     - ``timeout``: request timeout in seconds
     - ``http_client``: caller-owned async HTTP client passed to the SDK; not closed by giskard-llm
     - ``default_headers``: extra headers merged into every SDK request
+    - ``ignore_unsupported_content``: if True, drop response content giskard-llm
+      cannot represent (with a warning) instead of raising ``UnsupportedContentError``
 
 Azure Foundry OpenAI v1:
     Azure Foundry OpenAI v1 endpoints are OpenAI-compatible and should use
@@ -112,6 +114,7 @@ class OpenAIProvider:
         timeout: float | None = None,
         http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
+        ignore_unsupported_content: bool = False,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:
@@ -119,6 +122,7 @@ class OpenAIProvider:
                 "%s provider: ignoring unknown kwargs: %s", PROVIDER, sorted(_kwargs)
             )
         openai = _import_openai()
+        self._ignore_unsupported_content = ignore_unsupported_content
         self._client = openai.AsyncOpenAI(
             **compact(
                 api_key=api_key,
@@ -175,7 +179,9 @@ class OpenAIProvider:
         ) as e:  # Broad catch: _map_error checks SDK types first, then re-raises.
             self._map_error(e)
 
-        return OpenAIChatTranslator.from_openai(raw)
+        return OpenAIChatTranslator.from_openai(
+            raw, ignore_unsupported_content=self._ignore_unsupported_content
+        )
 
     async def embed(
         self,
@@ -275,4 +281,6 @@ class OpenAIProvider:
         ) as e:  # Broad catch: _map_error checks SDK types first, then re-raises.
             self._map_error(e)
 
-        return OpenAIResponseTranslator.from_openai(raw)
+        return OpenAIResponseTranslator.from_openai(
+            raw, ignore_unsupported_content=self._ignore_unsupported_content
+        )

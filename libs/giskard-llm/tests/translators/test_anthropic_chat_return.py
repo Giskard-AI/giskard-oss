@@ -255,8 +255,45 @@ def test_from_anthropic_text_only_has_no_reasoning():
 
 
 def test_block_content_to_giskard_unknown_type_raises():
-    """Unknown content-block types still raise so new Anthropic types stay visible."""
-    with pytest.raises(ValueError, match="Unsupported content block type: compaction"):
+    """Unknown content-block types raise UnsupportedContentError."""
+    from giskard.llm.errors import UnsupportedContentError
+
+    with pytest.raises(UnsupportedContentError) as exc_info:
         _ = AnthropicChatTranslator.block_content_to_giskard(
             cast(ContentBlock, cast(object, SimpleNamespace(type="compaction")))
         )
+    assert exc_info.value.content_type == "compaction"
+
+
+_SERVER_TOOL_USE = {
+    "type": "server_tool_use",
+    "id": "srvtoolu_01",
+    "name": "web_search",
+    "input": {"query": "weather in Paris"},
+}
+
+
+def test_from_anthropic_unsupported_block_raises():
+    """Blocks we cannot represent raise :class:`UnsupportedContentError` by default."""
+    from giskard.llm.errors import UnsupportedContentError
+
+    raw = _message({"content": [_SERVER_TOOL_USE, {"type": "text", "text": "Answer."}]})
+    with pytest.raises(UnsupportedContentError) as exc_info:
+        AnthropicChatTranslator.from_anthropic(raw)
+    assert exc_info.value.content_type == "server_tool_use"
+    assert exc_info.value.provider == "anthropic"
+
+
+def test_from_anthropic_unsupported_block_dropped_with_warning(
+    caplog: pytest.LogCaptureFixture,
+):
+    """With ``ignore_unsupported_content`` the block is dropped and a warning logged."""
+    raw = _message({"content": [_SERVER_TOOL_USE, {"type": "text", "text": "Answer."}]})
+    with caplog.at_level("WARNING"):
+        msg = (
+            AnthropicChatTranslator.from_anthropic(raw, ignore_unsupported_content=True)
+            .choices[0]
+            .message
+        )
+    assert msg.content == [TextContent(text="Answer.")]
+    assert "server_tool_use" in caplog.text

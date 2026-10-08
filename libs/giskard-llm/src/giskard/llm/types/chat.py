@@ -1,7 +1,7 @@
 from collections.abc import Sequence
-from typing import ClassVar, Literal, Protocol
+from typing import Annotated, ClassVar, Literal, Protocol
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 
 from ._base import ArgumentDict, _BaseModel
 
@@ -51,6 +51,47 @@ class RefusalContent(_BaseModel):
 
 
 CompletionContent = TextContent | RefusalContent
+
+# -- Reasoning details --------------------------------------------------------------
+# De facto OpenAI-compatible chat convention (OpenRouter / vLLM): structured, replayable
+# reasoning that must be passed back unmodified on later assistant turns.
+
+
+class ReasoningTextDetail(_BaseModel):
+    """Plaintext reasoning, optionally signed for verbatim replay."""
+
+    type: Literal["reasoning.text"] = "reasoning.text"
+    text: str
+    signature: str | None = None
+    id: str | None = None
+    format: str = "unknown"
+    index: int | None = None
+
+
+class ReasoningSummaryDetail(_BaseModel):
+    """Provider-generated summary of the reasoning."""
+
+    type: Literal["reasoning.summary"] = "reasoning.summary"
+    summary: str
+    id: str | None = None
+    format: str = "unknown"
+    index: int | None = None
+
+
+class ReasoningEncryptedDetail(_BaseModel):
+    """Opaque (encrypted or redacted) reasoning payload."""
+
+    type: Literal["reasoning.encrypted"] = "reasoning.encrypted"
+    data: str
+    id: str | None = None
+    format: str = "unknown"
+    index: int | None = None
+
+
+ReasoningDetail = Annotated[
+    ReasoningTextDetail | ReasoningSummaryDetail | ReasoningEncryptedDetail,
+    Field(discriminator="type"),
+]
 
 # -- Chat Message types -------------------------------------------------------------
 
@@ -116,9 +157,14 @@ class AssistantMessage(_BaseModel):
     # Reasoning never contributes to ``text`` / ``transcript``: those are what checks
     # and judges evaluate, and must only contain the visible answer. It is also never
     # sent back to a provider.
-    reasoning: str | None = None
+    reasoning: str | None = Field(
+        default=None, validation_alias=AliasChoices("reasoning", "reasoning_content")
+    )
+    reasoning_details: list[ReasoningDetail] | None = None
 
-    _wire_excluded: ClassVar[frozenset[str]] = frozenset({"reasoning"})
+    _wire_excluded: ClassVar[frozenset[str]] = frozenset(
+        {"reasoning", "reasoning_details"}
+    )
 
     @property
     def is_refusal(self) -> bool:
