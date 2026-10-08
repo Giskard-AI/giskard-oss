@@ -11,7 +11,9 @@ from giskard.llm.types._base import _BaseModel
 from giskard.llm.utils import sanitize_schema_name
 from pydantic import BaseModel, model_validator
 
+from ..types import AssistantMessage
 from ..types._serialization import close_object_schemas
+from ._unsupported import handle_unsupported_content
 
 if TYPE_CHECKING:
     from openai.types.chat.chat_completion import ChatCompletion
@@ -39,6 +41,21 @@ KNOWN_COMPLETION_PARAMS = frozenset(
         "metadata",
     }
 )
+_REASONING_DETAIL_TYPES = frozenset(
+    {"reasoning.text", "reasoning.summary", "reasoning.encrypted"}
+)
+
+
+def _keep_reasoning_detail(detail: Any, *, ignore_unsupported_content: bool) -> bool:
+    detail_type = detail.get("type") if isinstance(detail, dict) else None
+    if detail_type in _REASONING_DETAIL_TYPES:
+        return True
+    handle_unsupported_content(
+        PROVIDER,
+        f"reasoning_details:{detail_type}",
+        ignore_unsupported_content=ignore_unsupported_content,
+    )
+    return False
 
 
 class OpenAIChatParams(_BaseModel):
@@ -87,6 +104,16 @@ class OpenAIChatTranslator:
                 sorted(unknown),
             )
 
+        # The official Chat Completions API has no reasoning fields on assistant
+        # messages (``reasoning`` / ``reasoning_details`` are an OpenRouter / vLLM
+        # extension), so strip them rather than send unknown fields.
+        messages = [
+            m.model_copy(update={"reasoning": None, "reasoning_details": None})
+            if isinstance(m, AssistantMessage)
+            else m
+            for m in messages
+        ]
+
         chat_params = OpenAIChatParams.model_validate(
             {
                 "model": model,
@@ -104,5 +131,20 @@ class OpenAIChatTranslator:
     @staticmethod
     def from_openai(
         raw: "ChatCompletion",
+        *,
+        ignore_unsupported_content: bool = False,
     ) -> "CompletionResponse":
-        return CompletionResponse.model_validate(raw.model_dump())
+        # OpenAI-compatible servers return ``reasoning`` / ``reasoning_content`` /
+        # ``reasoning_details`` as SDK extras, which ``model_dump`` keeps.
+        data = raw.model_dump()
+        for choice in data.get("choices") or []:
+            message = choice.get("message") or {}
+            if details := message.get("reasoning_details"):
+                message["reasoning_details"] = [
+                    detail
+                    for detail in details
+                    if _keep_reasoning_detail(
+                        detail, ignore_unsupported_content=ignore_unsupported_content
+                    )
+                ]
+        return CompletionResponse.model_validate(data)

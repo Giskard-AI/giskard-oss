@@ -5,6 +5,7 @@ from giskard.llm.errors import (
     ProviderNotAvailableError,
     RateLimitError,
     ServerError,
+    UnsupportedContentError,
 )
 from giskard.llm.providers.anthropic import AnthropicProvider
 from giskard.llm.providers.azure_ai import AzureAIProvider
@@ -25,6 +26,15 @@ def test_subclass_hierarchy():
     assert isinstance(err, LLMError)
     assert isinstance(err, RateLimitError)
     assert err.status_code == 429
+
+
+def test_unsupported_content_error_is_not_retryable_and_names_opt_out():
+    err = UnsupportedContentError("anthropic", "thinking")
+    assert isinstance(err, LLMError)
+    assert err.status_code == 0
+    assert err.provider == "anthropic"
+    assert err.content_type == "thinking"
+    assert "ignore_unsupported_content=True" in str(err)
 
 
 @pytest.mark.no_providers

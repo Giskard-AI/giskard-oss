@@ -340,3 +340,42 @@ def test_from_google_refusal_uses_finish_message_when_present():
     out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
     assert out.choices[0].finish_reason == "refusal"
     assert out.choices[0].message.refusal == "Blocked for safety."
+
+
+def _signature_only_thought() -> types.GenerateContentResponse:
+    return _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"thought": True, "thought_signature": b"sig"},
+                            {"text": "Answer."},
+                        ]
+                    },
+                    "finish_reason": "STOP",
+                }
+            ]
+        }
+    )
+
+
+def test_from_google_unsupported_part_raises():
+    """A part we cannot represent (signature-only thought) raises by default."""
+    from giskard.llm.errors import UnsupportedContentError
+
+    with pytest.raises(UnsupportedContentError) as exc_info:
+        GoogleChatTranslator.from_google(_signature_only_thought(), _MODEL, 1)
+    assert exc_info.value.content_type == "thought,thought_signature"
+
+
+def test_from_google_unsupported_part_dropped_with_warning(
+    caplog: pytest.LogCaptureFixture,
+):
+    """With ``ignore_unsupported_content`` the part is dropped and a warning logged."""
+    with caplog.at_level("WARNING"):
+        out = GoogleChatTranslator.from_google(
+            _signature_only_thought(), _MODEL, 1, ignore_unsupported_content=True
+        )
+    assert out.choices[0].message.content == [TextContent(text="Answer.")]
+    assert "thought_signature" in caplog.text
