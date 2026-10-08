@@ -39,3 +39,16 @@ def get_serializer[T: BaseModel](
     return cast(
         Callable[[T, SerializationInfo], Any], _SERIALIZER_DICT[provider][model]
     )
+
+
+def close_object_schemas(schema: Any) -> Any:
+    """Close object schemas recursively, preserving explicit map value schemas."""
+    if isinstance(schema, dict):
+        if schema.get("type") == "object":
+            schema.setdefault("additionalProperties", False)
+        for value in schema.values():
+            close_object_schemas(value)
+    elif isinstance(schema, list):
+        for value in schema:
+            close_object_schemas(value)
+    return schema
