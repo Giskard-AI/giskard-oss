@@ -57,35 +57,32 @@ CompletionContent = TextContent | RefusalContent
 # reasoning that must be passed back unmodified on later assistant turns.
 
 
-class ReasoningTextDetail(_BaseModel):
+class _ReasoningDetailBase(_BaseModel):
+    id: str | None = None
+    format: str | None = "unknown"
+    index: int | None = None
+
+
+class ReasoningTextDetail(_ReasoningDetailBase):
     """Plaintext reasoning, optionally signed for verbatim replay."""
 
     type: Literal["reasoning.text"] = "reasoning.text"
     text: str
     signature: str | None = None
-    id: str | None = None
-    format: str = "unknown"
-    index: int | None = None
 
 
-class ReasoningSummaryDetail(_BaseModel):
+class ReasoningSummaryDetail(_ReasoningDetailBase):
     """Provider-generated summary of the reasoning."""
 
     type: Literal["reasoning.summary"] = "reasoning.summary"
     summary: str
-    id: str | None = None
-    format: str = "unknown"
-    index: int | None = None
 
 
-class ReasoningEncryptedDetail(_BaseModel):
+class ReasoningEncryptedDetail(_ReasoningDetailBase):
     """Opaque (encrypted or redacted) reasoning payload."""
 
     type: Literal["reasoning.encrypted"] = "reasoning.encrypted"
     data: str
-    id: str | None = None
-    format: str = "unknown"
-    index: int | None = None
 
 
 ReasoningDetail = Annotated[

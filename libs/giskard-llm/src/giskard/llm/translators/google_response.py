@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Iterable, Sequence
+from functools import partial
 from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 
 from giskard.llm.types._base import _BaseModel
@@ -299,6 +300,11 @@ class GoogleResponseTranslator:
     def from_google(
         raw: "Interaction", model: str, *, ignore_unsupported_content: bool = False
     ) -> ResponseResult:
+        unsupported = partial(
+            handle_unsupported_content,
+            PROVIDER,
+            ignore_unsupported_content=ignore_unsupported_content,
+        )
         outputs: list[ResponseOutputItem] = []
         for step_index, item in enumerate(raw.steps or []):
             if item.type == "model_output":
@@ -311,11 +317,7 @@ class GoogleResponseTranslator:
                             )
                         )
                     else:
-                        handle_unsupported_content(
-                            PROVIDER,
-                            f"model_output:{content.type}",
-                            ignore_unsupported_content=ignore_unsupported_content,
-                        )
+                        unsupported(f"model_output:{content.type}")
             elif item.type == "function_call":
                 outputs.append(
                     ResponseFunctionToolCall(
@@ -330,11 +332,7 @@ class GoogleResponseTranslator:
                     if content.type == "text":
                         summary.append(ResponseReasoningSummary(text=content.text))
                     else:
-                        handle_unsupported_content(
-                            PROVIDER,
-                            f"thought:{content.type}",
-                            ignore_unsupported_content=ignore_unsupported_content,
-                        )
+                        unsupported(f"thought:{content.type}")
                 outputs.append(
                     ResponseReasoningItem(
                         # Thought steps have no id; derive a stable one.
@@ -344,11 +342,7 @@ class GoogleResponseTranslator:
                     )
                 )
             else:
-                handle_unsupported_content(
-                    PROVIDER,
-                    item.type,
-                    ignore_unsupported_content=ignore_unsupported_content,
-                )
+                unsupported(item.type)
 
         usage = None
         if raw.usage:

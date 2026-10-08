@@ -1,17 +1,17 @@
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, get_args
 
 from giskard.llm.types import (
     ChatMessage,
     CompletionResponse,
+    ReasoningDetail,
     ToolDef,
 )
 from giskard.llm.types._base import _BaseModel
 from giskard.llm.utils import sanitize_schema_name
 from pydantic import BaseModel, model_validator
 
-from ..types import AssistantMessage
 from ..types._serialization import close_object_schemas
 from ._unsupported import handle_unsupported_content
 
@@ -42,8 +42,10 @@ KNOWN_COMPLETION_PARAMS = frozenset(
     }
 )
 _REASONING_DETAIL_TYPES = frozenset(
-    {"reasoning.text", "reasoning.summary", "reasoning.encrypted"}
+    m.model_fields["type"].default for m in get_args(get_args(ReasoningDetail)[0])
 )
+
+_REASONING_FIELDS = frozenset({"reasoning", "reasoning_details"})
 
 
 def _keep_reasoning_detail(detail: Any, *, ignore_unsupported_content: bool) -> bool:
@@ -104,16 +106,6 @@ class OpenAIChatTranslator:
                 sorted(unknown),
             )
 
-        # The official Chat Completions API has no reasoning fields on assistant
-        # messages (``reasoning`` / ``reasoning_details`` are an OpenRouter / vLLM
-        # extension), so strip them rather than send unknown fields.
-        messages = [
-            m.model_copy(update={"reasoning": None, "reasoning_details": None})
-            if isinstance(m, AssistantMessage)
-            else m
-            for m in messages
-        ]
-
         chat_params = OpenAIChatParams.model_validate(
             {
                 "model": model,
@@ -125,7 +117,16 @@ class OpenAIChatTranslator:
 
         return cast(
             "CompletionCreateParamsWithTimeout",
-            cast(object, chat_params.model_dump(context={"provider": _PROVIDER})),
+            cast(
+                object,
+                chat_params.model_dump(
+                    context={"provider": _PROVIDER},
+                    # The official Chat Completions API has no reasoning fields on
+                    # assistant messages (``reasoning`` / ``reasoning_details`` are an
+                    # OpenRouter / vLLM extension), so strip them on the way out.
+                    exclude={"messages": {"__all__": _REASONING_FIELDS}},
+                ),
+            ),
         )
 
     @staticmethod

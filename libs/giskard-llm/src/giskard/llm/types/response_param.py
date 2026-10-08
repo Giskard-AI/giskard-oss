@@ -66,9 +66,9 @@ class ResponseReasoningItemParam(TypedDict, total=False):
     type: Required[Literal["reasoning"]]
     id: Required[str]
     summary: Required[list[ResponseReasoningSummaryParam]]
-    content: list[ResponseReasoningTextParam] | None
+    content: list[ResponseReasoningTextParam]
     encrypted_content: str | None
-    status: Literal["in_progress", "completed", "incomplete"] | None
+    status: Literal["in_progress", "completed", "incomplete"]
 
 
 ResponseInputItemParam = (

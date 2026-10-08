@@ -19,29 +19,26 @@ CompletionContentParam = TextContentParam | RefusalContentParam
 # -- Reasoning details --------------------------------------------------------------
 
 
-class ReasoningTextDetailParam(TypedDict, total=False):
+class _ReasoningDetailBaseParam(TypedDict, total=False):
+    id: str | None
+    format: str
+    index: int
+
+
+class ReasoningTextDetailParam(_ReasoningDetailBaseParam, total=False):
     type: Required[Literal["reasoning.text"]]
     text: Required[str]
     signature: str | None
-    id: str | None
-    format: str
-    index: int
 
 
-class ReasoningSummaryDetailParam(TypedDict, total=False):
+class ReasoningSummaryDetailParam(_ReasoningDetailBaseParam, total=False):
     type: Required[Literal["reasoning.summary"]]
     summary: Required[str]
-    id: str | None
-    format: str
-    index: int
 
 
-class ReasoningEncryptedDetailParam(TypedDict, total=False):
+class ReasoningEncryptedDetailParam(_ReasoningDetailBaseParam, total=False):
     type: Required[Literal["reasoning.encrypted"]]
     data: Required[str]
-    id: str | None
-    format: str
-    index: int
 
 
 ReasoningDetailParam = (

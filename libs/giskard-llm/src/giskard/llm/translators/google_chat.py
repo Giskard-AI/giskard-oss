@@ -351,7 +351,8 @@ class GoogleChatTranslator:
         # Parts have no type tag: report which fields are set (e.g. code_execution_result).
         handle_unsupported_content(
             PROVIDER,
-            ",".join(sorted(part.model_dump(exclude_none=True))) or "empty",
+            ",".join(sorted(name for name, value in part if value is not None))
+            or "empty",
             ignore_unsupported_content=ignore_unsupported_content,
         )
         return None
@@ -363,29 +364,19 @@ class GoogleChatTranslator:
         *,
         ignore_unsupported_content: bool = False,
     ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
-        content_and_tool_calls = [
-            converted
-            for part_index, part in enumerate(parts)
-            if (
-                converted := GoogleChatTranslator.part_content_to_giskard(
-                    part,
-                    num_messages,
-                    part_index,
-                    ignore_unsupported_content=ignore_unsupported_content,
-                )
+        content: list[CompletionContent] = []
+        tool_calls: list[ToolCall] = []
+        for part_index, part in enumerate(parts):
+            converted = GoogleChatTranslator.part_content_to_giskard(
+                part,
+                num_messages,
+                part_index,
+                ignore_unsupported_content=ignore_unsupported_content,
             )
-            is not None
-        ]
-        content = [
-            content
-            for content in content_and_tool_calls
-            if not isinstance(content, ToolCall)
-        ]
-        tool_calls = [
-            tool_call
-            for tool_call in content_and_tool_calls
-            if isinstance(tool_call, ToolCall)
-        ]
+            if isinstance(converted, ToolCall):
+                tool_calls.append(converted)
+            elif converted is not None:
+                content.append(converted)
         return content, tool_calls
 
     @staticmethod

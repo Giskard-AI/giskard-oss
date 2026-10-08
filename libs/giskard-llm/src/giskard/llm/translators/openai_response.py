@@ -1,10 +1,11 @@
 import logging
 from collections.abc import Sequence
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, get_args
 
 from giskard.llm.types import (
     ResponseInputItem,
+    ResponseOutputItem,
     ResponseResult,
     ToolDef,
 )
@@ -24,7 +25,9 @@ if TYPE_CHECKING:
     from openai.types.responses.tool_param import ToolParam
 
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "max_tokens", "response_format"})
-_SUPPORTED_OUTPUT_TYPES = frozenset({"message", "function_call", "reasoning"})
+_SUPPORTED_OUTPUT_TYPES = frozenset(
+    m.model_fields["type"].default for m in get_args(ResponseOutputItem)
+)
 
 logger = logging.getLogger(__name__)
 PROVIDER = "openai"
