@@ -4,7 +4,7 @@ Request shape: https://docs.anthropic.com/en/api/messages
 """
 
 import logging
-from typing import Literal
+from typing import Any, Literal, cast
 
 import pytest
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
@@ -19,6 +19,7 @@ from giskard.llm.types import (
     UserMessage,
 )
 
+from .nested_schema_models import NestedOutputModel
 from .sdk_payload_validation import validate_anthropic_message_create
 from .tool_turn_fixtures import (
     ASSISTANT_TEXT_WITH_PARALLEL_TOOLS,
@@ -467,3 +468,61 @@ def test_httpx2_timeout_passes_through():
         _MODEL, [UserMessage(content="Hello.")], timeout=original
     )
     assert payload.get("timeout") is original
+
+
+def test_response_format_nested_pydantic_schema_valid_for_anthropic():
+    """Nested ``$defs`` get ``additionalProperties: false`` on every object (#2859)."""
+    pytest.importorskip("anthropic")
+    msg = UserMessage(content="hi")
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL, [msg], response_format=NestedOutputModel
+    )
+    output_config = cast(dict[str, Any], cast(object, payload.get("output_config")))
+    schema = cast(dict[str, Any], output_config["format"]["schema"])
+    assert "$defs" in schema or schema.get("properties")
+    assert schema["additionalProperties"] is False
+    validate_anthropic_message_create(payload)
+
+
+def test_response_format_preserves_const_and_pattern_constraints():
+    pytest.importorskip("anthropic")
+    from pydantic import BaseModel, Field
+
+    class Input(BaseModel):
+        language: Literal["en"]
+        ticket: str = Field(pattern=r"^TICKET-[0-9]+$", min_length=1)
+
+    class Output(BaseModel):
+        inputs: list[Input]
+        done: Literal[False]
+
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL, [UserMessage(content="hi")], response_format=Output
+    )
+    output = cast(dict[str, Any], cast(object, payload))
+    schema = output["output_config"]["format"]["schema"]
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["done"]["const"] is False
+    inner = schema["$defs"]["Input"]
+    assert inner["additionalProperties"] is False
+    assert inner["properties"]["language"]["const"] == "en"
+    assert inner["properties"]["ticket"]["pattern"] == r"^TICKET-[0-9]+$"
+    assert "minLength" not in inner["properties"]["ticket"]
+    validate_anthropic_message_create(payload)
+
+
+def test_response_format_dict_uses_anthropic_output_config_shape():
+    schema = {"type": "object", "properties": {"value": {"type": "string"}}}
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL,
+        [UserMessage(content="hi")],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {"name": "Result", "schema": schema},
+        },
+    )
+    assert cast(dict[str, Any], cast(object, payload))["output_config"] == {
+        "format": {"type": "json_schema", "schema": schema}
+    }
+    assert "response_format" not in payload
+    validate_anthropic_message_create(payload)

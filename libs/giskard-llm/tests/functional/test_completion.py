@@ -338,6 +338,14 @@ class ColorModel(BaseModel):
     hex: str
 
 
+class NestedInnerModel(BaseModel):
+    value: str
+
+
+class NestedOutputModel(BaseModel):
+    inner: NestedInnerModel
+
+
 class JudgeLikeResult(BaseModel):
     """Shape aligned with LLM checks: required non-blank ``reason``."""
 
@@ -370,6 +378,20 @@ async def test_response_format(provider: str):
     validated = ColorModel.model_validate(parsed)
     assert isinstance(validated.name, str)
     assert isinstance(validated.hex, str)
+
+
+@pytest.mark.anthropic
+async def test_anthropic_nested_response_format():
+    """Anthropic accepts and returns a nested Pydantic response schema (#2859)."""
+    client, model = _make_client("anthropic")
+    resp = await client.acompletion(
+        model,
+        [{"role": "user", "content": "Return inner.value as the string ok."}],
+        response_format=NestedOutputModel,
+    )
+    raw_json = resp.choices[0].message.text
+    assert raw_json is not None
+    NestedOutputModel.model_validate_json(raw_json)
 
 
 @pytest.mark.parametrize("provider", _PROVIDER_PARAMS)

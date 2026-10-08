@@ -180,6 +180,22 @@ def _extract_system_instruction(
     return system_blocks if system_blocks else None
 
 
+def _restore_supported_constraints(original: Any, transformed: Any) -> None:
+    """Keep API-supported constraints that the SDK moves into descriptions."""
+    if isinstance(original, dict) and isinstance(transformed, dict):
+        for key, value in original.items():
+            # Existing keys can be property names; retain their SDK conversion.
+            if key in ("const", "pattern") and key not in transformed:
+                transformed[key] = value
+            target = transformed.get(key)
+            if key == "oneOf" and target is None and "anyOf" not in original:
+                target = transformed.get("anyOf")
+            _restore_supported_constraints(value, target)
+    elif isinstance(original, list) and isinstance(transformed, list):
+        for value, target in zip(original, transformed):
+            _restore_supported_constraints(value, target)
+
+
 class SystemTextBlock(_BaseModel):
     text: str
     type: Literal["text"] = "text"
@@ -256,16 +272,37 @@ class AnthropicChatConfigParams(_BaseModel):
             if isinstance(v["response_format"], type) and issubclass(
                 v["response_format"], BaseModel
             ):
-                schema = v["response_format"].model_json_schema()
-                schema["additionalProperties"] = False
+                from anthropic import transform_schema
+
+                original_schema = v["response_format"].model_json_schema()
+                schema = transform_schema(original_schema)
+                _restore_supported_constraints(original_schema, schema)
                 v["output_config"] = {
                     "format": {
                         "type": "json_schema",
                         "schema": schema,
                     }
                 }
-            else:
-                v["output_config"] = v["response_format"]
+            elif isinstance(v["response_format"], dict):
+                response_format = v["response_format"]
+                if "format" in response_format:
+                    v["output_config"] = response_format
+                elif response_format.get("type") == "json_schema":
+                    schema = response_format.get("schema")
+                    if schema is None and isinstance(
+                        response_format.get("json_schema"), dict
+                    ):
+                        schema = response_format["json_schema"].get("schema")
+                    if not isinstance(schema, dict):
+                        raise ValueError(
+                            "response_format json_schema must contain a schema object"
+                        )
+                    v["output_config"] = {
+                        "format": {"type": "json_schema", "schema": schema}
+                    }
+                else:
+                    raise ValueError("unsupported Anthropic response_format dict")
+            v.pop("response_format", None)
 
         return v
 
@@ -296,11 +333,13 @@ class AnthropicChatTranslator:
                 sorted(unknown),
             )
 
-        anthropic_params = AnthropicChatConfigParams(
-            model=model,
-            messages=messages,
-            tools=tools,
-            **params,
+        anthropic_params = AnthropicChatConfigParams.model_validate(
+            {
+                "model": model,
+                "messages": messages,
+                "tools": tools,
+                **params,
+            }
         )
 
         payload = cast(
