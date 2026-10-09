@@ -278,14 +278,48 @@ async def test_literal_special_chars_not_escaped() -> None:
 
 
 async def test_empty_pattern_regex_mode() -> None:
-    """Test behavior with empty pattern in regex mode."""
+    """Test behavior with an empty pattern in regex mode.
+
+    An empty pattern would trivially match any text, which is almost never
+    the intent, so it must be rejected as an error rather than silently
+    passing.
+    """
     check = RegexMatching(
         text="Hello",
         pattern="",
     )
     result = await check.run(Trace())
-    # Empty regex matches any string
-    assert result.status == CheckStatus.PASS
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "empty or blank" in result.message.lower()
+
+
+async def test_whitespace_only_pattern_regex_mode() -> None:
+    """Test that a whitespace-only pattern is rejected as an error."""
+    check = RegexMatching(
+        text="Hello",
+        pattern="   ",
+    )
+    result = await check.run(Trace())
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "empty or blank" in result.message.lower()
+
+
+async def test_blank_pattern_from_trace() -> None:
+    """Test that a blank pattern resolved via pattern_key is also rejected."""
+    check = RegexMatching(
+        text="Hello World",
+        pattern_key="trace.last.inputs.expected",
+    )
+    interaction = Interaction(
+        inputs={"expected": "   "},
+        outputs={"response": "Hello World"},
+    )
+    result = await check.run(Trace(interactions=[interaction]))
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "empty or blank" in result.message.lower()
 
 
 async def test_missing_pattern_validation() -> None:
