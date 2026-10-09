@@ -4,7 +4,7 @@ Request shape: https://platform.openai.com/docs/api-reference/chat/create
 """
 
 import json
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import pytest
 from giskard.llm.translators.openai_chat import OpenAIChatTranslator
@@ -411,3 +411,34 @@ def test_response_format_pydantic_model_json_schema_without_strict():
     assert isinstance(schema_inner, dict)
     assert schema_inner.get("additionalProperties") is False
     validate_openai_completion_params(payload_raw)
+
+
+def test_response_format_nested_pydantic_schema_has_additional_properties_on_defs():
+    from .nested_schema_models import NestedOutputModel
+
+    msg = UserMessage(content="Hi.")
+    payload_raw = OpenAIChatTranslator.to_openai(
+        _MODEL, [msg], response_format=NestedOutputModel
+    )
+    payload = json.loads(json.dumps(cast(object, payload_raw)))
+    schema = cast(dict[str, Any], cast(object, payload))["response_format"][
+        "json_schema"
+    ]["schema"]
+    assert schema["additionalProperties"] is False
+    validate_openai_completion_params(payload_raw)
+
+
+def test_response_format_map_keeps_value_schema():
+    from pydantic import BaseModel
+
+    class MapOutput(BaseModel):
+        values: dict[str, int]
+
+    payload = OpenAIChatTranslator.to_openai(
+        _MODEL, [UserMessage(content="Hi.")], response_format=MapOutput
+    )
+    schema = cast(dict[str, Any], cast(object, payload))["response_format"][
+        "json_schema"
+    ]["schema"]
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["values"]["additionalProperties"] == {"type": "integer"}

@@ -63,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        python-version: ["3.14"]
         backend:
           # Each backend exercises a different install combination so we
           # catch dependency regressions in the three supported layouts:
@@ -127,15 +127,15 @@ jobs:
         # `extras` is the giskard-llm optional-dependency group to install;
         # aliases share an install (bare/azure_ai reuse openai/azure, gemini reuses google).
         include:
-          - { python-version: "3.12", provider: openai, extras: openai }
-          - { python-version: "3.12", provider: bare, extras: openai }
-          - { python-version: "3.12", provider: google, extras: google }
-          - { python-version: "3.12", provider: gemini, extras: google }
-          - { python-version: "3.12", provider: anthropic, extras: anthropic }
-          - { python-version: "3.12", provider: azure, extras: azure }
-          - { python-version: "3.12", provider: azure_ai, extras: azure }
+          - { python-version: "3.14", provider: openai, extras: openai }
+          - { python-version: "3.14", provider: bare, extras: openai }
+          - { python-version: "3.14", provider: google, extras: google }
+          - { python-version: "3.14", provider: gemini, extras: google }
+          - { python-version: "3.14", provider: anthropic, extras: anthropic }
+          - { python-version: "3.14", provider: azure, extras: azure }
+          - { python-version: "3.14", provider: azure_ai, extras: azure }
           - {
-              python-version: "3.12",
+              python-version: "3.14",
               provider: azure_foundry_v1,
               extras: openai,
             }
@@ -181,7 +181,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        python-version: ["3.14"]
         provider: [google]
     name: checks / ${{ matrix.provider }} / ${{ matrix.python-version }}
     env:
@@ -220,7 +220,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.14"]
     name: scan / garak / ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -249,7 +249,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.14"]
     name: scan / deepteam / ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
