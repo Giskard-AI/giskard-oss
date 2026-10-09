@@ -149,6 +149,31 @@ def test_discriminated_generic_with_concrete_type():
     assert GenericAnimal[int].model_validate(model_dump) == dog
 
 
+@pytest.mark.parametrize(
+    "animal,kind",
+    [
+        (GenericDog[int](name="Buddy", value=100, breed="Labrador"), "dog"),
+        (GenericCat[str](name="Whiskers", value="Meow", lives=9), "cat"),
+    ],
+)
+def test_discriminated_parametrized_generic_subclass_keeps_kind(
+    animal: GenericAnimal[T], kind: str
+):
+    """An instance of a parametrized registered class reports its origin's kind.
+
+    ``GenericDog[int]`` is a separate class created by pydantic, so a lookup
+    keyed on the exact class found nothing and ``kind`` was ``None``: the dump
+    could not be validated back and the discriminator was lost.
+    """
+    assert animal.kind == kind
+
+    model_dump = animal.model_dump()
+    assert model_dump["kind"] == kind
+
+    assert GenericAnimal.model_validate(model_dump) == animal
+    assert GenericAnimal.model_validate_json(animal.model_dump_json()) == animal
+
+
 def test_complex_type_adapter():
     type_adapter = TypeAdapter(GenericAnimal | int)
 

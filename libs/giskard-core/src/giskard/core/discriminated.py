@@ -96,12 +96,12 @@ class Discriminated(BaseModel):
             The kind string registered for this class, or None if unregistered.
         """
         cls = self.__class__
+        # A parametrized generic such as ``Equals[str, str, Trace, str]`` is a
+        # distinct class created by pydantic; the kind is registered on its
+        # unparametrized origin.
+        origin = cls.__pydantic_generic_metadata__["origin"] or cls
 
-        # Check if the class is directly registered
-        if cls in _REGISTRY._kinds:
-            return _REGISTRY._kinds[cls]
-
-        return None
+        return _REGISTRY._kinds.get(origin)
 
     @model_validator(mode="before")
     @classmethod
