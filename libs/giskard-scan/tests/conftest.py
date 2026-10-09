@@ -1,6 +1,12 @@
 import pytest
+from giskard.core import disable_telemetry
 from giskard.scan.quality import quality_suite_generator_registry
 from giskard.scan.vulnerability import vulnerability_suite_generator_registry
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Disable telemetry for tests."""
+    disable_telemetry()
 
 
 @pytest.fixture

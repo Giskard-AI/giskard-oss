@@ -12,6 +12,7 @@ from typing import Any, cast
 from giskard.core import (
     scoped_telemetry,
     telemetry_capture,
+    telemetry_finished,
     telemetry_tag,
 )
 from pydantic.experimental.missing_sentinel import MISSING
@@ -178,109 +179,110 @@ class ScenarioRunner:
             properties=shape_props,
         )
 
-        for step in steps:
-            try:
-                for interaction in step.interacts:
-                    trace = await trace.with_interaction(interaction)
-            except Exception as caught:
-                error = caught
-                if isinstance(caught, InteractionGenerationError):
-                    trace = cast(TraceType, caught.partial_trace)
-                    # Report the error that stopped the generator, not the wrapper
-                    # the trace raised to hand back its partial progress.
-                    if caught.__cause__ is not None:
-                        error = caught.__cause__
+        # A finished event is owed for every started one, including failures and
+        # cancellations.
+        with telemetry_finished(
+            "checks_scenario_run_finished", shape_props
+        ) as finished:
+            for step in steps:
+                try:
+                    for interaction in step.interacts:
+                        trace = await trace.with_interaction(interaction)
+                except Exception as caught:
+                    error = caught
+                    if isinstance(caught, InteractionGenerationError):
+                        trace = cast(TraceType, caught.partial_trace)
+                        # Report the error that stopped the generator, not the wrapper
+                        # the trace raised to hand back its partial progress.
+                        if caught.__cause__ is not None:
+                            error = caught.__cause__
 
-                if not return_exception:
-                    if error is caught:
-                        raise
-                    # Hide the InteractionGenerationError wrapper without losing
-                    # how the generator error was chained. Capture the original
-                    # links first: `raise` below re-points __context__ at the
-                    # wrapper we are unwrapping.
-                    context = error.__context__
-                    suppress_context = error.__suppress_context__
-                    try:
-                        raise error
-                    finally:
-                        error.__context__ = context
-                        error.__suppress_context__ = suppress_context
+                    if not return_exception:
+                        if error is caught:
+                            raise
+                        # Hide the InteractionGenerationError wrapper without losing
+                        # how the generator error was chained. Capture the original
+                        # links first: `raise` below re-points __context__ at the
+                        # wrapper we are unwrapping.
+                        context = error.__context__
+                        suppress_context = error.__suppress_context__
+                        try:
+                            raise error
+                        finally:
+                            error.__context__ = context
+                            error.__suppress_context__ = suppress_context
 
-                step_result = TestCaseResult(
-                    results=_skipped_check_results_for_step(
-                        step,
-                        "Checks were skipped due to input generation failure",
-                    ),
-                    duration_ms=int((time.perf_counter() - start_time) * 1000),
-                    last_interaction_index=(
-                        len(trace.interactions) - 1 if trace.interactions else None
-                    ),
-                    error=TestCaseError(
-                        message=str(error),
-                        exception_type=type(error).__name__,
-                        traceback="".join(traceback.format_exception(error)),
-                        phase="input_generation",
-                    ),
+                    step_result = TestCaseResult(
+                        results=_skipped_check_results_for_step(
+                            step,
+                            "Checks were skipped due to input generation failure",
+                        ),
+                        duration_ms=int((time.perf_counter() - start_time) * 1000),
+                        last_interaction_index=(
+                            len(trace.interactions) - 1 if trace.interactions else None
+                        ),
+                        error=TestCaseError(
+                            message=str(error),
+                            exception_type=type(error).__name__,
+                            traceback="".join(traceback.format_exception(error)),
+                            phase="input_generation",
+                        ),
+                    )
+                    steps_results.append(step_result)
+                    break
+
+                last_interaction_index = (
+                    len(trace.interactions) - 1 if trace.interactions else None
                 )
-                steps_results.append(step_result)
-                break
 
-            last_interaction_index = (
-                len(trace.interactions) - 1 if trace.interactions else None
-            )
-
-            test_case = TestCase(
-                trace=trace,
-                checks=step.checks,
-            )
-            step_result = await test_case.run(return_exception)
-            step_result = step_result.model_copy(
-                update={"last_interaction_index": last_interaction_index}
-            )
-            steps_results.append(step_result)
-
-            # Stop on first failure
-            if not step_result.passed:
-                break
-
-        if len(steps_results) < len(steps):
-            # Skipped steps own no new interaction; point them at the trace as it stood
-            # when execution stopped so the index is never left unset.
-            skipped_last_interaction_index = (
-                len(trace.interactions) - 1 if trace.interactions else None
-            )
-            for i in range(len(steps_results), len(steps)):
-                step_result = TestCaseResult(
-                    results=_skipped_check_results_for_step(
-                        steps[i],
-                        f"Step {i + 1} was skipped due to previous failure",
-                    ),
-                    duration_ms=0,
-                    last_interaction_index=skipped_last_interaction_index,
+                test_case = TestCase(
+                    trace=trace,
+                    checks=step.checks,
+                )
+                step_result = await test_case.run(return_exception)
+                step_result = step_result.model_copy(
+                    update={"last_interaction_index": last_interaction_index}
                 )
                 steps_results.append(step_result)
 
-        end_time = time.perf_counter()
-        duration_ms = int((end_time - start_time) * 1000)
+                # Stop on first failure
+                if not step_result.passed:
+                    break
 
-        result = ScenarioResult(
-            scenario_name=scenario.name,
-            steps=steps_results,
-            duration_ms=duration_ms,
-            final_trace=trace,
-            tags=list(scenario.tags),
-        )
+            if len(steps_results) < len(steps):
+                # Skipped steps own no new interaction; point them at the trace as it stood
+                # when execution stopped so the index is never left unset.
+                skipped_last_interaction_index = (
+                    len(trace.interactions) - 1 if trace.interactions else None
+                )
+                for i in range(len(steps_results), len(steps)):
+                    step_result = TestCaseResult(
+                        results=_skipped_check_results_for_step(
+                            steps[i],
+                            f"Step {i + 1} was skipped due to previous failure",
+                        ),
+                        duration_ms=0,
+                        last_interaction_index=skipped_last_interaction_index,
+                    )
+                    steps_results.append(step_result)
 
-        telemetry_capture(
-            "checks_scenario_run_finished",
-            properties={
-                **shape_props,
-                "outcome_status": result.status.value,
-                "duration_ms": duration_ms,
-            },
-        )
+            end_time = time.perf_counter()
+            duration_ms = int((end_time - start_time) * 1000)
 
-        return result
+            result = ScenarioResult(
+                scenario_name=scenario.name,
+                steps=steps_results,
+                duration_ms=duration_ms,
+                final_trace=trace,
+                tags=list(scenario.tags),
+            )
+
+            finished.update(
+                outcome="completed",
+                outcome_status=result.status.value,
+                duration_ms=duration_ms,
+            )
+            return result
 
     async def run[InputType, OutputType, TraceType: Trace[Any, Any]](
         self,

@@ -3,6 +3,8 @@
 Tests cover normal cases, edge cases, and error handling for scenario execution.
 """
 
+import asyncio
+import sys
 from collections.abc import AsyncGenerator
 from typing import override
 
@@ -1567,3 +1569,79 @@ async def test_scenario_result_tags_snapshot_independent_from_original():
     result = await scenario.run()
     scenario.tags.append("Category:Bar")  # mutate the original list
     assert result.tags == ["Category:Foo"]  # snapshot unchanged
+
+
+@pytest.mark.parametrize(
+    ("raised", "expected_outcome"),
+    [
+        (RuntimeError, "error"),
+        (asyncio.CancelledError, "cancelled"),
+        (KeyboardInterrupt, "cancelled"),
+    ],
+)
+async def test_scenario_run_reports_finish_when_target_raises(
+    monkeypatch: pytest.MonkeyPatch,
+    raised: type[BaseException],
+    expected_outcome: str,
+):
+    events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.runner.telemetry_capture",
+        lambda event, *, properties: events.append((event, properties)),
+    )
+    monkeypatch.setattr(
+        sys.modules["giskard.core.telemetry.telemetry"],
+        "telemetry_capture",
+        # Finish events are captured by the core helper; keep only this module's.
+        lambda event,
+        *,
+        properties,
+        _record=(lambda event, *, properties: events.append((event, properties))): (
+            _record(event, properties=properties)
+            if event.startswith("checks_scenario_run")
+            else None
+        ),
+    )
+
+    def target(inputs: str) -> str:
+        raise raised()
+
+    scenario = Scenario("raising").interact("hello")
+    with pytest.raises(raised):
+        await ScenarioRunner().run(scenario, target=target)
+
+    assert [event for event, _ in events] == [
+        "checks_scenario_run_started",
+        "checks_scenario_run_finished",
+    ]
+    assert events[1][1]["outcome"] == expected_outcome
+
+
+async def test_scenario_run_reports_completed_outcome(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.runner.telemetry_capture",
+        lambda event, *, properties: events.append((event, properties)),
+    )
+    monkeypatch.setattr(
+        sys.modules["giskard.core.telemetry.telemetry"],
+        "telemetry_capture",
+        # Finish events are captured by the core helper; keep only this module's.
+        lambda event,
+        *,
+        properties,
+        _record=(lambda event, *, properties: events.append((event, properties))): (
+            _record(event, properties=properties)
+            if event.startswith("checks_scenario_run")
+            else None
+        ),
+    )
+
+    scenario = Scenario("ok").interact("hello")
+    await ScenarioRunner().run(scenario, target=lambda inputs: inputs)
+
+    assert events[-1][0] == "checks_scenario_run_finished"
+    assert events[-1][1]["outcome"] == "completed"
+    assert events[-1][1]["outcome_status"] == "pass"
