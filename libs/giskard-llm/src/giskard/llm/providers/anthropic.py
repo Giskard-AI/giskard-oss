@@ -44,6 +44,8 @@ Provider-specific kwargs (configure-time):
     - ``http_client``: caller-owned ``httpx2.AsyncClient`` passed to the SDK; not closed by giskard-llm.
       Anthropic SDK v1 requires httpx2 (passing ``httpx.AsyncClient`` raises TypeError).
     - ``default_headers``: extra headers merged into every SDK request
+    - ``ignore_unsupported_content``: if True, drop response content giskard-llm
+      cannot represent (with a warning) instead of raising ``UnsupportedContentError``
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false
@@ -107,6 +109,7 @@ class AnthropicProvider:
         merge_system: bool = False,
         http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
+        ignore_unsupported_content: bool = False,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:
@@ -115,6 +118,7 @@ class AnthropicProvider:
             )
         anthropic = _import_anthropic()
         self._merge_system = merge_system
+        self._ignore_unsupported_content = ignore_unsupported_content
         self._client = anthropic.AsyncAnthropic(
             **compact(
                 api_key=api_key,
@@ -173,7 +177,9 @@ class AnthropicProvider:
         ) as e:  # Broad catch: _map_error checks SDK types first, then re-raises.
             self._map_error(e)
 
-        return AnthropicChatTranslator.from_anthropic(raw)
+        return AnthropicChatTranslator.from_anthropic(
+            raw, ignore_unsupported_content=self._ignore_unsupported_content
+        )
 
     # -- validation ------------------------------------------------------------
 

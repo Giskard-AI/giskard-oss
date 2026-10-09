@@ -27,6 +27,7 @@ from ..types import (
 )
 from ..types._base import _BaseModel
 from ..utils import deserialize_arguments
+from ._unsupported import handle_unsupported_content
 
 if TYPE_CHECKING:
     from anthropic.types.content_block import ContentBlock
@@ -358,8 +359,8 @@ class AnthropicChatTranslator:
 
     @staticmethod
     def block_content_to_giskard(
-        block: "ContentBlock",
-    ) -> CompletionContent | ToolCall:
+        block: "ContentBlock", *, ignore_unsupported_content: bool = False
+    ) -> CompletionContent | ToolCall | None:
         if block.type == "text":
             return TextContent(text=block.text)
         elif block.type == "tool_use":
@@ -371,34 +372,37 @@ class AnthropicChatTranslator:
                     arguments=deserialize_arguments(block.input),
                 ),
             )
-        else:
-            raise ValueError(f"Unsupported content block type: {block.type}")
+        handle_unsupported_content(
+            _PROVIDER_NAME,
+            block.type,
+            ignore_unsupported_content=ignore_unsupported_content,
+        )
+        return None
 
     @staticmethod
     def blocks_to_giskard(
-        blocks: "Sequence[ContentBlock]",
+        blocks: "Sequence[ContentBlock]", *, ignore_unsupported_content: bool = False
     ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
-        content_and_tool_calls = [
-            AnthropicChatTranslator.block_content_to_giskard(block) for block in blocks
-        ]
-        content = [
-            content
-            for content in content_and_tool_calls
-            if not isinstance(content, ToolCall)
-        ]
-        tool_calls = [
-            tool_call
-            for tool_call in content_and_tool_calls
-            if isinstance(tool_call, ToolCall)
-        ]
+        content: list[CompletionContent] = []
+        tool_calls: list[ToolCall] = []
+        for block in blocks:
+            converted = AnthropicChatTranslator.block_content_to_giskard(
+                block, ignore_unsupported_content=ignore_unsupported_content
+            )
+            if isinstance(converted, ToolCall):
+                tool_calls.append(converted)
+            elif converted is not None:
+                content.append(converted)
         return content, tool_calls
 
     @staticmethod
     def from_anthropic(
-        raw: "Message",
+        raw: "Message", *, ignore_unsupported_content: bool = False
     ) -> CompletionResponse:
         """Convert raw SDK response to CompletionResponse."""
-        content, tool_calls = AnthropicChatTranslator.blocks_to_giskard(raw.content)
+        content, tool_calls = AnthropicChatTranslator.blocks_to_giskard(
+            raw.content, ignore_unsupported_content=ignore_unsupported_content
+        )
 
         finish_reason = (
             FINISH_REASON_MAP.get(raw.stop_reason, "stop") if raw.stop_reason else None

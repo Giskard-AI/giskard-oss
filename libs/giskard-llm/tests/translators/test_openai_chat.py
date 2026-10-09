@@ -442,3 +442,31 @@ def test_response_format_map_keeps_value_schema():
     ]["schema"]
     assert schema["additionalProperties"] is False
     assert schema["properties"]["values"]["additionalProperties"] == {"type": "integer"}
+
+
+def test_assistant_reasoning_is_stripped_for_official_api():
+    """``reasoning`` / ``reasoning_details`` are not official Chat Completions fields: never sent."""
+    from giskard.llm.types import ReasoningTextDetail, ToolCall, ToolCallFunction
+
+    messages: list[ChatMessage] = [
+        UserMessage(content="What is 6*7?"),
+        AssistantMessage(
+            content=None,
+            reasoning="Multiply.",
+            reasoning_details=[ReasoningTextDetail(text="Multiply.", signature="s")],
+            tool_calls=[
+                ToolCall(
+                    id="call_1",
+                    function=ToolCallFunction(name="mul", arguments={"a": 6, "b": 7}),
+                )
+            ],
+        ),
+    ]
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
+    assistant = cast(dict[str, Any], cast(object, list(payload["messages"])[1]))
+    assert "reasoning" not in assistant
+    assert "reasoning_details" not in assistant
+    assert assistant["tool_calls"][0]["id"] == "call_1"
+    # The caller's message is left untouched.
+    assert cast(AssistantMessage, messages[1]).reasoning == "Multiply."
+    validate_openai_completion_params(payload)

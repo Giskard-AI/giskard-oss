@@ -346,3 +346,41 @@ def test_response_format_chat_json_schema_dict_maps_to_text_format():
     assert out_schema["additionalProperties"] is False
     assert "response_format" not in payload
     validate_openai_response_params(payload)
+
+
+def test_reasoning_item_round_trips_unchanged():
+    """A returned ``reasoning`` item is sent back verbatim (``id``, ``encrypted_content``)."""
+    from giskard.llm.types import ResponseFunctionCallOutput, ResponseResult
+
+    reasoning = {
+        "type": "reasoning",
+        "id": "rs_1",
+        "summary": [{"type": "summary_text", "text": "Plan: call the tool."}],
+        "encrypted_content": "enc-blob",
+    }
+    result = ResponseResult.model_validate(
+        {
+            "id": "resp_1",
+            "output": [
+                reasoning,
+                {
+                    "type": "function_call",
+                    "call_id": TOOL_CALL_ID,
+                    "name": "get_weather",
+                    "arguments": "{}",
+                },
+            ],
+        }
+    )
+    payload = OpenAIResponseTranslator.to_openai(
+        _MODEL,
+        [
+            _message("user", "Weather?"),
+            *result.outputs,
+            ResponseFunctionCallOutput(
+                call_id=TOOL_CALL_ID, output=TOOL_RESULT_CONTENT
+            ),
+        ],
+    )
+    assert list(payload.get("input", []))[1] == reasoning
+    validate_openai_response_params(payload)

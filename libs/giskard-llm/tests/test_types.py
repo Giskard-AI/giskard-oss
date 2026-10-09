@@ -99,3 +99,60 @@ def test_embedding_response():
     )
     assert len(resp.data) == 2
     assert resp.data[0].embedding == [0.1, 0.2, 0.3]
+
+
+def test_assistant_reasoning_never_in_text_or_transcript():
+    """Checks and judges read ``text`` / ``transcript``: reasoning must never leak there."""
+    from giskard.llm.types import ReasoningSummaryDetail, ReasoningTextDetail
+
+    msg = AssistantMessage(
+        content="The answer is 42.",
+        reasoning="SECRET chain of thought",
+        reasoning_details=[
+            ReasoningTextDetail(text="SECRET detail text"),
+            ReasoningSummaryDetail(summary="SECRET summary"),
+        ],
+    )
+    assert msg.text == "The answer is 42."
+    assert "SECRET" not in msg.transcript
+
+    reasoning_only = AssistantMessage(reasoning="SECRET chain of thought")
+    assert reasoning_only.text is None
+    assert "SECRET" not in reasoning_only.transcript
+
+
+def test_assistant_reasoning_content_alias_and_discriminated_details():
+    """``reasoning_content`` is accepted as an alias; details dispatch on ``type``."""
+    from giskard.llm.types import ReasoningEncryptedDetail
+
+    msg = AssistantMessage.model_validate(
+        {
+            "role": "assistant",
+            "reasoning_content": "thinking",
+            "reasoning_details": [{"type": "reasoning.encrypted", "data": "x"}],
+        }
+    )
+    assert msg.reasoning == "thinking"
+    assert msg.reasoning_details == [ReasoningEncryptedDetail(data="x")]
+    assert msg.model_dump()["reasoning"] == "thinking"
+
+
+def test_response_result_output_text_excludes_reasoning():
+    from giskard.llm.types import ResponseResult
+
+    result = ResponseResult.model_validate(
+        {
+            "id": "resp_1",
+            "output": [
+                {
+                    "type": "reasoning",
+                    "id": "rs_1",
+                    "summary": [{"type": "summary_text", "text": "SECRET"}],
+                    "content": [{"type": "reasoning_text", "text": "SECRET"}],
+                },
+                {"type": "message", "content": "42"},
+            ],
+        }
+    )
+    assert result.output_text == "42"
+    assert [r.id for r in result.reasoning] == ["rs_1"]
