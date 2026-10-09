@@ -125,3 +125,25 @@ def test_warning_can_be_escalated_to_error():
         warnings.simplefilter("error", UnavailableCheckWarning)
         with pytest.raises(UnavailableCheckWarning):
             CHECK_ADAPTER.validate_python(HUB_PAYLOAD)
+
+
+def test_unavailable_hub_check_applies_dump_options_to_spec():
+    """Spec keys honor exclude/include/exclude_none like real fields would."""
+    with pytest.warns(UnavailableCheckWarning):
+        check = CHECK_ADAPTER.validate_python({**HUB_PAYLOAD, "context": None})
+
+    assert "context" not in check.to_spec()
+    assert check.model_dump()["context"] is None
+    assert "reference" not in check.model_dump(exclude={"reference"})
+    assert check.model_dump(include={"name", "reference"}) == {
+        "name": "correctness",
+        "reference": "Paris",
+    }
+
+
+def test_unavailable_check_warning_points_at_caller():
+    """The warning is attributed to the loading line, not pydantic internals."""
+    with pytest.warns(UnavailableCheckWarning) as record:
+        CHECK_ADAPTER.validate_python(HUB_PAYLOAD)
+
+    assert record[0].filename == __file__

@@ -1,17 +1,12 @@
 """Placeholder for Giskard Hub checks that are not available in this environment."""
 
+import os
 import warnings
-from pathlib import Path
 from typing import Any
 
 import giskard.core
 import pydantic
-from pydantic import (
-    Field,
-    SerializerFunctionWrapHandler,
-    computed_field,
-    model_serializer,
-)
+from pydantic import ConfigDict, Field, computed_field
 
 from .check import Check
 from .interaction import Trace
@@ -21,12 +16,12 @@ HUB_KIND_PREFIX = "hub_"
 """Kind prefix reserved for checks provided by Giskard Hub."""
 
 # Attribute the warning to the caller that loaded the payload, not to the
-# validation machinery it went through.
+# validation machinery it went through. The trailing separator keeps e.g. the
+# ``pydantic`` prefix from also matching ``pydantic_settings``.
 _WARNING_SKIP_PREFIXES = tuple(
-    str(Path(module.__file__).parent)
-    for module in (pydantic, giskard.core)
-    if module.__file__ is not None
-) + (str(Path(__file__).parents[1]),)
+    os.path.join(os.path.dirname(path), "")
+    for path in (pydantic.__file__, giskard.core.__file__, os.path.dirname(__file__))
+)
 
 
 class UnavailableCheckWarning(UserWarning):
@@ -47,46 +42,36 @@ class UnavailableHubCheck(Check[Any, Any, Trace[Any, Any]]):
     serializes back to the original payload so the spec round-trips unchanged.
 
     This class is intentionally not registered under any kind.
+
+    Notes
+    -----
+    This is the one ``Check`` that sets ``extra="allow"``, despite the rule in
+    ``Discriminated``. That rule guards against unknown keys being silently
+    dropped; here they are kept verbatim as extra fields, so pydantic dumps
+    them back at the top level with every dump option applied.
     """
 
-    unavailable_kind: str = Field(description="Kind of the unavailable Hub check")
-    spec: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Original check configuration, without kind, name or description",
+    model_config = ConfigDict(extra="allow")
+
+    unavailable_kind: str = Field(
+        exclude=True, description="Kind of the unavailable Hub check"
     )
 
     @computed_field
-    def kind(self) -> str | None:
+    def kind(self) -> str:
         """The original Hub kind, so dumps and results keep reporting it."""
         return self.unavailable_kind
 
     @classmethod
     def from_payload(cls, kind: str, value: dict[str, Any]) -> "UnavailableHubCheck":
         """Build the placeholder from a raw check payload and warn about it."""
-        spec = {
-            k: v for k, v in value.items() if k not in {"kind", "name", "description"}
-        }
         warnings.warn(
             f"Check kind '{kind}' is provided by Giskard Hub and is not available "
             "in this environment; it will be skipped. Run it on Giskard Hub.",
             UnavailableCheckWarning,
             skip_file_prefixes=_WARNING_SKIP_PREFIXES,
         )
-        return cls(
-            name=value.get("name"),
-            description=value.get("description"),
-            unavailable_kind=kind,
-            spec=spec,
-        )
-
-    @model_serializer(mode="wrap")
-    def _serialize_as_original(
-        self, handler: SerializerFunctionWrapHandler
-    ) -> dict[str, Any]:
-        data: dict[str, Any] = handler(self)
-        data.pop("unavailable_kind", None)
-        spec: dict[str, Any] = data.pop("spec", {})
-        return {**data, **spec}
+        return cls.model_validate({**value, "unavailable_kind": kind})
 
     async def run(self, trace: Trace[Any, Any]) -> CheckResult:
         return CheckResult.skip(
