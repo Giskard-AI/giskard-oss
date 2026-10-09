@@ -109,6 +109,16 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
                 ),
             )
 
+        if matcher == "":
+            return (
+                None,
+                None,
+                CheckResult.error(
+                    message=f"Value for {matcher_name} is empty; the check would pass without testing anything.",
+                    details=details,
+                ),
+            )
+
         # Validate text
         if isinstance(text, NoMatch):
             return (
@@ -308,6 +318,12 @@ class StringMatching[InputType, OutputType, TraceType: Trace](  # pyright: ignor
         # Format both strings for comparison
         formatted_text = self._format_str(text)
         formatted_keyword = self._format_str(keyword)
+
+        if formatted_keyword == "":
+            return CheckResult.error(
+                message="Keyword is empty after normalization; the check would pass without testing anything.",
+                details=details,
+            )
 
         # Check if keyword appears in text
         if formatted_keyword in formatted_text:
