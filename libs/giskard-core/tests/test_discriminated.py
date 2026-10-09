@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 import pytest
 from giskard.core import Discriminated, discriminated_base
@@ -329,3 +329,45 @@ def test_kind_is_not_writable():
     assert dog.kind == "dog"
     assert isinstance(dog, Dog)
     assert "kind" not in Dog.model_fields
+
+
+@discriminated_base
+class Plant(Discriminated):
+    """Base whose unregistered ``wild_*`` kinds resolve to a placeholder."""
+
+    @classmethod
+    def _resolve_unregistered_kind(cls, kind: str, value: dict[str, Any]) -> Any:
+        if not kind.startswith("wild_"):
+            return None
+        return UnknownPlant(original_kind=kind)
+
+
+class UnknownPlant(Plant):
+    """Unregistered placeholder for ``wild_*`` kinds."""
+
+    original_kind: str
+
+
+@Plant.register("wild_rose")
+class WildRose(Plant):
+    """A registered kind that matches the fallback prefix."""
+
+
+def test_unregistered_kind_uses_base_fallback():
+    """A base can substitute a placeholder for an unregistered kind."""
+    plant = Plant.model_validate({"kind": "wild_fern"})
+    assert isinstance(plant, UnknownPlant)
+    assert plant.original_kind == "wild_fern"
+
+
+def test_registered_kind_bypasses_fallback():
+    """The fallback only runs on a registry miss."""
+    assert isinstance(Plant.model_validate({"kind": "wild_rose"}), WildRose)
+
+
+def test_fallback_returning_none_raises():
+    """Kinds the fallback declines keep the "not registered" error."""
+    with pytest.raises(
+        ValueError, match=f"Kind cactus is not registered for class {Plant}"
+    ):
+        Plant.model_validate({"kind": "cactus"})
