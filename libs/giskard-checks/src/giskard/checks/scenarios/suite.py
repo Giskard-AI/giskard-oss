@@ -23,6 +23,7 @@ from rich.progress import (
 from rich.text import Text
 
 from .._telemetry_props import suite_shape_properties
+from ..core._run_sync import run_sync as _run_sync
 from ..core.interaction import Trace
 from ..core.result import (
     STATUS_SUMMARY_ORDER,
@@ -162,6 +163,30 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         """
         self.scenarios.append(scenario)
         return self
+
+    def run_sync(
+        self,
+        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),
+        return_exception: bool = False,
+        parallel: bool = False,
+        max_concurrency: int | None = None,
+        verbose: bool = True,
+    ) -> SuiteResult:
+        """Blocking version of :meth:`run`, with the same arguments and result.
+
+        Each call creates a new event loop. Targets and checks that retain
+        loop-bound state, such as asyncio semaphores, cannot reuse that state
+        across calls. Use one async context and :meth:`run` for such objects.
+
+        Raises
+        ------
+        RuntimeError
+            If called while an asyncio event loop is already running. In that
+            case, use ``await suite.run(...)`` instead.
+        """
+        return _run_sync(
+            self.run, target, return_exception, parallel, max_concurrency, verbose
+        )
 
     async def run(
         self,
