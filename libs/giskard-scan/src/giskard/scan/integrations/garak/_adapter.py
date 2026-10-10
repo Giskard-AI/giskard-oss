@@ -3,6 +3,7 @@
 import asyncio
 import concurrent.futures
 import logging
+import math
 import time
 from collections import defaultdict
 from collections.abc import Iterable
@@ -380,7 +381,7 @@ def _score_to_check(
 ) -> CheckResult:
     """Map one detector score for one conversation onto a CheckResult."""
     details = _detector_details(detector_label)
-    if score is None:
+    if score is None or math.isnan(score):
         return CheckResult.skip(message="detector returned no score", details=details)
 
     metrics = [Metric(name=detector_label, value=score)]
