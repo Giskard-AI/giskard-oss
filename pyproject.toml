@@ -59,8 +59,9 @@ full = ["giskard[all-llms,all-checks,scan,litellm]"]
 "Twitter" = "https://twitter.com/giskard_ai"
 
 [tool.uv]
-# garak caps datasets<4; datasets 3.6.0 caps fsspec<=2025.3.0 (CVE-2026-104851 fix: 2026.6.0).
-override-dependencies = ["fsspec>=2026.6.0"]
+# garak <=0.17.0 caps datasets<4, blocking the path-traversal fix (5.0.1). garak main already
+# requires datasets>=5.0.1 (NVIDIA/garak#2297); drop this once a release ships it.
+override-dependencies = ["datasets>=5.0.1"]
 
 [tool.uv.workspace]
 members = [
