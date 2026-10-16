@@ -163,3 +163,45 @@ def test_from_anthropic_refusal_category_only():
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
     assert msg.refusal == "bio"
     assert msg.is_refusal
+
+
+@pytest.mark.parametrize(
+    ("block", "block_type"),
+    [
+        ({"type": "thinking", "thinking": "Hmm.", "signature": "sig"}, "thinking"),
+        ({"type": "redacted_thinking", "data": "opaque"}, "redacted_thinking"),
+    ],
+)
+def test_from_anthropic_unsupported_block_raises(
+    block: dict[str, object], block_type: str
+):
+    """Blocks we cannot represent raise :class:`UnsupportedContentError` by default."""
+    from giskard.llm.errors import UnsupportedContentError
+
+    raw = _message({"content": [block, {"type": "text", "text": "Answer."}]})
+    with pytest.raises(UnsupportedContentError) as exc_info:
+        AnthropicChatTranslator.from_anthropic(raw)
+    assert exc_info.value.content_type == block_type
+    assert exc_info.value.provider == "anthropic"
+
+
+def test_from_anthropic_unsupported_block_dropped_with_warning(
+    caplog: pytest.LogCaptureFixture,
+):
+    """With ``ignore_unsupported_content`` the block is dropped and a warning logged."""
+    raw = _message(
+        {
+            "content": [
+                {"type": "thinking", "thinking": "Hmm.", "signature": "sig"},
+                {"type": "text", "text": "Answer."},
+            ]
+        }
+    )
+    with caplog.at_level("WARNING"):
+        msg = (
+            AnthropicChatTranslator.from_anthropic(raw, ignore_unsupported_content=True)
+            .choices[0]
+            .message
+        )
+    assert msg.content == [TextContent(text="Answer.")]
+    assert "thinking" in caplog.text

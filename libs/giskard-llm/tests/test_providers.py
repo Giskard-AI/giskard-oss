@@ -38,23 +38,28 @@ if TYPE_CHECKING:
 # -- Helpers -------------------------------------------------------------------
 
 
-def _make_openai_provider():
+def _make_openai_provider(ignore_unsupported_content: bool = False):
     provider = OpenAIProvider.__new__(OpenAIProvider)
+    provider._ignore_unsupported_content = ignore_unsupported_content
     provider._client = MagicMock()
     provider._client.chat = MagicMock()
     provider._client.chat.completions = MagicMock()
     return provider
 
 
-def _make_google_provider():
+def _make_google_provider(ignore_unsupported_content: bool = False):
     provider = GoogleProvider.__new__(GoogleProvider)
+    provider._ignore_unsupported_content = ignore_unsupported_content
     provider._client = MagicMock()
     return provider
 
 
-def _make_anthropic_provider(merge_system: bool = False):
+def _make_anthropic_provider(
+    merge_system: bool = False, ignore_unsupported_content: bool = False
+):
     provider = AnthropicProvider.__new__(AnthropicProvider)
     provider._merge_system = merge_system
+    provider._ignore_unsupported_content = ignore_unsupported_content
     provider._client = MagicMock()
     return provider
 
@@ -1102,3 +1107,81 @@ class TestAzureAiEndpointNormalization:
             mock_client.call_args.kwargs["azure_endpoint"]
             == "https://dev.services.ai.azure.com/openai/v1"
         )
+
+
+# -- ignore_unsupported_content ------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        pytest.param(
+            lambda **kw: OpenAIProvider(api_key="k", **kw),
+            id="openai",
+            marks=pytest.mark.openai,
+        ),
+        pytest.param(
+            lambda **kw: AzureOpenAIProvider(
+                api_key="k", base_url="https://x.openai.azure.com", **kw
+            ),
+            id="azure",
+            marks=pytest.mark.azure,
+        ),
+        pytest.param(
+            lambda **kw: AzureAIProvider(
+                api_key="k", base_url="https://x.services.ai.azure.com", **kw
+            ),
+            id="azure_ai",
+            marks=pytest.mark.azure_ai,
+        ),
+        pytest.param(
+            lambda **kw: AnthropicProvider(api_key="k", **kw),
+            id="anthropic",
+            marks=pytest.mark.anthropic,
+        ),
+        pytest.param(
+            lambda **kw: GoogleProvider(api_key="k", **kw),
+            id="google",
+            marks=pytest.mark.google,
+        ),
+    ],
+)
+@pytest.mark.parametrize("ignore", [False, True])
+def test_providers_accept_ignore_unsupported_content(factory: Any, ignore: bool):
+    """Every provider accepts the option (default ``False``) and stores it."""
+    provider = factory(ignore_unsupported_content=ignore)
+    assert provider._ignore_unsupported_content is ignore
+    assert factory()._ignore_unsupported_content is False
+
+
+@pytest.mark.anthropic
+@pytest.mark.parametrize("ignore", [False, True])
+async def test_anthropic_complete_forwards_ignore_unsupported_content(ignore: bool):
+    """The provider option reaches the translator on the ``complete`` path."""
+    from anthropic.types import Message
+    from giskard.llm.errors import UnsupportedContentError
+
+    provider = _make_anthropic_provider(ignore_unsupported_content=ignore)
+    raw = Message.model_validate(
+        {
+            "id": "msg_1",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-x",
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+            "content": [
+                {"type": "thinking", "thinking": "Hmm.", "signature": "sig"},
+                {"type": "text", "text": "Answer."},
+            ],
+        }
+    )
+    provider._client.messages.create = AsyncMock(return_value=raw)
+    messages: list[Any] = [{"role": "user", "content": "Hi"}]
+
+    if ignore:
+        resp = await provider.complete("claude-x", messages)
+        assert resp.choices[0].message.text == "Answer."
+    else:
+        with pytest.raises(UnsupportedContentError):
+            await provider.complete("claude-x", messages)

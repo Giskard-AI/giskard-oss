@@ -222,3 +222,96 @@ def test_from_openai_message_then_function():
     assert out.outputs[0].output_text == "Calling tool…"
     assert isinstance(out.outputs[1], GiskardFunctionToolCall)
     assert out.outputs[1].name == "f"
+
+
+# -- Reasoning / unsupported output items -------------------------------------------
+
+
+def test_from_openai_reasoning_item():
+    """``reasoning`` items parse with every field; they never reach ``output_text``."""
+    from giskard.llm.types import (
+        ResponseReasoningItem,
+        ResponseReasoningSummary,
+        ResponseReasoningText,
+    )
+    from openai.types.responses.response_reasoning_item import (
+        Content,
+        Summary,
+    )
+    from openai.types.responses.response_reasoning_item import (
+        ResponseReasoningItem as OpenAIReasoningItem,
+    )
+
+    reasoning = OpenAIReasoningItem(
+        id="rs_1",
+        type="reasoning",
+        summary=[Summary(type="summary_text", text="Summarised thinking")],
+        content=[Content(type="reasoning_text", text="Raw thinking")],
+        encrypted_content="enc",
+        status="completed",
+    )
+    msg = ResponseOutputMessage(
+        id="msg_1",
+        type="message",
+        role="assistant",
+        status="completed",
+        content=[ResponseOutputText(type="output_text", text="42", annotations=[])],
+    )
+    raw = Response.model_construct(id="resp_r", output=[reasoning, msg], model=_MODEL)
+    out = OpenAIResponseTranslator.from_openai(raw)
+
+    assert out.outputs[0] == ResponseReasoningItem(
+        id="rs_1",
+        summary=[ResponseReasoningSummary(text="Summarised thinking")],
+        content=[ResponseReasoningText(text="Raw thinking")],
+        encrypted_content="enc",
+        status="completed",
+    )
+    assert out.reasoning == [out.outputs[0]]
+    assert out.output_text == "42"
+
+
+def _web_search_call() -> object:
+    from openai.types.responses.response_function_web_search import (
+        ActionSearch,
+        ResponseFunctionWebSearch,
+    )
+
+    return ResponseFunctionWebSearch(
+        id="ws_1",
+        type="web_search_call",
+        status="completed",
+        action=ActionSearch(type="search", query="weather"),
+    )
+
+
+def test_from_openai_unsupported_output_item_raises():
+    """Output items we do not model raise instead of failing pydantic validation."""
+    from giskard.llm.errors import UnsupportedContentError
+
+    raw = Response.model_construct(
+        id="resp_u", output=[_web_search_call()], model=_MODEL
+    )
+    with pytest.raises(UnsupportedContentError, match="web_search_call"):
+        OpenAIResponseTranslator.from_openai(raw)
+
+
+def test_from_openai_unsupported_output_item_dropped_with_warning(
+    caplog: pytest.LogCaptureFixture,
+):
+    """With ``ignore_unsupported_content`` the item is dropped and a warning logged."""
+    msg = ResponseOutputMessage(
+        id="msg_1",
+        type="message",
+        role="assistant",
+        status="completed",
+        content=[ResponseOutputText(type="output_text", text="Sunny", annotations=[])],
+    )
+    raw = Response.model_construct(
+        id="resp_u", output=[_web_search_call(), msg], model=_MODEL
+    )
+    with caplog.at_level("WARNING"):
+        out = OpenAIResponseTranslator.from_openai(raw, ignore_unsupported_content=True)
+    assert len(out.outputs) == 1
+    assert out.output_text == "Sunny"
+    assert "web_search_call" in caplog.text

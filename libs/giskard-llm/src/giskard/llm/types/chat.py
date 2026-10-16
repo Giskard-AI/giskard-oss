@@ -1,7 +1,7 @@
 from collections.abc import Sequence
-from typing import Literal, Protocol
+from typing import Annotated, Literal, Protocol
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 
 from ._base import ArgumentDict, _BaseModel
 
@@ -51,6 +51,44 @@ class RefusalContent(_BaseModel):
 
 
 CompletionContent = TextContent | RefusalContent
+
+# -- Reasoning details --------------------------------------------------------------
+# De facto OpenAI-compatible chat convention (OpenRouter / vLLM): structured, replayable
+# reasoning that must be passed back unmodified on later assistant turns.
+
+
+class _ReasoningDetailBase(_BaseModel):
+    id: str | None = None
+    format: str | None = "unknown"
+    index: int | None = None
+
+
+class ReasoningTextDetail(_ReasoningDetailBase):
+    """Plaintext reasoning, optionally signed for verbatim replay."""
+
+    type: Literal["reasoning.text"] = "reasoning.text"
+    text: str
+    signature: str | None = None
+
+
+class ReasoningSummaryDetail(_ReasoningDetailBase):
+    """Provider-generated summary of the reasoning."""
+
+    type: Literal["reasoning.summary"] = "reasoning.summary"
+    summary: str
+
+
+class ReasoningEncryptedDetail(_ReasoningDetailBase):
+    """Opaque (encrypted or redacted) reasoning payload."""
+
+    type: Literal["reasoning.encrypted"] = "reasoning.encrypted"
+    data: str
+
+
+ReasoningDetail = Annotated[
+    ReasoningTextDetail | ReasoningSummaryDetail | ReasoningEncryptedDetail,
+    Field(discriminator="type"),
+]
 
 # -- Chat Message types -------------------------------------------------------------
 
@@ -113,6 +151,12 @@ class AssistantMessage(_BaseModel):
     content: str | Sequence[CompletionContent] | None = None
     refusal: str | None = None
     tool_calls: Sequence[ToolCall] | None = None
+    # Reasoning never contributes to ``text`` / ``transcript``: those are what checks
+    # and judges evaluate, and must only contain the visible answer.
+    reasoning: str | None = Field(
+        default=None, validation_alias=AliasChoices("reasoning", "reasoning_content")
+    )
+    reasoning_details: list[ReasoningDetail] | None = None
 
     @property
     def is_refusal(self) -> bool:

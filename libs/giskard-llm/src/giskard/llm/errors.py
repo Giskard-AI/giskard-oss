@@ -46,6 +46,31 @@ class UnsupportedOperationError(LLMError):
         self.operation = operation
 
 
+class UnsupportedContentError(LLMError):
+    """The provider returned content that giskard-llm cannot represent.
+
+    Raised instead of silently dropping data. ``status_code`` is ``0`` so the
+    retry middleware does not retry: the same request yields the same content.
+
+    Parameters
+    ----------
+    provider : str
+        Provider name (e.g. ``"anthropic"``).
+    content_type : str
+        Provider-native type of the unsupported item (e.g. ``"web_search_call"``).
+    """
+
+    def __init__(self, provider: str, content_type: str) -> None:
+        super().__init__(
+            0,
+            f"Provider '{provider}' returned unsupported content type "
+            f"'{content_type}'. Configure the provider with "
+            "ignore_unsupported_content=True to drop it with a warning instead.",
+            provider,
+        )
+        self.content_type = content_type
+
+
 class ProviderNotAvailableError(LLMError):
     """The provider SDK is not installed."""
 
