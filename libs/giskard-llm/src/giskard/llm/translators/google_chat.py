@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         GenerateContentResponse,
         Part,
         PartDict,
+        SafetySettingOrDict,
         ToolDict,
     )
 
@@ -43,6 +44,10 @@ if TYPE_CHECKING:
         model: Required[str]
         contents: Required[ContentListUnionDict]
         config: GenerateContentConfigDict
+else:
+    # google-genai is an optional dependency and is never imported at module load, so
+    # safety settings are passed through untouched and validated by the SDK config.
+    SafetySettingOrDict = Any
 
 
 _PROVIDER = "google/chat"
@@ -211,6 +216,7 @@ class GoogleChatConfigParams(_BaseModel):
     max_output_tokens: int | None = Field(default=None, validation_alias="max_tokens")
     response_mime_type: Literal["application/json"] | None = None
     response_schema: type[BaseModel] | None = None
+    safety_settings: Sequence[SafetySettingOrDict] | None = None
 
 
 class GoogleChatParams(_BaseModel):
