@@ -4,6 +4,7 @@ import importlib
 import os
 
 import pytest
+from giskard.core import disable_telemetry
 
 _PROVIDER_PACKAGES = {
     "openai": "openai",
@@ -26,6 +27,11 @@ _TEST_PROVIDER_GROUPS: dict[str, frozenset[str]] = {
 }
 
 _ANY_PROVIDER_PACKAGES = ["openai", "google.genai", "anthropic"]
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Disable telemetry for tests."""
+    disable_telemetry()
 
 
 def _parse_test_provider() -> tuple[frozenset[str], str] | None:
