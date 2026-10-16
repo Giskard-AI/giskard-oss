@@ -9,6 +9,7 @@ from giskard.checks.core.interaction.interact import Interact
 from giskard.checks.core.scenario import Scenario
 from giskard.checks.judges.contradiction import Contradiction
 from giskard.checks.judges.groundedness import Groundedness
+from giskard.checks.judges.numerical_faithfulness import NumericalFaithfulness
 from giskard.checks.judges.toxicity import Toxicity
 from giskard.checks.scenarios.runner import _build_steps
 from giskard.checks.scenarios.suite import Suite
@@ -55,6 +56,9 @@ def _assert_missing_json_roundtrip(model, field: str) -> None:
         pytest.param(Toxicity(), "output", id="toxicity-output"),
         pytest.param(Groundedness(), "answer", id="groundedness-answer"),
         pytest.param(Contradiction(), "answer", id="contradiction-answer"),
+        pytest.param(
+            NumericalFaithfulness(), "answer", id="numerical-faithfulness-answer"
+        ),
     ],
 )
 def test_missing_field_json_roundtrip(model, field):
