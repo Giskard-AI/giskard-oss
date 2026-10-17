@@ -6,6 +6,7 @@ from .conformity import Conformity
 from .contradiction import Contradiction
 from .groundedness import Groundedness
 from .judge import LLMJudge
+from .language_consistency import LanguageConsistency
 from .toxicity import Toxicity
 
 __all__ = [
@@ -15,6 +16,7 @@ __all__ = [
     "Conformity",
     "Contradiction",
     "Groundedness",
+    "LanguageConsistency",
     "LLMJudge",
     "Toxicity",
 ]
