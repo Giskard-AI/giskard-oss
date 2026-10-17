@@ -73,6 +73,29 @@ async def test_invalid_json_string_fails(outputs: str) -> None:
     assert "error" in result.details
 
 
+@pytest.mark.parametrize(
+    "outputs",
+    [
+        "NaN",
+        "Infinity",
+        "-Infinity",
+        '{"value": NaN}',
+    ],
+)
+async def test_non_finite_json_constants_fail(outputs: str) -> None:
+    check = JsonValid()
+    trace = await Trace.from_interactions(
+        Interaction(inputs="Return JSON", outputs=outputs)
+    )
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
+    assert "not valid JSON" in result.message
+    assert "error" in result.details
+
+
 async def test_nested_jsonpath_extraction() -> None:
     check = JsonValid(target_key="trace.last.outputs.response")
     trace = await Trace.from_interactions(
@@ -200,6 +223,29 @@ async def test_non_serializable_value_fails() -> None:
     assert result.failed
     assert result.message is not None
     assert "trace.last.outputs" in result.message
+    assert "not JSON serializable" in result.message
+    assert "error" in result.details
+
+
+@pytest.mark.parametrize(
+    "outputs",
+    [
+        float("nan"),
+        float("inf"),
+        -float("inf"),
+        {"value": float("nan")},
+    ],
+)
+async def test_non_finite_parsed_values_fail(outputs: Any) -> None:
+    check = JsonValid(parse=False)
+    trace = await Trace.from_interactions(
+        Interaction(inputs="Return JSON", outputs=outputs)
+    )
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.FAIL
+    assert result.message is not None
     assert "not JSON serializable" in result.message
     assert "error" in result.details
 
