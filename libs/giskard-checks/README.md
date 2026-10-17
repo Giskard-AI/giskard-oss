@@ -30,7 +30,7 @@ Requires Python >= 3.12.
 Quickstart
 ----------
 
-Use the fluent API to create and run scenarios:
+Use the fluent API to create and run scenarios in a script:
 
 ```python
 from giskard.checks import Groundedness, Scenario
@@ -53,7 +53,7 @@ scenario = (
     )
 )
 
-result = await scenario.run()
+result = scenario.run_sync()
 assert result.passed
 print(f"Scenario completed in {result.duration_ms}ms")
 ```
@@ -88,18 +88,16 @@ scenario = (
 )
 ```
 
-The `run()` method is async. In a script, wrap it with `asyncio.run()`:
+Use `run_sync()` in a script without a running event loop:
 
 ```python
-import asyncio
+result = scenario.run_sync()
+```
 
+In a notebook cell or inside an async function, await `run()` instead:
 
-async def main():
-    result = await scenario.run()
-    print(result)
-
-
-asyncio.run(main())
+```python
+result = await scenario.run()
 ```
 
 Running Multiple Scenarios with Suite
@@ -130,13 +128,19 @@ suite = Suite(name="my_suite", target=target_sut)
 suite.append(scenario1)
 suite.append(scenario2)
 
-# Run the suite
-results = await suite.run()
+# Run the suite in a script without a running event loop
+results = suite.run_sync()
 # `pass_rate` is None when nothing was evaluated (empty or fully skipped suite)
 if results.pass_rate is None:
     print("Aggregated pass rate: n/a")
 else:
     print(f"Aggregated pass rate: {results.pass_rate * 100}%")
+```
+
+In a notebook cell or inside an async function, await the suite instead:
+
+```python
+results = await suite.run()
 ```
 
 Why this library?
