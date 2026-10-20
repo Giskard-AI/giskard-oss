@@ -1,11 +1,10 @@
 import logging
 from collections.abc import Sequence
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any, cast, get_args
+from typing import TYPE_CHECKING, Any, cast
 
 from giskard.llm.types import (
     ResponseInputItem,
-    ResponseOutputItem,
     ResponseResult,
     ToolDef,
 )
@@ -15,7 +14,7 @@ from pydantic import BaseModel, Field, SerializationInfo, model_validator
 from ..errors import BadRequestError
 from ..types._serialization import close_object_schemas
 from ..utils import sanitize_schema_name
-from ._unsupported import handle_unsupported_content
+from ._unsupported import keep_supported
 
 if TYPE_CHECKING:
     from openai.types.responses.response import Response
@@ -25,9 +24,7 @@ if TYPE_CHECKING:
     from openai.types.responses.tool_param import ToolParam
 
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "max_tokens", "response_format"})
-_SUPPORTED_OUTPUT_TYPES = frozenset(
-    m.model_fields["type"].default for m in get_args(ResponseOutputItem)
-)
+_SUPPORTED_OUTPUT_TYPES = frozenset({"message", "function_call", "reasoning"})
 
 logger = logging.getLogger(__name__)
 PROVIDER = "openai"
@@ -187,15 +184,10 @@ class OpenAIResponseTranslator:
         provider: str = PROVIDER,
     ) -> ResponseResult:
         data = raw.model_dump()
-        outputs: list[dict[str, Any]] = []
-        for item in data.get("output") or []:
-            if item.get("type") in _SUPPORTED_OUTPUT_TYPES:
-                outputs.append(item)
-            else:
-                handle_unsupported_content(
-                    provider,
-                    str(item.get("type")),
-                    ignore_unsupported_content=ignore_unsupported_content,
-                )
-        data["output"] = outputs
+        data["output"] = keep_supported(
+            data.get("output") or [],
+            _SUPPORTED_OUTPUT_TYPES,
+            provider,
+            ignore_unsupported_content=ignore_unsupported_content,
+        )
         return ResponseResult.model_validate(data)
