@@ -16,7 +16,11 @@ pytest.importorskip("anthropic")
 from anthropic.types import Message
 from anthropic.types.content_block import ContentBlock
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
-from giskard.llm.types import TextContent
+from giskard.llm.types import (
+    ReasoningEncryptedDetail,
+    ReasoningTextDetail,
+    TextContent,
+)
 
 pytestmark = pytest.mark.anthropic
 
@@ -185,12 +189,19 @@ def test_from_anthropic_thinking_then_text():
     )
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
     assert msg.reasoning == "The capital of France is Paris."
+    assert msg.reasoning_details == [
+        ReasoningTextDetail(
+            text="The capital of France is Paris.",
+            signature="sig_thinking_block",
+            format="anthropic-claude-v1",
+        )
+    ]
     assert msg.content == [TextContent(text="Paris is in France.")]
     assert msg.text == "Paris is in France."
 
 
 def test_from_anthropic_redacted_thinking_then_text():
-    """``redacted_thinking`` is skipped; it does not crash or populate ``reasoning``."""
+    """``redacted_thinking`` is kept opaque in ``reasoning_details``, not ``reasoning``."""
     raw = _message(
         {
             "content": [
@@ -201,6 +212,11 @@ def test_from_anthropic_redacted_thinking_then_text():
     )
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
     assert msg.reasoning is None
+    assert msg.reasoning_details == [
+        ReasoningEncryptedDetail(
+            data="opaque-redacted-payload", format="anthropic-claude-v1"
+        )
+    ]
     assert msg.content == [TextContent(text="Paris is in France.")]
     assert msg.text == "Paris is in France."
 
@@ -236,21 +252,27 @@ def test_from_anthropic_thinking_and_tool_use():
 
 
 def test_from_anthropic_redacted_thinking_only_is_dropped_not_raised():
-    """A response with only ``redacted_thinking`` does not crash and has nothing to report."""
+    """A response with only ``redacted_thinking`` does not crash and has no visible output."""
     raw = _message(
         {"content": [{"type": "redacted_thinking", "data": "opaque-encrypted-data"}]}
     )
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
     assert msg.reasoning is None
+    assert msg.reasoning_details == [
+        ReasoningEncryptedDetail(
+            data="opaque-encrypted-data", format="anthropic-claude-v1"
+        )
+    ]
     assert msg.content is None
     assert msg.tool_calls is None
 
 
 def test_from_anthropic_text_only_has_no_reasoning():
-    """A text-only response leaves ``message.reasoning`` unset."""
+    """A text-only response leaves ``message.reasoning`` / ``reasoning_details`` unset."""
     raw = _message({"content": [{"type": "text", "text": "Hello from Claude."}]})
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
     assert msg.reasoning is None
+    assert msg.reasoning_details is None
     assert msg.text == "Hello from Claude."
 
 
