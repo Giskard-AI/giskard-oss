@@ -82,10 +82,12 @@ class TypeSafeSOM(BaseSOM):
                 json={
                     "model": self.model,
                     "state": [
-                        # ``reasoning`` is private model state, not part of the
+                        # Reasoning is private model state, not part of the
                         # conversation the SOM should judge.
                         message.model_dump(
-                            mode="json", exclude_none=True, exclude={"reasoning"}
+                            mode="json",
+                            exclude_none=True,
+                            exclude={"reasoning", "reasoning_details"},
                         )
                         for message in messages
                     ],
