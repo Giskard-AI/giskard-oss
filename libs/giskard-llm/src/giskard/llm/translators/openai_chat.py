@@ -45,8 +45,6 @@ _REASONING_DETAIL_TYPES = frozenset(
     m.model_fields["type"].default for m in get_args(get_args(ReasoningDetail)[0])
 )
 
-_REASONING_FIELDS = frozenset({"reasoning", "reasoning_details"})
-
 
 def _keep_reasoning_detail(detail: Any, *, ignore_unsupported_content: bool) -> bool:
     detail_type = detail.get("type") if isinstance(detail, dict) else None
@@ -117,16 +115,7 @@ class OpenAIChatTranslator:
 
         return cast(
             "CompletionCreateParamsWithTimeout",
-            cast(
-                object,
-                chat_params.model_dump(
-                    context={"provider": _PROVIDER},
-                    # The official Chat Completions API has no reasoning fields on
-                    # assistant messages (``reasoning`` / ``reasoning_details`` are an
-                    # OpenRouter / vLLM extension), so strip them on the way out.
-                    exclude={"messages": {"__all__": _REASONING_FIELDS}},
-                ),
-            ),
+            cast(object, chat_params.model_dump(context={"provider": _PROVIDER})),
         )
 
     @staticmethod
