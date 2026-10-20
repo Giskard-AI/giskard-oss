@@ -296,6 +296,18 @@ def test_from_openai_unsupported_output_item_raises():
         OpenAIResponseTranslator.from_openai(raw)
 
 
+def test_from_openai_unsupported_output_item_reports_calling_provider():
+    """Azure providers reuse the translator; the error names them, not ``openai``."""
+    from giskard.llm.errors import UnsupportedContentError
+
+    raw = Response.model_construct(
+        id="resp_u", output=[_web_search_call()], model=_MODEL
+    )
+    with pytest.raises(UnsupportedContentError) as exc_info:
+        OpenAIResponseTranslator.from_openai(raw, provider="azure_ai")
+    assert exc_info.value.provider == "azure_ai"
+
+
 def test_from_openai_unsupported_output_item_dropped_with_warning(
     caplog: pytest.LogCaptureFixture,
 ):

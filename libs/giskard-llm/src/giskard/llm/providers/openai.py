@@ -180,7 +180,9 @@ class OpenAIProvider:
             self._map_error(e)
 
         return OpenAIChatTranslator.from_openai(
-            raw, ignore_unsupported_content=self._ignore_unsupported_content
+            raw,
+            ignore_unsupported_content=self._ignore_unsupported_content,
+            provider=self._PROVIDER,
         )
 
     async def embed(
@@ -282,5 +284,7 @@ class OpenAIProvider:
             self._map_error(e)
 
         return OpenAIResponseTranslator.from_openai(
-            raw, ignore_unsupported_content=self._ignore_unsupported_content
+            raw,
+            ignore_unsupported_content=self._ignore_unsupported_content,
+            provider=self._PROVIDER,
         )

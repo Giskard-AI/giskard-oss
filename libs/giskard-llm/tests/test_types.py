@@ -137,6 +137,14 @@ def test_assistant_reasoning_content_alias_and_discriminated_details():
     assert msg.model_dump()["reasoning"] == "thinking"
 
 
+def test_assistant_null_reasoning_does_not_shadow_reasoning_content():
+    """A ``reasoning: null`` key must not hide a populated ``reasoning_content``."""
+    msg = AssistantMessage.model_validate(
+        {"role": "assistant", "reasoning": None, "reasoning_content": "thinking"}
+    )
+    assert msg.reasoning == "thinking"
+
+
 def test_response_result_output_text_excludes_reasoning():
     from giskard.llm.types import ResponseResult
 

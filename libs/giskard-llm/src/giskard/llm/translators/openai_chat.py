@@ -46,12 +46,14 @@ _REASONING_DETAIL_TYPES = frozenset(
 )
 
 
-def _keep_reasoning_detail(detail: Any, *, ignore_unsupported_content: bool) -> bool:
+def _keep_reasoning_detail(
+    detail: Any, provider: str, *, ignore_unsupported_content: bool
+) -> bool:
     detail_type = detail.get("type") if isinstance(detail, dict) else None
     if detail_type in _REASONING_DETAIL_TYPES:
         return True
     handle_unsupported_content(
-        PROVIDER,
+        provider,
         f"reasoning_details:{detail_type}",
         ignore_unsupported_content=ignore_unsupported_content,
     )
@@ -123,6 +125,7 @@ class OpenAIChatTranslator:
         raw: "ChatCompletion",
         *,
         ignore_unsupported_content: bool = False,
+        provider: str = PROVIDER,
     ) -> "CompletionResponse":
         # OpenAI-compatible servers return ``reasoning`` / ``reasoning_content`` /
         # ``reasoning_details`` as SDK extras, which ``model_dump`` keeps.
@@ -134,7 +137,9 @@ class OpenAIChatTranslator:
                     detail
                     for detail in details
                     if _keep_reasoning_detail(
-                        detail, ignore_unsupported_content=ignore_unsupported_content
+                        detail,
+                        provider,
+                        ignore_unsupported_content=ignore_unsupported_content,
                     )
                 ]
         return CompletionResponse.model_validate(data)

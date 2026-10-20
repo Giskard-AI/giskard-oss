@@ -1,7 +1,7 @@
 from collections.abc import Sequence
-from typing import Annotated, ClassVar, Literal, Protocol
+from typing import Annotated, Any, ClassVar, Literal, Protocol
 
-from pydantic import AliasChoices, Field
+from pydantic import Field, model_validator
 
 from ._base import ArgumentDict, _BaseModel
 
@@ -154,14 +154,22 @@ class AssistantMessage(_BaseModel):
     # Reasoning never contributes to ``text`` / ``transcript``: those are what checks
     # and judges evaluate, and must only contain the visible answer. It is also never
     # sent back to a provider.
-    reasoning: str | None = Field(
-        default=None, validation_alias=AliasChoices("reasoning", "reasoning_content")
-    )
+    reasoning: str | None = None
     reasoning_details: list[ReasoningDetail] | None = None
 
     _wire_excluded: ClassVar[frozenset[str]] = frozenset(
         {"reasoning", "reasoning_details"}
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_reasoning_content(cls, data: Any) -> Any:
+        # vLLM / DeepSeek name it ``reasoning_content``; a null ``reasoning`` key must
+        # not shadow it (a plain ``AliasChoices`` picks the first key present).
+        if isinstance(data, dict) and data.get("reasoning") is None:
+            if (reasoning_content := data.get("reasoning_content")) is not None:
+                return {**data, "reasoning": reasoning_content}
+        return data
 
     @property
     def is_refusal(self) -> bool:

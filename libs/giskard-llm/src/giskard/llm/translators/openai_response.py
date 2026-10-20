@@ -181,7 +181,10 @@ class OpenAIResponseTranslator:
 
     @staticmethod
     def from_openai(
-        raw: "Response", *, ignore_unsupported_content: bool = False
+        raw: "Response",
+        *,
+        ignore_unsupported_content: bool = False,
+        provider: str = PROVIDER,
     ) -> ResponseResult:
         data = raw.model_dump()
         outputs: list[dict[str, Any]] = []
@@ -190,7 +193,7 @@ class OpenAIResponseTranslator:
                 outputs.append(item)
             else:
                 handle_unsupported_content(
-                    PROVIDER,
+                    provider,
                     str(item.get("type")),
                     ignore_unsupported_content=ignore_unsupported_content,
                 )

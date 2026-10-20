@@ -82,12 +82,13 @@ class TypeSafeSOM(BaseSOM):
                 json={
                     "model": self.model,
                     "state": [
-                        # Reasoning is private model state, not part of the
+                        # A provider context strips wire-excluded fields (e.g.
+                        # reasoning): private model state, not part of the
                         # conversation the SOM should judge.
                         message.model_dump(
                             mode="json",
                             exclude_none=True,
-                            exclude={"reasoning", "reasoning_details"},
+                            context={"provider": "typesafe/som"},
                         )
                         for message in messages
                     ],
