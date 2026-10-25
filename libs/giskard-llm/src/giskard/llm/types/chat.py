@@ -152,8 +152,10 @@ class AssistantMessage(_BaseModel):
     refusal: str | None = None
     tool_calls: Sequence[ToolCall] | None = None
     # Reasoning never contributes to ``text`` / ``transcript``: those are what checks
-    # and judges evaluate, and must only contain the visible answer. They are also never
-    # sent back to a provider.
+    # and judges evaluate, and must only contain the visible answer. It is only replayed
+    # to the provider that produced it: the Anthropic serializer sends signed thinking
+    # back (required for tool loops with thinking on). Every other serializer strips it
+    # through ``_wire_excluded``.
     reasoning: str | None = None
     reasoning_details: list[ReasoningDetail] | None = None
 

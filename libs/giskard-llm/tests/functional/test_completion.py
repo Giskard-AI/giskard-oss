@@ -6,11 +6,12 @@ Assert on structure (non-empty, correct role, correct type), not content.
 
 import json
 import os
+import re
 
 import pytest
 from giskard.llm import LLMClient
 from giskard.llm.errors import BadRequestError
-from giskard.llm.types import ToolDefParam
+from giskard.llm.types import ToolDefParam, ToolMessage, UserMessage
 from pydantic import BaseModel, Field, field_validator
 
 from .helpers import (
@@ -230,6 +231,48 @@ async def test_tool_result_loop(provider: str):
             {"role": "tool", "tool_call_id": tc.id, "content": "4"},
         ],
         tools=[ADD_TOOL],
+    )
+    assert resp2.choices[0].finish_reason == "stop"
+    assert resp2.choices[0].message.text
+
+
+_CLAUDE_VERSION = re.compile(r"claude-[a-z]+-(\d+)(?:-(\d)(?!\d))?")
+
+
+def _anthropic_thinking(model: str) -> dict[str, object]:
+    """Thinking config for ``model``: a token budget before Claude 4.6, else adaptive.
+
+    Claude 5 models reject ``{"type": "enabled"}`` and need ``{"type": "adaptive"}``.
+    """
+    match = _CLAUDE_VERSION.search(model)
+    if match and (int(match[1]), int(match[2] or 0)) < (4, 6):
+        return {"type": "enabled", "budget_tokens": 1024}
+    return {"type": "adaptive"}
+
+
+@pytest.mark.parametrize("provider", ANTHROPIC_PROVIDER_PARAMS)
+async def test_tool_result_loop_with_thinking(provider: str):
+    """Tool loop with thinking on: the returned assistant message is passed back
+    unchanged, so its signed thinking blocks are replayed (Anthropic 400s otherwise)."""
+    client, model = _make_client(provider)
+    thinking = _anthropic_thinking(model)
+    question = UserMessage(content="What is 2+2? Use the add tool.")
+
+    resp1 = await client.acompletion(
+        model, [question], tools=[ADD_TOOL], thinking=thinking
+    )
+    assistant = resp1.choices[0].message
+    assert assistant.tool_calls
+    if thinking["type"] == "enabled":
+        # Budgeted thinking always emits a block; adaptive may skip it on easy asks.
+        assert assistant.reasoning_details
+    tc = assistant.tool_calls[0]
+
+    resp2 = await client.acompletion(
+        model,
+        [question, assistant, ToolMessage(tool_call_id=tc.id, content="4")],
+        tools=[ADD_TOOL],
+        thinking=thinking,
     )
     assert resp2.choices[0].finish_reason == "stop"
     assert resp2.choices[0].message.text
