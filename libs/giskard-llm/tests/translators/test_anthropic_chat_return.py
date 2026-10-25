@@ -17,10 +17,16 @@ from anthropic.types import Message
 from anthropic.types.content_block import ContentBlock
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
 from giskard.llm.types import (
+    ChatMessage,
     ReasoningEncryptedDetail,
     ReasoningTextDetail,
     TextContent,
+    ToolMessage,
+    UserMessage,
 )
+
+from .sdk_payload_validation import validate_anthropic_message_create
+from .tool_turn_fixtures import TOOL_CALL_ID, TOOL_RESULT_CONTENT, WEATHER_TOOL
 
 pytestmark = pytest.mark.anthropic
 
@@ -319,3 +325,43 @@ def test_from_anthropic_unsupported_block_dropped_with_warning(
         )
     assert msg.content == [TextContent(text="Answer.")]
     assert "server_tool_use" in caplog.text
+
+
+def test_thinking_tool_turn_passed_back_unchanged_replays_verbatim():
+    """A thinking + tool_use response, passed back as-is, replays its blocks in order."""
+    raw = _message(
+        {
+            "stop_reason": "tool_use",
+            "content": [
+                {"type": "thinking", "thinking": "Need weather.", "signature": "s1"},
+                {"type": "redacted_thinking", "data": "opaque"},
+                {
+                    "type": "tool_use",
+                    "id": TOOL_CALL_ID,
+                    "name": "get_weather",
+                    "input": {"city": "Paris"},
+                },
+            ],
+        }
+    )
+    assistant = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    messages: list[ChatMessage] = [
+        UserMessage(content="What's the weather in Paris?"),
+        assistant,
+        ToolMessage(content=TOOL_RESULT_CONTENT, tool_call_id=TOOL_CALL_ID),
+    ]
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL, messages, tools=[WEATHER_TOOL], thinking={"type": "adaptive"}
+    )
+
+    assert payload["messages"][1]["content"] == [
+        {"type": "thinking", "thinking": "Need weather.", "signature": "s1"},
+        {"type": "redacted_thinking", "data": "opaque"},
+        {
+            "type": "tool_use",
+            "id": TOOL_CALL_ID,
+            "name": "get_weather",
+            "input": {"city": "Paris"},
+        },
+    ]
+    validate_anthropic_message_create(payload)
