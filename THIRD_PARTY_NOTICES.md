@@ -186,7 +186,7 @@ Find a list of packages below
 - License: Apache Software License;; BSD License;; MIT License
 - Compatible: True
 
-### certifi-2026.6.17
+### certifi-2026.10.23
 
 - HomePage: https://github.com/certifi/python-certifi
 - Author: Kenneth Reitz
@@ -263,7 +263,7 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### filelock-3.29.4
+### filelock-4.2.4
 
 - HomePage:
 - Author:
@@ -662,7 +662,7 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### setuptools-83.0.0
+### setuptools-84.2.1
 
 - HomePage:
 - Author: Python Packaging Authority
