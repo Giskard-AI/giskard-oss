@@ -459,7 +459,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### logfire-api-4.37.0
+### logfire-api-5.3.0
 
 - HomePage:
 - Author: Pydantic Team
