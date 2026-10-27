@@ -9,6 +9,7 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel, Field
 
+from ..utils.sync import call_sync
 from .check import Check
 from .interaction import Trace
 from .result import TestCaseResult
@@ -46,6 +47,30 @@ class TestCase[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
 
         runner = get_runner()
         return await runner.run(self, return_exception)
+
+    def run_sync(self, return_exception: bool = False) -> TestCaseResult:
+        """Run the test case from synchronous code.
+
+        Equivalent to ``asyncio.run(test_case.run(...))`` when no event loop is
+        running. In a notebook, an async test, or an ``async def`` function,
+        use ``await test_case.run(...)`` instead.
+
+        Parameters
+        ----------
+        return_exception : bool, default False
+            Forwarded to `run`.
+
+        Returns
+        -------
+        TestCaseResult
+            The same result `run` returns.
+
+        Raises
+        ------
+        RuntimeError
+            If called while an asyncio event loop is running in this thread.
+        """
+        return call_sync(self.run, return_exception=return_exception)
 
     async def assert_passed(self) -> None:
         """Run the test case and assert that it passed.

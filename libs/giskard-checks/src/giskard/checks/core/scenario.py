@@ -3,6 +3,7 @@ from typing import Any, ClassVar, Self
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.experimental.missing_sentinel import MISSING
 
+from ..utils.sync import call_sync
 from .check import Check
 from .input_generator import InputGenerator
 from .interaction import Interact, InteractionSpec, Trace
@@ -364,6 +365,44 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         runner = get_runner()
         return await runner.run(
             self,
+            target=target,
+            return_exception=return_exception,
+            multiple_runs=multiple_runs,
+        )
+
+    def run_sync(
+        self,
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
+        return_exception: bool = False,
+        multiple_runs: int | None = None,
+    ) -> ScenarioResult[TraceType]:
+        """Execute the scenario from synchronous code.
+
+        Equivalent to ``asyncio.run(scenario.run(...))`` when no event loop is
+        running, e.g. in a plain script. In a notebook, an async test, or an
+        ``async def`` function, use ``await scenario.run(...)`` instead.
+
+        Parameters
+        ----------
+        target : Target | MISSING, optional
+            Forwarded to `run`.
+        return_exception : bool, default False
+            Forwarded to `run`.
+        multiple_runs : int | None, optional
+            Forwarded to `run`.
+
+        Returns
+        -------
+        ScenarioResult[TraceType]
+            The same result `run` returns.
+
+        Raises
+        ------
+        RuntimeError
+            If called while an asyncio event loop is running in this thread.
+        """
+        return call_sync(
+            self.run,
             target=target,
             return_exception=return_exception,
             multiple_runs=multiple_runs,

@@ -33,6 +33,7 @@ from ..core.result import (
 )
 from ..core.scenario import Scenario
 from ..core.types import Target
+from ..utils.sync import call_sync
 
 InputType = TypeVar("InputType", infer_variance=True)
 OutputType = TypeVar("OutputType", infer_variance=True)
@@ -267,6 +268,58 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             )
 
         return suite_result
+
+    def run_sync(
+        self,
+        target: Target[InputType, OutputType, Trace[Any, Any]] | MISSING = (MISSING),
+        return_exception: bool = False,
+        parallel: bool = False,
+        max_concurrency: int | None = None,
+        verbose: bool = True,
+    ) -> SuiteResult:
+        """Run all scenarios in the suite from synchronous code.
+
+        Equivalent to ``asyncio.run(suite.run(...))`` when no event loop is
+        running, e.g. in a plain script. In a notebook, an async test, or an
+        ``async def`` function, use ``await suite.run(...)`` instead.
+
+        Parameters
+        ----------
+        target : Target | MISSING, optional
+            Forwarded to `run`.
+        return_exception : bool
+            Forwarded to `run`.
+        parallel : bool
+            Forwarded to `run`.
+        max_concurrency : int | None
+            Forwarded to `run`.
+        verbose : bool
+            Forwarded to `run`.
+
+        Returns
+        -------
+        SuiteResult
+            The same result `run` returns.
+
+        Raises
+        ------
+        RuntimeError
+            If called while an asyncio event loop is running in this thread.
+
+        Examples
+        --------
+        ```python
+        results = suite.run_sync(parallel=True, verbose=False)
+        ```
+        """
+        return call_sync(
+            self.run,
+            target=target,
+            return_exception=return_exception,
+            parallel=parallel,
+            max_concurrency=max_concurrency,
+            verbose=verbose,
+        )
 
     @contextmanager
     def _progress_bar(self, enabled: bool) -> Iterator[_SuiteProgress]:
