@@ -25,8 +25,8 @@ pytestmark = pytest.mark.functional
 # -- Provider parametrization -------------------------------------------------
 
 _MODELS = {
-    "openai": os.getenv("TEST_OPENAI_MODEL", "openai/gpt-4.1-nano"),
-    "bare": os.getenv("TEST_BARE_MODEL", "gpt-4.1-nano"),
+    "openai": os.getenv("TEST_OPENAI_MODEL", "openai/gpt-5.4-nano"),
+    "bare": os.getenv("TEST_BARE_MODEL", "gpt-5.4-nano"),
     "google": os.getenv("TEST_GOOGLE_MODEL", "google/gemini-3.5-flash"),
     "gemini": os.getenv("TEST_GEMINI_MODEL", "gemini/gemini-3.5-flash"),
     "anthropic": os.getenv(
