@@ -11,7 +11,11 @@ from giskard.llm import LLMClient
 from giskard.llm.errors import AuthenticationError, LLMError, UnsupportedOperationError
 from giskard.llm.types import ResponseFunctionToolCall, ToolDefParam
 
-from .helpers import azure_foundry_v1_base_url
+from .helpers import (
+    ANTHROPIC_PROVIDER_PARAMS,
+    anthropic_configure_params,
+    azure_foundry_v1_base_url,
+)
 
 pytestmark = pytest.mark.functional
 
@@ -295,17 +299,14 @@ async def test_respond_invalid_model_raises(provider: str):
 # -- Unsupported provider scenario --------------------------------------------
 
 
-@pytest.mark.anthropic
-async def test_respond_unsupported_provider():
+@pytest.mark.parametrize("provider", ANTHROPIC_PROVIDER_PARAMS)
+async def test_respond_unsupported_provider(provider: str):
     """Anthropic provider -> clear error when calling arespond()."""
     client = LLMClient()
-    client.configure(
-        "test-anthropic",
-        provider="anthropic",
-        api_key="os.environ/ANTHROPIC_API_KEY",  # pragma: allowlist secret
-    )
+    alias = f"test-{provider}"
+    client.configure(alias, **anthropic_configure_params(provider))
     with pytest.raises(UnsupportedOperationError, match="does not support"):
-        await client.aresponse("test-anthropic/claude-haiku-4-5-20251001", "Hello")
+        await client.aresponse(f"{alias}/claude-haiku-5-5", "Hello")
 
 
 @pytest.mark.parametrize("provider", _PROVIDER_PARAMS)
