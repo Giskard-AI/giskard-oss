@@ -6,6 +6,8 @@ This exercises our orchestration only: the asyncio.TaskGroup fan-out, result
 gathering after the group exits, and the SuiteResult assembly.
 """
 
+import math
+
 import pytest
 
 pytest.importorskip("garak")
@@ -40,10 +42,10 @@ class _FakeDetector:
     hit_desc = "hit"
     pass_desc = "pass"
 
-    def __init__(self, score: float) -> None:
+    def __init__(self, score: float | None) -> None:
         self._score = score
 
-    def detect(self, attempt: Attempt) -> list[float]:
+    def detect(self, attempt: Attempt) -> list[float | None]:
         # One score per conversation in the attempt.
         return [self._score for _ in attempt.conversations]
 
@@ -161,6 +163,45 @@ async def test_run_failure_score_marks_check_failed(
     assert len(check_results) == 1
     assert check_results[0].failed
     assert check_results[0].details["check_name"] == "fake.Detector"
+
+
+@pytest.mark.parametrize(
+    "score",
+    [math.nan, -1.0, 2.0, math.inf],
+    ids=["nan", "below_range", "above_range", "inf"],
+)
+async def test_run_invalid_detector_score_marks_check_errored(
+    monkeypatch: pytest.MonkeyPatch, target, score: float
+) -> None:
+    adapter_cls = _patch_resolvers(
+        monkeypatch,
+        probes=[_FakeProbe([_attempt("a1")])],
+        detectors=[("fake.Detector", _FakeDetector(score=score))],
+    )
+
+    result = await adapter_cls().run(target=target)
+
+    check = result.results[0].steps[0].results[0]
+    assert check.errored
+    assert not check.passed
+    assert not check.failed
+    assert check.details["check_name"] == "fake.Detector"
+
+
+async def test_run_none_detector_score_marks_check_skipped(
+    monkeypatch: pytest.MonkeyPatch, target
+) -> None:
+    adapter_cls = _patch_resolvers(
+        monkeypatch,
+        probes=[_FakeProbe([_attempt("a1")])],
+        detectors=[("fake.Detector", _FakeDetector(score=None))],
+    )
+
+    result = await adapter_cls().run(target=target)
+
+    check = result.results[0].steps[0].results[0]
+    assert check.skipped
+    assert check.message == "detector returned no score"
 
 
 async def test_run_emits_error_for_probe_exception(
