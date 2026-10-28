@@ -1,22 +1,46 @@
 [project]
 name = "giskard-llm"
-version = "1.0.1"
+version = "1.0.3"
 description = "Lightweight LLM routing layer over native provider SDKs"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Giskard R&D", email = "rnd@giskard.ai" }]
 requires-python = ">=3.12"
 dependencies = [
-    "giskard-core>=1.0.2,<2",
+    "giskard-core>=1.0.3,<2",
     "pydantic>=2.11.0,<3",
+    # Imported directly in translators/providers; shipped transitively by the
+    # provider SDKs (openai/anthropic/google), declared explicitly so the direct
+    # imports (e.g. ``from httpx import AsyncClient``) are not hidden transitive
+    # couplings.
+    "httpx>=0.28.1,<1",  # 0.x: <1; matches all consumers (openai/google-genai/huggingface-hub pin httpx<1)
 ]
 
 [project.optional-dependencies]
 openai = ["openai>=1.30,<4"]
 google = ["google-genai>=2.0,<3"]
-anthropic = ["anthropic>=1,<2"]
+anthropic = [
+    "anthropic>=1,<2",
+    # anthropic SDK v1 mandates httpx2; giskard-llm's anthropic provider/translator
+    # import httpx2 directly (not merely via anthropic), so declare it explicitly
+    # in this extra rather than relying on the transitive pull.
+    "httpx2>=2.12.0,<3",
+]
 azure = ["giskard-llm[openai]"]  # alias: azure/ and azure_ai/ use the openai SDK
 all = ["giskard-llm[openai,google,anthropic]"]
+
+[tool.deptry]
+known_first_party = ["giskard"]  # giskard.* is a PEP 420 namespace shared by all workspace libs
+
+[tool.deptry.package_module_name_map]
+# Distribution ``google-genai`` ships the top-level module ``google`` (namespace).
+"google-genai" = "google"
+
+[tool.deptry.per_rule_ignores]
+"DEP002" = [
+    "giskard-core",  # workspace sibling; imported as giskard.core (first-party), not as the dist name
+    "giskard-llm",  # self-referenced by the azure/all optional extras (alias extras), never imported by name
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -34,6 +58,7 @@ markers = [
     "azure: tests requiring the openai SDK (Azure OpenAI)",
     "azure_ai: tests requiring the openai SDK (Azure AI Foundry)",
     "azure_foundry_v1: tests requiring the openai SDK (Azure Foundry OpenAI v1)",
+    "azure_anthropic: tests requiring the anthropic SDK (Azure Foundry Anthropic Messages)",
     "functional: functional tests making real API calls",
     "no_providers: tests that run without any provider SDK installed",
 ]

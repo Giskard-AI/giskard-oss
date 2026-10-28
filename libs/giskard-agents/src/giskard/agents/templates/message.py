@@ -18,7 +18,9 @@ class MessageTemplate(BaseModel):
         Only use template strings from trusted sources. If ``content_template`` can
         be influenced by untrusted input, it can lead to template injection and
         unintended disclosure or execution of logic exposed by the template
-        environment.
+        environment. When templates may come from untrusted users, enable the
+        strict template policy (see :func:`~giskard.agents.set_template_policy`
+        and :func:`~giskard.agents.strict_templates`).
     """
 
     role: Literal["user", "assistant", "system", "developer"]

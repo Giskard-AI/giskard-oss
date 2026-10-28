@@ -6,11 +6,15 @@ This is the ``acompletion`` path. For the OpenAI **Responses** API, see
 Assistant ``content`` blocks: https://docs.anthropic.com/en/api/messages
 """
 
+from types import SimpleNamespace
+from typing import cast
+
 import pytest
 
 pytest.importorskip("anthropic")
 
 from anthropic.types import Message
+from anthropic.types.content_block import ContentBlock
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
 from giskard.llm.types import TextContent
 
@@ -163,3 +167,96 @@ def test_from_anthropic_refusal_category_only():
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
     assert msg.refusal == "bio"
     assert msg.is_refusal
+
+
+def test_from_anthropic_thinking_then_text():
+    """Thinking blocks map to ``message.reasoning`` and stay out of ``content`` / ``text``."""
+    raw = _message(
+        {
+            "content": [
+                {
+                    "type": "thinking",
+                    "thinking": "The capital of France is Paris.",
+                    "signature": "sig_thinking_block",
+                },
+                {"type": "text", "text": "Paris is in France."},
+            ],
+        }
+    )
+    msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    assert msg.reasoning == "The capital of France is Paris."
+    assert msg.content == [TextContent(text="Paris is in France.")]
+    assert msg.text == "Paris is in France."
+
+
+def test_from_anthropic_redacted_thinking_then_text():
+    """``redacted_thinking`` is skipped; it does not crash or populate ``reasoning``."""
+    raw = _message(
+        {
+            "content": [
+                {"type": "redacted_thinking", "data": "opaque-redacted-payload"},
+                {"type": "text", "text": "Paris is in France."},
+            ],
+        }
+    )
+    msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    assert msg.reasoning is None
+    assert msg.content == [TextContent(text="Paris is in France.")]
+    assert msg.text == "Paris is in France."
+
+
+def test_from_anthropic_thinking_and_tool_use():
+    """Thinking ahead of a tool call maps to ``reasoning`` and still yields the tool call."""
+    raw = _message(
+        {
+            "content": [
+                {
+                    "type": "thinking",
+                    "thinking": "I should check the weather.",
+                    "signature": "sig_xyz",
+                },
+                {
+                    "type": "tool_use",
+                    "id": "toolu_03",
+                    "name": "get_weather",
+                    "input": {"city": "Paris"},
+                },
+            ],
+            "stop_reason": "tool_use",
+        }
+    )
+    choice = AnthropicChatTranslator.from_anthropic(raw).choices[0]
+    msg = choice.message
+    assert choice.finish_reason == "tool_calls"
+    assert msg.reasoning == "I should check the weather."
+    assert msg.content is None
+    assert msg.tool_calls is not None
+    assert msg.tool_calls[0].function.name == "get_weather"
+    assert msg.tool_calls[0].function.arguments == {"city": "Paris"}
+
+
+def test_from_anthropic_redacted_thinking_only_is_dropped_not_raised():
+    """A response with only ``redacted_thinking`` does not crash and has nothing to report."""
+    raw = _message(
+        {"content": [{"type": "redacted_thinking", "data": "opaque-encrypted-data"}]}
+    )
+    msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    assert msg.reasoning is None
+    assert msg.content is None
+    assert msg.tool_calls is None
+
+
+def test_from_anthropic_text_only_has_no_reasoning():
+    """A text-only response leaves ``message.reasoning`` unset."""
+    raw = _message({"content": [{"type": "text", "text": "Hello from Claude."}]})
+    msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    assert msg.reasoning is None
+    assert msg.text == "Hello from Claude."
+
+
+def test_block_content_to_giskard_unknown_type_raises():
+    """Unknown content-block types still raise so new Anthropic types stay visible."""
+    with pytest.raises(ValueError, match="Unsupported content block type: compaction"):
+        _ = AnthropicChatTranslator.block_content_to_giskard(
+            cast(ContentBlock, cast(object, SimpleNamespace(type="compaction")))
+        )

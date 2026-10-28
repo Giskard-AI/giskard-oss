@@ -72,6 +72,7 @@ Find a list of packages below
 |✔|nltk|
 |✔|numpy|
 |✔|openai|
+|✔|opentelemetry-api|
 |✔|packaging|
 |✔|posthog|
 |✔|propcache|
@@ -115,7 +116,7 @@ Find a list of packages below
 - License: Python Software Foundation License
 - Compatible: True
 
-### aiohttp-3.14.3
+### aiohttp-3.14.5
 
 - HomePage:
 - Author:
@@ -185,7 +186,7 @@ Find a list of packages below
 - License: Apache Software License;; BSD License;; MIT License
 - Compatible: True
 
-### certifi-2026.6.17
+### certifi-2026.10.19
 
 - HomePage: https://github.com/certifi/python-certifi
 - Author: Kenneth Reitz
@@ -262,7 +263,7 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### filelock-3.29.4
+### filelock-4.2.4
 
 - HomePage:
 - Author:
@@ -514,6 +515,13 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
+### opentelemetry-api-1.43.0
+
+- HomePage:
+- Author: OpenTelemetry Authors
+- License: Apache-2.0
+- Compatible: True
+
 ### packaging-26.2
 
 - HomePage:
@@ -654,7 +662,7 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### setuptools-83.0.0
+### setuptools-84.2.0
 
 - HomePage:
 - Author: Python Packaging Authority
@@ -745,7 +753,7 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### yarl-1.24.2
+### yarl-1.25.1
 
 - HomePage: https://github.com/aio-libs/yarl
 - Author: Andrew Svetlov

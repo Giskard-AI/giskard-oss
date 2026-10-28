@@ -52,6 +52,8 @@ from .core import (
     TestCaseResult,
     TestCaseStatus,
     Trace,
+    UnavailableCheckWarning,
+    UnavailableHubCheck,
     resolve,
 )
 from .core.mixin import WithEmbeddingMixin, WithGeneratorMixin, WithJudgeMixin
@@ -155,9 +157,12 @@ __all__ = [
     "Toxicity",
     "StringMatching",
     "RegexMatching",
+    "UnavailableHubCheck",
     # Exceptions
     "InputGenerationException",
     "InteractionGenerationError",
+    # Warnings
+    "UnavailableCheckWarning",
     # LLM-based generators
     "BaseLLMGenerator",
     "LLMGenerator",
