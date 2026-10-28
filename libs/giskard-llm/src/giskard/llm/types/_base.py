@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, Any
+from typing import Annotated, Any, ClassVar
 
 from pydantic import (
     BaseModel,
@@ -16,6 +16,9 @@ from ._serialization import get_serializer, register_serializer
 
 class _BaseModel(BaseModel):
     """Shared base for all giskard-llm response models. Defaults model_dump to exclude None fields."""
+
+    # Fields kept on the model but never sent to a provider API.
+    _wire_excluded: ClassVar[frozenset[str]] = frozenset()
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         kwargs.setdefault("exclude_none", True)
@@ -35,7 +38,11 @@ class _BaseModel(BaseModel):
         if custom_serializer:
             return custom_serializer(self, info)
 
-        return handler(self)
+        data = handler(self)
+        if provider and self._wire_excluded and isinstance(data, dict):
+            for field in self._wire_excluded:
+                data.pop(field, None)
+        return data
 
     @classmethod
     def register_serializer(cls, provider: str):
