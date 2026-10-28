@@ -452,7 +452,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### litellm-1.89.7
+### litellm-1.103.6
 
 - HomePage:
 - Author: BerriAI
