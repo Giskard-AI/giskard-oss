@@ -44,7 +44,7 @@ def _load(
     monkeypatch.setattr(
         HuggingFaceDatasetScenarioGenerator,
         "load_scenarios",
-        lambda self, description, languages: list(base),
+        lambda self, description, languages, max_scenarios=None, rng=None: list(base),
     )
     return GCGInjectionScenarioGenerator().load_scenarios("desc", ["en"])
 
