@@ -65,7 +65,10 @@ class NoMatch(BaseModel):
 
 
 def _is_list_expression(expression: JSONPath) -> bool:
-    if isinstance(expression, Child | Descendants):
+    if isinstance(expression, Descendants):
+        return True
+
+    if isinstance(expression, Child):
         return _is_list_expression(expression.right) or _is_list_expression(
             expression.left
         )

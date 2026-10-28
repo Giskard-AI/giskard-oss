@@ -1,3 +1,4 @@
+import copy
 import re
 import unicodedata
 from typing import Literal
@@ -24,9 +25,15 @@ def normalize_data[T](
 
     match data:
         case dict():
-            return type(data)(
-                {k: normalize_data(v, normalization_form) for k, v in data.items()}
-            )
+            # Copy rather than call the constructor: dict subclasses such as
+            # defaultdict do not accept a mapping as their first argument.
+            normalized = copy.copy(data)
+            for k, v in data.items():
+                normalized[k] = normalize_data(v, normalization_form)
+            return normalized
+        case tuple() if hasattr(data, "_fields"):
+            # Named tuples take their fields as positional arguments.
+            return type(data)(*(normalize_data(v, normalization_form) for v in data))
         case list() | tuple() | set():
             return type(data)(normalize_data(v, normalization_form) for v in data)
         case str():

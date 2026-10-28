@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any, ClassVar, Self, override
-from weakref import WeakSet
+from weakref import WeakValueDictionary, finalize
 
 from pydantic import (
     ConfigDict,
@@ -34,7 +34,7 @@ class RateLimiterRegistry:
     throttling is consistent across serialization boundaries.
     """
 
-    _instances: dict[str, WeakSet["BaseRateLimiter[Any]"]]
+    _instances: dict[str, WeakValueDictionary[int, "BaseRateLimiter[Any]"]]
 
     def __init__(self):
         self._instances = {}
@@ -52,10 +52,10 @@ class RateLimiterRegistry:
         """
         instances = self._instances.get(rate_limiter.id)
         if instances is None:
-            instances = WeakSet["BaseRateLimiter"]()
+            instances = WeakValueDictionary[int, "BaseRateLimiter"]()
             self._instances[rate_limiter.id] = instances
 
-        all_instances = list(instances)
+        all_instances = list(instances.values())
         matching_instances = [
             instance for instance in all_instances if instance == rate_limiter
         ]
@@ -79,7 +79,24 @@ class RateLimiterRegistry:
                 RuntimeWarning,
             )
 
-        instances.add(rate_limiter)
+        # Register the cleanup finalizer before inserting into the
+        # WeakValueDictionary: weakref callbacks fire in reverse registration
+        # order, so this ordering guarantees the dict's own internal cleanup
+        # (removing the dead entry) runs before _cleanup_id inspects it,
+        # rather than racing it.
+        finalize(rate_limiter, self._cleanup_id, rate_limiter.id)
+        instances[id(rate_limiter)] = rate_limiter
+
+    def _cleanup_id(self, id: str) -> None:
+        """Drop the tracking entry for `id` once its instance map is empty.
+
+        Without this, every unique id (e.g. the default random UUID) leaves
+        behind an empty WeakValueDictionary in ``_instances`` forever after
+        its last instance is garbage collected.
+        """
+        instances = self._instances.get(id)
+        if instances is not None and not instances:
+            self._instances.pop(id, None)
 
     def get_instance(self, id: str) -> "BaseRateLimiter[Any]":
         """Retrieve a registered rate limiter by id.
@@ -103,7 +120,7 @@ class RateLimiterRegistry:
         if not instances:
             raise ValueError(f"Rate limiter with id '{id}' not found")
 
-        return next(iter(instances))
+        return next(iter(instances.values()))
 
 
 @discriminated_base

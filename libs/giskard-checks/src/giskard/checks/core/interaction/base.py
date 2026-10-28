@@ -1,6 +1,8 @@
 from collections.abc import AsyncGenerator
+from typing import ClassVar
 
 from giskard.core import Discriminated, discriminated_base
+from pydantic import ConfigDict
 
 from .interaction import Interaction
 from .trace import Trace
@@ -29,7 +31,18 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
         Type of the input values for interactions
     OutputType : TypeVar
         Type of the output values for interactions
+
+    Notes
+    -----
+    Unknown fields are rejected (``extra="forbid"``), matching ``Check``.
+    Interaction specs sit directly in persisted scenario JSON, so without this
+    pydantic silently drops unrecognized keys: a scenario writing ``output``
+    instead of ``outputs`` would leave ``outputs`` at its ``MISSING`` default
+    and bind the scenario-level target instead of the value that was written.
     """
+
+    # Rationale and the subclass rule: see ``Discriminated`` in giskard-core.
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     def generate(
         self, trace: TraceType

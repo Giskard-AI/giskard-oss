@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 from giskard.checks import Equals, Scenario, Suite
-from giskard.checks.core.interaction import Trace
+from giskard.checks.core.interaction import Interaction, Trace
 from giskard.checks.core.result import (
     CheckResult,
     GroupedSuiteResult,
@@ -13,6 +13,7 @@ from giskard.checks.core.result import (
     ScenarioResult,
     ScenarioStatus,
     SuiteResult,
+    TestCaseError,
 )
 from giskard.checks.core.result import (
     TestCaseResult as CheckTestCaseResult,
@@ -70,7 +71,7 @@ async def test_suite_target_precedence(sut1, sut2):
     scenario = (
         Scenario("test", target=sut1)
         .interact("hello")
-        .check(Equals(expected_value="SUT2: hello", key="trace.last.outputs"))
+        .check(Equals(expected_value="SUT2: hello", target_key="trace.last.outputs"))
     )
 
     # Suite with a different target
@@ -88,7 +89,7 @@ async def test_suite_run_target_precedence(sut1, sut2, sut3):
     scenario = (
         Scenario("test", target=sut1)
         .interact("hello")
-        .check(Equals(expected_value="SUT3: hello", key="trace.last.outputs"))
+        .check(Equals(expected_value="SUT3: hello", target_key="trace.last.outputs"))
     )
 
     suite = Suite(name="my_suite", target=sut2)
@@ -106,13 +107,13 @@ async def test_suite_mixed_targets(sut1, sut2):
     scenario1 = (
         Scenario("s1", target=sut1)
         .interact("hello")
-        .check(Equals(expected_value="SUT1: hello", key="trace.last.outputs"))
+        .check(Equals(expected_value="SUT1: hello", target_key="trace.last.outputs"))
     )
 
     scenario2 = (
         Scenario("s2", target=sut2)
         .interact("world")
-        .check(Equals(expected_value="SUT2: world", key="trace.last.outputs"))
+        .check(Equals(expected_value="SUT2: world", target_key="trace.last.outputs"))
     )
 
     # Suite with NO target
@@ -133,7 +134,7 @@ async def test_suite_result_aggregation():
     scenario2 = (
         Scenario("s2")
         .interact("b", "c")
-        .check(Equals(expected_value="b", key="trace.last.outputs"))
+        .check(Equals(expected_value="b", target_key="trace.last.outputs"))
     )
 
     suite = Suite(name="agg_suite")
@@ -293,6 +294,69 @@ def test_suite_result_rich_console_ignores_invalid_failure_limit_env(
     assert "... and" not in output
 
 
+@pytest.mark.parametrize(
+    "field",
+    ["scenario_name", "check_name", "message", "error", "outputs", "tag"],
+)
+def test_suite_result_rich_console_renders_markup_like_text_literally(field: str):
+    # LLM outputs and check messages routinely contain square brackets, e.g.
+    # the "[/INST]" delimiter of Llama chat templates. Rich must not parse them
+    # as markup: an unmatched closing tag raises MarkupError mid-report.
+    def value(name: str, default: str) -> str:
+        return "[/INST] [bold]leak" if field == name else default
+
+    result = SuiteResult(
+        results=[
+            ScenarioResult(
+                scenario_name=value("scenario_name", "scenario"),
+                steps=[
+                    CheckTestCaseResult(
+                        results=[
+                            CheckResult.failure(
+                                message=value("message", "failed"),
+                                details={"check_name": value("check_name", "check")},
+                            )
+                        ],
+                        duration_ms=1,
+                    ),
+                    CheckTestCaseResult(
+                        results=[],
+                        duration_ms=1,
+                        error=TestCaseError(
+                            message=value("error", "boom"),
+                            exception_type="ValueError",
+                        ),
+                    ),
+                ],
+                duration_ms=1,
+                final_trace=Trace(
+                    interactions=[
+                        Interaction(inputs="hi", outputs=value("outputs", "hello"))
+                    ]
+                ),
+                tags=[f"Category:{value('tag', 'safety')}"],
+            )
+        ],
+        duration_ms=1,
+    )
+    console = Console(record=True, width=200)
+
+    console.print(result.group_by("Category"))
+
+    assert "[/INST] [bold]leak" in console.export_text()
+
+
+def test_grouped_suite_result_rich_console_renders_markup_like_key_literally():
+    # The grouping key is used as the table title and column header.
+    console = Console(record=True, width=200)
+
+    console.print(SuiteResult(results=[], duration_ms=0).group_by("[/INST]"))
+
+    output = console.export_text()
+    assert "Results by [/INST]" in output
+    assert output.count("[/INST]") == 2
+
+
 @pytest.mark.asyncio
 async def test_suite_parallel_preserves_result_order():
     delays = {"first": 0.09, "second": 0.01, "third": 0.05}
@@ -377,12 +441,12 @@ async def test_suite_continues_after_input_generation_error_with_return_exceptio
     failing = (
         Scenario("failing_input_generation")
         .interact("boom")
-        .check(Equals(expected_value="boom", key="trace.last.outputs"))
+        .check(Equals(expected_value="boom", target_key="trace.last.outputs"))
     )
     passing = (
         Scenario("passing_after_error")
         .interact("ok")
-        .check(Equals(expected_value="ok", key="trace.last.outputs"))
+        .check(Equals(expected_value="ok", target_key="trace.last.outputs"))
     )
     suite = Suite(name="input_generation_errors", target=target)
     suite.append(failing).append(passing)
@@ -540,6 +604,18 @@ async def test_suite_parallel_progress_shows_a_row_per_scenario(monkeypatch):
     assert "  ↳ beta" in rows
 
 
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.asyncio
+async def test_suite_progress_renders_markup_like_scenario_names_literally(parallel):
+    """A scenario name such as "[/INST] ..." must not crash the progress bar."""
+    suite = Suite(name="markup_names_suite", target=lambda inputs: inputs)
+    suite.append(Scenario("[/INST] template leak").interact("hi"))
+
+    result = await suite.run(parallel=parallel)
+
+    assert result.passed_count == 1
+
+
 @pytest.mark.parametrize(
     ("records", "expected"),
     [
@@ -589,7 +665,7 @@ async def test_suite_progress_records_each_scenario_outcome(monkeypatch):
     failing = (
         Scenario("s2")
         .interact("b", "c")
-        .check(Equals(expected_value="b", key="trace.last.outputs"))
+        .check(Equals(expected_value="b", target_key="trace.last.outputs"))
     )
     suite = Suite(name="record_suite")
     suite.append(passing).append(failing)
@@ -636,6 +712,56 @@ def test_group_stats_total_includes_skipped():
 def test_group_stats_pass_rate_excludes_skipped_from_denominator():
     stats = GroupStats(name="X", passed=2, failed=1, errored=0, skipped=5)
     assert stats.pass_rate == pytest.approx(2 / 3)
+
+
+def test_suite_pass_rate_none_when_empty():
+    from giskard.checks.core.result import SuiteResult
+    from giskard.checks.scenarios.suite import Suite
+
+    suite_result = SuiteResult(results=[], duration_ms=0, suite=Suite(name="test"))
+    assert suite_result.pass_rate is None
+
+
+def test_suite_pass_rate_none_when_all_skipped():
+    from giskard.checks.core.interaction.trace import Trace
+    from giskard.checks.core.result import (
+        CheckResult,
+        ScenarioResult,
+        SuiteResult,
+        TestCaseResult,
+    )
+    from giskard.checks.scenarios.suite import Suite
+
+    skipped_scenario = ScenarioResult(
+        scenario_name="t_skip",
+        steps=[
+            TestCaseResult(
+                results=[CheckResult.skip(message="precondition not met")],
+                duration_ms=0,
+            )
+        ],
+        duration_ms=0,
+        final_trace=Trace(interactions=[]),
+    )
+    suite_result = SuiteResult(
+        results=[skipped_scenario],
+        duration_ms=0,
+        suite=Suite(name="test"),
+    )
+    assert suite_result.skipped_count == 1
+    assert suite_result.pass_rate is None
+
+
+def test_suite_result_rich_console_renders_em_dash_when_pass_rate_none():
+    result = SuiteResult(results=[], duration_ms=0)
+    assert result.pass_rate is None
+    console = Console(record=True, width=120)
+
+    console.print(result)
+
+    output = console.export_text()
+    assert "Pass Rate:" in output
+    assert "—" in output
 
 
 def test_suite_group_by_skipped_scenario_counted_separately():
@@ -695,12 +821,12 @@ async def test_suite_group_by_returns_grouped_suite_result(identity_sut):
     suite.append(
         Scenario("t1", tags=["Category:Hallucination"])
         .interact("hi")
-        .check(Equals(expected_value="hi", key="trace.last.outputs"))
+        .check(Equals(expected_value="hi", target_key="trace.last.outputs"))
     )
     suite.append(
         Scenario("t2", tags=["Category:Adversarial"])
         .interact("hi")
-        .check(Equals(expected_value="WRONG", key="trace.last.outputs"))
+        .check(Equals(expected_value="WRONG", target_key="trace.last.outputs"))
     )
     suite.append(Scenario("t3").interact("hi"))  # untagged, no checks
 

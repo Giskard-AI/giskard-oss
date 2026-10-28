@@ -9,7 +9,7 @@ from giskard.checks import Conformity, LLMGenerator, Scenario, Trace, WithGenera
 from pydantic import BaseModel, Field
 
 from ...utils.knowledge_base import Document, KnowledgeBase
-from ..base import ScenarioContext, TargetMode
+from ..base import DEFAULT_TARGET_MODE, ScenarioContext, TargetMode
 from .base import (
     KnowledgeBaseScenarioGenerator,
     _normalize_for_match,
@@ -54,7 +54,7 @@ class OutOfScopeScenarioGenerator(KnowledgeBaseScenarioGenerator, WithGeneratorM
         context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
-        target_mode: TargetMode = "multiturn",
+        target_mode: TargetMode = DEFAULT_TARGET_MODE,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         params = self._prepare_generation_params(
             context,

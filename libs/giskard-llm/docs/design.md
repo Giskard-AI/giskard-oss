@@ -13,7 +13,10 @@ Input types and output types use different base classes:
 The Chat Completions API (OpenAI, Azure, Anthropic, Google via `generateContent`) uses a **nested** tool format:
 
 ```python
-{"type": "function", "function": {"name": "add", "description": "...", "parameters": {...}}}
+{
+    "type": "function",
+    "function": {"name": "add", "description": "...", "parameters": {...}},
+}
 ```
 
 The Responses API (OpenAI) and Interactions API (Google) use a **flat** tool format:

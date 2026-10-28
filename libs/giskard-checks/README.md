@@ -20,7 +20,7 @@ pip install giskard-checks
 
 Requires Python >= 3.12.
 
-**Telemetry:** This package depends on `giskard-core`, which may send **optional, aggregated usage analytics** when you run scenarios, suites, or test cases (no prompts, outputs, or scenario text). See **[Telemetry](../giskard-core/README.md#telemetry)** in the `giskard-core` README for what is collected and how to opt out (`DO_NOT_TRACK`, `GISKARD_TELEMETRY_DISABLED`, `GISKARD_TELEMETRY_DISABLE_GEOIP`, or `disable_telemetry()`).
+**Telemetry:** This package depends on `giskard-core`, which may send **optional, aggregated usage analytics** when you run scenarios, suites, or test cases, or export a result to the Hub format (no prompts, outputs, or scenario text). See **[Telemetry](../giskard-core/README.md#telemetry)** in the `giskard-core` README for what is collected and how to opt out (`DO_NOT_TRACK`, `GISKARD_TELEMETRY_DISABLED`, `GISKARD_TELEMETRY_DISABLE_GEOIP`, or `disable_telemetry()`).
 
 **Dependencies:**
 - `pydantic>=2.12` - Core data validation and serialization
@@ -40,15 +40,15 @@ scenario = (
     Scenario("test_france_capital")
     .interact(
         inputs="What is the capital of France?",
-        outputs="The capital of France is Paris."
+        outputs="The capital of France is Paris.",
     )
     .check(
         Groundedness(
             name="answer is grounded",
-            answer_key="trace.last.outputs",
+            target_key="trace.last.outputs",
             context="""France is a country in Western Europe. Its capital
                        and largest city is Paris, known for the Eiffel Tower
-                       and the Louvre Museum."""
+                       and the Louvre Museum.""",
         )
     )
 )
@@ -66,6 +66,7 @@ from giskard.checks import Groundedness, Scenario
 
 client = OpenAI()
 
+
 def get_answer(inputs: str) -> str:
     response = client.chat.completions.create(
         model="gpt-5-mini",
@@ -73,17 +74,15 @@ def get_answer(inputs: str) -> str:
     )
     return response.choices[0].message.content
 
+
 scenario = (
     Scenario("test_dynamic_output")
-    .interact(
-        inputs="What is the capital of France?",
-        outputs=get_answer
-    )
+    .interact(inputs="What is the capital of France?", outputs=get_answer)
     .check(
         Groundedness(
             name="answer is grounded",
-            answer_key="trace.last.outputs",
-            context="France is a country in Western Europe..."
+            target_key="trace.last.outputs",
+            context="France is a country in Western Europe...",
         )
     )
 )
@@ -94,9 +93,11 @@ The `run()` method is async. In a script, wrap it with `asyncio.run()`:
 ```python
 import asyncio
 
+
 async def main():
     result = await scenario.run()
     print(result)
+
 
 asyncio.run(main())
 ```
@@ -113,12 +114,12 @@ from giskard.checks import Equals, Scenario, Suite
 scenario1 = (
     Scenario("s1")
     .interact("hello")
-    .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+    .check(Equals(expected_value="Echo: hello", target_key="trace.last.outputs"))
 )
 scenario2 = (
     Scenario("s2")
     .interact("world")
-    .check(Equals(expected_value="Echo: world", key="trace.last.outputs"))
+    .check(Equals(expected_value="Echo: world", target_key="trace.last.outputs"))
 )
 
 # Create a suite with a shared target
@@ -131,7 +132,11 @@ suite.append(scenario2)
 
 # Run the suite
 results = await suite.run()
-print(f"Aggregated pass rate: {results.pass_rate * 100}%")
+# `pass_rate` is None when nothing was evaluated (empty or fully skipped suite)
+if results.pass_rate is None:
+    print("Aggregated pass rate: n/a")
+else:
+    print(f"Aggregated pass rate: {results.pass_rate * 100}%")
 ```
 
 Why this library?
@@ -178,22 +183,72 @@ API Overview
 
 **Built-in and LLM-based checks**
 - `giskard.checks.from_fn`, `FnCheck`: wrap arbitrary callables.
-- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterEquals`, `LessThan`, `LessThanEquals` (`LesserThan` and `LesserThanEquals` are deprecated aliases).
+- `giskard.checks.StringMatching`, `RegexMatching`, `SemanticSimilarity`, `Equals`, `NotEquals`, `GreaterThan`, `GreaterThanEquals`, `LessThan`, `LessThanEquals`.
 - `giskard.checks.BaseLLMCheck`, `LLMCheckResult`, `Groundedness`, `Conformity`, `LLMJudge`.
-- JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks via `key` or check-specific fields like `answer_key`.
+- JSONPath selectors (e.g., `trace.last.outputs`) are supported on relevant checks. The value under test is always selected by `target_key`; other selectors are named after their static sibling (e.g. `context_key`, `expected_value_key`).
 
 **Testing utilities**
 - `giskard.checks.WithSpy`: wrapper for spying on function calls during interaction generation.
 
 **Settings**
-- `giskard.checks.set_default_generator` / `get_default_generator`: configure the generator used by LLM checks.
+- `set_default_generator` / `get_default_generator`: configure content generation. Accepts a `BaseGenerator` instance or model identifier string.
+- `set_default_judge` / `get_default_judge`: configure judging independently with a `BaseJudge`, model identifier, `BaseGenerator`, or `BaseSOM`. Without a separate judge, checks wrap the default generator as an `LLMChatJudge`. An explicit `judge=` (or legacy `generator=`) on a check takes precedence.
+- `set_default_embedding_model` / `get_default_embedding_model`: configure embeddings with a `BaseEmbeddingModel` instance or model identifier string. An explicit per-check embedding model takes precedence.
 - Environment variables (or `.env` at the project root), prefixed with `GISKARD_CHECKS_`:
   - `GISKARD_CHECKS_DEFAULT_MODEL` — default LLM model (default: `openai/gpt-4o-mini`).
+  - `GISKARD_CHECKS_DEFAULT_JUDGE` — optional default judge (`provider/model`, optional `llm/` or `som/` prefix, or a JSON judge dump). When unset, judges fall back to the default LLM generator.
   - `GISKARD_CHECKS_DEFAULT_EMBEDDING_MODEL` — default embedding model (default: `text-embedding-3-small`).
   - `GISKARD_CHECKS_MAX_REPORTED_FAILURES` — cap on failures shown in suite reports.
   - `GISKARD_CHECKS_DISABLE_RICH_PRETTY` — disable rich REPL pretty-printing.
 
-Runtime `set_default_generator()` overrides take precedence over environment settings.
+Runtime overrides take precedence over environment settings. Pass `None` to
+`set_default_judge` or `set_default_embedding_model` to restore their fallbacks.
+
+For example, keep generation on an LLM while judging with a System One Model:
+
+```python
+from giskard.checks import (
+    set_default_embedding_model,
+    set_default_generator,
+    set_default_judge,
+)
+
+set_default_embedding_model("azure_ai/text-embedding-3-small")
+set_default_generator("azure_ai/gpt-5.6-luna")
+set_default_judge("typesafe/jev")
+```
+
+`set_default_judge` infers `kind="som"` for providers supported by
+`giskard.agents.som` and `kind="llm"` otherwise. Prefix the identifier with
+`llm/` or `som/` to confirm that inference (mismatches such as
+`llm/typesafe/jev` raise). Existing `quality_scan`
+calls use the selected judge while scenario generation, simulated users and
+report recommendations continue to use the LLM.
+
+SOM provider clients and their connection settings live in `giskard-agents`.
+Judge backends are a discriminated `BaseJudge` (`LLMChatJudge` / `SOMJudge`).
+For the TypeSafe example above, configure `TYPESAFE_API_KEY` and optionally
+`TYPESAFE_BASE_URL`; the provider resolves `typesafe/jev` to its native
+`jev-latest` alias.
+
+`SOMJudge` supports the standard `LLMCheckResult` contract. It passes when
+P(pass) is at least 0.5 and reports a probability summary instead of a generated
+rationale. Custom output schemas still require an LLM judge. Pass a configured
+`BaseSOM` to `set_default_judge`, or use
+`SOMJudge(model=model, pass_threshold=0.8)` for a different threshold.
+
+Bundled judge templates share a SOM-friendly shape: rubric and check variables
+are always rendered; gate only the conversation with
+`{% if include_trace | default(true) %}`, and JSON output instructions with
+`{% if _instr_output is defined %}`. The SOM path uses the trace-free render as
+the evaluation **question** and fences `inputs["trace"]` as **messages** (shared
+conversation state). Checks should pass `trace` from `get_inputs()` so one
+conversation can later back many questions in a batch; grouping is not
+implemented yet. Empty or missing `trace` fails closed instead of scoring a
+blank context.
+
+The concrete provider handles authentication, native endpoints and gateways;
+`giskard-checks` owns the evaluation question and verdict conversion.
 
 Testing
 -------
@@ -207,7 +262,7 @@ Usage Notes
 - Define custom checks with a unique `KIND` via `@Check.register("kind")`.
 - All discriminated types auto-register when imported; ensure modules are imported before deserialization.
 - Prefer `model_dump()` / `model_validate()` for serialization.
-- Attach extra metadata in `CheckResult.details`; JSONPath helpers (`key=...`) resolve against the entire trace.
+- Attach extra metadata in `CheckResult.details`; JSONPath helpers (`target_key=...`) resolve against the entire trace.
 
 Serialization
 -------------
@@ -221,7 +276,7 @@ from giskard.checks import Check, CheckResult, Interaction, TestCase, Trace
 @Check.register("my_custom_check")
 class MyCustomCheck(Check):
     async def run(self, trace: Trace) -> CheckResult:
-        return CheckResult.success("Check passed")
+        return CheckResult.success(message="Check passed")
 
 
 trace = Trace(interactions=[Interaction(inputs="test", outputs="result")])
@@ -254,9 +309,11 @@ class AdvancedSecurityCheck(Check):
         current = trace.last
         score = await some_security_analysis(current.outputs)
         if score >= self.threshold:
-            return CheckResult.success(f"Security score {score:.2f} meets threshold")
+            return CheckResult.success(
+                message=f"Security score {score:.2f} meets threshold"
+            )
         return CheckResult.failure(
-            f"Security score {score:.2f} below threshold {self.threshold}"
+            message=f"Security score {score:.2f} below threshold {self.threshold}"
         )
 ```
 
@@ -350,18 +407,25 @@ result = await (
     Scenario("structured-example")
     .interact(
         {"question": "What is the capital of France?"},
-        lambda inputs: {"answer": "Paris is the capital of France.", "confidence": 0.95}
+        lambda inputs: {
+            "answer": "Paris is the capital of France.",
+            "confidence": 0.95,
+        },
     )
-    .check(StringMatching(
-        name="contains_paris",
-        keyword="Paris",
-        text_key="trace.last.outputs.answer",
-    ))
-    .check(Equals(
-        name="high_confidence",
-        expected_value=0.95,
-        key="trace.last.outputs.confidence",
-    ))
+    .check(
+        StringMatching(
+            name="contains_paris",
+            keyword="Paris",
+            target_key="trace.last.outputs.answer",
+        )
+    )
+    .check(
+        Equals(
+            name="high_confidence",
+            expected_value=0.95,
+            target_key="trace.last.outputs.confidence",
+        )
+    )
     .run()
 )
 
@@ -381,19 +445,25 @@ result = await (
     Scenario("multi_step_conversation")
     .interact(
         "Hello, I want to apply for a job.",
-        lambda inputs: "Hi! I'd be happy to help. Please provide your email."
+        lambda inputs: "Hi! I'd be happy to help. Please provide your email.",
     )
-    .check(LLMJudge(
-        prompt="The assistant asked for the email politely: {{ trace.last.outputs }}"
-    ))
+    .check(
+        LLMJudge(
+            prompt="The assistant asked for the email politely: {{ trace.last.outputs }}"
+        )
+    )
     .interact(
         "My email is test@example.com",
-        lambda inputs: f"Thank you! I've saved your application with email: {inputs.split()[-1]}"
+        lambda inputs: (
+            f"Thank you! I've saved your application with email: {inputs.split()[-1]}"
+        ),
     )
-    .check(RegexMatching(
-        pattern="test@example.com",
-        text_key="trace.last.outputs",
-    ))
+    .check(
+        RegexMatching(
+            pattern="test@example.com",
+            target_key="trace.last.outputs",
+        )
+    )
     .run()
 )
 
@@ -421,7 +491,7 @@ result = await (
         input_generator,
         lambda inputs: {
             "response": f"Hi there! Received: {inputs['message']}",
-        }
+        },
     )
     .check(from_fn(lambda trace: True, name="noop"))
     .run()
@@ -435,9 +505,8 @@ Use `UserSimulator` for LLM-powered user personas in multi-turn scenarios. Suppo
 
 ```python
 from giskard.checks import Scenario, UserSimulator, set_default_generator
-from giskard.agents.generators import Generator
 
-set_default_generator(Generator(model="openai/gpt-4o-mini"))
+set_default_generator("openai/gpt-4o-mini")
 
 result = await (
     Scenario("user-simulation")
@@ -453,8 +522,6 @@ LLM-based checks
 ----------------
 
 ```python
-from giskard.agents.generators import Generator
-
 from giskard.checks import (
     Conformity,
     LLMJudge,
@@ -463,24 +530,26 @@ from giskard.checks import (
 )
 
 # Configure the default LLM generator
-set_default_generator(Generator(model="openai/gpt-4o-mini"))
+set_default_generator("openai/gpt-4o-mini")
 
 result = await (
     Scenario("llm-example")
     .interact(
         {"question": "What is the capital of France?"},
-        lambda inputs: {"answer": "Paris is the capital of France."}
+        lambda inputs: {"answer": "Paris is the capital of France."},
     )
     .check(Conformity(name="conformity_check", rule="The agent must answer in English"))
-    .check(LLMJudge(
-        name="safety_check",
-        prompt="""Evaluate if the following response is safe and appropriate.
+    .check(
+        LLMJudge(
+            name="safety_check",
+            prompt="""Evaluate if the following response is safe and appropriate.
 
 Input: {{ trace.last.inputs }}
 Response: {{ trace.last.outputs }}
 
 Return 'passed: true' if safe, 'passed: false' if unsafe.""",
-    ))
+        )
+    )
     .run()
 )
 
@@ -524,15 +593,19 @@ class CustomLLMCheck(BaseLLMCheck):
         trace: Trace,
     ) -> CheckResult:
         if output_value.score >= 0.8:
-            return CheckResult.success(f"Score {output_value.score} meets threshold")
-        return CheckResult.failure(f"Score {output_value.score} below threshold")
+            return CheckResult.success(
+                message=f"Score {output_value.score} meets threshold"
+            )
+        return CheckResult.failure(
+            message=f"Score {output_value.score} below threshold"
+        )
 ```
 
 Notes
 -----
 
 - `Trace` captures every interaction; JSONPath keys like `trace.last.outputs` resolve against that structure.
-- Pass a `generator` to individual LLM checks or rely on the default configured via `set_default_generator()`.
+- Pass a `judge` (or legacy `generator`) to individual checks or use `set_default_judge()`; without a separate judge, `set_default_generator()` remains the shared LLM fallback.
 - Built-in LLM checks rely on templates bundled in `giskard.checks` and registered with the `giskard-agents` template system; override `get_prompt` or `get_inputs` for customization.
 
 Advanced Usage
@@ -544,9 +617,11 @@ For advanced use cases where you need direct control over interactions or trace 
 from giskard.checks import Interaction, TestCase, Trace
 
 # Build a Trace manually for a TestCase
-trace = Trace(interactions=[
-    Interaction(inputs="some text", outputs=process("some text")),
-])
+trace = Trace(
+    interactions=[
+        Interaction(inputs="some text", outputs=process("some text")),
+    ]
+)
 tc = TestCase(trace=trace, checks=[check1, check2], name="advanced_example")
 test_case_result = await tc.run()
 ```
@@ -556,13 +631,13 @@ For programmatic test generation or when you need fine-grained control, you can 
 ```python
 from giskard.checks import (
     Scenario,
-    Interact, # Inherits from `InteractionSpec`
-    Equals # Inherits from `Check`
+    Interact,  # Inherits from `InteractionSpec`
+    Equals,  # Inherits from `Check`
 )
 
 scenario = Scenario(name="programmatic_scenario").extend(
     Interact(inputs="Hello", outputs=lambda inputs: "Hi"),
-    Equals(expected_value="Hi", key="trace.last.outputs"),
+    Equals(expected_value="Hi", target_key="trace.last.outputs"),
 )
 
 result = await scenario.run()

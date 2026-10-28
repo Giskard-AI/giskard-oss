@@ -52,7 +52,7 @@ async def test_prompt_allows_explicit_refusals_without_context_support() -> None
 
 
 async def test_answer_and_context_from_trace() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(generator=generator)
     interaction = Interaction(
         inputs={"query": "Where is the Eiffel Tower?"},
@@ -62,7 +62,7 @@ async def test_answer_and_context_from_trace() -> None:
     result = await groundedness.run(Trace(interactions=[interaction]))
 
     assert result.status == CheckStatus.PASS
-    assert result.details["reason"] is None
+    assert result.details["reason"] == "Mock reason."
 
     assert len(generator.calls) == 1
     # Verify that answer and context were extracted from trace
@@ -77,7 +77,7 @@ async def test_answer_and_context_from_trace() -> None:
 
 
 async def test_direct_answer_and_context() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(
         generator=generator,
         answer="Direct answer",
@@ -115,10 +115,10 @@ async def test_direct_answer_and_single_string_context() -> None:
 
 
 async def test_custom_keys() -> None:
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(
         generator=generator,
-        answer_key="trace.interactions[0].outputs.response",
+        target_key="trace.interactions[0].outputs.response",
         context_key="trace.interactions[0].metadata.documents",
     )
     interaction = Interaction(
@@ -137,7 +137,7 @@ async def test_custom_keys() -> None:
 
 async def test_answer_priority_over_trace() -> None:
     """Test that direct answer takes priority over trace extraction."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(
         generator=generator,
         answer="Direct answer takes priority",
@@ -145,6 +145,7 @@ async def test_answer_priority_over_trace() -> None:
     interaction = Interaction(
         inputs={"query": "Test"},
         outputs={"response": "Trace answer"},
+        metadata={"context": ["Supporting context"]},
     )
     result = await groundedness.run(Trace(interactions=[interaction]))
 
@@ -154,7 +155,7 @@ async def test_answer_priority_over_trace() -> None:
 
 async def test_context_priority_over_trace() -> None:
     """Test that direct context takes priority over trace extraction."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(
         generator=generator,
         context=["Direct context"],
@@ -167,12 +168,12 @@ async def test_context_priority_over_trace() -> None:
     result = await groundedness.run(Trace(interactions=[interaction]))
 
     assert result.status == CheckStatus.PASS
-    assert result.details["inputs"]["context"] == "['Direct context']"
+    assert result.details["inputs"]["context"] == "Direct context"
 
 
 async def test_empty_string_context_is_preserved() -> None:
     """Test that an empty string context is preserved and does not fall back to trace."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(
         generator=generator,
         answer="Some answer",
@@ -200,24 +201,82 @@ async def test_empty_context() -> None:
     result = await groundedness.run(Trace())
 
     assert result.status == CheckStatus.FAIL
-    assert result.details["inputs"]["context"] == "[]"
+    assert result.details["inputs"]["context"] == ""
+
+
+async def test_list_context_is_joined_without_python_repr_artifacts() -> None:
+    """A list[str] context must reach the judge prompt as readable text.
+
+    Regression test for the bug where get_inputs() rendered a list context via
+    bare str(), producing the Python repr (e.g. "['doc 1', 'doc 2']") instead of
+    the documents themselves. Documents containing apostrophes are especially
+    revealing: str(repr) mixes quote styles and escapes the apostrophe, which
+    should never appear in the actual prompt text.
+    """
+    generator = MockGenerator(passed=True, reason="Mock reason.")
+    groundedness = Groundedness(
+        generator=generator,
+        answer="The Eiffel Tower is in Paris, and it's a landmark.",
+        context=[
+            "Paris is the capital of France.",
+            "It's located in Europe.",
+        ],
+    )
+    result = await groundedness.run(Trace())
+
+    context_str = cast(str, result.details["inputs"]["context"])
+    assert context_str == "Paris is the capital of France.\nIt's located in Europe."
+    assert "[" not in context_str
+    assert "]" not in context_str
+    assert '\\"' not in context_str
+    assert "\\'" not in context_str
+
+
+async def test_list_answer_from_trace_is_joined_without_python_repr_artifacts() -> None:
+    """A list-valued answer extracted via answer_key must not leak Python repr."""
+    generator = MockGenerator(passed=True, reason="Mock reason.")
+    groundedness = Groundedness(
+        generator=generator,
+        target_key="trace.last.metadata.answer_parts",
+        context="Paris is the capital of France.",
+    )
+    interaction = Interaction(
+        inputs={"query": "Where is Paris?"},
+        outputs={"response": "unused"},
+        metadata={
+            "answer_parts": [
+                "Paris is the capital of France.",
+                "It's located in Europe.",
+            ]
+        },
+    )
+    result = await groundedness.run(Trace(interactions=[interaction]))
+
+    answer_str = cast(str, result.details["inputs"]["answer"])
+    assert answer_str == "Paris is the capital of France.\nIt's located in Europe."
+    assert "[" not in answer_str
+    assert "]" not in answer_str
+    assert '\\"' not in answer_str
+    assert "\\'" not in answer_str
 
 
 async def test_missing_answer_in_trace() -> None:
-    """Test behavior when answer is not found in trace."""
-    generator = MockGenerator(passed=True, reason=None)
+    """Missing answer key returns ERROR without invoking the judge."""
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(generator=generator)
     # Empty trace - no interactions
     result = await groundedness.run(Trace())
 
-    assert result.status == CheckStatus.PASS
-    # When resolve returns NoMatch, str(NoMatch) becomes "No match for key: ..."
-    assert result.details["inputs"]["answer"] == "No match for key: trace.last.outputs"
+    assert result.status == CheckStatus.ERROR
+    assert result.errored
+    assert "answer key" in (result.message or "")
+    assert "trace.last.outputs" in (result.message or "")
+    assert len(generator.calls) == 0
 
 
 async def test_missing_context_in_trace() -> None:
-    """Test behavior when context is not found in trace."""
-    generator = MockGenerator(passed=True, reason=None)
+    """Missing context key returns ERROR without invoking the judge."""
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     groundedness = Groundedness(generator=generator)
     interaction = Interaction(
         inputs={"query": "Test"},
@@ -226,17 +285,34 @@ async def test_missing_context_in_trace() -> None:
     )
     result = await groundedness.run(Trace(interactions=[interaction]))
 
-    assert result.status == CheckStatus.PASS
-    # When resolve returns NoMatch, str(NoMatch) becomes "No match for key: ..."
-    assert (
-        result.details["inputs"]["context"]
-        == "No match for key: trace.last.metadata.context"
+    assert result.status == CheckStatus.ERROR
+    assert result.errored
+    assert "context key" in (result.message or "")
+    assert "trace.last.metadata.context" in (result.message or "")
+    assert len(generator.calls) == 0
+
+
+async def test_not_does_not_invert_missing_context_error() -> None:
+    from giskard.checks import Not
+
+    generator = MockGenerator(passed=True, reason="Mock reason.")
+    groundedness = Groundedness(generator=generator)
+    interaction = Interaction(
+        inputs={"query": "Test"},
+        outputs={"response": "Answer"},
     )
+
+    result = await Not(check=groundedness).run(Trace(interactions=[interaction]))
+
+    assert result.status == CheckStatus.ERROR
+    assert result.errored
+    assert "context key" in (result.message or "")
+    assert len(generator.calls) == 0
 
 
 async def test_using_trace_last_property() -> None:
     """Test that demonstrates using trace.last instead of trace.interactions[-1]."""
-    generator = MockGenerator(passed=True, reason=None)
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     interaction1 = Interaction(
         inputs={"query": "First question"},
         outputs={"response": "First answer"},
@@ -258,7 +334,7 @@ async def test_using_trace_last_property() -> None:
     # Use trace.last to verify the groundedness check uses the last interaction
     groundedness = Groundedness(
         generator=generator,
-        answer_key="trace.last.outputs.response",
+        target_key="trace.last.outputs.response",
         context_key="trace.last.metadata.context",
     )
     result = await groundedness.run(trace)
@@ -270,17 +346,17 @@ async def test_using_trace_last_property() -> None:
 
 
 async def test_trace_last_with_empty_trace() -> None:
-    """Test that trace.last returns None for empty trace."""
-    generator = MockGenerator(passed=True, reason=None)
+    """Empty trace has no last interaction; Groundedness returns ERROR."""
+    generator = MockGenerator(passed=True, reason="Mock reason.")
     trace = Trace()
 
     # Verify trace.last returns None for empty trace
     assert trace.last is None
 
-    # Groundedness should handle empty trace gracefully
     groundedness = Groundedness(generator=generator)
     result = await groundedness.run(trace)
 
-    assert result.status == CheckStatus.PASS
-    # When resolve returns NoMatch, str(NoMatch) becomes "No match for key: ..."
-    assert result.details["inputs"]["answer"] == "No match for key: trace.last.outputs"
+    assert result.status == CheckStatus.ERROR
+    assert result.errored
+    assert "answer key" in (result.message or "")
+    assert len(generator.calls) == 0

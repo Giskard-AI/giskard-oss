@@ -1,23 +1,10 @@
 """Built-in check implementations and helpers."""
 
-# Import judge checks from new location and re-export for backward compatibility
-from ..judges import (
-    AnswerRelevance,
-    BaseLLMCheck,
-    Conformity,
-    Groundedness,
-    LLMCheckResult,
-    LLMJudge,
-    Toxicity,
-)
-
 # Import comparison checks (staying in builtin)
 from .comparison import (
     Equals,
-    GreaterEquals,
     GreaterThan,
-    LesserThan,
-    LesserThanEquals,
+    GreaterThanEquals,
     LessThan,
     LessThanEquals,
     NotEquals,
@@ -47,16 +34,7 @@ __all__ = [
     "NotEquals",
     "LessThan",
     "LessThanEquals",
-    "LesserThan",
     "GreaterThan",
-    "LesserThanEquals",
-    "GreaterEquals",
-    "AnswerRelevance",
-    "Groundedness",
-    "Conformity",
-    "LLMJudge",
+    "GreaterThanEquals",
     "SemanticSimilarity",
-    "Toxicity",
-    "BaseLLMCheck",
-    "LLMCheckResult",
 ]

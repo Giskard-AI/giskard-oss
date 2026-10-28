@@ -34,7 +34,7 @@ class MockJudgeGenerator(BaseGenerator):
     """Mock generator that returns a pre-configured judge verdict (passed/reason)."""
 
     passed: bool
-    reason: str | None = None
+    reason: str
     calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
 
     @override
@@ -52,6 +52,33 @@ class MockJudgeGenerator(BaseGenerator):
                         content=json.dumps(
                             {"passed": self.passed, "reason": self.reason}
                         )
+                    ),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
+        )
+
+
+class InvalidReasonMockJudgeGenerator(BaseGenerator):
+    """Mock generator that returns JSON with an invalid (null/blank) reason."""
+
+    reason: str | None = None
+    calls: list[Sequence[ChatMessage]] = Field(default_factory=list)
+
+    @override
+    async def _call_model(
+        self,
+        messages: Sequence[ChatMessage],
+        params: GenerationParams,
+        metadata: dict[str, Any] | None = None,
+    ) -> CompletionResponse:
+        self.calls.append(messages)
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(
+                        content=json.dumps({"passed": True, "reason": self.reason})
                     ),
                     finish_reason="stop",
                     index=0,

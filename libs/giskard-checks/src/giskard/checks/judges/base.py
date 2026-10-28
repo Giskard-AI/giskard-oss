@@ -1,38 +1,52 @@
 from typing import Any, override
 
-from giskard.agents import ChatWorkflow, MessageTemplate, TemplateReference
+from giskard.agents import (
+    MessageTemplate,
+    TemplateReference,
+)
 from giskard.llm.types import ChatMessage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from ..core import Trace
+from .._judge_result import LLMCheckResult as LLMCheckResult
+from ..core import Interaction, Trace
 from ..core.check import Check
-from ..core.mixin import WithGeneratorMixin
+from ..core.judge import MissingJudgeEvidenceError, SOMJudge
+from ..core.mixin import WithJudgeMixin
 from ..core.result import CheckResult
 
 
-class LLMCheckResult(BaseModel):
-    """Default result model for LLM-based checks."""
+def format_prompt_text(value: Any) -> str:
+    """Render a resolved trace/input value as plain text for an LLM prompt.
 
-    reason: str | None = Field(
-        default=None, description="Optional explanation for the result"
-    )
-    passed: bool = Field(..., description="Whether the check passed or failed")
+    Judge inputs such as ``context`` accept ``str | list[str]``, and
+    JSONPath resolution can also return a list for ``answer`` (multi-match
+    paths, or a single match whose value is already a list). A bare
+    ``str(value)`` on a list renders Python's ``repr`` -- brackets, comma
+    separators, and quoted (sometimes escaped) items -- which leaks
+    implementation syntax into the prompt. Join list values into a single
+    newline-separated block instead. Any other value (a plain string,
+    ``NoMatch``, or arbitrary trace payload) is stringified as before.
+    """
+    if isinstance(value, list):
+        return "\n".join(str(item) for item in value)
+    return str(value)
 
 
 class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
-    Check[InputType, OutputType, TraceType], WithGeneratorMixin
+    Check[InputType, OutputType, TraceType], WithJudgeMixin
 ):
     """Abstract base class for LLM-based checks.
 
-    Provides a framework for creating checks that use Large Language Models
-    to evaluate interactions. Subclasses must implement the `get_prompt` method
-    to define how the LLM should be prompted.
+    Provides a framework for creating checks that use a :class:`BaseJudge`
+    backend (LLM chat or System One Model) to evaluate interactions.
+    Subclasses must implement the `get_prompt` method to define how the
+    evaluation prompt is built.
 
     Attributes
     ----------
-    generator : BaseGenerator
-        Generator for LLM evaluation. Defaults to the global
-        default generator if not specified.
+    judge : BaseJudge or None
+        Judge backend. Defaults to the global default judge when unset.
+        Legacy ``generator=`` kwargs are migrated to ``judge`` automatically.
     """
 
     @property
@@ -53,27 +67,6 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         """
         raise NotImplementedError
 
-    async def _build_workflow(self, trace: TraceType) -> ChatWorkflow[Any]:
-        """Build the workflow for LLM evaluation.
-
-        Parameters
-        ----------
-        trace : Trace
-            The trace to evaluate.
-
-        Returns
-        -------
-        ChatWorkflow[Any]
-            Configured workflow ready for execution.
-        """
-        _ = trace  # Not used in base implementation
-        prompt = self.get_prompt()
-
-        if isinstance(prompt, str):
-            prompt = MessageTemplate(role="user", content_template=prompt)
-
-        return ChatWorkflow(generator=self._generator, messages=[prompt])
-
     @override
     async def run(self, trace: TraceType) -> CheckResult:
         """Execute the LLM-based check.
@@ -90,17 +83,17 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         CheckResult
             The result of the check evaluation.
         """
-        workflow = await self._build_workflow(trace)
-
+        judge = self._judge
         inputs = await self.get_inputs(trace)
-        workflow = workflow.with_inputs(**inputs)
-
-        if self.output_type is not None:
-            workflow = workflow.with_output(self.output_type)
-
-        chat = await workflow.run()
-
-        return await self._handle_output(chat.output, inputs, trace)
+        if isinstance(judge, SOMJudge):
+            inputs["trace"] = self.get_som_trace(trace, inputs)
+        try:
+            output = await judge.judge(
+                self.get_prompt(), inputs, output_type=self.output_type
+            )
+        except MissingJudgeEvidenceError as error:
+            return CheckResult.error(message=str(error), details={"inputs": inputs})
+        return await self._handle_output(output, inputs, trace)
 
     async def get_inputs(self, trace: TraceType) -> dict[str, Any]:
         """Get template inputs for the LLM prompt.
@@ -118,6 +111,13 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
             to access properties like `trace.interactions` and `trace.last`.
         """
         return {"trace": trace}
+
+    def get_som_trace(
+        self, trace: TraceType, inputs: dict[str, Any]
+    ) -> Trace[Any, Any]:
+        """Return the conversation evidence to send to a SOM judge."""
+        candidate = inputs.get("trace", trace)
+        return candidate if isinstance(candidate, Trace) else trace
 
     async def _handle_output(
         self,
@@ -148,7 +148,7 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         if isinstance(output_value, LLMCheckResult):
             if output_value.passed:
                 return CheckResult.success(
-                    message=output_value.reason or "Check passed",
+                    message=output_value.reason,
                     details={
                         "reason": output_value.reason,
                         "inputs": template_inputs,
@@ -156,7 +156,7 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
                 )
             else:
                 return CheckResult.failure(
-                    message=output_value.reason or "Check failed",
+                    message=output_value.reason,
                     details={
                         "reason": output_value.reason,
                         "inputs": template_inputs,
@@ -166,3 +166,12 @@ class BaseLLMCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignore[
         raise NotImplementedError(
             f"Custom output type {type(output_value)} requires overriding _handle_output"
         )
+
+
+def trace_with_current_turn(
+    trace: Trace[Any, Any], *, inputs: Any, outputs: Any
+) -> Trace[Any, Any]:
+    """Use existing evidence or build a minimal current-turn trace."""
+    if trace.interactions:
+        return trace
+    return Trace(interactions=[Interaction(inputs=inputs, outputs=outputs)])

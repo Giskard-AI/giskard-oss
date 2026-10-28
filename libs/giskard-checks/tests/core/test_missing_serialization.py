@@ -34,7 +34,7 @@ def _assert_missing_json_roundtrip(model, field: str) -> None:
         pytest.param(Interact(inputs="hi"), "outputs", id="interact-outputs"),
         pytest.param(
             Equals(
-                key="trace.last.outputs",
+                target_key="trace.last.outputs",
                 expected_value_key="trace.last.metadata.expected",
             ),
             "expected_value",

@@ -66,7 +66,7 @@ class Tool(BaseModel):
         ValueError
             If the function lacks proper annotations or docstring.
         """
-        sig = inspect.signature(fn)
+        sig = inspect.signature(fn, eval_str=True)
         description, parameter_descriptions = parse_docstring(fn, sig)
 
         fields = {}

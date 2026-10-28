@@ -25,17 +25,17 @@ class Conformity[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
     ----------
     rule : str
         The rule statement to evaluate against the trace (literal text).
-
-    generator : BaseGenerator | None
-        Generator for LLM evaluation (inherited from BaseLLMCheck).
+    judge : BaseJudge or None
+        Judge backend (inherited from BaseLLMCheck). Legacy ``generator=`` is
+        migrated to ``judge`` automatically.
 
     Examples
     --------
     >>> from giskard.agents import Generator
-    >>> from giskard.checks import Conformity
+    >>> from giskard.checks import Conformity, LLMChatJudge
     >>> check = Conformity(
     ...     rule="The last response should be polite.",
-    ...     generator=Generator(model="openai/gpt-5-mini")
+    ...     judge=LLMChatJudge(generator=Generator(model="openai/gpt-5-mini"))
     ... )
     """
 

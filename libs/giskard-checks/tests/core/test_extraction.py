@@ -157,3 +157,42 @@ class TestJSONPathStrAnnotatedType:
 
         with pytest.raises(ValidationError, match="Invalid JSONPath expression"):
             Model(key="trace.last.outputs[")
+
+
+class TestResolveDescendants:
+    """Tests for resolve()'s handling of the descendants operator (``..``).
+
+    ``trace..ctx`` searches the whole trace, so the number of values it finds
+    depends on the data, not on the expression. It must always resolve to a
+    list -- otherwise ComparisonCheck's match=any/all/none rejects the value
+    with a type error whenever exactly one interaction happens to carry the
+    field.
+    """
+
+    @staticmethod
+    def _trace(*metadata: dict[str, str]) -> Trace[str, str]:
+        return Trace[str, str](
+            interactions=[
+                Interaction(inputs=f"q{i}", outputs=f"a{i}", metadata=m)
+                for i, m in enumerate(metadata)
+            ]
+        )
+
+    def test_descendants_with_single_match_returns_a_list_not_a_bare_scalar(self):
+        trace = self._trace({"ctx": "doc-1"}, {})
+        assert resolve(trace, "trace..ctx") == ["doc-1"]
+
+    def test_descendants_with_multiple_matches_returns_a_list(self):
+        trace = self._trace({"ctx": "doc-1"}, {"ctx": "doc-2"}, {})
+        result = resolve(trace, "trace..ctx")
+        assert isinstance(result, list)
+        assert sorted(result) == ["doc-1", "doc-2"]
+
+    def test_descendants_with_no_match_returns_an_empty_list(self):
+        """Consistent with `*`, which already returns [] rather than NoMatch."""
+        trace = self._trace({})
+        assert resolve(trace, "trace..missing") == []
+
+    def test_child_expression_without_wildcard_still_returns_a_bare_scalar(self):
+        trace = self._trace({})
+        assert resolve(trace, "trace.last.outputs") == "a0"

@@ -143,7 +143,7 @@ class KnowledgeBase(WithEmbeddingMixin):
             raise ValueError("Query embedding must be a 1D vector")
         if not np.all(np.isfinite(query_vector)):
             raise ValueError("Query embedding must not contain non-finite values")
-        query_norm = np.linalg.norm(query_vector)
+        query_norm = float(np.linalg.norm(query_vector))
         if query_norm == 0:
             raise ValueError("Query embedding must not be a zero vector")
 

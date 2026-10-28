@@ -8,6 +8,7 @@ from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
 from pydantic import BaseModel, Field
 from pydantic.experimental.missing_sentinel import MISSING
 from rich.console import RenderableType
+from rich.markup import escape
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -80,7 +81,7 @@ class _SuiteProgress(Progress):
     @contextmanager
     def scenario_row(self, name: str) -> Iterator[None]:
         """Show a row for one scenario while it runs, then remove it."""
-        task_id = self.add_task(f"  ↳ {name}", total=None)
+        task_id = self.add_task(f"  ↳ {escape(name)}", total=None)
         try:
             yield
         finally:
@@ -126,7 +127,11 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     suite.append(scenario1).append(scenario2)
 
     result = await suite.run()
-    print(result.pass_rate)
+    # pass_rate is None when nothing was evaluated (empty or fully skipped suite)
+    if result.pass_rate is None:
+        print("No scenarios evaluated")
+    else:
+        print(result.pass_rate)
     ```
     """
 
@@ -176,11 +181,18 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         return_exception : bool
             If True, return results even when exceptions occur instead of raising.
         parallel : bool
-            If True, run all scenarios concurrently while preserving result order.
+            If True, run scenarios concurrently against the target while
+            preserving result order. Defaults to ``False`` (serial execution).
+            This controls *suite execution*, not scenario generation
+            (``generate_suite`` always runs generators concurrently).
+            Scan helpers such as ``quality_scan`` / ``vulnerability_scan``
+            pass ``parallel=True`` by default.
         max_concurrency : int | None
             Max concurrent scenarios when ``parallel=True`` (positive int).
             ``None`` (default) is unbounded: all scenarios start at once, so the
-            provider's rate limits become the effective cap.
+            provider's rate limits become the effective cap. When
+            ``parallel=False``, a valid value has no effect on scheduling, but
+            invalid values are still rejected.
         verbose : bool
             If True (default), display a progress bar showing which scenario is
             currently running. Set to False for non-interactive environments.
@@ -278,7 +290,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
         results: list[ScenarioResult[Trace[Any, Any]]] = []
         for scenario in self.scenarios:
-            progress.describe(f"Running: {scenario.name}")
+            progress.describe(f"Running: {escape(scenario.name)}")
             result = await scenario.run(
                 target=target, return_exception=return_exception
             )

@@ -1,3 +1,14 @@
+"""Result models for checks, test cases, scenarios and suites.
+
+``CheckStatus`` has four states: ``PASS``, ``FAIL``, ``ERROR`` and ``SKIP``.
+ERROR and SKIP mean *no verdict was reached*: branch on ``status`` (or the
+explicit ``failed`` / ``errored`` / ``skipped`` properties) rather than on
+``not passed``, keep the four states distinct in exports, and exclude SKIP
+from pass-rate denominators. Rollups still use priority (ERROR > FAIL >
+all-SKIP > PASS), so a mix of PASS and SKIP remains PASS — only an all-SKIP
+collection becomes SKIP.
+"""
+
 from collections import defaultdict
 from collections.abc import Mapping
 from enum import Enum
@@ -10,6 +21,7 @@ if TYPE_CHECKING:
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.markdown import Markdown
+from rich.markup import escape
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
@@ -52,6 +64,9 @@ STATUS_SUMMARY_ORDER: tuple[tuple[str, str], ...] = (
     ("skip", "skipped"),
     ("pass", "passed"),
 )
+
+
+STATUS_PAST_TENSE: Mapping[str, str] = dict(STATUS_SUMMARY_ORDER)
 
 
 def format_status_count_parts(counts: Mapping[str, int]) -> list[str]:
@@ -155,6 +170,7 @@ class CheckResult(BaseResult, frozen=True):
         *,
         message: str | None = None,
         details: dict[str, Any] | None = None,
+        metrics: list[Metric] | None = None,
     ) -> "CheckResult":
         """Construct a successful result.
 
@@ -165,6 +181,7 @@ class CheckResult(BaseResult, frozen=True):
             status=CheckStatus.PASS,
             message=message,
             details={} if details is None else details,
+            metrics=metrics or [],
         )
 
     @classmethod
@@ -173,12 +190,14 @@ class CheckResult(BaseResult, frozen=True):
         *,
         message: str | None = None,
         details: dict[str, Any] | None = None,
+        metrics: list[Metric] | None = None,
     ) -> "CheckResult":
         """Construct a failure result."""
         return cls(
             status=CheckStatus.FAIL,
             message=message,
             details={} if details is None else details,
+            metrics=metrics or [],
         )
 
     @classmethod
@@ -234,12 +253,17 @@ class CheckResult(BaseResult, frozen=True):
     ) -> RenderResult:
         status = STATUS_MAPPING[self.status]
 
-        name = self.details.get("check_name", "[dim italic]Unnamed check[/dim italic]")
+        name = (
+            escape(str(self.details["check_name"]))
+            if "check_name" in self.details
+            else "[dim italic]Unnamed check[/dim italic]"
+        )
 
         if self.status == CheckStatus.FAIL or self.status == CheckStatus.ERROR:
             details = (
-                self.message
-                or "[dim italic]No specific error message provided[/dim italic]"
+                escape(self.message)
+                if self.message
+                else "[dim italic]No specific error message provided[/dim italic]"
             )
         else:
             details = ""
@@ -398,7 +422,7 @@ class TestCaseError(BaseModel, frozen=True):
         return (
             f"[{color} bold]Test case[/{color} bold]\t"
             f"[{color}]ERROR[/{color}]\t"
-            f"{self.summary()}"
+            f"{escape(self.summary())}"
         )
 
 
@@ -492,25 +516,31 @@ class TestCaseResult(BaseResult, frozen=True):
         return [result for result in self.results if result.failed or result.errored]
 
     def format_failures(self) -> list[str]:
-        """Format failed check results into a list of readable error messages.
+        """Format non-passing check results into readable messages (FAIL, ERROR, and SKIP).
 
         Returns
         -------
         list[str]
-            List of formatted error messages for failed checks. Each message includes
-            the check name/kind and the failure reason.
+            List of formatted messages for every check that did not reach a PASS
+            verdict, including skipped checks. Each message includes the check
+            name/kind, its status and the reason. This is the diagnostic
+            superset used by ``assert_passed``; ``failures_and_errors``
+            intentionally excludes SKIP.
         """
         failure_messages: list[str] = []
         if self.error is not None:
             failure_messages.append(f"Test case ERRORED: {self.error.summary()}")
         for result in self.results:
-            if result.failed or result.errored:
-                check_name: str = result.details.get(
-                    "check_name"
-                ) or result.details.get("check_kind", "Unknown check")
-                status = "ERRORED" if result.errored else "FAILED"
-                message = result.message or "No specific error message provided"
-                failure_messages.append(f"{check_name} {status}: {message}")
+            # SKIP is reported too: a skipped check reached no verdict, so
+            # omitting it would render a non-passing test case as unexplained.
+            if result.passed:
+                continue
+            check_name: str = result.details.get("check_name") or result.details.get(
+                "check_kind", "Unknown check"
+            )
+            status = STATUS_PAST_TENSE[result.status.value].upper()
+            message = result.message or "No specific error message provided"
+            failure_messages.append(f"{check_name} {status}: {message}")
         return failure_messages
 
     def assert_passed(self) -> None:
@@ -583,8 +613,9 @@ class SuiteResult(BaseResult, frozen=True):
         Number of scenarios that errored.
     skipped_count : int
         Number of scenarios that were skipped.
-    pass_rate : float
-        Fraction of non-skipped scenarios that passed (1.0 when all scenarios are skipped).
+    pass_rate : float | None
+        Fraction of non-skipped scenarios that passed; None when there are no
+        non-skipped scenarios.
     """
 
     results: list[ScenarioResult[Any]] = Field(
@@ -625,11 +656,14 @@ class SuiteResult(BaseResult, frozen=True):
 
     @computed_field
     @property
-    def pass_rate(self) -> float:
-        """The pass rate of the suite (passed scenarios / (total scenarios - skipped scenarios))."""
+    def pass_rate(self) -> float | None:
+        """The pass rate of the suite (passed scenarios / (total scenarios - skipped scenarios)).
+
+        None when no scenario was evaluated (empty suite or all scenarios skipped).
+        """
         denominator = len(self.results) - self.skipped_count
         if denominator == 0:
-            return 1.0
+            return None
         return self.passed_count / denominator
 
     @property
@@ -742,7 +776,7 @@ def _suite_report_renderables(
         for f in reported_failures:
             yield Panel(
                 f,
-                title=f.scenario_name,
+                title=escape(f.scenario_name),
                 border_style=f"{STATUS_MAPPING[f.status]['color']} bold",
             )
         if n_hidden > 0:
@@ -752,7 +786,7 @@ def _suite_report_renderables(
         yield Rule("SUMMARY", characters="=", style="grey")
         for f in reported_failures:
             status = STATUS_MAPPING[f.status]
-            yield f"[{status['color']} bold]{f.scenario_name}[/{status['color']} bold]\t[{status['color']}]{f.status.value.upper()}[/{status['color']}]"
+            yield f"[{status['color']} bold]{escape(f.scenario_name)}[/{status['color']} bold]\t[{status['color']}]{f.status.value.upper()}[/{status['color']}]"
             for tc in f.failures_and_errors:
                 for c in tc.failures_and_errors:
                     yield from (
@@ -778,7 +812,8 @@ def _suite_report_renderables(
         )
     )
     summary = ", ".join(count_parts)
-    yield f"Summary: {summary} | Pass Rate: [default bold]{result.pass_rate:.1%}[/default bold] | Total Duration: {result.duration_ms}ms"
+    pass_rate = f"{result.pass_rate:.1%}" if result.pass_rate is not None else "—"
+    yield f"Summary: {summary} | Pass Rate: [default bold]{pass_rate}[/default bold] | Total Duration: {result.duration_ms}ms"
 
 
 def _parse_tag(tag: str) -> tuple[str, str]:
@@ -839,8 +874,9 @@ class GroupedSuiteResult(BaseResult, frozen=True):
     ) -> RenderResult:
         yield from _suite_report_renderables(self.suite_result, console, options)
 
-        table = Table(title=f"Results by {self.key}")
-        table.add_column(self.key, style="bold")
+        key = escape(self.key)
+        table = Table(title=f"Results by {key}")
+        table.add_column(key, style="bold")
         table.add_column("Pass Rate", justify="right")
 
         for group_value, stats in self.groups.items():
@@ -849,7 +885,7 @@ class GroupedSuiteResult(BaseResult, frozen=True):
             elif group_value == "":
                 display_name = "true"
             else:
-                display_name = group_value
+                display_name = escape(group_value)
             rate = (
                 f"{stats.passed} / {stats.non_skipped}"
                 if stats.pass_rate is not None

@@ -21,7 +21,7 @@ pip install giskard-core
 
 ### What we collect
 
-Installed versions of `giskard-core`, `giskard-checks`, and `giskard-agents` (each the package version or `not_installed`), a coarse **environment** label (`ci`, `colab`, `kaggle`, or `local`), and when you run **giskard-checks** flows, aggregated non-content metrics such as step counts, counts of checks by `kind`, booleans (e.g. custom trace type or target present), durations, and pass/fail/skip-style outcomes. **Scenario names, prompts, model outputs, trace content, and exception messages are not sent.**
+Installed versions of Giskard libraries (each the package version or `not_installed`), a coarse **environment** label (`ci`, `colab`, `kaggle`, or `local`), and aggregated non-content metrics for Checks runs, Scan runs, and Hub-format exports. These metrics include counts, counts of checks by `kind` (including custom kind identifiers you register), fixed feature modes, booleans, durations, and pass/fail/error/skip-style outcomes. **Descriptions, language values, scenario names, prompts, model outputs, recommendations, trace content, file paths, and exception messages are not sent.**
 
 If an error propagates through the telemetry context, a single event may record **`exception_type`** (the Python class name only), not the exception string or traceback.
 
@@ -31,10 +31,12 @@ A random **persistent ID** may be stored under `~/.giskard/id` so repeated sessi
 
 ### How to disable telemetry
 
-Set any of these environment variables to a truthy value **before** importing `giskard` packages (values are matched case-insensitively; common examples: `1`, `true`, `yes`, `on`):
+Set any of these environment variables to a truthy value (matched case-insensitively; wrapping quotes are ignored; common examples: `1`, `true`, `yes`, `on`):
 
 - `DO_NOT_TRACK`
 - `GISKARD_TELEMETRY_DISABLED`
+
+Flags are read from the **process environment** and from a **`.env` file in the working directory** (process env wins). Set them **before importing** Giskard packages to skip creating `~/.giskard/id` and to never start the analytics sender. If you set them later, further events are dropped and the sender is stopped so **no requests are made** to PostHog (including in environments that block `eu.i.posthog.com`).
 
 You can also call `disable_telemetry()` from `giskard.core` at runtime to turn off further sends for that process (for example from test harnesses). That does not remove `~/.giskard/id` if it was already created; use env-based opt-out before import to avoid writing the file.
 
@@ -48,7 +50,7 @@ disable_telemetry()
 
 When telemetry is **enabled**, PostHog may apply **GeoIP** enrichment to events (server-side location metadata used in dashboards). That enrichment is **off** whenever telemetry is fully disabled (see above) or when you call `disable_telemetry()`.
 
-To **keep usage analytics** but **disable GeoIP only**, set this environment variable to a truthy value **before** importing Giskard packages (same matching rules as in [How to disable telemetry](#how-to-disable-telemetry)):
+To **keep usage analytics** but **disable GeoIP only**, set this environment variable to a truthy value (same matching rules and `.env` behavior as in [How to disable telemetry](#how-to-disable-telemetry)):
 
 - `GISKARD_TELEMETRY_DISABLE_GEOIP`
 

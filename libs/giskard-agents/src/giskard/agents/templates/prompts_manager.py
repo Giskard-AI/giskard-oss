@@ -4,7 +4,6 @@ from typing import Any, Dict
 from giskard.llm.types import ChatMessage, UserMessage
 from jinja2 import Template
 from pydantic import BaseModel, Field
-from typing_extensions import deprecated
 
 from .environment import create_message_environment
 
@@ -69,10 +68,6 @@ class PromptsManager(BaseModel):
             raise ValueError(f"Namespace {namespace} does not exist")
         del self.namespaces[namespace]
 
-    @deprecated("Use set_default_prompts_path instead")
-    def set_prompts_path(self, path: str | Path):
-        self.set_default_prompts_path(path)
-
     async def render_template(
         self, template_name: str, variables: dict[str, Any] | None = None
     ) -> list[ChatMessage]:
@@ -114,12 +109,6 @@ _prompts_manager = PromptsManager()
 def get_prompts_manager() -> PromptsManager:
     """Get the global prompts manager."""
     return _prompts_manager
-
-
-@deprecated("Use set_default_prompts_path instead")
-def set_prompts_path(path: str):
-    """Set a custom prompts path."""
-    _prompts_manager.set_default_prompts_path(path)
 
 
 def set_default_prompts_path(path: str):

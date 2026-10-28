@@ -1,11 +1,11 @@
 import sys
-from collections import defaultdict
 from typing import Any, Callable, Generic, TypeVar
 
 from pydantic import (
     BaseModel,
     GetCoreSchemaHandler,
     computed_field,
+    model_validator,
 )
 from pydantic_core import core_schema
 
@@ -18,7 +18,6 @@ class _Registry(Generic[T]):
     def __init__(self):
         self._subclasses: dict[type, dict[str, type]] = {}
         self._kinds: dict[type[T], str] = {}
-        self._reverse_kinds: dict[type[T], dict[str, type[T]]] = defaultdict(dict)
 
     def register_base(self, base_cls: type[T]):
         if not issubclass(base_cls, Discriminated):
@@ -56,13 +55,37 @@ class _Registry(Generic[T]):
 
         self._subclasses[actual_base_cls][kind] = subclass
         self._kinds[subclass] = kind
-        self._reverse_kinds[actual_base_cls][kind] = subclass
 
 
 _REGISTRY = _Registry()
 
 
 class Discriminated(BaseModel):
+    """Base for polymorphic models keyed by a ``kind`` discriminator.
+
+    Subclasses are registered with ``@Base.register("kind")`` and are then
+    selected by that string during validation, so a dumped model round-trips
+    back to its concrete type.
+
+    Notes
+    -----
+    Several discriminated bases in this codebase set
+    ``model_config = ConfigDict(extra="forbid")``. This is the canonical
+    explanation of that choice; the individual bases point here rather than
+    repeating it.
+
+    Without ``extra="forbid"`` pydantic silently drops unrecognized keys. A
+    persisted model referencing a renamed or misspelled field would then fall
+    back to that field's default and run "successfully" against the wrong
+    configuration -- a silent wrong answer rather than a loud error. Each base
+    documents in its own ``Notes`` which of its fields makes this concrete.
+
+    ``extra="forbid"`` is inherited by every subclass, including those that
+    declare their own ``model_config``, because pydantic merges config dicts
+    along the MRO. A subclass must therefore not set ``extra`` itself -- doing
+    so silently reopens the hole for that whole branch of the hierarchy.
+    """
+
     @computed_field
     def kind(self) -> str | None:
         """The discriminator field identifying the concrete type.
@@ -73,11 +96,77 @@ class Discriminated(BaseModel):
             The kind string registered for this class, or None if unregistered.
         """
         cls = self.__class__
+        # A parametrized generic such as ``Equals[str, str, Trace, str]`` is a
+        # distinct class created by pydantic; the kind is registered on its
+        # unparametrized origin.
+        origin = cls.__pydantic_generic_metadata__["origin"] or cls
 
-        # Check if the class is directly registered
-        if cls in _REGISTRY._kinds:
-            return _REGISTRY._kinds[cls]
+        return _REGISTRY._kinds.get(origin)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_discriminator(cls, data: Any) -> Any:
+        """Tolerate the ``kind`` discriminator on input.
+
+        ``kind`` is a ``computed_field``, so ``model_dump()`` emits it even
+        though it is not a model field. A model configured with
+        ``extra="forbid"`` would otherwise reject it, breaking every
+        ``model_dump() -> model_validate()`` round trip -- including the one
+        the registry itself performs in ``__get_pydantic_core_schema__``.
+
+        This runs on the concrete subclass, so it also covers a direct
+        ``SomeSubclass.model_validate(dumped)`` call, which never goes through
+        ``validate_discriminated``. Dropping (rather than validating) the value
+        is safe: the registry has already used ``kind`` to select the class by
+        the time this runs, and ``kind`` is derived from the concrete class, so
+        the incoming value is redundant.
+        """
+        if isinstance(data, dict) and "kind" in data:
+            return {k: v for k, v in data.items() if k != "kind"}  # pyright: ignore[reportUnknownVariableType]
+        return data
+
+    @classmethod
+    def kinds(cls) -> frozenset[str]:
+        """Return the kind strings registered for this discriminated family.
+
+        Resolves to the ``@discriminated_base`` ancestor so calling
+        ``kinds()`` on an intermediate or concrete subclass returns the same
+        set as on the base.
+
+        Returns
+        -------
+        frozenset[str]
+            Registered discriminator values. Empty if ``cls`` is not part of
+            a discriminated registry.
+        """
+        base_cls = _REGISTRY._get_base_cls(cls)
+        if base_cls is None:
+            return frozenset()
+        return frozenset(_REGISTRY._subclasses.get(base_cls, {}))
+
+    @classmethod
+    def _resolve_unregistered_kind(cls, kind: str, value: dict[str, Any]) -> Any:
+        """Resolve a payload whose ``kind`` is not registered for this family.
+
+        Called on the ``@discriminated_base`` class when validation meets an
+        unknown kind. Returning ``None`` (the default) raises the usual
+        "not registered" error; a base may override this to substitute a
+        placeholder instead. It only runs on a registry miss, so a kind that
+        is registered always resolves to its real class.
+
+        Parameters
+        ----------
+        kind : str
+            The unregistered discriminator value.
+        value : dict[str, Any]
+            The raw payload being validated, ``kind`` included.
+
+        Returns
+        -------
+        Any
+            A validated instance to use in place of the payload, or ``None``
+            to raise.
+        """
         return None
 
     @classmethod
@@ -114,10 +203,14 @@ class Discriminated(BaseModel):
             if not isinstance(kind, str):
                 raise ValueError(f"Kind is expected to be a string, got {type(kind)}")
 
-            if kind not in _REGISTRY._reverse_kinds[origin]:
+            registered = _REGISTRY._subclasses.get(origin)
+            if registered is None or kind not in registered:
+                fallback = origin._resolve_unregistered_kind(kind, value)
+                if fallback is not None:
+                    return fallback
                 raise ValueError(f"Kind {kind} is not registered for class {origin}")
 
-            return _REGISTRY._reverse_kinds[origin][kind].model_validate(value)
+            return registered[kind].model_validate(value)
 
         return core_schema.no_info_plain_validator_function(validate_discriminated)
 

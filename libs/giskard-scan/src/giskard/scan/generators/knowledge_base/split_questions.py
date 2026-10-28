@@ -6,7 +6,7 @@ import numpy as np
 from giskard.checks import Scenario, Trace
 from pydantic import Field
 
-from ..base import ScenarioContext, TargetMode
+from ..base import DEFAULT_TARGET_MODE, ScenarioContext, TargetMode
 from .base import KnowledgeBaseScenarioGenerator
 
 SPLIT_QUESTIONS_QUALITY_TAGS = ["quality:split-questions", "component:history"]
@@ -33,7 +33,7 @@ class SplitQuestionsScenarioGenerator(KnowledgeBaseScenarioGenerator):
         context: ScenarioContext,
         max_scenarios: int | None = None,
         rng: np.random.Generator | None = None,
-        target_mode: TargetMode = "multiturn",
+        target_mode: TargetMode = DEFAULT_TARGET_MODE,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         if self._skip_for_singleturn(target_mode):
             return []
