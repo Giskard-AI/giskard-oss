@@ -45,8 +45,15 @@ def call_sync[**P, T](
     except RuntimeError:
         return asyncio.run(fn(*args, **kwargs))
 
-    owner = fn.__qualname__.rpartition(".")[0] or fn.__qualname__
-    instance = re.sub(r"(?<!^)(?=[A-Z])", "_", owner).lower()
+    bound_to = getattr(fn, "__self__", None)
+    if bound_to is not None:
+        owner = type(bound_to).__name__
+    else:
+        owner = getattr(fn, "__qualname__", type(fn).__name__)
+    # CamelCase -> snake_case, keeping acronyms together (LLMScenario -> llm_scenario)
+    instance = re.sub(
+        r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", "_", owner
+    ).lower()
     raise RuntimeError(
         f"{owner}.run_sync() cannot be called while an asyncio event loop is "
         "running (for example in a Jupyter notebook, an async test, or an "
