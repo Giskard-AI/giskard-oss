@@ -22,7 +22,7 @@ dependencies = [
 openai = ["giskard-llm[openai]>=1.0.3,<2"]
 google = ["giskard-llm[google]>=1.0.3,<2"]
 anthropic = ["giskard-llm[anthropic]>=1.0.3,<2"]
-litellm = ["litellm>=1.83.0,!=1.107.0,<2"]
+litellm = ["litellm>=1.95.0,!=1.107.0,<2"]
 all = ["giskard-llm[all]>=1.0.3,<2"]
 
 [build-system]
