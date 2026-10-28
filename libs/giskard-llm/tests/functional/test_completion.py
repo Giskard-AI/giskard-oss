@@ -13,7 +13,11 @@ from giskard.llm.errors import BadRequestError
 from giskard.llm.types import ToolDefParam
 from pydantic import BaseModel, Field, field_validator
 
-from .helpers import azure_foundry_v1_base_url
+from .helpers import (
+    ANTHROPIC_PROVIDER_PARAMS,
+    anthropic_configure_params,
+    azure_foundry_v1_base_url,
+)
 
 pytestmark = pytest.mark.functional
 
@@ -32,6 +36,9 @@ _MODELS = {
     "azure_foundry_v1": os.getenv(
         "TEST_AZURE_FOUNDRY_V1_MODEL", "azure_foundry_v1/gpt-4.1-nano"
     ),
+    "azure_anthropic": os.getenv(
+        "TEST_AZURE_ANTHROPIC_MODEL", "azure_anthropic/claude-haiku-5-5"
+    ),
 }
 
 # `bare` intentionally has no entry: it exercises the no-prefix path where
@@ -40,7 +47,7 @@ _CONFIGURE_PARAMS = {  # pragma: allowlist secret
     "openai": {"provider": "openai", "api_key": "os.environ/OPENAI_API_KEY"},
     "google": {"provider": "google", "api_key": "os.environ/GOOGLE_API_KEY"},
     "gemini": {"provider": "gemini", "api_key": "os.environ/GOOGLE_API_KEY"},
-    "anthropic": {"provider": "anthropic", "api_key": "os.environ/ANTHROPIC_API_KEY"},
+    "anthropic": anthropic_configure_params("anthropic"),
     "azure": {
         "provider": "azure",
         "api_key": "os.environ/AZURE_API_KEY",
@@ -57,6 +64,7 @@ _CONFIGURE_PARAMS = {  # pragma: allowlist secret
         "api_key": "os.environ/AZURE_AI_API_KEY",  # pragma: allowlist secret
         "base_url": azure_foundry_v1_base_url(),
     },
+    "azure_anthropic": anthropic_configure_params("azure_anthropic"),
 }
 
 _PROVIDER_MARKS = {
@@ -68,6 +76,7 @@ _PROVIDER_MARKS = {
     "azure": pytest.mark.azure,
     "azure_ai": pytest.mark.azure_ai,
     "azure_foundry_v1": pytest.mark.azure_foundry_v1,
+    "azure_anthropic": pytest.mark.azure_anthropic,
 }
 
 _PROVIDER_PARAMS = [
@@ -380,10 +389,10 @@ async def test_response_format(provider: str):
     assert isinstance(validated.hex, str)
 
 
-@pytest.mark.anthropic
-async def test_anthropic_nested_response_format():
+@pytest.mark.parametrize("provider", ANTHROPIC_PROVIDER_PARAMS)
+async def test_anthropic_nested_response_format(provider: str):
     """Anthropic accepts and returns a nested Pydantic response schema (#2859)."""
-    client, model = _make_client("anthropic")
+    client, model = _make_client(provider)
     resp = await client.acompletion(
         model,
         [{"role": "user", "content": "Return inner.value as the string ok."}],
@@ -437,6 +446,7 @@ async def test_configure_explicit(provider: str):
 # -- Provider-specific parameter scenarios ------------------------------------
 
 
+# Anthropic.com only: Foundry's claude-haiku-5-5 rejects `temperature` as deprecated.
 @pytest.mark.anthropic
 async def test_anthropic_temperature_accepted():
     """SDK v1 forwards temperature via extra_body; the live API must accept it."""
