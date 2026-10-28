@@ -96,12 +96,12 @@ class Discriminated(BaseModel):
             The kind string registered for this class, or None if unregistered.
         """
         cls = self.__class__
+        # A parametrized generic such as ``Equals[str, str, Trace, str]`` is a
+        # distinct class created by pydantic; the kind is registered on its
+        # unparametrized origin.
+        origin = cls.__pydantic_generic_metadata__["origin"] or cls
 
-        # Check if the class is directly registered
-        if cls in _REGISTRY._kinds:
-            return _REGISTRY._kinds[cls]
-
-        return None
+        return _REGISTRY._kinds.get(origin)
 
     @model_validator(mode="before")
     @classmethod
@@ -124,6 +124,50 @@ class Discriminated(BaseModel):
         if isinstance(data, dict) and "kind" in data:
             return {k: v for k, v in data.items() if k != "kind"}  # pyright: ignore[reportUnknownVariableType]
         return data
+
+    @classmethod
+    def kinds(cls) -> frozenset[str]:
+        """Return the kind strings registered for this discriminated family.
+
+        Resolves to the ``@discriminated_base`` ancestor so calling
+        ``kinds()`` on an intermediate or concrete subclass returns the same
+        set as on the base.
+
+        Returns
+        -------
+        frozenset[str]
+            Registered discriminator values. Empty if ``cls`` is not part of
+            a discriminated registry.
+        """
+        base_cls = _REGISTRY._get_base_cls(cls)
+        if base_cls is None:
+            return frozenset()
+        return frozenset(_REGISTRY._subclasses.get(base_cls, {}))
+
+    @classmethod
+    def _resolve_unregistered_kind(cls, kind: str, value: dict[str, Any]) -> Any:
+        """Resolve a payload whose ``kind`` is not registered for this family.
+
+        Called on the ``@discriminated_base`` class when validation meets an
+        unknown kind. Returning ``None`` (the default) raises the usual
+        "not registered" error; a base may override this to substitute a
+        placeholder instead. It only runs on a registry miss, so a kind that
+        is registered always resolves to its real class.
+
+        Parameters
+        ----------
+        kind : str
+            The unregistered discriminator value.
+        value : dict[str, Any]
+            The raw payload being validated, ``kind`` included.
+
+        Returns
+        -------
+        Any
+            A validated instance to use in place of the payload, or ``None``
+            to raise.
+        """
+        return None
 
     @classmethod
     def register(cls, kind: str) -> Callable[[type[T]], type[T]]:
@@ -161,6 +205,9 @@ class Discriminated(BaseModel):
 
             registered = _REGISTRY._subclasses.get(origin)
             if registered is None or kind not in registered:
+                fallback = origin._resolve_unregistered_kind(kind, value)
+                if fallback is not None:
+                    return fallback
                 raise ValueError(f"Kind {kind} is not registered for class {origin}")
 
             return registered[kind].model_validate(value)

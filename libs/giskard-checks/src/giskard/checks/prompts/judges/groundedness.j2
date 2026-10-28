@@ -46,6 +46,10 @@ Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT 
 
 Remember, even small factual details that are not present in the reference context should be considered as incorrect. Synonyms and paraphrases are fine. Explicit refusals, limitations, or scope statements do not need to appear in the reference context.
 Omissions are tolerated, even if missing key information. Never mention omissions in the reason, missing information, paraphrasing or synonyms in the reason field, it is not a reason for failure.
+{% if _instr_output is defined %}
+
+-------------------
 
 **Output Format:**
 {{ _instr_output }}
+{% endif %}

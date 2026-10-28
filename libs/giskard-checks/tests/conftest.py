@@ -34,11 +34,15 @@ def isolate_giskard_env(
 
 
 @pytest.fixture(autouse=True)
-def reset_default_generator():
-    """Restore the global default generator after each test."""
-    original = settings_module._default_generator
+def reset_runtime_defaults():
+    """Restore runtime defaults after each test."""
+    original_generator = settings_module._default_generator
+    original_judge = settings_module._default_judge
+    original_embedding = settings_module._default_embedding_model
     yield
-    settings_module._default_generator = original
+    settings_module._default_generator = original_generator
+    settings_module._default_judge = original_judge
+    settings_module._default_embedding_model = original_embedding
 
 
 def pytest_configure(config: pytest.Config) -> None:
