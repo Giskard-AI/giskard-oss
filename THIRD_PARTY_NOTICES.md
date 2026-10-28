@@ -452,14 +452,14 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### litellm-1.89.7
+### litellm-1.103.6
 
 - HomePage:
 - Author: BerriAI
 - License: MIT
 - Compatible: True
 
-### logfire-api-5.3.0
+### logfire-api-5.2.0
 
 - HomePage:
 - Author: Pydantic Team
