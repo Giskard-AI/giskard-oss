@@ -109,6 +109,16 @@ class TextBasedCheck[InputType, OutputType, TraceType: Trace](  # pyright: ignor
                 ),
             )
 
+        if not matcher.strip():
+            return (
+                None,
+                None,
+                CheckResult.error(
+                    message=f"Value for {matcher_name} is empty or blank, expected a non-empty {matcher_name}.",
+                    details=details,
+                ),
+            )
+
         # Validate text
         if isinstance(text, NoMatch):
             return (

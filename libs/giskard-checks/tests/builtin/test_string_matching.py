@@ -329,11 +329,42 @@ async def test_empty_text() -> None:
 
 
 async def test_empty_keyword() -> None:
-    """Test behavior with empty keyword."""
+    """Test behavior with an empty keyword.
+
+    An empty keyword would trivially match any text, which is almost never
+    the intent, so it must be rejected as an error rather than silently
+    passing.
+    """
     check = StringMatching(text="Hello", keyword="")
     result = await check.run(Trace())
-    # Empty string should be found in any text
-    assert result.status == CheckStatus.PASS
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "empty or blank" in result.message.lower()
+
+
+async def test_whitespace_only_keyword() -> None:
+    """Test that a whitespace-only keyword is rejected as an error."""
+    check = StringMatching(text="Hello", keyword="   ")
+    result = await check.run(Trace())
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "empty or blank" in result.message.lower()
+
+
+async def test_blank_keyword_from_trace() -> None:
+    """Test that a blank keyword resolved via keyword_key is also rejected."""
+    check = StringMatching(
+        text="Hello World",
+        keyword_key="trace.last.inputs.expected",
+    )
+    interaction = Interaction(
+        inputs={"expected": "   "},
+        outputs={"response": "Hello World"},
+    )
+    result = await check.run(Trace(interactions=[interaction]))
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "empty or blank" in result.message.lower()
 
 
 async def test_unicode_e_acute_nfc_nfd_matching() -> None:
