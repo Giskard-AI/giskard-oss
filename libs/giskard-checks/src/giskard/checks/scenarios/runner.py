@@ -5,6 +5,7 @@ pattern, where components yield Interactions or CheckResults and receive
 updated Trace objects via the async generator protocol.
 """
 
+import inspect
 import time
 import traceback
 from typing import Any, cast
@@ -18,7 +19,6 @@ from pydantic.experimental.missing_sentinel import MISSING
 
 from .._telemetry_props import scenario_shape_properties
 from ..core import InteractionGenerationError, Trace
-from ..core.interaction import Interact
 from ..core.result import CheckResult, ScenarioResult, TestCaseError, TestCaseResult
 from ..core.scenario import Scenario, Step
 from ..core.testcase import TestCase
@@ -40,11 +40,14 @@ def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
     target: Target[InputType, OutputType, TraceType] | MISSING,
 ) -> list[Step[InputType, OutputType, TraceType]]:
-    """Build steps with target bound to Interact outputs where needed.
+    """Build steps with the run/scenario target bound to each interaction spec.
 
     If no target is provided, returns the scenario's steps as-is. Otherwise,
-    returns new Step objects with interacts that have MISSING outputs
-    replaced by the given target.
+    returns new Step objects whose interacts have been passed through
+    ``InteractionSpec.bind_target(target)``. The default ``bind_target`` is a
+    no-op for specs that resolve their own outputs; ``Interact`` overrides it
+    to fill in ``MISSING`` outputs with the target. Custom specs can override
+    ``bind_target`` to receive the same hook.
     """
     target = target if target is not MISSING else scenario.target
 
@@ -55,8 +58,7 @@ def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
     for step in scenario.steps:
         interacts = []
         for interact in step.interacts:
-            if isinstance(interact, Interact) and interact.outputs is MISSING:
-                interact = interact.model_copy().set_outputs(target)
+            interact = interact.bind_target(target)
             interacts.append(interact)
 
         steps.append(step.model_copy(update={"interacts": interacts}))
@@ -178,70 +180,81 @@ class ScenarioRunner:
             properties=shape_props,
         )
 
-        for step in steps:
-            try:
-                for interaction in step.interacts:
-                    trace = await trace.with_interaction(interaction)
-            except Exception as caught:
-                error = caught
-                if isinstance(caught, InteractionGenerationError):
-                    trace = cast(TraceType, caught.partial_trace)
-                    # Report the error that stopped the generator, not the wrapper
-                    # the trace raised to hand back its partial progress.
-                    if caught.__cause__ is not None:
-                        error = caught.__cause__
+        if scenario.setup is not None:
+            setup_result = scenario.setup()
+            if inspect.isawaitable(setup_result):
+                await setup_result
 
-                if not return_exception:
-                    if error is caught:
-                        raise
-                    # Hide the InteractionGenerationError wrapper without losing
-                    # how the generator error was chained. Capture the original
-                    # links first: `raise` below re-points __context__ at the
-                    # wrapper we are unwrapping.
-                    context = error.__context__
-                    suppress_context = error.__suppress_context__
-                    try:
-                        raise error
-                    finally:
-                        error.__context__ = context
-                        error.__suppress_context__ = suppress_context
+        try:
+            for step in steps:
+                try:
+                    for interaction in step.interacts:
+                        trace = await trace.with_interaction(interaction)
+                except Exception as caught:
+                    error = caught
+                    if isinstance(caught, InteractionGenerationError):
+                        trace = cast(TraceType, caught.partial_trace)
+                        # Report the error that stopped the generator, not the wrapper
+                        # the trace raised to hand back its partial progress.
+                        if caught.__cause__ is not None:
+                            error = caught.__cause__
 
-                step_result = TestCaseResult(
-                    results=_skipped_check_results_for_step(
-                        step,
-                        "Checks were skipped due to input generation failure",
-                    ),
-                    duration_ms=int((time.perf_counter() - start_time) * 1000),
-                    last_interaction_index=(
-                        len(trace.interactions) - 1 if trace.interactions else None
-                    ),
-                    error=TestCaseError(
-                        message=str(error),
-                        exception_type=type(error).__name__,
-                        traceback="".join(traceback.format_exception(error)),
-                        phase="input_generation",
-                    ),
+                    if not return_exception:
+                        if error is caught:
+                            raise
+                        # Hide the InteractionGenerationError wrapper without losing
+                        # how the generator error was chained. Capture the original
+                        # links first: `raise` below re-points __context__ at the
+                        # wrapper we are unwrapping.
+                        context = error.__context__
+                        suppress_context = error.__suppress_context__
+                        try:
+                            raise error
+                        finally:
+                            error.__context__ = context
+                            error.__suppress_context__ = suppress_context
+
+                    step_result = TestCaseResult(
+                        results=_skipped_check_results_for_step(
+                            step,
+                            "Checks were skipped due to input generation failure",
+                        ),
+                        duration_ms=int((time.perf_counter() - start_time) * 1000),
+                        last_interaction_index=(
+                            len(trace.interactions) - 1 if trace.interactions else None
+                        ),
+                        error=TestCaseError(
+                            message=str(error),
+                            exception_type=type(error).__name__,
+                            traceback="".join(traceback.format_exception(error)),
+                            phase="input_generation",
+                        ),
+                    )
+                    steps_results.append(step_result)
+                    break
+
+                last_interaction_index = (
+                    len(trace.interactions) - 1 if trace.interactions else None
+                )
+
+                test_case = TestCase(
+                    trace=trace,
+                    checks=step.checks,
+                )
+                step_result = await test_case.run(return_exception)
+                step_result = step_result.model_copy(
+                    update={"last_interaction_index": last_interaction_index}
                 )
                 steps_results.append(step_result)
-                break
 
-            last_interaction_index = (
-                len(trace.interactions) - 1 if trace.interactions else None
-            )
-
-            test_case = TestCase(
-                trace=trace,
-                checks=step.checks,
-            )
-            step_result = await test_case.run(return_exception)
-            step_result = step_result.model_copy(
-                update={"last_interaction_index": last_interaction_index}
-            )
-            steps_results.append(step_result)
-
-            # Stop on first failure
-            if not step_result.passed:
-                break
+                # Stop on first failure
+                if not step_result.passed:
+                    break
+        finally:
+            if scenario.teardown is not None:
+                teardown_result = scenario.teardown()
+                if inspect.isawaitable(teardown_result):
+                    await teardown_result
 
         if len(steps_results) < len(steps):
             # Skipped steps own no new interaction; point them at the trace as it stood

@@ -3,7 +3,9 @@ from typing import ClassVar
 
 from giskard.core import Discriminated, discriminated_base
 from pydantic import ConfigDict
+from pydantic.experimental.missing_sentinel import MISSING
 
+from ..types import Target
 from .interaction import Interaction
 from .trace import Trace
 
@@ -82,3 +84,35 @@ class InteractionSpec[InputType, OutputType, TraceType: Trace](  # pyright: igno
         ```
         """
         raise NotImplementedError
+
+    def bind_target(
+        self,
+        target: Target[InputType, OutputType, TraceType] | MISSING,
+    ) -> "InteractionSpec[InputType, OutputType, TraceType]":
+        """Bind a run/scenario target to this spec, returning a bound copy.
+
+        Called by the scenario runner when a target is available (set at the
+        scenario or ``run()`` level). Specs whose interactions need the target
+        to fill in ``MISSING`` outputs override this to return a copy with the
+        target applied; specs that resolve their own outputs override this as
+        a no-op (the default) and return ``self`` unchanged.
+
+        The default implementation is a no-op, so custom ``InteractionSpec``
+        subclasses that do not need target binding are unaffected. Subclasses
+        that *do* need it (notably ``Interact``) override this method to get
+        the same hook the runner previously reserved for ``Interact`` via an
+        ``isinstance`` special case.
+
+        Parameters
+        ----------
+        target : Target | MISSING
+            The SUT to bind. The runner only calls this with a concrete
+            target (never ``MISSING``); the ``MISSING`` arm of the type keeps
+            the signature consistent with the ``Target`` alias.
+
+        Returns
+        -------
+        InteractionSpec[InputType, OutputType, TraceType]
+            A spec with the target applied. The default returns ``self``.
+        """
+        return self

@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any, ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -7,7 +8,7 @@ from .check import Check
 from .input_generator import InputGenerator
 from .interaction import Interact, InteractionSpec, Trace
 from .result import ScenarioResult
-from .types import GeneratorType, Target
+from .types import GeneratorType, SyncOrAsync, Target
 
 
 class Step[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: ignore[reportMissingTypeArgument]
@@ -89,6 +90,13 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
     target : Target[InputType, OutputType, TraceType] | MISSING
         Default SUT for interactions whose outputs are ``MISSING`` when no
         per-call ``target`` is passed to ``run`` (see ``with_target``).
+    setup : Callable[[], SyncOrAsync[None]] | None
+        Optional fixture setup hook called before the first step of each run.
+        May be sync or ``async``; not serialised (see ``with_setup``).
+    teardown : Callable[[], SyncOrAsync[None]] | None
+        Optional fixture teardown hook called after the last step of each run,
+        including on error. May be sync or ``async``; not serialised
+        (see ``with_teardown``).
     multiple_runs : int
         Default upper bound on how many times to execute the full scenario (each
         execution uses a fresh trace). Each run must pass for the next to run;
@@ -130,6 +138,27 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
     target: Target[InputType, OutputType, TraceType] | MISSING = Field(
         default=MISSING,
         description="Scenario-level target SUT that will be used to replace MISSING outputs.",
+    )
+    setup: Callable[[], SyncOrAsync[None]] | None = Field(
+        default=None,
+        exclude=True,
+        repr=False,
+        description=(
+            "Optional fixture setup hook called once before the first step of each run. "
+            "May be a plain function or an ``async def`` coroutine; the runner awaits "
+            "awaitable results. Not serialised (callables are not persistable)."
+        ),
+    )
+    teardown: Callable[[], SyncOrAsync[None]] | None = Field(
+        default=None,
+        exclude=True,
+        repr=False,
+        description=(
+            "Optional fixture teardown hook called once after the last step of each run, "
+            "including when a check or interaction raises. May be a plain function or an "
+            "``async def`` coroutine; the runner awaits awaitable results. Not serialised "
+            "(callables are not persistable)."
+        ),
     )
     multiple_runs: int = Field(
         default=1,
@@ -307,6 +336,47 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             This scenario for method chaining.
         """
         self.target = target
+        return self
+
+    def with_setup(self, setup: Callable[[], SyncOrAsync[None]]) -> Self:
+        """Set the fixture setup hook called before the first step of each run.
+
+        The hook is a plain callable taking no arguments; it may be a regular
+        function or an ``async def`` coroutine (awaitable results are awaited).
+        Use it to reset fixtures / mock worlds independently of the SUT, so the
+        target callable is not overloaded with setup state. Not serialised.
+
+        Parameters
+        ----------
+        setup : Callable[[], SyncOrAsync[None]]
+            Setup hook invoked once per run before any interaction runs.
+
+        Returns
+        -------
+        Self
+            This scenario for method chaining.
+        """
+        self.setup = setup
+        return self
+
+    def with_teardown(self, teardown: Callable[[], SyncOrAsync[None]]) -> Self:
+        """Set the fixture teardown hook called after the last step of each run.
+
+        The hook runs even when a check or interaction raises, so it can be used
+        to release resources created by ``setup``. It may be a regular function
+        or an ``async def`` coroutine (awaitable results are awaited). Not serialised.
+
+        Parameters
+        ----------
+        teardown : Callable[[], SyncOrAsync[None]]
+            Teardown hook invoked once per run after the last step (or on error).
+
+        Returns
+        -------
+        Self
+            This scenario for method chaining.
+        """
+        self.teardown = teardown
         return self
 
     def with_tags(self, tags: list[str]) -> Self:
