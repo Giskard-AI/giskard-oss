@@ -7,10 +7,18 @@ license = { text = "Apache Software License 2.0" }
 authors = [{ name = "Giskard R&D", email = "rnd@giskard.ai" }]
 requires-python = ">=3.12"
 dependencies = [
-    "giskard-checks>=1.0.5,<2",
-    "giskard-agents>=1.0.3,<2",
+    "giskard-checks>=1.0.6,<2",
+    "giskard-agents>=1.0.6,<2",
     "numpy>=2.4.1,<3",
     "huggingface-hub>=1.11.0,<2",
+    # Imported directly across scan generators (BaseModel, Field, ...); shipped
+    # transitively by giskard-checks/giskard-agents, declared explicitly so the
+    # direct import is not a hidden transitive coupling.
+    "pydantic>=2.12,<3",
+    # Imported directly in scan.generators.huggingface (AsyncClient); shipped
+    # transitively by huggingface-hub/giskard-agents, declared explicitly so the
+    # direct import is not a hidden transitive coupling.
+    "httpx>=0.28.1,<1",  # 0.x: <1; matches all consumers (huggingface-hub/giskard-llm pin httpx<1)
 ]
 
 [project.optional-dependencies]
@@ -18,13 +26,36 @@ garak = ["garak>=0.15,<1"]
 deepteam = [
     "deepteam>=1.0.7,<2",
     # deepteam imports stdlib nntplib, removed in 3.13+ (PEP 594)
-    "standard-nntplib>=3.13; python_version >= '3.13'",
+    "standard-nntplib>=3.13,<4; python_version >= '3.13'",  # stdlib shim; version tracks Python, <4 for next major
+    # Imported directly in the deepteam integration (_judge_generator); shipped
+    # transitively by deepteam, declared explicitly in this extra so the direct
+    # import is not a hidden transitive coupling.
+    "deepeval>=4.0.7,<5",
 ]
 
 
 [build-system]
 requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
+
+[tool.deptry]
+known_first_party = ["giskard"]  # giskard.* is a PEP 420 namespace shared by all workspace libs
+
+[tool.deptry.package_module_name_map]
+# ``standard-nntplib`` is a backport shim that restores the stdlib ``nntplib``
+# module removed in Python 3.13 (PEP 594); it is pulled in only for the deepteam
+# extra, never imported statically by giskard-scan itself.
+"standard-nntplib" = "nntplib"
+
+[tool.deptry.per_rule_ignores]
+"DEP001" = [
+    "lidar",  # private optional integration package, installed out-of-band (see Makefile install-lidar-test); intentionally not in pyproject/uv.lock
+]
+"DEP002" = [
+    "giskard-agents",  # workspace sibling; imported as giskard.agents (first-party), not as the dist name
+    "giskard-checks",  # workspace sibling; imported as giskard.checks (first-party), not as the dist name
+    "standard-nntplib",  # py3.13 nntplib shim for deepteam; imported by deepteam at runtime, never statically by giskard-scan
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/giskard"]

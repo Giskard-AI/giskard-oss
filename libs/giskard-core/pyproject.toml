@@ -1,13 +1,21 @@
 [project]
 name = "giskard-core"
-version = "1.0.2"
+version = "1.0.3"
 description = "Core shared utilities and foundational components for the Giskard library ecosystem."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
 dependencies = [
-    "posthog>=7.10.3",
+    "posthog>=7.10.3,<8",
     "pydantic>=2.11.0,<3",
+]
+
+[tool.deptry]
+known_first_party = ["giskard"]  # giskard.* is a PEP 420 namespace shared by all workspace libs
+
+[tool.deptry.per_rule_ignores]
+"DEP003" = [
+    "pydantic_core",  # part of pydantic's public API; pydantic pins pydantic-core exactly, so declaring it would only constrain pydantic
 ]
 
 [tool.pytest.ini_options]

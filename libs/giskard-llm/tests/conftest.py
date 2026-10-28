@@ -15,6 +15,7 @@ _PROVIDER_PACKAGES = {
     "azure": "openai",
     "azure_ai": "openai",
     "azure_foundry_v1": "openai",
+    "azure_anthropic": "anthropic",
 }
 
 # When TEST_PROVIDER is set, keep only tests whose pytest provider mark is in this set.

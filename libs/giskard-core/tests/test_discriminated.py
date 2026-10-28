@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 import pytest
 from giskard.core import Discriminated, discriminated_base
@@ -147,6 +147,31 @@ def test_discriminated_generic_with_concrete_type():
     dog = GenericDog(name="Buddy", value=100, breed="Labrador")
     model_dump = dog.model_dump()
     assert GenericAnimal[int].model_validate(model_dump) == dog
+
+
+@pytest.mark.parametrize(
+    "animal,kind",
+    [
+        (GenericDog[int](name="Buddy", value=100, breed="Labrador"), "dog"),
+        (GenericCat[str](name="Whiskers", value="Meow", lives=9), "cat"),
+    ],
+)
+def test_discriminated_parametrized_generic_subclass_keeps_kind(
+    animal: GenericAnimal[T], kind: str
+):
+    """An instance of a parametrized registered class reports its origin's kind.
+
+    ``GenericDog[int]`` is a separate class created by pydantic, so a lookup
+    keyed on the exact class found nothing and ``kind`` was ``None``: the dump
+    could not be validated back and the discriminator was lost.
+    """
+    assert animal.kind == kind
+
+    model_dump = animal.model_dump()
+    assert model_dump["kind"] == kind
+
+    assert GenericAnimal.model_validate(model_dump) == animal
+    assert GenericAnimal.model_validate_json(animal.model_dump_json()) == animal
 
 
 def test_complex_type_adapter():
@@ -304,3 +329,45 @@ def test_kind_is_not_writable():
     assert dog.kind == "dog"
     assert isinstance(dog, Dog)
     assert "kind" not in Dog.model_fields
+
+
+@discriminated_base
+class Plant(Discriminated):
+    """Base whose unregistered ``wild_*`` kinds resolve to a placeholder."""
+
+    @classmethod
+    def _resolve_unregistered_kind(cls, kind: str, value: dict[str, Any]) -> Any:
+        if not kind.startswith("wild_"):
+            return None
+        return UnknownPlant(original_kind=kind)
+
+
+class UnknownPlant(Plant):
+    """Unregistered placeholder for ``wild_*`` kinds."""
+
+    original_kind: str
+
+
+@Plant.register("wild_rose")
+class WildRose(Plant):
+    """A registered kind that matches the fallback prefix."""
+
+
+def test_unregistered_kind_uses_base_fallback():
+    """A base can substitute a placeholder for an unregistered kind."""
+    plant = Plant.model_validate({"kind": "wild_fern"})
+    assert isinstance(plant, UnknownPlant)
+    assert plant.original_kind == "wild_fern"
+
+
+def test_registered_kind_bypasses_fallback():
+    """The fallback only runs on a registry miss."""
+    assert isinstance(Plant.model_validate({"kind": "wild_rose"}), WildRose)
+
+
+def test_fallback_returning_none_raises():
+    """Kinds the fallback declines keep the "not registered" error."""
+    with pytest.raises(
+        ValueError, match=f"Kind cactus is not registered for class {Plant}"
+    ):
+        Plant.model_validate({"kind": "cactus"})
