@@ -50,6 +50,7 @@ class AssistantMessageParam(TypedDict, total=False):
     content: str | Sequence[CompletionContentParam]
     refusal: str
     tool_calls: list[ToolCallParam]
+    reasoning: str
 
 
 class ToolMessageParam(TypedDict, total=False):

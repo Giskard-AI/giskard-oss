@@ -19,6 +19,7 @@ from .result import (
 from .scenario import Scenario, Step
 from .testcase import TestCase
 from .types import Target
+from .unavailable import UnavailableCheckWarning, UnavailableHubCheck
 
 __all__ = [
     "Scenario",
@@ -48,4 +49,6 @@ __all__ = [
     "JudgeInput",
     "LLMChatJudge",
     "SOMJudge",
+    "UnavailableCheckWarning",
+    "UnavailableHubCheck",
 ]
