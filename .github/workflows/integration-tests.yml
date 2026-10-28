@@ -139,6 +139,11 @@ jobs:
               provider: azure_foundry_v1,
               extras: openai,
             }
+          - {
+              python-version: "3.14",
+              provider: azure_anthropic,
+              extras: anthropic,
+            }
     name: llm / ${{ matrix.provider }} / ${{ matrix.python-version }}
     env:
       PROVIDER: ${{ matrix.provider }}
@@ -166,8 +171,8 @@ jobs:
           AZURE_API_KEY: ${{ matrix.provider == 'azure' && secrets.AZURE_API_KEY || '' }}
           AZURE_API_BASE: ${{ matrix.provider == 'azure' && secrets.AZURE_API_BASE || '' }}
           AZURE_API_VERSION: ${{ matrix.provider == 'azure' && secrets.AZURE_API_VERSION || '' }}
-          AZURE_AI_API_KEY: ${{ (matrix.provider == 'azure_ai' || matrix.provider == 'azure_foundry_v1') && secrets.AZURE_AI_API_KEY || '' }}
-          AZURE_AI_ENDPOINT: ${{ (matrix.provider == 'azure_ai' || matrix.provider == 'azure_foundry_v1') && secrets.AZURE_AI_ENDPOINT || '' }}
+          AZURE_AI_API_KEY: ${{ (matrix.provider == 'azure_ai' || matrix.provider == 'azure_foundry_v1' || matrix.provider == 'azure_anthropic') && secrets.AZURE_AI_API_KEY || '' }}
+          AZURE_AI_ENDPOINT: ${{ (matrix.provider == 'azure_ai' || matrix.provider == 'azure_foundry_v1' || matrix.provider == 'azure_anthropic') && secrets.AZURE_AI_ENDPOINT || '' }}
           AZURE_AI_OPENAI_V1_ENDPOINT: ${{ matrix.provider == 'azure_foundry_v1' && secrets.AZURE_AI_OPENAI_V1_ENDPOINT || '' }}
         run: make test-functional PACKAGE=giskard-llm PROVIDER=$PROVIDER
 
