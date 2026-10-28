@@ -9,8 +9,8 @@ dependencies = [
     "jsonpath-ng>=1.7.0,<2",
     "pydantic>=2.12,<3",
     "pydantic-settings>=2.7,<3",
-    "giskard-agents>=1.0.4,<2",
-    "giskard-core>=1.0.2,<2",
+    "giskard-agents>=1.0.6,<2",
+    "giskard-core>=1.0.3,<2",
     "jsonschema>=4.23.0,<5",
     "numpy>=2.4.1,<3",
     # Calendar-versioned (YYYY.M.D); the upstream regex package has maintained
