@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 from giskard.checks import Equals, Scenario, Suite
-from giskard.checks.core.interaction import Trace
+from giskard.checks.core.interaction import Interaction, Trace
 from giskard.checks.core.result import (
     CheckResult,
     GroupedSuiteResult,
@@ -13,6 +13,7 @@ from giskard.checks.core.result import (
     ScenarioResult,
     ScenarioStatus,
     SuiteResult,
+    TestCaseError,
 )
 from giskard.checks.core.result import (
     TestCaseResult as CheckTestCaseResult,
@@ -293,6 +294,69 @@ def test_suite_result_rich_console_ignores_invalid_failure_limit_env(
     assert "... and" not in output
 
 
+@pytest.mark.parametrize(
+    "field",
+    ["scenario_name", "check_name", "message", "error", "outputs", "tag"],
+)
+def test_suite_result_rich_console_renders_markup_like_text_literally(field: str):
+    # LLM outputs and check messages routinely contain square brackets, e.g.
+    # the "[/INST]" delimiter of Llama chat templates. Rich must not parse them
+    # as markup: an unmatched closing tag raises MarkupError mid-report.
+    def value(name: str, default: str) -> str:
+        return "[/INST] [bold]leak" if field == name else default
+
+    result = SuiteResult(
+        results=[
+            ScenarioResult(
+                scenario_name=value("scenario_name", "scenario"),
+                steps=[
+                    CheckTestCaseResult(
+                        results=[
+                            CheckResult.failure(
+                                message=value("message", "failed"),
+                                details={"check_name": value("check_name", "check")},
+                            )
+                        ],
+                        duration_ms=1,
+                    ),
+                    CheckTestCaseResult(
+                        results=[],
+                        duration_ms=1,
+                        error=TestCaseError(
+                            message=value("error", "boom"),
+                            exception_type="ValueError",
+                        ),
+                    ),
+                ],
+                duration_ms=1,
+                final_trace=Trace(
+                    interactions=[
+                        Interaction(inputs="hi", outputs=value("outputs", "hello"))
+                    ]
+                ),
+                tags=[f"Category:{value('tag', 'safety')}"],
+            )
+        ],
+        duration_ms=1,
+    )
+    console = Console(record=True, width=200)
+
+    console.print(result.group_by("Category"))
+
+    assert "[/INST] [bold]leak" in console.export_text()
+
+
+def test_grouped_suite_result_rich_console_renders_markup_like_key_literally():
+    # The grouping key is used as the table title and column header.
+    console = Console(record=True, width=200)
+
+    console.print(SuiteResult(results=[], duration_ms=0).group_by("[/INST]"))
+
+    output = console.export_text()
+    assert "Results by [/INST]" in output
+    assert output.count("[/INST]") == 2
+
+
 @pytest.mark.asyncio
 async def test_suite_parallel_preserves_result_order():
     delays = {"first": 0.09, "second": 0.01, "third": 0.05}
@@ -538,6 +602,18 @@ async def test_suite_parallel_progress_shows_a_row_per_scenario(monkeypatch):
 
     assert "  ↳ alpha" in rows
     assert "  ↳ beta" in rows
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.asyncio
+async def test_suite_progress_renders_markup_like_scenario_names_literally(parallel):
+    """A scenario name such as "[/INST] ..." must not crash the progress bar."""
+    suite = Suite(name="markup_names_suite", target=lambda inputs: inputs)
+    suite.append(Scenario("[/INST] template leak").interact("hi"))
+
+    result = await suite.run(parallel=parallel)
+
+    assert result.passed_count == 1
 
 
 @pytest.mark.parametrize(

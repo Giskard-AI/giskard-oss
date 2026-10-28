@@ -8,6 +8,7 @@ from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
 from pydantic import BaseModel, Field
 from pydantic.experimental.missing_sentinel import MISSING
 from rich.console import RenderableType
+from rich.markup import escape
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -80,7 +81,7 @@ class _SuiteProgress(Progress):
     @contextmanager
     def scenario_row(self, name: str) -> Iterator[None]:
         """Show a row for one scenario while it runs, then remove it."""
-        task_id = self.add_task(f"  ↳ {name}", total=None)
+        task_id = self.add_task(f"  ↳ {escape(name)}", total=None)
         try:
             yield
         finally:
@@ -289,7 +290,7 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
         results: list[ScenarioResult[Trace[Any, Any]]] = []
         for scenario in self.scenarios:
-            progress.describe(f"Running: {scenario.name}")
+            progress.describe(f"Running: {escape(scenario.name)}")
             result = await scenario.run(
                 target=target, return_exception=return_exception
             )

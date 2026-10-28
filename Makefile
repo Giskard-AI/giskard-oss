@@ -156,7 +156,10 @@ typecheck: ## Run type checking with basedpyright
 security: ## Check for security vulnerabilities
 	# TODO: Remove --ignore-vuln PYSEC-2026-3740 when a fixed nltk release exists
 	# No fixed version yet for nltk 3.10.3 advisory PYSEC-2026-3740
-	uv run pip-audit --skip-editable --ignore-vuln PYSEC-2026-3740
+	# TODO: Remove --ignore-vuln PYSEC-2026-3804 when a fixed accelerate release exists
+	uv run --isolated --locked pip-audit --skip-editable \
+		--ignore-vuln PYSEC-2026-3740 \
+		--ignore-vuln PYSEC-2026-3804
 
 # Run licensecheck INSIDE the synced project env (uv run --with, not uvx): it reads
 # each package's version from the installed env via importlib, so output is pinned to
@@ -221,7 +224,19 @@ bump-workspace-pins: ## Rewrite >= pins for PACKAGE to VERSION (used by the rele
 	@test -n "$(VERSION)" || { echo "VERSION is required (e.g. PACKAGE=giskard-checks VERSION=1.0.3)"; exit 1; }
 	uv run python tools/bump_workspace_pins.py "$(PACKAGE)" "$(VERSION)"
 
-check: lint check-format check-compat typecheck security check-licenses check-notices check-extra-pins ## Run all checks
+# Run deptry on each library's source tree against that library's own pyproject.toml
+# [tool.deptry] config. deptry is pinned in the root `dev` group. The root
+# meta-package ships no code of its own, so it is intentionally not scanned; dev-
+# only CLI tools (pytest plugins, pip-audit, deptry) are not checked either. Each
+# lib is run with `uv run --directory libs/<lib>` so deptry reads that lib's
+# [tool.deptry] and its own dependency declarations (not the umbrella's) and
+# resolves transitive deps from that lib's environment.
+deptry-each-lib = $(foreach lib,$(LIBS),uv run --directory libs/$(lib) deptry src &&) true
+
+check-deps: ## Check for unused/missing/misplaced dependencies with deptry (per library)
+	$(deptry-each-lib)
+
+check: lint check-format check-compat typecheck security check-deps check-licenses check-notices check-extra-pins ## Run all checks
 
 clean: ## Clean up build artifacts and caches
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

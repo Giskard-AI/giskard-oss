@@ -4,12 +4,12 @@ from giskard.agents import TemplateReference
 from pydantic import Field
 from pydantic.experimental.missing_sentinel import MISSING
 
-from ..core import Trace
+from ..core import Interaction, Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
 from ..core.result import CheckResult
 from ._inputs import ResolvableInput, error_if_unresolved
-from .base import BaseLLMCheck
+from .base import BaseLLMCheck, trace_with_current_turn
 
 
 @Check.register("answer_relevance")
@@ -149,16 +149,31 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
             value=self.answer,
         )
 
+        som_trace = (
+            trace
+            if self.include_history
+            else Trace(interactions=[Interaction(inputs=question, outputs=answer)])
+        )
         inputs: dict[str, Any] = {
             "question": question,
             "answer": answer,
             "context": self.context if self.context is not MISSING else "",
+            "trace": som_trace,
         }
 
         # Omitted entirely (rather than passed empty) when disabled, so the
         # template drops the <CONVERSATION HISTORY> section instead of rendering
-        # an empty one.
+        # an empty one. SOM receives only the resolved current turn through
+        # ``trace`` when history is disabled, preserving the same isolation.
         if self.include_history:
             inputs["history"] = trace
 
         return inputs
+
+    @override
+    def get_som_trace(
+        self, trace: TraceType, inputs: dict[str, Any]
+    ) -> Trace[Any, Any]:
+        return trace_with_current_turn(
+            inputs["trace"], inputs=inputs["question"], outputs=inputs["answer"]
+        )

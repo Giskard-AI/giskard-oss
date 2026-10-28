@@ -180,6 +180,22 @@ def _extract_system_instruction(
     return system_blocks if system_blocks else None
 
 
+def _restore_supported_constraints(original: Any, transformed: Any) -> None:
+    """Keep API-supported constraints that the SDK moves into descriptions."""
+    if isinstance(original, dict) and isinstance(transformed, dict):
+        for key, value in original.items():
+            # Existing keys can be property names; retain their SDK conversion.
+            if key in ("const", "pattern") and key not in transformed:
+                transformed[key] = value
+            target = transformed.get(key)
+            if key == "oneOf" and target is None and "anyOf" not in original:
+                target = transformed.get("anyOf")
+            _restore_supported_constraints(value, target)
+    elif isinstance(original, list) and isinstance(transformed, list):
+        for value, target in zip(original, transformed):
+            _restore_supported_constraints(value, target)
+
+
 class SystemTextBlock(_BaseModel):
     text: str
     type: Literal["text"] = "text"
@@ -256,16 +272,37 @@ class AnthropicChatConfigParams(_BaseModel):
             if isinstance(v["response_format"], type) and issubclass(
                 v["response_format"], BaseModel
             ):
-                schema = v["response_format"].model_json_schema()
-                schema["additionalProperties"] = False
+                from anthropic import transform_schema
+
+                original_schema = v["response_format"].model_json_schema()
+                schema = transform_schema(original_schema)
+                _restore_supported_constraints(original_schema, schema)
                 v["output_config"] = {
                     "format": {
                         "type": "json_schema",
                         "schema": schema,
                     }
                 }
-            else:
-                v["output_config"] = v["response_format"]
+            elif isinstance(v["response_format"], dict):
+                response_format = v["response_format"]
+                if "format" in response_format:
+                    v["output_config"] = response_format
+                elif response_format.get("type") == "json_schema":
+                    schema = response_format.get("schema")
+                    if schema is None and isinstance(
+                        response_format.get("json_schema"), dict
+                    ):
+                        schema = response_format["json_schema"].get("schema")
+                    if not isinstance(schema, dict):
+                        raise ValueError(
+                            "response_format json_schema must contain a schema object"
+                        )
+                    v["output_config"] = {
+                        "format": {"type": "json_schema", "schema": schema}
+                    }
+                else:
+                    raise ValueError("unsupported Anthropic response_format dict")
+            v.pop("response_format", None)
 
         return v
 
@@ -296,11 +333,13 @@ class AnthropicChatTranslator:
                 sorted(unknown),
             )
 
-        anthropic_params = AnthropicChatConfigParams(
-            model=model,
-            messages=messages,
-            tools=tools,
-            **params,
+        anthropic_params = AnthropicChatConfigParams.model_validate(
+            {
+                "model": model,
+                "messages": messages,
+                "tools": tools,
+                **params,
+            }
         )
 
         payload = cast(
@@ -338,28 +377,34 @@ class AnthropicChatTranslator:
     @staticmethod
     def blocks_to_giskard(
         blocks: "Sequence[ContentBlock]",
-    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
-        content_and_tool_calls = [
-            AnthropicChatTranslator.block_content_to_giskard(block) for block in blocks
-        ]
-        content = [
-            content
-            for content in content_and_tool_calls
-            if not isinstance(content, ToolCall)
-        ]
-        tool_calls = [
-            tool_call
-            for tool_call in content_and_tool_calls
-            if isinstance(tool_call, ToolCall)
-        ]
-        return content, tool_calls
+    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall], str | None]:
+        """Split blocks into content, tool calls and joined readable thinking.
+
+        ``redacted_thinking`` is opaque and skipped.
+        """
+        content: list[CompletionContent] = []
+        tool_calls: list[ToolCall] = []
+        thoughts: list[str] = []
+        for block in blocks:
+            if block.type == "thinking":
+                if block.thinking:
+                    thoughts.append(block.thinking)
+            elif block.type != "redacted_thinking":
+                converted = AnthropicChatTranslator.block_content_to_giskard(block)
+                if isinstance(converted, ToolCall):
+                    tool_calls.append(converted)
+                else:
+                    content.append(converted)
+        return content, tool_calls, "\n".join(thoughts) or None
 
     @staticmethod
     def from_anthropic(
         raw: "Message",
     ) -> CompletionResponse:
         """Convert raw SDK response to CompletionResponse."""
-        content, tool_calls = AnthropicChatTranslator.blocks_to_giskard(raw.content)
+        content, tool_calls, reasoning = AnthropicChatTranslator.blocks_to_giskard(
+            raw.content
+        )
 
         finish_reason = (
             FINISH_REASON_MAP.get(raw.stop_reason, "stop") if raw.stop_reason else None
@@ -380,6 +425,7 @@ class AnthropicChatTranslator:
             content=content if content else None,
             refusal=refusal_out,
             tool_calls=tool_calls or None,
+            reasoning=reasoning,
         )
 
         usage = None

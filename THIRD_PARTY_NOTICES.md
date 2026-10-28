@@ -45,12 +45,15 @@ Find a list of packages below
 |✔|griffecli|
 |✔|griffelib|
 |✔|h11|
+|✔|h2|
 |✔|hf-xet|
+|✔|hpack|
 |✔|httpcore|
 |✔|httpcore2|
 |✔|httpx|
 |✔|httpx2|
 |✔|huggingface-hub|
+|✔|hyperframe|
 |✔|idna|
 |✔|importlib-metadata|
 |✔|jinja2|
@@ -69,6 +72,7 @@ Find a list of packages below
 |✔|nltk|
 |✔|numpy|
 |✔|openai|
+|✔|opentelemetry-api|
 |✔|packaging|
 |✔|posthog|
 |✔|propcache|
@@ -112,7 +116,7 @@ Find a list of packages below
 - License: Python Software Foundation License
 - Compatible: True
 
-### aiohttp-3.14.3
+### aiohttp-3.14.5
 
 - HomePage:
 - Author:
@@ -140,7 +144,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### anyio-4.14.0
+### anyio-4.14.2
 
 - HomePage:
 - Author: Alex Grönholm
@@ -182,7 +186,7 @@ Find a list of packages below
 - License: Apache Software License;; BSD License;; MIT License
 - Compatible: True
 
-### certifi-2026.6.17
+### certifi-2026.10.19
 
 - HomePage: https://github.com/certifi/python-certifi
 - Author: Kenneth Reitz
@@ -259,7 +263,7 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### filelock-3.29.4
+### filelock-4.2.4
 
 - HomePage:
 - Author:
@@ -273,11 +277,11 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2025.3.0
+### fsspec-2026.9.0
 
 - HomePage:
 - Author:
-- License: BSD License
+- License: BSD-3-Clause
 - Compatible: True
 
 ### google-auth-2.55.0
@@ -322,11 +326,25 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
+### h2-4.4.1
+
+- HomePage:
+- Author: Cory Benfield
+- License: MIT
+- Compatible: True
+
 ### hf-xet-1.5.1
 
 - HomePage:
 - Author:
 - License: Apache-2.0
+- Compatible: True
+
+### hpack-4.2.0
+
+- HomePage:
+- Author: Cory Benfield
+- License: MIT
 - Compatible: True
 
 ### httpcore-1.0.9
@@ -362,6 +380,13 @@ Find a list of packages below
 - HomePage: https://github.com/huggingface/huggingface_hub
 - Author: Hugging Face, Inc.
 - License: Apache Software License
+- Compatible: True
+
+### hyperframe-6.1.0
+
+- HomePage:
+- Author: Cory Benfield
+- License: MIT License
 - Compatible: True
 
 ### idna-3.18
@@ -427,7 +452,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### litellm-1.89.3
+### litellm-1.89.7
 
 - HomePage:
 - Author: BerriAI
@@ -462,7 +487,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### multidict-6.7.1
+### multidict-6.9.1
 
 - HomePage: https://github.com/aio-libs/multidict
 - Author: Andrew Svetlov
@@ -488,6 +513,13 @@ Find a list of packages below
 - HomePage:
 - Author: OpenAI
 - License: Apache Software License
+- Compatible: True
+
+### opentelemetry-api-1.43.0
+
+- HomePage:
+- Author: OpenTelemetry Authors
+- License: Apache-2.0
 - Compatible: True
 
 ### packaging-26.2
@@ -630,7 +662,7 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### setuptools-83.0.0
+### setuptools-84.2.0
 
 - HomePage:
 - Author: Python Packaging Authority
@@ -707,7 +739,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### urllib3-2.7.0
+### urllib3-2.8.0
 
 - HomePage:
 - Author: Andrey Petrov
@@ -721,7 +753,7 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### yarl-1.24.2
+### yarl-1.25.1
 
 - HomePage: https://github.com/aio-libs/yarl
 - Author: Andrew Svetlov

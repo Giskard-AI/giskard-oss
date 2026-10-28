@@ -2,6 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 from rich.console import Console, ConsoleOptions, RenderResult
+from rich.markup import escape
 
 
 class Interaction[InputType, OutputType](BaseModel, frozen=True):
@@ -39,5 +40,5 @@ class Interaction[InputType, OutputType](BaseModel, frozen=True):
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        yield "Inputs: " + repr(self.inputs)
-        yield "Outputs: " + repr(self.outputs)
+        yield "Inputs: " + escape(repr(self.inputs))
+        yield "Outputs: " + escape(repr(self.outputs))

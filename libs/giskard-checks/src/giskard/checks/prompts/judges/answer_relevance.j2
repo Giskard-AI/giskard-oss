@@ -51,14 +51,6 @@ would be relevant to something asked earlier in the conversation.
 
 ## Markers
 
-{# `is defined` is required: the environment uses StrictUndefined, and `history`
-   is omitted entirely (not passed empty) when include_history is disabled. #}
-{% if history is defined and history %}
-<CONVERSATION HISTORY>
-{{ history | fence }}
-</CONVERSATION HISTORY>
-{% endif %}
-
 <CURRENT QUESTION>
 {{ question | fence }}
 </CURRENT QUESTION>
@@ -72,8 +64,18 @@ would be relevant to something asked earlier in the conversation.
 {{ context | fence }}
 </DOMAIN CONTEXT>
 {% endif %}
+{% if include_trace | default(true) %}
+{# `is defined` is required: the environment uses StrictUndefined, and `history`
+   is omitted entirely (not passed empty) when include_history is disabled. #}
+{% if history is defined and history %}
 
+<CONVERSATION HISTORY>
+{{ history | fence }}
+</CONVERSATION HISTORY>
+{% endif %}
+{% endif %}
+{% if _instr_output is defined %}
 ---
-
 **Output Format:**
 {{ _instr_output }}
+{% endif %}
