@@ -12,7 +12,7 @@ from giskard.checks.generators.dataset import (
     schema_cache_key,
     substitute_prompt,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .conftest import LLMTrace, MockGenerator
 
@@ -125,6 +125,22 @@ def test_substitute_prompt_wrong_placeholder_token_raises():
     # The malformed tokens are left untouched (not silently shipped as a value).
 
 
+class AliasedRequest(BaseModel):
+    # camelCase wire format, as is common for HTTP agent APIs
+    user_message: str = Field(alias="userMessage")
+    session_id: str = Field(alias="sessionId")
+
+
+def test_substitute_prompt_preserves_aliased_fields():
+    msg = AliasedRequest.model_validate(
+        {"userMessage": PROMPT_PLACEHOLDER, "sessionId": "abc"}
+    )
+    out = substitute_prompt(msg, "X")
+    assert isinstance(out, AliasedRequest)
+    assert out.user_message == "X"
+    assert out.session_id == "abc"
+
+
 # --- schema-keyed cache ---
 
 
@@ -206,6 +222,18 @@ async def test_structured_embedded_placeholder():
     g = DatasetInputGenerator(generator=gen, prompt="X")
     value = await anext(g(LLMTrace(), input_type=Email))
     assert value.body == "Please answer to X"
+
+
+async def test_structured_schema_with_aliased_fields():
+    # The LLM fills in the JSON schema it is shown, which uses the aliases.
+    gen = MockGenerator(
+        responses=[_mapping_response({"userMessage": "{{prompt}}", "sessionId": "abc"})]
+    )
+    g = DatasetInputGenerator(generator=gen, prompt="X")
+    value = await anext(g(LLMTrace(), input_type=AliasedRequest))
+    assert isinstance(value, AliasedRequest)
+    assert value.user_message == "X"
+    assert value.session_id == "abc"
 
 
 async def test_template_cached_per_schema_prompt_substituted_each_time():
