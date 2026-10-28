@@ -330,6 +330,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
         return_exception: bool = False,
         multiple_runs: int | None = None,
+        min_pass_rate: float | None = None,
     ) -> ScenarioResult[TraceType]:
         """Execute the scenario via the default runner, with optional multiple runs.
 
@@ -337,9 +338,16 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         steps: interaction specs update the trace, then checks validate it and
         stop that run on failure. When more than one run is configured, the
         scenario is executed up to that many times, with a fresh trace each time.
-        Each run must pass overall for the next to run. Execution stops early on
-        the first non-passing run (FAIL, ERROR, or SKIP). Multi-run is not
-        equivalent to retrying until a single passing outcome.
+
+        Without ``min_pass_rate``, each run must pass overall for the next to
+        run, and execution stops early on the first non-passing run (FAIL,
+        ERROR, or SKIP). Multi-run is not equivalent to retrying until a single
+        passing outcome.
+
+        With ``min_pass_rate``, every ``multiple_runs`` attempt runs (no
+        short-circuit) and the scenario passes only if the empirical pass rate
+        reaches the threshold. This supports statistical testing of
+        non-deterministic targets.
 
         Parameters
         ----------
@@ -352,6 +360,10 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         multiple_runs : int | None, optional
             Optional cap on full scenario executions. When provided, it overrides
             the scenario-level ``multiple_runs`` value.
+        min_pass_rate : float | None, optional
+            Optional pass-rate threshold in ``(0, 1]``. When set, all
+            ``multiple_runs`` attempts run and the scenario passes only if the
+            empirical pass rate meets this threshold.
 
         Returns
         -------
@@ -367,4 +379,5 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
             target=target,
             return_exception=return_exception,
             multiple_runs=multiple_runs,
+            min_pass_rate=min_pass_rate,
         )

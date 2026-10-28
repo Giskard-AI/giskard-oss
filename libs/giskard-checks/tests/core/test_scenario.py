@@ -828,6 +828,244 @@ class TestScenarioEdgeCases:
         assert result.passed
 
 
+class TestScenarioAdvisoryChecks:
+    """Advisory checks record a verdict but never stop the scenario or fail it."""
+
+    async def test_advisory_failure_does_not_stop_scenario(self):
+        """A failing advisory check does not abort subsequent steps.
+
+        Without ``advisory`` the second step would be skipped after the first
+        step's failure. With ``advisory=True`` the verdict is recorded but
+        execution continues.
+        """
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+        mock_interaction1 = MockInteractionSpec(interactions=[interaction1])
+        mock_interaction2 = MockInteractionSpec(interactions=[interaction2])
+
+        advisory_fail = MockCheck(
+            result=CheckResult.failure(message="soft failure"), advisory=True
+        )
+        hard_pass = MockCheck(result=CheckResult.success(message="ok"))
+
+        result = await (
+            Scenario("advisory_continues")
+            .add_interaction(mock_interaction1)
+            .check(advisory_fail)
+            .add_interaction(mock_interaction2)
+            .check(hard_pass)
+            .run()
+        )
+
+        # Both interactions were applied: the second step ran, it was not skipped.
+        assert len(result.final_trace.interactions) == 2
+        assert result.final_trace.interactions[1] == interaction2
+        # The advisory failure verdict is preserved (not hidden).
+        assert result.steps[0].results[0].failed
+        assert result.steps[0].results[0].details.get("advisory") is True
+        # The second step ran and passed.
+        assert not result.steps[1].skipped
+        assert result.steps[1].passed
+        # The advisory-only failure does not fail the scenario overall.
+        assert result.passed
+        assert not result.failed
+
+    async def test_advisory_error_does_not_stop_scenario(self):
+        """An advisory check that errors also does not stop the scenario."""
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+        mock_interaction1 = MockInteractionSpec(interactions=[interaction1])
+        mock_interaction2 = MockInteractionSpec(interactions=[interaction2])
+
+        advisory_error = MockCheck(
+            result=CheckResult.error(message="soft error"), advisory=True
+        )
+        hard_pass = MockCheck(result=CheckResult.success(message="ok"))
+
+        result = await (
+            Scenario("advisory_error_continues")
+            .add_interaction(mock_interaction1)
+            .check(advisory_error)
+            .add_interaction(mock_interaction2)
+            .check(hard_pass)
+            .run()
+        )
+
+        assert len(result.final_trace.interactions) == 2
+        assert result.steps[0].results[0].errored
+        assert result.steps[0].results[0].details.get("advisory") is True
+        assert result.steps[1].passed
+        # An advisory error does not fail the scenario.
+        assert result.passed
+
+    async def test_hard_failure_still_stops_scenario(self):
+        """A non-advisory failure in a step with advisory checks still stops."""
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+        mock_interaction1 = MockInteractionSpec(interactions=[interaction1])
+        mock_interaction2 = MockInteractionSpec(interactions=[interaction2])
+
+        advisory_pass = MockCheck(
+            result=CheckResult.success(message="ok"), advisory=True
+        )
+        hard_fail = MockCheck(result=CheckResult.failure(message="hard failure"))
+
+        result = await (
+            Scenario("hard_failure_still_stops")
+            .add_interaction(mock_interaction1)
+            .check(advisory_pass)
+            .check(hard_fail)
+            .add_interaction(mock_interaction2)
+            .check(MockCheck(result=CheckResult.success()))
+            .run()
+        )
+
+        # The hard failure stopped the scenario: the second step was skipped.
+        assert len(result.final_trace.interactions) == 1
+        assert result.steps[1].skipped
+        assert result.failed
+
+    async def test_advisory_default_is_false_preserves_existing_behavior(self):
+        """``advisory`` defaults to False so existing checks stop the scenario."""
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+        mock_interaction1 = MockInteractionSpec(interactions=[interaction1])
+        mock_interaction2 = MockInteractionSpec(interactions=[interaction2])
+
+        # No advisory flag set -> behaves like a normal hard failure.
+        fail_check = MockCheck(result=CheckResult.failure(message="fail"))
+
+        result = await (
+            Scenario("default_is_hard")
+            .add_interaction(mock_interaction1)
+            .check(fail_check)
+            .add_interaction(mock_interaction2)
+            .check(MockCheck(result=CheckResult.success()))
+            .run()
+        )
+
+        assert result.steps[1].skipped
+        assert result.failed
+
+
+class TestScenarioMinPassRate:
+    """Statistical multi-run via ``min_pass_rate``."""
+
+    async def test_min_pass_rate_passes_when_threshold_met(self):
+        """A flaky scenario that passes often enough meets the threshold."""
+        calls = 0
+
+        def check_fn(trace: Trace[str, str]) -> CheckResult:
+            nonlocal calls
+            calls += 1
+            # Pass on odd attempts, fail on even ones.
+            return CheckResult.success() if calls % 2 else CheckResult.failure()
+
+        result = await (
+            Scenario("flaky_pass_rate")
+            .check(from_fn(check_fn))
+            .run(multiple_runs=4, min_pass_rate=0.5)
+        )
+
+        assert calls == 4  # all attempts ran (no short-circuit)
+        assert result.runs_executed == 4
+        assert result.pass_rate == 0.5
+        assert result.min_pass_rate == 0.5
+        assert result.passed  # 0.5 >= 0.5
+
+    async def test_min_pass_rate_fails_when_threshold_not_met(self):
+        """When the empirical pass rate is below the threshold, the scenario fails."""
+        calls = 0
+
+        def check_fn(trace: Trace[str, str]) -> CheckResult:
+            nonlocal calls
+            calls += 1
+            # Pass only on the first attempt.
+            return CheckResult.success() if calls == 1 else CheckResult.failure()
+
+        result = await (
+            Scenario("flaky_fail_rate")
+            .check(from_fn(check_fn))
+            .run(multiple_runs=4, min_pass_rate=0.75)
+        )
+
+        assert calls == 4
+        assert result.runs_executed == 4
+        assert result.pass_rate == 0.25
+        assert result.failed  # 0.25 < 0.75
+
+    async def test_min_pass_rate_never_short_circuits(self):
+        """Unlike plain multiple_runs, min_pass_rate runs every attempt."""
+        calls = 0
+
+        def check_fn(trace: Trace[str, str]) -> CheckResult:
+            nonlocal calls
+            calls += 1
+            return CheckResult.failure()
+
+        result = await (
+            Scenario("min_pass_rate_no_short_circuit")
+            .check(from_fn(check_fn))
+            .run(multiple_runs=3, min_pass_rate=1.0)
+        )
+
+        assert calls == 3  # would be 1 with plain multiple_runs
+        assert result.runs_executed == 3
+        assert result.pass_rate == 0.0
+        assert result.failed
+
+    @pytest.mark.parametrize("value", [0.0, -0.1, 1.5, "0.5", True])
+    async def test_min_pass_rate_validation_errors(self, value):
+        """min_pass_rate rejects values outside (0, 1]."""
+        with pytest.raises(ValueError, match="min_pass_rate"):
+            await Scenario("invalid_min_pass_rate").run(
+                multiple_runs=2, min_pass_rate=value
+            )
+
+    async def test_min_pass_rate_without_multiple_runs_uses_scenario_default(self):
+        """min_pass_rate falls back to the scenario's multiple_runs when unset."""
+        calls = 0
+
+        def check_fn(trace: Trace[str, str]) -> CheckResult:
+            nonlocal calls
+            calls += 1
+            return CheckResult.success()
+
+        result = await (
+            Scenario("uses_default_multiple_runs", multiple_runs=3)
+            .check(from_fn(check_fn))
+            .run(min_pass_rate=1.0)
+        )
+
+        assert calls == 3
+        assert result.pass_rate == 1.0
+        assert result.passed
+
+    async def test_min_pass_rate_counts_advisory_only_failure_run_as_pass(self):
+        """An advisory-only failure run is a passing run under min_pass_rate.
+
+        Advisory failures do not fail the scenario, so a run whose only failure
+        is advisory reports ``passed`` and counts toward ``passed_runs`` in
+        statistical mode. This pins the interaction between the two features.
+        """
+        advisory_fail = MockCheck(
+            result=CheckResult.failure(message="soft failure"), advisory=True
+        )
+
+        result = await (
+            Scenario("advisory_under_min_pass_rate")
+            .check(advisory_fail)
+            .run(multiple_runs=3, min_pass_rate=1.0)
+        )
+
+        assert result.runs_executed == 3  # all attempts ran
+        assert result.pass_rate == 1.0  # every run passed (advisory-only)
+        assert result.passed  # 1.0 >= 1.0
+        # The advisory verdict is still recorded per run, not hidden.
+        assert result.steps[0].results[0].failed
+        assert result.steps[0].results[0].details.get("advisory") is True
+
+
 class TestScenarioErrorHandling:
     """Test error handling in scenarios."""
 

@@ -297,6 +297,12 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
         Configured upper bound on full scenario executions for this invocation.
     runs_executed : int
         How many full scenario executions ran before stopping (≤ ``multiple_runs``).
+    min_pass_rate : float | None
+        Optional statistical pass-rate threshold across runs. When set, the
+        scenario is considered to pass only if ``pass_rate >= min_pass_rate``.
+    pass_rate : float | None
+        Empirical pass rate across runs (passed runs / runs_executed). Set by
+        the runner when ``min_pass_rate`` is used; ``None`` otherwise.
     status : ScenarioStatus
         Aggregated outcome of the scenario derived from its steps.
     passed : bool
@@ -321,6 +327,20 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
         default=1,
         description="Full scenario executions that ran before stopping (at most multiple_runs).",
     )
+    min_pass_rate: float | None = Field(
+        default=None,
+        description=(
+            "Threshold on the empirical pass rate across runs. When set, the "
+            "scenario passes only if pass_rate >= min_pass_rate."
+        ),
+    )
+    pass_rate: float | None = Field(
+        default=None,
+        description=(
+            "Empirical pass rate across runs (passed runs / runs_executed). Set "
+            "by the runner when min_pass_rate is used; None otherwise."
+        ),
+    )
     tags: list[str] = Field(
         default_factory=list,
         description="Snapshot of scenario tags at run time.",
@@ -332,6 +352,17 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
         """The status of the scenario."""
         if not self.steps:
             return ScenarioStatus.PASS
+
+        # When a statistical pass-rate threshold was configured, the empirical
+        # pass rate is the verdict: the scenario passes only if it meets the
+        # threshold. The last run's step-level status is still reported, but a
+        # single run's outcome does not override the threshold verdict.
+        if self.min_pass_rate is not None and self.pass_rate is not None:
+            return (
+                ScenarioStatus.PASS
+                if self.pass_rate >= self.min_pass_rate
+                else ScenarioStatus.FAIL
+            )
 
         # Priority-based evaluation
         if any(step.errored for step in self.steps):
@@ -388,9 +419,13 @@ class ScenarioResult[TraceType: Trace](BaseResult, frozen=True):  # pyright: ign
         else:
             yield repr(self.final_trace)
 
+        runs_line = f" | runs: {self.runs_executed}/{self.multiple_runs}"
+        if self.pass_rate is not None:
+            runs_line += f" | pass rate: {self.pass_rate:.0%}"
+            if self.min_pass_rate is not None:
+                runs_line += f" (≥ {self.min_pass_rate:.0%})"
         yield Rule(
-            f"{_pluralize(len(self.steps), 'step')} in {self.duration_ms}ms"
-            f" | runs: {self.runs_executed}/{self.multiple_runs}",
+            f"{_pluralize(len(self.steps), 'step')} in {self.duration_ms}ms{runs_line}",
             style=f"{status['color']} bold",
         )
 
@@ -480,10 +515,15 @@ class TestCaseResult(BaseResult, frozen=True):
         if not self.results:
             return TestCaseStatus.PASS
 
-        # Priority-based evaluation
-        if any(r.errored for r in self.results):
+        # Advisory checks record a FAIL/ERROR verdict for reporting, but their
+        # outcome is non-blocking: the test case only fails or errors when a
+        # non-advisory check does. The scenario runner stamps ``advisory`` into
+        # each result's ``details`` so the rollup can distinguish them.
+        if any(
+            r.errored and not r.details.get("advisory", False) for r in self.results
+        ):
             return TestCaseStatus.ERROR
-        if any(r.failed for r in self.results):
+        if any(r.failed and not r.details.get("advisory", False) for r in self.results):
             return TestCaseStatus.FAIL
         if all(r.skipped for r in self.results):
             return TestCaseStatus.SKIP

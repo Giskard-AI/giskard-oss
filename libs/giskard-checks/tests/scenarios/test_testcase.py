@@ -437,6 +437,68 @@ class TestTestCaseResult:
         assert "Test case failed" in error_message
         assert "FAILED" in error_message
 
+    def test_testcase_result_status_ignores_advisory_failures(self):
+        """A FAIL/ERROR stamped ``advisory`` does not fail the test case status.
+
+        The scenario runner stamps each advisory check's verdict with
+        ``details['advisory'] = True``; the status rollup then treats an
+        advisory-only failure as non-blocking while preserving the verdict in
+        each ``CheckResult`` for reporting.
+        """
+        advisory_fail = CheckResult.failure(
+            message="soft failure", details={"check_name": "advisory", "advisory": True}
+        )
+        advisory_error = CheckResult.error(
+            message="soft error",
+            details={"check_name": "advisory_err", "advisory": True},
+        )
+        passing = CheckResult.success(message="ok", details={"check_name": "hard"})
+
+        advisory_only = TestCaseResult(results=[advisory_fail, passing], duration_ms=0)
+        assert advisory_only.passed
+        assert not advisory_only.failed
+        # The advisory verdict is still recorded (not hidden).
+        assert advisory_only.results[0].failed
+
+        advisory_error_only = TestCaseResult(results=[advisory_error], duration_ms=0)
+        assert advisory_error_only.passed
+        assert not advisory_error_only.errored
+        assert advisory_error_only.results[0].errored
+
+    def test_testcase_result_status_fails_on_non_advisory_failure(self):
+        """A non-advisory failure alongside an advisory one still fails."""
+        advisory_fail = CheckResult.failure(
+            message="soft", details={"check_name": "adv", "advisory": True}
+        )
+        hard_fail = CheckResult.failure(message="hard", details={"check_name": "hard"})
+
+        result = TestCaseResult(results=[advisory_fail, hard_fail], duration_ms=0)
+        assert result.failed
+        assert not result.passed
+
+    async def test_check_advisory_field_default_and_excluded_from_spec(self):
+        """``Check.advisory`` defaults to False and is not part of the Hub spec."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="input", outputs="output")
+        )
+        check = Equals(
+            expected_value="output",
+            target_key="trace.interactions[-1].outputs",
+            name="exact_output",
+            advisory=True,
+        )
+        assert check.advisory is True
+        # Default is False.
+        assert Equals(expected_value="x").advisory is False
+        # advisory is identity, not configuration: excluded from the Hub wire spec.
+        spec = check.to_spec()
+        assert "advisory" not in spec
+        assert spec["kind"] == "equals"
+        # Sanity: the check still runs.
+        test_case = TestCase(trace=trace, checks=[check])
+        run_result = await test_case.run()
+        assert run_result.passed
+
 
 class TestTestCaseAssertPassed:
     """Test TestCase.assert_passed() convenience method."""

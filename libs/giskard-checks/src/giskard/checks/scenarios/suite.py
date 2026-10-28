@@ -170,6 +170,8 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         parallel: bool = False,
         max_concurrency: int | None = None,
         verbose: bool = True,
+        multiple_runs: int | None = None,
+        min_pass_rate: float | None = None,
     ) -> SuiteResult:
         """Run all scenarios in the suite.
 
@@ -196,6 +198,15 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         verbose : bool
             If True (default), display a progress bar showing which scenario is
             currently running. Set to False for non-interactive environments.
+        multiple_runs : int | None
+            Optional cap on full scenario executions, forwarded to every
+            scenario's ``run``. When set with ``min_pass_rate``, each scenario is
+            run that many times and counts as passed only if its empirical pass
+            rate meets the threshold.
+        min_pass_rate : float | None
+            Optional pass-rate threshold in ``(0, 1]`` forwarded to every
+            scenario's ``run``. The suite pass rate then reflects scenarios
+            that met their threshold. See ``Scenario.run`` for details.
 
         Returns
         -------
@@ -242,10 +253,21 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             with self._progress_bar(enabled=verbose) as tracker:
                 if parallel:
                     results = await self._run_parallel(
-                        target, return_exception, max_concurrency, tracker
+                        target,
+                        return_exception,
+                        max_concurrency,
+                        tracker,
+                        multiple_runs=multiple_runs,
+                        min_pass_rate=min_pass_rate,
                     )
                 else:
-                    results = await self._run_serial(target, return_exception, tracker)
+                    results = await self._run_serial(
+                        target,
+                        return_exception,
+                        tracker,
+                        multiple_runs=multiple_runs,
+                        min_pass_rate=min_pass_rate,
+                    )
             end_time = time.perf_counter()
 
             suite_result = SuiteResult(
@@ -287,12 +309,18 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         target: Any,
         return_exception: bool,
         progress: _SuiteProgress,
+        *,
+        multiple_runs: int | None = None,
+        min_pass_rate: float | None = None,
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
         results: list[ScenarioResult[Trace[Any, Any]]] = []
         for scenario in self.scenarios:
             progress.describe(f"Running: {escape(scenario.name)}")
             result = await scenario.run(
-                target=target, return_exception=return_exception
+                target=target,
+                return_exception=return_exception,
+                multiple_runs=multiple_runs,
+                min_pass_rate=min_pass_rate,
             )
             results.append(result)
             progress.record(result.status)
@@ -304,6 +332,9 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
         return_exception: bool,
         max_concurrency: int | None,
         progress: _SuiteProgress,
+        *,
+        multiple_runs: int | None = None,
+        min_pass_rate: float | None = None,
     ) -> list[ScenarioResult[Trace[Any, Any]]]:
         semaphore = (
             asyncio.Semaphore(max_concurrency) if max_concurrency else nullcontext()
@@ -315,7 +346,10 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
             async with semaphore:
                 with progress.scenario_row(scenario.name):
                     result = await scenario.run(
-                        target=target, return_exception=return_exception
+                        target=target,
+                        return_exception=return_exception,
+                        multiple_runs=multiple_runs,
+                        min_pass_rate=min_pass_rate,
                     )
                 progress.record(result.status)
             return result
