@@ -513,7 +513,9 @@ class GarakScanAdapter:
             return self._run_probe(probe, target, loop, detector_cache)
         except Exception as exc:  # noqa: BLE001 — one bad probe must not abort the scan
             logger.warning("Probe %s raised: %s", probe.probename, exc)
-            # Emit an error scenario so an empty suite cannot report pass_rate 1.0.
+            # Emit an errored scenario so a crashing probe still surfaces as a
+            # failure signal (empty suites now yield pass_rate None, but the
+            # probe error itself would otherwise be discarded).
             return [_error_probe_scenario(probe.probename, exc)]
 
     async def run[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]

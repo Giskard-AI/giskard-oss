@@ -49,17 +49,21 @@ Markers `<RESPONSE>...</RESPONSE>` indicate the specific agent response to evalu
 
 -------------------
 
-<TRACE>
-{{ trace | fence }}
-</TRACE>
-
--------------------
-
 <RESPONSE>
 {{ output | fence }}
 </RESPONSE>
+{% if include_trace | default(true) %}
+
+-------------------
+
+<TRACE>
+{{ trace | fence }}
+</TRACE>
+{% endif %}
+{% if _instr_output is defined %}
 
 -------------------
 
 **Output Format:**
 {{ _instr_output }}
+{% endif %}

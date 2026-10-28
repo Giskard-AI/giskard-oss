@@ -1,6 +1,6 @@
 [project]
 name = "giskard-checks"
-version = "1.0.2b6"
+version = "1.0.6"
 description = "Scenario-based evaluations and LLM-as-judge checks for agentic systems"
 readme = "README.md"
 license = { text = "MIT" }
@@ -9,29 +9,56 @@ dependencies = [
     "jsonpath-ng>=1.7.0,<2",
     "pydantic>=2.12,<3",
     "pydantic-settings>=2.7,<3",
-    "giskard-agents>=1.0.2b6,<2",
-    "jinja2>=3.1.6,<4",
-    "giskard-core>=1.0.1b6,<2",
+    "giskard-agents>=1.0.6,<2",
+    "giskard-core>=1.0.3,<2",
     "jsonschema>=4.23.0,<5",
     "numpy>=2.4.1,<3",
+    # Calendar-versioned (YYYY.M.D); the upstream regex package has maintained
+    # backwards compatibility across years and does not follow semver, so a
+    # next-major upper bound does not apply cleanly.  Left unbounded on purpose.
     "regex>=2026.1.15",
     "rich>=14.2.0,<16",
+    # Imported directly (giskard.checks.builtin.json_valid uses referencing.exceptions);
+    # shipped transitively by jsonschema, declared explicitly so the direct import
+    # is not a hidden transitive coupling.
+    "referencing>=0.28.4,<1",  # 0.x: <1; same floor as jsonschema (which has no upper bound)
 ]
 
 [project.optional-dependencies]
 readability = [
-    "textstat>=0.7.0",
+    "textstat>=0.7.0,<1",
 ]
 regorus = ["celine-regorus>=0.9.1; sys_platform != 'win32' and (sys_platform != 'linux' or platform_machine != 'aarch64')"]
 all = ["giskard-checks[readability,regorus]"] # Install all optional dependencies
+
+[tool.deptry]
+known_first_party = ["giskard"]  # giskard.* is a PEP 420 namespace shared by all workspace libs
+
+[tool.deptry.package_module_name_map]
+# Distribution ``celine-regorus`` installs the top-level module ``regorus``.
+"celine-regorus" = "regorus"
+
+[tool.deptry.per_rule_ignores]
+"DEP002" = [
+    "giskard-agents",  # workspace sibling; imported as giskard.agents (first-party), not as the dist name
+    "giskard-core",  # workspace sibling; imported as giskard.core (first-party), not as the dist name
+    "giskard-checks",  # self-referenced by the `all` optional extra (alias extras), never imported by name
+    "celine-regorus",  # optional: imported dynamically via utils.optional_deps (importlib), never statically
+    "textstat",  # optional: imported dynamically via utils.optional_deps (importlib), never statically
+]
+"DEP003" = [
+    "pydantic_core",  # part of pydantic's public API; pydantic pins pydantic-core exactly, so declaring it would only constrain pydantic
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]
 addopts = "--doctest-modules"
 asyncio_mode = "auto"
 pythonpath = ["src"]
+consider_namespace_packages = true
 markers = [
     "integration: integration tests that are skipped unless --run-integration is provided",
+    "uses_ambient_env: opt out of the GISKARD_* environment isolation fixture",
 ]
 
 [tool.ruff.lint]

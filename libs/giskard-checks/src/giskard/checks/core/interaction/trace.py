@@ -45,7 +45,7 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
 
     Use in JSONPath expressions:
     >>> from giskard.checks import Groundedness
-    >>> check = Groundedness(answer_key="trace.last.outputs")
+    >>> check = Groundedness(target_key="trace.last.outputs")
 
     Access all outputs:
     >>> all_outputs = [interaction.outputs for interaction in trace.interactions]
@@ -76,7 +76,7 @@ class Trace[InputType, OutputType](BaseModel, frozen=True):
         last_interaction = trace.last
 
         # In JSONPath expressions
-        check = Groundedness(answer_key="trace.last.outputs")
+        check = Groundedness(target_key="trace.last.outputs")
 
         # In Jinja2 templates
         # {{ trace.last.outputs }}

@@ -4,12 +4,12 @@ from giskard.agents import TemplateReference
 from pydantic import Field
 from pydantic.experimental.missing_sentinel import MISSING
 
-from ..core import Trace
+from ..core import Interaction, Trace
 from ..core.check import Check
 from ..core.extraction import JSONPathStr, provided_or_resolve
 from ..core.result import CheckResult
 from ._inputs import ResolvableInput, error_if_unresolved
-from .base import BaseLLMCheck
+from .base import BaseLLMCheck, trace_with_current_turn
 
 
 @Check.register("answer_relevance")
@@ -36,9 +36,9 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         JSONPath expression to extract the question from the trace
         (default: ``"trace.last.inputs"``).
     answer : str | MISSING
-        The answer to evaluate. When provided, takes priority over ``answer_key``.
-        If omitted, extracted from the trace using ``answer_key``.
-    answer_key : JSONPathStr
+        The answer to evaluate. When provided, takes priority over ``target_key``.
+        If omitted, extracted from the trace using ``target_key``.
+    target_key : JSONPathStr
         JSONPath expression to extract the answer from the trace
         (default: ``"trace.last.outputs"``).
     context : str | MISSING
@@ -53,7 +53,7 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
 
     Notes
     -----
-    When ``question_key`` or ``answer_key`` matches nothing in the trace, the check
+    When ``question_key`` or ``target_key`` matches nothing in the trace, the check
     returns ``CheckStatus.ERROR`` without invoking the judge. History is supporting
     context only: the judge is instructed to score the resolved question/answer and
     never to substitute a question inferred from history, so a misconfigured key
@@ -80,11 +80,11 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
     )
     answer: str | MISSING = Field(
         default=MISSING,
-        description="The answer to evaluate. Takes priority over answer_key.",
+        description="The answer to evaluate. Takes priority over target_key.",
     )
-    answer_key: JSONPathStr = Field(
+    target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        description="JSONPath to extract the answer from the trace.",
+        description=("JSONPath to extract the answer from the trace."),
     )
     context: str | MISSING = Field(
         default=MISSING,
@@ -118,7 +118,7 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         if early := error_if_unresolved(
             trace,
             ResolvableInput("question", self.question_key, self.question),
-            ResolvableInput("answer", self.answer_key, self.answer),
+            ResolvableInput("answer", self.target_key, self.answer, "target_key"),
         ):
             return early
         return await super().run(trace)
@@ -145,20 +145,35 @@ class AnswerRelevance[InputType, OutputType, TraceType: Trace](  # pyright: igno
         )
         answer = provided_or_resolve(
             trace,
-            key=self.answer_key,
+            key=self.target_key,
             value=self.answer,
         )
 
+        som_trace = (
+            trace
+            if self.include_history
+            else Trace(interactions=[Interaction(inputs=question, outputs=answer)])
+        )
         inputs: dict[str, Any] = {
             "question": question,
             "answer": answer,
             "context": self.context if self.context is not MISSING else "",
+            "trace": som_trace,
         }
 
         # Omitted entirely (rather than passed empty) when disabled, so the
         # template drops the <CONVERSATION HISTORY> section instead of rendering
-        # an empty one.
+        # an empty one. SOM receives only the resolved current turn through
+        # ``trace`` when history is disabled, preserving the same isolation.
         if self.include_history:
             inputs["history"] = trace
 
         return inputs
+
+    @override
+    def get_som_trace(
+        self, trace: TraceType, inputs: dict[str, Any]
+    ) -> Trace[Any, Any]:
+        return trace_with_current_turn(
+            inputs["trace"], inputs=inputs["question"], outputs=inputs["answer"]
+        )

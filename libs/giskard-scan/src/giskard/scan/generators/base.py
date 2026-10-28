@@ -36,7 +36,7 @@ class ScenarioContext(BaseModel):
     knowledge_base: KnowledgeBase | None = None
 
 
-TargetMode = Literal["singleturn", "multiturn"]
+type TargetMode = Literal["singleturn", "multiturn"]
 
 # Shared product default for generate_suite, vulnerability/quality scans, and
 # third-party adapters (garak / deepteam). Flip here to change all of them.

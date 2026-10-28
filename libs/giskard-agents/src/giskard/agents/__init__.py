@@ -4,13 +4,16 @@ from .chat import Chat
 from .context import RunContext
 from .embeddings import BaseEmbeddingModel, EmbeddingModel
 from .errors import Error, ModelRefusalError, WorkflowError
-from .generators import BaseGenerator, Generator
+from .generators import BaseGenerator, GenerationParams, Generator
+from .som import BaseSOM, SOMResponse, resolve_som
 from .templates import (
     MessageTemplate,
     add_prompts_path,
     get_prompts_manager,
     remove_prompts_path,
     set_default_prompts_path,
+    set_template_policy,
+    strict_templates,
 )
 from .tools import Tool, tool
 from .workflow import ChatWorkflow, ErrorPolicy, StepType, TemplateReference
@@ -21,6 +24,10 @@ __all__ = [
     "__version__",
     "Generator",
     "BaseGenerator",
+    "GenerationParams",
+    "BaseSOM",
+    "SOMResponse",
+    "resolve_som",
     "ChatWorkflow",
     "TemplateReference",
     "Chat",
@@ -31,6 +38,8 @@ __all__ = [
     "add_prompts_path",
     "remove_prompts_path",
     "get_prompts_manager",
+    "set_template_policy",
+    "strict_templates",
     "RunContext",
     "ErrorPolicy",
     "WorkflowError",

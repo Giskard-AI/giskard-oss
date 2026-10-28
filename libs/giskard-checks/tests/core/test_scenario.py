@@ -369,6 +369,87 @@ class TestScenarioNormalCases:
         assert result.final_trace.interactions[0] == interaction1
         assert result.errored
 
+    async def test_skipped_step_without_checks_reports_skip_not_pass(self):
+        """A checkless step that never ran must report SKIP, never PASS."""
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+
+        result = await (
+            Scenario("skipped_checkless_step")
+            .add_interaction(MockInteractionSpec(interactions=[interaction1]))
+            .check(MockCheck(result=CheckResult.failure(message="Check 1 failed")))
+            .add_interaction(MockInteractionSpec(interactions=[interaction2]))
+            .run()
+        )
+
+        assert len(result.steps) == 2
+        assert result.steps[0].failed
+        # The second step carries no checks and never ran.
+        assert result.steps[1].skipped
+        assert not result.steps[1].passed
+        assert len(result.steps[1].results) == 1
+        assert result.steps[1].results[0].skipped
+        assert result.steps[1].results[0].details.get("check_name") == "step"
+        failures = result.steps[1].format_failures()
+        assert len(failures) == 1
+        assert "step SKIPPED:" in failures[0]
+        assert "Unknown check" not in failures[0]
+        assert result.failed
+
+    async def test_skipped_step_without_checks_after_error_reports_skip(self):
+        """Same as above when the preceding step errored rather than failed."""
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+
+        result = await (
+            Scenario("skipped_checkless_step_after_error")
+            .add_interaction(MockInteractionSpec(interactions=[interaction1]))
+            .check(MockCheck(result=CheckResult.error(message="Check 1 errored")))
+            .add_interaction(MockInteractionSpec(interactions=[interaction2]))
+            .run()
+        )
+
+        assert len(result.steps) == 2
+        assert result.steps[0].errored
+        assert result.steps[1].skipped
+        assert not result.steps[1].passed
+        assert result.steps[1].results[0].details.get("check_name") == "step"
+        assert result.errored
+
+    async def test_skipped_step_check_results_carry_check_spec(self):
+        """Skipped checks still report their config via details['check_spec'].
+
+        A Hub import maps details['check_spec'] onto CheckResult.spec (ENG-1737);
+        a check skipped after an earlier failure must carry it too so its
+        settings render in the evaluation UI.
+        """
+        interaction1 = Interaction(inputs="input1", outputs="output1")
+        interaction2 = Interaction(inputs="input2", outputs="output2")
+
+        result = await (
+            Scenario("skipped_step_keeps_spec")
+            .add_interaction(MockInteractionSpec(interactions=[interaction1]))
+            .check(MockCheck(result=CheckResult.failure(message="Check 1 failed")))
+            .add_interaction(MockInteractionSpec(interactions=[interaction2]))
+            .check(
+                Equals(
+                    expected_value="output2",
+                    target_key="trace.interactions[-1].outputs",
+                    name="second_step_check",
+                )
+            )
+            .run()
+        )
+
+        assert result.steps[1].skipped
+        skipped = result.steps[1].results[0]
+        assert skipped.skipped
+        spec = skipped.details["check_spec"]
+        assert spec["kind"] == "equals"
+        assert spec["expected_value"] == "output2"
+        assert spec["target_key"] == "trace.interactions[-1].outputs"
+        assert "name" not in spec
+
     async def test_trace_accumulation_across_components(self):
         """Test that trace accumulates interactions across components."""
         interaction1 = Interaction(inputs="1", outputs="2")
@@ -1287,15 +1368,17 @@ class TestScenarioExtendAndSerialization:
         fluent = (
             Scenario("fluent")
             .interact("Hello", "Hi")
-            .check(Equals(expected_value="Hi", key="trace.last.outputs"))
+            .check(Equals(expected_value="Hi", target_key="trace.last.outputs"))
             .interact("World", "Echo: World")
-            .check(Equals(expected_value="Echo: World", key="trace.last.outputs"))
+            .check(
+                Equals(expected_value="Echo: World", target_key="trace.last.outputs")
+            )
         )
         from_seq = Scenario(name="fluent").extend(
             Interact(inputs="Hello", outputs="Hi"),
-            Equals(expected_value="Hi", key="trace.last.outputs"),
+            Equals(expected_value="Hi", target_key="trace.last.outputs"),
             Interact(inputs="World", outputs="Echo: World"),
-            Equals(expected_value="Echo: World", key="trace.last.outputs"),
+            Equals(expected_value="Echo: World", target_key="trace.last.outputs"),
         )
 
         result_fluent = await fluent.run()
@@ -1321,7 +1404,7 @@ class TestScenarioExtendAndSerialization:
         scenario = (
             Scenario("serialize_test", multiple_runs=2)
             .interact("Hello", "Hi")
-            .check(Equals(expected_value="Hi", key="trace.last.outputs"))
+            .check(Equals(expected_value="Hi", target_key="trace.last.outputs"))
         )
         serialized = scenario.model_dump()
         assert serialized["multiple_runs"] == 2
@@ -1339,7 +1422,9 @@ class TestScenarioExtendAndSerialization:
             steps=[
                 Step(
                     interacts=[Interact(inputs="Hello", outputs="Hi")],
-                    checks=[Equals(expected_value="Hi", key="trace.last.outputs")],
+                    checks=[
+                        Equals(expected_value="Hi", target_key="trace.last.outputs")
+                    ],
                 ),
             ],
         )
@@ -1402,7 +1487,9 @@ class TestScenarioDynamicBinding:
         result = await (
             Scenario("test", target=echo_sut)  # target provided on scenario level
             .interact("hello")  # no outputs provided
-            .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+            .check(
+                Equals(expected_value="Echo: hello", target_key="trace.last.outputs")
+            )
             .run()
         )
 
@@ -1413,7 +1500,9 @@ class TestScenarioDynamicBinding:
         result = await (
             Scenario("test")  # no target provided
             .interact("hello")  # no outputs provided
-            .check(Equals(expected_value="Echo: hello", key="trace.last.outputs"))
+            .check(
+                Equals(expected_value="Echo: hello", target_key="trace.last.outputs")
+            )
             .run(target=echo_sut)  # target provided on run
         )
         assert result.passed
@@ -1423,7 +1512,9 @@ class TestScenarioDynamicBinding:
         result = await (
             Scenario("test", target=echo_sut)  # target provided on scenario level
             .interact("hello")  # no outputs provided
-            .check(Equals(expected_value="Echo: HELLO", key="trace.last.outputs"))
+            .check(
+                Equals(expected_value="Echo: HELLO", target_key="trace.last.outputs")
+            )
             .run(
                 target=echo_upper_sut
             )  # target provided on run (overrides scenario level target)
@@ -1450,7 +1541,7 @@ async def test_scenario_result_snapshots_tags():
     scenario = (
         Scenario("s", tags=["Category:Hallucination"])
         .interact("hello", sut)
-        .check(Equals(expected_value="reply: hello", key="trace.last.outputs"))
+        .check(Equals(expected_value="reply: hello", target_key="trace.last.outputs"))
     )
     result = await scenario.run()
     assert result.tags == ["Category:Hallucination"]

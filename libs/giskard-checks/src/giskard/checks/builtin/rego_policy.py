@@ -73,7 +73,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
         Inline Rego source loaded into the engine.
     rule : str
         Fully qualified boolean rule path (e.g. ``data.giskard.allow``).
-    key : str, optional
+    target_key : str, optional
         JSONPath into the trace for the OPA input document
         (default: ``trace.last.outputs``).
     data : dict, optional
@@ -102,9 +102,9 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
         ...,
         description="Fully qualified boolean rule path (e.g. data.giskard.allow).",
     )
-    key: JSONPathStr = Field(
+    target_key: JSONPathStr = Field(
         default="trace.last.outputs",
-        description="JSONPath expression to extract the OPA input document.",
+        description=("JSONPath expression to extract the OPA input document."),
     )
     data: dict[str, Any] = Field(
         default_factory=dict,
@@ -162,9 +162,9 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
             undefined, error if evaluation fails or the rule value is not
             boolean.
         """
-        raw_value = resolve(trace, self.key)
+        raw_value = resolve(trace, self.target_key)
         details: dict[str, Any] = {
-            "key": self.key,
+            "target_key": self.target_key,
             "data": self.data,
             "rule": self.rule,
         }
@@ -172,7 +172,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
         if isinstance(raw_value, NoMatch):
             details["input"] = raw_value
             return CheckResult.error(
-                message=f"No value found for key '{self.key}'.",
+                message=f"No value found for key '{self.target_key}'.",
                 details=details,
             )
 
@@ -183,7 +183,7 @@ class RegoPolicy[InputType, OutputType, TraceType: Trace](  # pyright: ignore[re
         except (TypeError, ValueError) as err:
             details["error"] = str(err)
             return CheckResult.error(
-                message=f"Value at key '{self.key}' is not JSON serializable: {err}",
+                message=f"Value at key '{self.target_key}' is not JSON serializable: {err}",
                 details=details,
             )
 

@@ -35,8 +35,13 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     - Result formatting
     """
 
-    key: JSONPathStr = Field(
-        ..., description="The key to extract the actual value from the trace"
+    target_key: JSONPathStr = Field(
+        default="trace.last.outputs",
+        description=(
+            "JSONPath expression to extract the actual value from the trace. "
+            "Defaults to 'trace.last.outputs' which extracts the last "
+            "interaction's outputs."
+        ),
     )
     expected_value: ExpectedType | MISSING = Field(
         default=MISSING,
@@ -156,7 +161,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
         if not isinstance(actual_value, (list, set, tuple)):
             return CheckResult.error(
                 message=(
-                    f"Expected a list, set, or tuple at key '{self.key}' when match is "
+                    f"Expected a list, set, or tuple at key '{self.target_key}' when match is "
                     f"{self.match!r}, but got {type(actual_value).__name__}."
                 ),
                 details=details,
@@ -208,7 +213,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
     @override
     async def run(self, trace: TraceType) -> CheckResult:
         """Execute the check against the provided trace."""
-        actual_value = resolve(trace, self.key)
+        actual_value = resolve(trace, self.target_key)
         expected_value = provided_or_resolve(
             trace,
             key=self.expected_value_key,
@@ -228,7 +233,7 @@ class ComparisonCheck[InputType, OutputType, TraceType: Trace, ExpectedType](  #
 
         if isinstance(actual_value, NoMatch):
             return CheckResult.error(
-                message=f"No value found for key '{self.key}', expected a value {self._comparison_message} {repr(self.expected_value)}.",
+                message=f"No value found for key '{self.target_key}', expected a value {self._comparison_message} {repr(self.expected_value)}.",
                 details=details,
             )
 
@@ -274,8 +279,10 @@ class LessThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrigh
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    key : str
-        The key to extract the actual value from the trace
+    target_key : JSONPathStr
+        JSONPath expression to extract the actual value from the trace.
+        Defaults to "trace.last.outputs" which extracts the last
+        interaction's outputs.
     """
 
     @override
@@ -317,8 +324,10 @@ class GreaterThan[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyr
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    key : str
-        The key to extract the actual value from the trace
+    target_key : JSONPathStr
+        JSONPath expression to extract the actual value from the trace.
+        Defaults to "trace.last.outputs" which extracts the last
+        interaction's outputs.
     """
 
     @override
@@ -360,8 +369,10 @@ class LessThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # 
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    key : str
-        The key to extract the actual value from the trace
+    target_key : JSONPathStr
+        JSONPath expression to extract the actual value from the trace.
+        Defaults to "trace.last.outputs" which extracts the last
+        interaction's outputs.
     """
 
     @override
@@ -403,8 +414,10 @@ class GreaterThanEquals[InputType, OutputType, TraceType: Trace, ExpectedType]( 
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    key : str
-        The key to extract the actual value from the trace
+    target_key : JSONPathStr
+        JSONPath expression to extract the actual value from the trace.
+        Defaults to "trace.last.outputs" which extracts the last
+        interaction's outputs.
     """
 
     @override
@@ -446,8 +459,10 @@ class Equals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyright:
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    key : str
-        The key to extract the actual value from the trace
+    target_key : JSONPathStr
+        JSONPath expression to extract the actual value from the trace.
+        Defaults to "trace.last.outputs" which extracts the last
+        interaction's outputs.
     """
 
     @override
@@ -489,8 +504,10 @@ class NotEquals[InputType, OutputType, TraceType: Trace, ExpectedType](  # pyrig
     ----------
     expected_value : ExpectedType
         The expected value to compare against the extracted values
-    key : str
-        The key to extract the actual value from the trace
+    target_key : JSONPathStr
+        JSONPath expression to extract the actual value from the trace.
+        Defaults to "trace.last.outputs" which extracts the last
+        interaction's outputs.
     """
 
     @override

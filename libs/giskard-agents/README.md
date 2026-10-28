@@ -36,6 +36,21 @@ Three basic elements to keep in mind:
 
 The API is async throughout — all run methods return coroutines.
 
+## System One Models
+
+`BaseSOM` provides a separate interface for models that predict a probability
+from a question and chat messages. Its async `predict()` method returns a
+`SOMResponse` containing the probability, model identifier, and optional token
+usage. Applications interpret that probability and supply any verdict or
+explanation they need.
+
+Use `resolve_som("provider/model")` to select a supported provider. The
+initial integration supports `typesafe/jev` (the provider's `jev-latest` alias),
+using `TYPESAFE_API_KEY` and an optional `TYPESAFE_BASE_URL`. For another provider,
+implement `BaseSOM.predict()` and return `SOMResponse`; no checks dependency
+is required. Register the implementation with `BaseSOM.register()` if its
+configuration needs to survive serialization.
+
 ## Basic usage
 
 ### Running a chat

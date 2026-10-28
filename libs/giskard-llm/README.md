@@ -65,9 +65,17 @@ response = await client.acompletion(
 |---|---|---|---|---|---|
 | `openai/` (default) | `openai` | `OPENAI_API_KEY` | yes | yes | `base_url`, `timeout`, `http_client`, `default_headers` |
 | `google/` | `google-genai` | `GOOGLE_API_KEY` / `GEMINI_API_KEY` | yes | yes | `http_client`, `default_headers`, `http_options` |
-| `anthropic/` | `anthropic` | `ANTHROPIC_API_KEY` | yes | no | `merge_system`, `timeout`, `http_client`, `default_headers` |
+| `anthropic/` | `anthropic` | `ANTHROPIC_API_KEY` | yes | no | `merge_system`, `timeout`, `http_client` (`httpx2`, see below), `default_headers` |
 | `azure/` | `openai` | `AZURE_API_KEY`, `AZURE_API_BASE` | yes | yes | `api_version`, `base_url`, `http_client`, `default_headers` |
 | `azure_ai/` | `openai` | `AZURE_AI_API_KEY`, `AZURE_AI_ENDPOINT` | yes | model-dependent | `base_url`, `http_client`, `default_headers` |
+
+### Structured output schemas
+
+Pydantic `response_format` models are converted in each provider's translator.
+OpenAI and Azure close object schemas recursively while preserving explicit
+`additionalProperties` schemas on `dict[str, X]` fields. Anthropic uses its SDK's
+`transform_schema`; that SDK converts `dict[str, X]` fields to closed objects with
+no declared properties, so avoid map fields in Anthropic structured output models.
 
 
 ## Azure Foundry OpenAI v1
@@ -133,6 +141,21 @@ client.configure(
 
 response = await client.acompletion("azure-secure/gpt-4.1-nano", messages)
 await http_client.aclose()
+```
+
+The `anthropic` provider is the exception. Anthropic SDK v1 requires an
+`httpx2.AsyncClient` and raises a `TypeError` for an `httpx.AsyncClient`.
+
+```python
+import httpx2
+
+anthropic_http_client = httpx2.AsyncClient(verify="/path/to/ca.pem")
+client.configure(
+    "anthropic-secure",
+    provider="anthropic",
+    api_key="os.environ/ANTHROPIC_API_KEY",  # pragma: allowlist secret
+    http_client=anthropic_http_client,
+)
 ```
 
 For detailed per-provider documentation (role mapping, message constraints, tool format, error mapping), see the provider class docstrings in `src/giskard/llm/providers/`.

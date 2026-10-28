@@ -1,6 +1,7 @@
 """Tests for the normalization utility functions."""
 
 import unicodedata
+from collections import defaultdict, namedtuple
 
 from giskard.checks.utils.normalization import normalize_data, normalize_string
 
@@ -155,3 +156,26 @@ def test_normalize_data_list_e_acute() -> None:
     assert result[0] == "café"
     assert result[1] == "café"
     assert result[0] == result[1]
+
+
+def test_normalize_data_namedtuple_e_acute() -> None:
+    """Test that normalize_data rebuilds named tuples from their fields."""
+    Point = namedtuple("Point", ["label", "value"])
+    data = Point(label="café", value=1)
+
+    result = normalize_data(data, "NFC")
+
+    assert isinstance(result, Point)
+    assert result == Point(label="café", value=1)
+
+
+def test_normalize_data_defaultdict_e_acute() -> None:
+    """Test that normalize_data keeps a defaultdict and its default factory."""
+    data = defaultdict(list, {"text": "café"})
+
+    result = normalize_data(data, "NFC")
+
+    assert isinstance(result, defaultdict)
+    assert result.default_factory is list
+    assert result == {"text": "café"}
+    assert data["text"] == "café"

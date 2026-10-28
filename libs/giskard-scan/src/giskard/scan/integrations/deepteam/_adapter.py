@@ -175,7 +175,13 @@ async def _testcase_to_scenario(
     reason = getattr(test_case, "reason", None) or ""
     if error is not None:
         check = CheckResult.error(message=str(error), details=details)
-    elif score is not None and score >= _HIT_THRESHOLD:
+    elif score is None:
+        # No score means deepteam reached no verdict; reporting FAIL would be
+        # indistinguishable from a genuine vulnerability hit.
+        check = CheckResult.skip(
+            message=reason or "deepteam returned no score", details=details
+        )
+    elif score >= _HIT_THRESHOLD:
         # Polarity flip: a high score means the model resisted -> scan success.
         check = CheckResult.success(message=reason, details=details, metrics=metrics)
     else:

@@ -2,6 +2,7 @@ from .check import Check
 from .exceptions import InputGenerationException, InteractionGenerationError
 from .extraction import resolve
 from .interaction import Interact, Interaction, InteractionSpec, Trace
+from .judge import BaseJudge, JudgeInput, LLMChatJudge, SOMJudge
 from .result import (
     CheckResult,
     CheckStatus,
@@ -9,13 +10,16 @@ from .result import (
     GroupStats,
     Metric,
     ScenarioResult,
+    ScenarioStatus,
     SuiteResult,
     TestCaseError,
     TestCaseResult,
+    TestCaseStatus,
 )
 from .scenario import Scenario, Step
 from .testcase import TestCase
 from .types import Target
+from .unavailable import UnavailableCheckWarning, UnavailableHubCheck
 
 __all__ = [
     "Scenario",
@@ -32,11 +36,19 @@ __all__ = [
     "GroupStats",
     "Metric",
     "ScenarioResult",
+    "ScenarioStatus",
     "SuiteResult",
     "TestCaseError",
     "TestCaseResult",
+    "TestCaseStatus",
     "TestCase",
     "InputGenerationException",
     "InteractionGenerationError",
     "resolve",
+    "BaseJudge",
+    "JudgeInput",
+    "LLMChatJudge",
+    "SOMJudge",
+    "UnavailableCheckWarning",
+    "UnavailableHubCheck",
 ]

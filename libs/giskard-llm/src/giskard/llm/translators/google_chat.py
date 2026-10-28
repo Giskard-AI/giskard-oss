@@ -422,10 +422,22 @@ class GoogleChatTranslator:
 
         usage = None
         if raw.usage_metadata:
+            # google-genai defines total_token_count as the sum of prompt,
+            # candidates, tool_use_prompt and thoughts token counts. thoughts_token_count
+            # is generated (and billed) output, so fold it into output_tokens; likewise
+            # count tool_use_prompt on the input side. This keeps
+            # input_tokens + output_tokens == total_tokens when the model thinks.
+            um = raw.usage_metadata
+            input_tokens = (um.prompt_token_count or 0) + (
+                um.tool_use_prompt_token_count or 0
+            )
+            output_tokens = (um.candidates_token_count or 0) + (
+                um.thoughts_token_count or 0
+            )
             usage = Usage(
-                input_tokens=raw.usage_metadata.prompt_token_count or 0,
-                output_tokens=raw.usage_metadata.candidates_token_count or 0,
-                total_tokens=raw.usage_metadata.total_token_count or 0,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=um.total_token_count or (input_tokens + output_tokens),
             )
 
         return CompletionResponse(choices=choices, model=model, usage=usage)
