@@ -137,14 +137,18 @@ class LLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgume
     prompt : str | None
         Inline prompt string. Jinja2 rendering only applies when `as_template=True`.
     prompt_path : str | None
-        Template reference (e.g. "giskard.checks::scenarios/my_template.j2").
+        Template reference in ``namespace::path`` form, where the namespace is a
+        package registered with ``add_prompts_path`` (e.g.
+        "giskard.checks::generators/user_simulator.j2"). Scenario templates such as
+        ``scenarios/llm01_injection.j2`` live in the ``giskard.scan`` namespace, which
+        is registered when ``giskard.scan`` is imported.
     max_steps : int
         Maximum conversation turns (default: 3).
 
     Examples
     --------
     >>> gen = LLMGenerator(prompt="You are a user. Ask about the product.")
-    >>> gen = LLMGenerator(prompt_path="giskard.checks::scenarios/llm01.j2")
+    >>> gen = LLMGenerator(prompt_path="giskard.checks::generators/user_simulator.j2")
     """
 
     prompt: str | None = Field(default=None, description="Inline prompt string.")

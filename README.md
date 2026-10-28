@@ -23,7 +23,7 @@
 <br />
 
 > [!IMPORTANT]
-> **Giskard v3** is a fresh rewrite designed for dynamic, multi-turn testing of AI agents. This release drops heavy dependencies for better efficiency while introducing a more powerful AI vulnerability scanner and enhanced RAG evaluation — both now shipping natively in `giskard-scan` (beta), with no dependency on v2. Only the legacy scan for **tabular/ML models** remains v2-only.
+> **Giskard v3** is a fresh rewrite designed for dynamic, multi-turn testing of AI agents. This release drops heavy dependencies for better efficiency while introducing a more powerful AI vulnerability scanner and enhanced RAG evaluation — both now shipping natively in `giskard-scan`, with no dependency on v2. Only the legacy scan for **tabular/ML models** remains v2-only.
 > **Giskard v2 remains available but is no longer actively maintained.**
 > Follow progress → [Read the v3 Announcement](https://github.com/orgs/Giskard-AI/discussions/2250) · [Roadmap](https://github.com/Giskard-AI/giskard-oss/issues/2252)
 
@@ -44,7 +44,7 @@ Requires Python 3.12+.
 | `openai` / `anthropic` / … | provider SDKs (see `pyproject.toml` optional deps) |
 
 **Telemetry:** optional aggregated analytics via `giskard-core`. No prompts or outputs are sent.
-Opt out **before importing Giskard**: `export DO_NOT_TRACK=1` or `export GISKARD_TELEMETRY_DISABLED=1`.
+Opt out with `export DO_NOT_TRACK=1` or `export GISKARD_TELEMETRY_DISABLED=1` (or the same keys in a `.env` file in the working directory). Set them before import to skip creating `~/.giskard/id`; setting them later still stops further sends.
 Details: [`giskard-core` README](libs/giskard-core/README.md#telemetry).
 
 ---
@@ -53,8 +53,8 @@ Giskard is an open-source Python library for **testing and evaluating agentic sy
 
 | Status         | Package          | Description                                                                                                                                                              |
 | -------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ✅ Beta        | `giskard-checks` | Testing & evaluation — scenario API, built-in checks, LLM-as-judge                                                                                                       |
-| ✅ Beta        | `giskard-scan`   | Agent vulnerability scanner + RAG/quality evaluation — red teaming, prompt injection, jailbreaks & harmful content (`vulnerability_scan`, successor of [v2 Scan](https://legacy-docs.giskard.ai/en/stable/open_source/scan/index.html)), plus knowledge-base quality eval (`quality_scan`, successor of [v2 RAGET](https://legacy-docs.giskard.ai/en/stable/open_source/testset_generation/index.html)) |
+| ✅ Stable      | `giskard-checks` | Testing & evaluation — scenario API, built-in checks, LLM-as-judge                                                                                                       |
+| ✅ Stable      | `giskard-scan`   | Agent vulnerability scanner + RAG/quality evaluation — red teaming, prompt injection, jailbreaks & harmful content (`vulnerability_scan`, successor of [v2 Scan](https://legacy-docs.giskard.ai/en/stable/open_source/scan/index.html)), plus knowledge-base quality eval (`quality_scan`, successor of [v2 RAGET](https://legacy-docs.giskard.ai/en/stable/open_source/testset_generation/index.html)) |
 
 These build on three foundational libraries — `giskard-core` (shared utilities & telemetry), `giskard-llm` (provider-agnostic LLM routing), and `giskard-agents` (agent & workflow orchestration) — which are pulled in automatically and rarely used directly.
 

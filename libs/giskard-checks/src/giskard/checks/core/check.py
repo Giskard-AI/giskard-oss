@@ -1,7 +1,7 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from giskard.core import Discriminated, discriminated_base
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from .interaction import Trace
 
@@ -17,10 +17,41 @@ class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
 
     Subclasses should be registered using the @Check.register("kind") decorator
     to enable polymorphic serialization and deserialization.
+
+    Unknown fields are rejected (``extra="forbid"``). Without this, pydantic
+    silently drops unrecognized keys: a persisted suite referencing a renamed
+    field would fall back to that field's default and the check would run
+    green while evaluating the wrong value.
+
     """
+
+    # Rationale and the subclass rule: see ``Discriminated`` in giskard-core.
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, description="Check name")
     description: str | None = Field(default=None, description="Check description")
+
+    @classmethod
+    def _resolve_unregistered_kind(cls, kind: str, value: dict[str, Any]) -> Any:
+        """Load unregistered Hub checks (``hub_*``) as skipped placeholders.
+
+        Any other unregistered kind (e.g. a custom check whose module was not
+        imported) still raises.
+        """
+        from .unavailable import HUB_KIND_PREFIX, UnavailableHubCheck
+
+        if not kind.startswith(HUB_KIND_PREFIX):
+            return None
+        return UnavailableHubCheck.from_payload(kind, value)
+
+    def to_spec(self) -> dict[str, Any]:
+        """Return the check configuration in the Giskard Hub wire format."""
+        return self.model_dump(
+            mode="json",
+            exclude={"name", "description"},
+            exclude_none=True,
+            fallback=str,
+        )
 
     async def run(self, trace: TraceType) -> "CheckResult":
         """Execute the check against the provided trace.

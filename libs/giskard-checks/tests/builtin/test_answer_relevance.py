@@ -17,14 +17,26 @@ Tests cover:
 - ``include_history=False`` omits ``history`` from the template inputs
 """
 
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, override
 
-from giskard.checks import AnswerRelevance, CheckResult, CheckStatus, Interaction, Trace
+from giskard.agents import BaseSOM, SOMResponse
+from giskard.checks import (
+    AnswerRelevance,
+    CheckResult,
+    CheckStatus,
+    Interaction,
+    SOMJudge,
+    Trace,
+)
+from giskard.llm.types import ChatMessage
+from pydantic import PrivateAttr
 
 from ..testing_utils import MockJudgeGenerator as MockGenerator
 
-_EXPECTED_INPUT_KEYS = frozenset({"question", "answer", "history", "context"})
+_EXPECTED_INPUT_KEYS = frozenset({"question", "answer", "history", "context", "trace"})
 # ``history`` is omitted from template inputs when include_history=False.
+# ``trace`` remains for SOM shared-state groundwork.
 _EXPECTED_INPUT_KEYS_NO_HISTORY = _EXPECTED_INPUT_KEYS - {"history"}
 
 
@@ -291,7 +303,7 @@ class TestAnswerRelevanceInputResolution:
         check = AnswerRelevance(
             generator=generator,
             question_key="trace.interactions[0].inputs.query",
-            answer_key="trace.interactions[0].outputs.response",
+            target_key="trace.interactions[0].outputs.response",
         )
         trace = await Trace.from_interactions(
             Interaction(
@@ -362,7 +374,7 @@ class TestAnswerRelevanceUnresolvedKeys:
         generator = MockGenerator(passed=True, reason="Judge must not run.")
         check = AnswerRelevance(
             generator=generator,
-            answer_key="trace.last.metadata.does_not_exist",
+            target_key="trace.last.metadata.does_not_exist",
         )
         trace = await Trace.from_interactions(
             Interaction(inputs="What is the best language?", outputs="Python"),
@@ -383,7 +395,7 @@ class TestAnswerRelevanceUnresolvedKeys:
         check = AnswerRelevance(
             generator=generator,
             question_key="trace.last.metadata.no_question",
-            answer_key="trace.last.metadata.no_answer",
+            target_key="trace.last.metadata.no_answer",
         )
         trace = await Trace.from_interactions(
             Interaction(inputs="What's Python?", outputs="A snake.")
@@ -404,7 +416,7 @@ class TestAnswerRelevanceUnresolvedKeys:
             question="Direct question",
             answer="Direct answer",
             question_key="trace.last.metadata.does_not_exist",
-            answer_key="trace.last.metadata.also_missing",
+            target_key="trace.last.metadata.also_missing",
         )
 
         result = await check.run(Trace())
@@ -490,6 +502,42 @@ class TestAnswerRelevanceIncludeHistory:
         # The current turn still reaches the judge through question/answer.
         assert "Turn 2 question" in prompt
         assert "Turn 2 answer" in prompt
+
+    async def test_include_history_false_isolates_som_messages_to_current_turn(self):
+        """SOM shared messages must not expose earlier turns when disabled."""
+
+        class RecordingSOM(BaseSOM):
+            _messages: Sequence[ChatMessage] = PrivateAttr(default_factory=list)
+
+            @override
+            async def predict(
+                self,
+                messages: Sequence[ChatMessage],
+                question: str,
+                *,
+                timeout: float | int | None = None,
+            ) -> SOMResponse:
+                self._messages = messages
+                return SOMResponse(model=self.model, probability=1)
+
+        model = RecordingSOM(model="answer-relevance-test")
+        check = AnswerRelevance(
+            judge=SOMJudge(model=model),
+            include_history=False,
+        )
+        trace = await Trace.from_interactions(
+            Interaction(inputs="Secret prior question", outputs="Secret prior answer"),
+            Interaction(inputs="Current question", outputs="Current answer"),
+        )
+
+        result = await check.run(trace)
+
+        assert result.passed
+        messages = "\n".join(message.text or "" for message in model._messages)
+        assert "Secret prior question" not in messages
+        assert "Secret prior answer" not in messages
+        assert "Current question" in messages
+        assert "Current answer" in messages
 
     async def test_include_history_false_still_errors_on_broken_key(self):
         """The unresolved-key guard is independent of the history flag."""

@@ -97,6 +97,7 @@ def _skipped_check_results_for_step[InputType, OutputType, TraceType: Trace[Any,
                 "check_kind": check.kind,
                 "check_name": check.name,
                 "check_description": check.description,
+                "check_spec": check.to_spec(),
             },
         )
         for check in step.checks

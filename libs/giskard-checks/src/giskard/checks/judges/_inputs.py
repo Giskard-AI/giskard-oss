@@ -13,17 +13,25 @@ class ResolvableInput(NamedTuple):
     Attributes
     ----------
     name : str
-        Field name used to build the error message and details (e.g. ``"answer"``,
-        reported as ``"No value found for answer key '...'."``).
+        Human-readable label used to build the error message (e.g. ``"answer"``,
+        reported as ``"No value found for answer key '...'."``) and to name the
+        resolved value in ``details``.
     key : str
         JSONPath expression used when ``value`` is ``MISSING``.
     value : Any
         Directly-provided value, which takes priority over ``key``.
+    key_field : str | None
+        Name of the model field holding ``key``, used as the ``details`` entry
+        so users can act on the reported key. Defaults to ``f"{name}_key"``,
+        which is correct for every input whose field follows that convention;
+        the subject input passes ``"target_key"`` explicitly, since its domain
+        label ("answer", "output") is only a read alias there.
     """
 
     name: str
     key: str
     value: Any
+    key_field: str | None = None
 
 
 def error_if_unresolved[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
@@ -42,12 +50,12 @@ def error_if_unresolved[TraceType: Trace](  # pyright: ignore[reportMissingTypeA
 
     Returns ``None`` when every input resolves (including to empty strings).
     """
-    for name, key, value in inputs:
+    for name, key, value, key_field in inputs:
         resolved = provided_or_resolve(trace, key=key, value=value)
         if isinstance(resolved, NoMatch):
             return CheckResult.error(
                 message=f"No value found for {name} key '{key}'.",
-                details={f"{name}_key": key, name: resolved},
+                details={key_field or f"{name}_key": key, name: resolved},
             )
 
     return None
@@ -68,6 +76,8 @@ def error_if_unresolved_answer_or_context[TraceType: Trace](  # pyright: ignore[
     """
     return error_if_unresolved(
         trace,
-        ResolvableInput("answer", answer_key, answer),
+        # The answer is the subject under test, so its field is ``target_key``
+        # even though the judge-facing label stays "answer".
+        ResolvableInput("answer", answer_key, answer, "target_key"),
         ResolvableInput("context", context_key, context),
     )

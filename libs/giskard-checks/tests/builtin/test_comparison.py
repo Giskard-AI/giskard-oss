@@ -22,6 +22,7 @@ from giskard.checks import (
     Trace,
 )
 from giskard.checks.core.extraction import NoMatch
+from pydantic import ValidationError
 
 
 class TestLessThan:
@@ -32,7 +33,7 @@ class TestLessThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LessThan(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -47,7 +48,7 @@ class TestLessThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = LessThan(
             expected_value=5,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -64,7 +65,7 @@ class TestLessThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LessThan(
             expected_value=5,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -79,7 +80,7 @@ class TestLessThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
         check = LessThan(
             expected_value=5.0,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -94,7 +95,7 @@ class TestLessThan:
         )
         check = LessThan(
             expected_value="banana",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -109,7 +110,7 @@ class TestLessThan:
         )
         check = LessThan(
             expected_value="apple",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -124,7 +125,7 @@ class TestLessThan:
         )
         check = LessThan(
             expected_value=10,
-            key="trace.interactions[-1].outputs.missing",
+            target_key="trace.interactions[-1].outputs.missing",
         )
 
         result = await check.run(trace)
@@ -141,7 +142,7 @@ class TestLessThan:
         )
         check = LessThan(
             expected_value=10,
-            key="trace.interactions[-1].outputs.value",
+            target_key="trace.interactions[-1].outputs.value",
         )
 
         result = await check.run(trace)
@@ -155,7 +156,7 @@ class TestLessThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="5"))
         check = LessThan(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -173,7 +174,7 @@ class TestLessThan:
         )
         check = LessThan(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -193,7 +194,7 @@ class TestGreaterThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = GreaterThan(
             expected_value=5,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -208,7 +209,7 @@ class TestGreaterThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = GreaterThan(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -225,7 +226,7 @@ class TestGreaterThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = GreaterThan(
             expected_value=5,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -240,7 +241,7 @@ class TestGreaterThan:
         )
         check = GreaterThan(
             expected_value="apple",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -253,7 +254,7 @@ class TestGreaterThan:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="10"))
         check = GreaterThan(
             expected_value=5,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -273,7 +274,7 @@ class TestGreaterThan:
         )
         check = GreaterThan(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -293,7 +294,7 @@ class TestLessThanEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LessThanEquals(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -308,7 +309,7 @@ class TestLessThanEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = LessThanEquals(
             expected_value=5,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -323,7 +324,7 @@ class TestLessThanEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = LessThanEquals(
             expected_value=5,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -342,7 +343,7 @@ class TestLessThanEquals:
         )
         check = LessThanEquals(
             expected_value="banana",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -357,7 +358,7 @@ class TestLessThanEquals:
         )
         check = LessThanEquals(
             expected_value="apple",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -370,7 +371,7 @@ class TestLessThanEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="5"))
         check = LessThanEquals(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -390,7 +391,7 @@ class TestLessThanEquals:
         )
         check = LessThanEquals(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -410,7 +411,7 @@ class TestGreaterThanEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=10))
         check = GreaterThanEquals(
             expected_value=5,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -425,7 +426,7 @@ class TestGreaterThanEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = GreaterThanEquals(
             expected_value=5,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -440,7 +441,7 @@ class TestGreaterThanEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = GreaterThanEquals(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -459,7 +460,7 @@ class TestGreaterThanEquals:
         )
         check = GreaterThanEquals(
             expected_value="apple",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -474,7 +475,7 @@ class TestGreaterThanEquals:
         )
         check = GreaterThanEquals(
             expected_value="apple",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -487,7 +488,7 @@ class TestGreaterThanEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="10"))
         check = GreaterThanEquals(
             expected_value=5,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -507,7 +508,7 @@ class TestGreaterThanEquals:
         )
         check = GreaterThanEquals(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -520,7 +521,7 @@ class TestGreaterThanEquals:
 
     def test_serialises_with_greater_than_equals_kind(self):
         """Serialized kind remains greater_than_equals and round-trips."""
-        check = GreaterThanEquals(expected_value=10, key="trace.last.outputs")
+        check = GreaterThanEquals(expected_value=10)
         assert check.model_dump()["kind"] == "greater_than_equals"
         restored = Check.model_validate(check.model_dump())
         assert isinstance(restored, GreaterThanEquals)
@@ -535,7 +536,7 @@ class TestComparisonEdgeCases:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = LessThan(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -551,7 +552,7 @@ class TestComparisonEdgeCases:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = GreaterThan(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -568,7 +569,7 @@ class TestComparisonEdgeCases:
         )
         check = LessThan(
             expected_value="abc",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -604,7 +605,7 @@ class TestComparisonEdgeCases:
         )
         check = LessThan(
             expected_value=ComparableValue(10),
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -627,7 +628,7 @@ class TestComparisonEdgeCases:
         )
         check = LessThan(
             expected_value=10,  # int, not ComparableValue
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -645,7 +646,7 @@ class TestComparisonEdgeCases:
         )
         check = LessThan(
             expected_value=[10, 10],  # Expected list
-            key="trace.interactions[*].outputs",
+            target_key="trace.interactions[*].outputs",
         )
 
         result = await check.run(trace)
@@ -663,7 +664,7 @@ class TestComparisonEdgeCases:
         )
         check = LessThan(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -681,7 +682,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = NotEquals(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -696,7 +697,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=5))
         check = NotEquals(
             expected_value=5,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -711,10 +712,7 @@ class TestNotEquals:
     async def test_float_not_equals_success(self):
         """Test that 3.14 != 5.0 passes."""
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=3.14))
-        check = NotEquals(
-            expected_value=5.0,
-            key="trace.interactions[-1].outputs",
-        )
+        check = NotEquals(expected_value=5.0)
 
         result = await check.run(trace)
 
@@ -728,7 +726,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value="world",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -745,7 +743,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value="hello",
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -760,7 +758,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
         check = NotEquals(
             expected_value=False,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -775,7 +773,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=True))
         check = NotEquals(
             expected_value=True,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -790,7 +788,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="5"))
         check = NotEquals(
             expected_value=5,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -807,7 +805,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value=True,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -824,7 +822,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value=10,
-            key="trace.interactions[-1].outputs.missing",
+            target_key="trace.interactions[-1].outputs.missing",
         )
 
         result = await check.run(trace)
@@ -841,7 +839,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value=10,
-            key="trace.interactions[-1].outputs.value",
+            target_key="trace.interactions[-1].outputs.value",
         )
 
         result = await check.run(trace)
@@ -855,7 +853,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = NotEquals(
             expected_value=10,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -870,7 +868,7 @@ class TestNotEquals:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs=None))
         check = NotEquals(
             expected_value=None,
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -887,7 +885,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value=[3, 4],
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -904,7 +902,7 @@ class TestNotEquals:
         )
         check = NotEquals(
             expected_value=[1, 2],
-            key="trace.interactions[-1].outputs",
+            target_key="trace.interactions[-1].outputs",
         )
 
         result = await check.run(trace)
@@ -925,17 +923,17 @@ class TestComparisonSentinelDefault:
     def test_omitting_both_raises(self, check_cls):
         """Omitting both expected_value and expected_value_key must raise ValueError."""
         with pytest.raises(ValueError, match="expected_value"):
-            check_cls(key="trace.last.outputs")
+            check_cls(target_key="trace.last.outputs")
 
     def test_explicit_none_is_valid(self):
         """explicit expected_value=None must be accepted (compares against None)."""
-        check = Equals(key="trace.last.outputs", expected_value=None)
+        check = Equals(target_key="trace.last.outputs", expected_value=None)
         assert check.expected_value is None
 
     def test_expected_value_key_is_valid(self):
         """Providing expected_value_key without expected_value must be accepted."""
         check = Equals(
-            key="trace.last.outputs",
+            target_key="trace.last.outputs",
             expected_value_key="trace.last.metadata.expected",
         )
         assert check.expected_value_key == "trace.last.metadata.expected"
@@ -944,7 +942,7 @@ class TestComparisonSentinelDefault:
         """Providing both expected_value and expected_value_key must raise ValueError."""
         with pytest.raises(ValueError, match="Exactly one"):
             Equals(
-                key="trace.last.outputs",
+                target_key="trace.last.outputs",
                 expected_value=42,
                 expected_value_key="trace.last.metadata.expected",
             )
@@ -975,7 +973,7 @@ class TestComparisonMatchMode:
         trace = await self._tool_calls_trace()
         check = Equals(
             expected_value="search",
-            key="trace.last.metadata.tool_calls[*].name",
+            target_key="trace.last.metadata.tool_calls[*].name",
             match="any",
         )
 
@@ -989,7 +987,7 @@ class TestComparisonMatchMode:
         trace = await self._tool_calls_trace()
         check = Equals(
             expected_value="delete",
-            key="trace.last.metadata.tool_calls[*].name",
+            target_key="trace.last.metadata.tool_calls[*].name",
             match="any",
         )
 
@@ -1007,7 +1005,7 @@ class TestComparisonMatchMode:
         )
         check = Equals(
             expected_value="ok",
-            key="trace.interactions[*].outputs",
+            target_key="trace.interactions[*].outputs",
             match="all",
         )
 
@@ -1023,7 +1021,7 @@ class TestComparisonMatchMode:
         )
         check = Equals(
             expected_value="ok",
-            key="trace.interactions[*].outputs",
+            target_key="trace.interactions[*].outputs",
             match="all",
         )
 
@@ -1038,7 +1036,7 @@ class TestComparisonMatchMode:
         trace = await self._tool_calls_trace()
         check = Equals(
             expected_value="delete",
-            key="trace.last.metadata.tool_calls[*].name",
+            target_key="trace.last.metadata.tool_calls[*].name",
             match="none",
         )
 
@@ -1051,7 +1049,7 @@ class TestComparisonMatchMode:
         trace = await self._tool_calls_trace()
         check = Equals(
             expected_value="search",
-            key="trace.last.metadata.tool_calls[*].name",
+            target_key="trace.last.metadata.tool_calls[*].name",
             match="none",
         )
 
@@ -1066,7 +1064,7 @@ class TestComparisonMatchMode:
         trace = await Trace.from_interactions(Interaction(inputs="test", outputs="ok"))
         check = Equals(
             expected_value="ok",
-            key="trace.last.outputs",
+            target_key="trace.last.outputs",
             match="any",
         )
 
@@ -1081,7 +1079,7 @@ class TestComparisonMatchMode:
         trace = await self._tool_calls_trace(tool_calls=[])
         check = Equals(
             expected_value="search",
-            key="trace.last.metadata.tool_calls[*].name",
+            target_key="trace.last.metadata.tool_calls[*].name",
             match="any",
         )
 
@@ -1101,7 +1099,7 @@ class TestComparisonMatchMode:
         trace = await self._tool_calls_trace(tool_calls=[])
         check = Equals(
             expected_value="search",
-            key="trace.last.metadata.tool_calls[*].name",
+            target_key="trace.last.metadata.tool_calls[*].name",
             match=match,
         )
 
@@ -1116,7 +1114,7 @@ class TestComparisonMatchMode:
         )
         check = GreaterThan(
             expected_value=2,
-            key="trace.last.outputs",
+            target_key="trace.last.outputs",
             match="any",
         )
 
@@ -1131,7 +1129,7 @@ class TestComparisonMatchMode:
         )
         check = GreaterThan(
             expected_value=2,
-            key="trace.last.outputs",
+            target_key="trace.last.outputs",
             match="any",
         )
 
@@ -1148,7 +1146,7 @@ class TestComparisonMatchMode:
         )
         check = GreaterThan(
             expected_value=3,
-            key="trace.last.outputs",
+            target_key="trace.last.outputs",
             match=match,
         )
 
@@ -1165,7 +1163,7 @@ class TestComparisonMatchMode:
         )
         check = GreaterThan(
             expected_value=3,
-            key="trace.last.outputs",
+            target_key="trace.last.outputs",
             match="any",
         )
 
@@ -1181,7 +1179,7 @@ class TestComparisonMatchMode:
         )
         check = Equals(
             expected_value="message 1",
-            key="trace.interactions[*].outputs",
+            target_key="trace.interactions[*].outputs",
         )
 
         result = await check.run(trace)
@@ -1200,7 +1198,7 @@ class TestComparisonMatchMode:
         )
         check = Equals(
             expected_value="message 1",
-            key="trace.interactions[*].outputs",
+            target_key="trace.interactions[*].outputs",
             match="any",
         )
 
@@ -1214,9 +1212,94 @@ class TestLessThanSerialisation:
     """Serialised ``kind`` strings for the less-than comparison checks."""
 
     def test_less_than_serialises_with_new_kind(self):
-        check = LessThan(expected_value=10, key="trace.last.outputs")
+        check = LessThan(expected_value=10, target_key="trace.last.outputs")
         assert check.model_dump()["kind"] == "less_than"
 
     def test_less_than_equals_serialises_with_new_kind(self):
-        check = LessThanEquals(expected_value=10, key="trace.last.outputs")
+        check = LessThanEquals(expected_value=10, target_key="trace.last.outputs")
         assert check.model_dump()["kind"] == "less_than_equals"
+
+
+class TestDefaultKey:
+    """``target_key`` defaults to ``trace.last.outputs`` like every peer check."""
+
+    @pytest.mark.parametrize(
+        "check_cls",
+        [Equals, NotEquals, LessThan, GreaterThan, LessThanEquals, GreaterThanEquals],
+    )
+    def test_key_is_not_required(self, check_cls: type[Any]):
+        assert not check_cls.model_fields["target_key"].is_required()
+
+    @pytest.mark.parametrize(
+        "check_cls",
+        [Equals, NotEquals, LessThan, GreaterThan, LessThanEquals, GreaterThanEquals],
+    )
+    def test_constructs_without_key_and_defaults(self, check_cls: type[Any]):
+        check = check_cls(expected_value=5)
+        assert check.target_key == "trace.last.outputs"
+
+    def test_explicit_target_key_overrides_default(self):
+        check = Equals(expected_value=5, target_key="trace.last.inputs")
+        assert check.target_key == "trace.last.inputs"
+
+    async def test_default_key_resolves_against_real_trace_pass(self):
+        """The default must actually resolve at run() time, not just be set."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="ignored", outputs="hello"),
+        )
+        check = Equals(expected_value="hello")
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.details is not None
+        assert result.details["actual_value"] == "hello"
+
+    async def test_default_key_resolves_against_real_trace_fail(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="ignored", outputs="hello"),
+        )
+        check = Equals(expected_value="goodbye")
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.FAIL
+        assert result.details is not None
+        assert result.details["actual_value"] == "hello"
+
+    async def test_default_key_targets_last_interaction(self):
+        """The default resolves the *last* interaction, not the first."""
+        trace = await Trace.from_interactions(
+            Interaction(inputs="a", outputs=1),
+            Interaction(inputs="b", outputs=2),
+        )
+
+        assert (
+            await GreaterThan(expected_value=1).run(trace)
+        ).status == CheckStatus.PASS
+        assert (await Equals(expected_value=2).run(trace)).status == CheckStatus.PASS
+        assert (await Equals(expected_value=1).run(trace)).status == CheckStatus.FAIL
+
+    async def test_explicit_key_overrides_default_at_runtime(self):
+        trace = await Trace.from_interactions(
+            Interaction(inputs="question", outputs="answer"),
+        )
+        check = Equals(expected_value="question", target_key="trace.last.inputs")
+
+        result = await check.run(trace)
+
+        assert result.status == CheckStatus.PASS
+        assert result.details is not None
+        assert result.details["actual_value"] == "question"
+
+    def test_unknown_key_still_rejected_under_extra_forbid(self):
+        """Defaulting ``key`` must not let stale/renamed fields bind silently."""
+        with pytest.raises(ValidationError):
+            Equals.model_validate(
+                {"kind": "equals", "expected_value": 5, "keyy": "trace.last.outputs"}
+            )
+
+    async def test_round_trip_without_key_keeps_default(self):
+        check = Equals(expected_value="hello")
+        restored = Check.model_validate(check.model_dump())
+        assert restored.target_key == "trace.last.outputs"  # pyright: ignore[reportAttributeAccessIssue]

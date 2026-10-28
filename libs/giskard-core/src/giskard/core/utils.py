@@ -13,6 +13,19 @@ GISKARD_LIBS = frozenset(
     ]
 )
 
+_TRUTHY_ENV_VALUES = frozenset({"1", "true", "yes", "on", "t", "y"})
+
+
+def is_true_env_str(value: str | None) -> bool:
+    """Return whether an environment-variable value represents true.
+
+    Parameters
+    ----------
+    value : str or None
+        Environment-variable value to parse.
+    """
+    return value is not None and value.strip().lower() in _TRUTHY_ENV_VALUES
+
 
 def get_lib_version(lib: str, default: str = "unknown") -> str:
     try:

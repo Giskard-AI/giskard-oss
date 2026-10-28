@@ -30,7 +30,7 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
-    key: JSONPathStr = Field(
+    target_key: JSONPathStr = Field(
         default="trace.last.outputs",
         description="JSONPath expression to extract the value to validate.",
     )
@@ -71,23 +71,23 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
 
     @override
     async def run(self, trace: TraceType) -> CheckResult:
-        value = resolve(trace, self.key)
+        value = resolve(trace, self.target_key)
         details: dict[str, Any] = {
-            "key": self.key,
+            "target_key": self.target_key,
             "value": value,
             "schema": self.expected_schema,
         }
 
         if isinstance(value, NoMatch):
             return CheckResult.error(
-                message=f"No value found for key '{self.key}'.",
+                message=f"No value found for key '{self.target_key}'.",
                 details=details,
             )
 
         if self.parse:
             if not isinstance(value, str):
                 return CheckResult.error(
-                    message=f"Value at key '{self.key}' is not a string: {value!r}",
+                    message=f"Value at key '{self.target_key}' is not a string: {value!r}",
                     details=details,
                 )
             try:
@@ -95,7 +95,7 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
             except json.JSONDecodeError as err:
                 details["error"] = str(err)
                 return CheckResult.failure(
-                    message=f"Value at key '{self.key}' is not valid JSON: {err}",
+                    message=f"Value at key '{self.target_key}' is not valid JSON: {err}",
                     details=details,
                 )
         else:
@@ -104,7 +104,7 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
             except (TypeError, ValueError) as err:
                 details["error"] = str(err)
                 return CheckResult.failure(
-                    message=f"Value at key '{self.key}' is not JSON serializable: {err}",
+                    message=f"Value at key '{self.target_key}' is not JSON serializable: {err}",
                     details=details,
                 )
 
@@ -123,14 +123,14 @@ class JsonValid[InputType, OutputType, TraceType: Trace](  # pyright: ignore[rep
                 details["error"] = err.message
                 return CheckResult.failure(
                     message=(
-                        f"JSON value at key '{self.key}' does not match the "
+                        f"JSON value at key '{self.target_key}' does not match the "
                         f"provided schema: {err.message}."
                     ),
                     details=details,
                 )
 
         return CheckResult.success(
-            message=f"Value at key '{self.key}' is valid JSON.",
+            message=f"Value at key '{self.target_key}' is valid JSON.",
             details=details,
         )
 

@@ -2,6 +2,7 @@ name: Integration Tests
 
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] guarded by authorize job, label gate for external PRs, and immutable head.sha checkout
+    branches: [main]
     types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
@@ -55,12 +56,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        python-version: ["3.14"]
         backend:
           # Each backend exercises a different install combination so we
           # catch dependency regressions in the three supported layouts:
@@ -91,7 +94,7 @@ jobs:
           # external contributors, and the immutable head.sha pin keeps the
           # reviewed commit identical to the executed one.
           allow-unsafe-pr-checkout: true
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -113,7 +116,9 @@ jobs:
   test-llm-functional:
     needs: authorize
     runs-on: ubuntu-latest
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -122,17 +127,22 @@ jobs:
         # `extras` is the giskard-llm optional-dependency group to install;
         # aliases share an install (bare/azure_ai reuse openai/azure, gemini reuses google).
         include:
-          - { python-version: "3.12", provider: openai, extras: openai }
-          - { python-version: "3.12", provider: bare, extras: openai }
-          - { python-version: "3.12", provider: google, extras: google }
-          - { python-version: "3.12", provider: gemini, extras: google }
-          - { python-version: "3.12", provider: anthropic, extras: anthropic }
-          - { python-version: "3.12", provider: azure, extras: azure }
-          - { python-version: "3.12", provider: azure_ai, extras: azure }
+          - { python-version: "3.14", provider: openai, extras: openai }
+          - { python-version: "3.14", provider: bare, extras: openai }
+          - { python-version: "3.14", provider: google, extras: google }
+          - { python-version: "3.14", provider: gemini, extras: google }
+          - { python-version: "3.14", provider: anthropic, extras: anthropic }
+          - { python-version: "3.14", provider: azure, extras: azure }
+          - { python-version: "3.14", provider: azure_ai, extras: azure }
           - {
-              python-version: "3.12",
+              python-version: "3.14",
               provider: azure_foundry_v1,
               extras: openai,
+            }
+          - {
+              python-version: "3.14",
+              provider: azure_anthropic,
+              extras: anthropic,
             }
     name: llm / ${{ matrix.provider }} / ${{ matrix.python-version }}
     env:
@@ -146,7 +156,7 @@ jobs:
           # Deliberate opt-in — see test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -161,20 +171,22 @@ jobs:
           AZURE_API_KEY: ${{ matrix.provider == 'azure' && secrets.AZURE_API_KEY || '' }}
           AZURE_API_BASE: ${{ matrix.provider == 'azure' && secrets.AZURE_API_BASE || '' }}
           AZURE_API_VERSION: ${{ matrix.provider == 'azure' && secrets.AZURE_API_VERSION || '' }}
-          AZURE_AI_API_KEY: ${{ (matrix.provider == 'azure_ai' || matrix.provider == 'azure_foundry_v1') && secrets.AZURE_AI_API_KEY || '' }}
-          AZURE_AI_ENDPOINT: ${{ (matrix.provider == 'azure_ai' || matrix.provider == 'azure_foundry_v1') && secrets.AZURE_AI_ENDPOINT || '' }}
+          AZURE_AI_API_KEY: ${{ (matrix.provider == 'azure_ai' || matrix.provider == 'azure_foundry_v1' || matrix.provider == 'azure_anthropic') && secrets.AZURE_AI_API_KEY || '' }}
+          AZURE_AI_ENDPOINT: ${{ (matrix.provider == 'azure_ai' || matrix.provider == 'azure_foundry_v1' || matrix.provider == 'azure_anthropic') && secrets.AZURE_AI_ENDPOINT || '' }}
           AZURE_AI_OPENAI_V1_ENDPOINT: ${{ matrix.provider == 'azure_foundry_v1' && secrets.AZURE_AI_OPENAI_V1_ENDPOINT || '' }}
         run: make test-functional PACKAGE=giskard-llm PROVIDER=$PROVIDER
 
   test-checks-functional:
     needs: authorize
     runs-on: ubuntu-latest
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        python-version: ["3.14"]
         provider: [google]
     name: checks / ${{ matrix.provider }} / ${{ matrix.python-version }}
     env:
@@ -187,7 +199,7 @@ jobs:
           # Deliberate opt-in — see test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -206,22 +218,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.14"]
     name: scan / garak / ${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
           # Deliberate opt-in — see test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -233,22 +247,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read # checkout repository
-    environment: ci
+    environment:
+      name: ci
+      deployment: false
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.14"]
     name: scan / deepteam / ${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
           persist-credentials: false
           # Deliberate opt-in — see test-agents-functional for the full
           # rationale and compensating controls.
           allow-unsafe-pr-checkout: true
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}

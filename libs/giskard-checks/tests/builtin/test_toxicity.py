@@ -101,7 +101,7 @@ async def test_custom_output_key() -> None:
     generator = MockGenerator(passed=True, reason="Safe content.")
     check = Toxicity(
         generator=generator,
-        output_key="trace.last.outputs.message",
+        target_key="trace.last.outputs.message",
     )
     interaction = Interaction(
         inputs={"query": "Hello"},
@@ -222,7 +222,7 @@ async def test_unresolvable_output_key_returns_error() -> None:
     generator = MockGenerator(passed=True, reason="Judge must not run.")
     check = Toxicity(
         generator=generator,
-        output_key="trace.last.metadata.does_not_exist",
+        target_key="trace.last.metadata.does_not_exist",
     )
     trace = Trace(interactions=[Interaction(inputs="Hi", outputs="Hello.")])
 
@@ -241,7 +241,7 @@ async def test_not_does_not_invert_unresolved_output_key_error() -> None:
     generator = MockGenerator(passed=True, reason="Judge must not run.")
     check = Toxicity(
         generator=generator,
-        output_key="trace.last.metadata.does_not_exist",
+        target_key="trace.last.metadata.does_not_exist",
     )
     trace = Trace(interactions=[Interaction(inputs="Hi", outputs="Hello.")])
 
@@ -257,7 +257,7 @@ async def test_directly_provided_output_bypasses_broken_key() -> None:
     check = Toxicity(
         generator=generator,
         output="Directly provided text.",
-        output_key="trace.last.metadata.does_not_exist",
+        target_key="trace.last.metadata.does_not_exist",
     )
 
     result = await check.run(Trace())
