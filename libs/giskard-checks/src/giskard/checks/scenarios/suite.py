@@ -4,7 +4,12 @@ from collections.abc import Iterable, Iterator
 from contextlib import contextmanager, nullcontext
 from typing import Any, Generic, Self, TypeVar
 
-from giskard.core import telemetry_capture, telemetry_run_context, telemetry_tag
+from giskard.core import (
+    telemetry_capture,
+    telemetry_finished,
+    telemetry_run_context,
+    telemetry_tag,
+)
 from pydantic import BaseModel, Field
 from pydantic.experimental.missing_sentinel import MISSING
 from rich.console import RenderableType
@@ -238,33 +243,36 @@ class Suite(BaseModel, Generic[InputType, OutputType]):
                 properties=shape_props,
             )
 
-            start_time = time.perf_counter()
-            with self._progress_bar(enabled=verbose) as tracker:
-                if parallel:
-                    results = await self._run_parallel(
-                        target, return_exception, max_concurrency, tracker
-                    )
-                else:
-                    results = await self._run_serial(target, return_exception, tracker)
-            end_time = time.perf_counter()
+            # Report a finish for every start, including errors and cancellation.
+            with telemetry_finished(
+                "checks_suite_run_finished", shape_props
+            ) as finished:
+                start_time = time.perf_counter()
+                with self._progress_bar(enabled=verbose) as tracker:
+                    if parallel:
+                        results = await self._run_parallel(
+                            target, return_exception, max_concurrency, tracker
+                        )
+                    else:
+                        results = await self._run_serial(
+                            target, return_exception, tracker
+                        )
+                end_time = time.perf_counter()
 
-            suite_result = SuiteResult(
-                results=results,
-                duration_ms=int((end_time - start_time) * 1000),
-                suite=self,
-            )
+                suite_result = SuiteResult(
+                    results=results,
+                    duration_ms=int((end_time - start_time) * 1000),
+                    suite=self,
+                )
 
-            telemetry_capture(
-                "checks_suite_run_finished",
-                properties={
-                    **shape_props,
-                    "duration_ms": suite_result.duration_ms,
-                    "passed_count": suite_result.passed_count,
-                    "failed_count": suite_result.failed_count,
-                    "errored_count": suite_result.errored_count,
-                    "skipped_count": suite_result.skipped_count,
-                },
-            )
+                finished.update(
+                    outcome="completed",
+                    duration_ms=suite_result.duration_ms,
+                    passed_count=suite_result.passed_count,
+                    failed_count=suite_result.failed_count,
+                    errored_count=suite_result.errored_count,
+                    skipped_count=suite_result.skipped_count,
+                )
 
         return suite_result
 
