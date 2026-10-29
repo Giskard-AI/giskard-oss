@@ -22,6 +22,7 @@ from giskard.checks import (
     Interaction,
     LLMChatJudge,
     Not,
+    NumericalFaithfulness,
     SOMJudge,
     Toxicity,
     Trace,
@@ -298,6 +299,9 @@ async def test_not_does_not_invert_missing_som_evidence():
         AnswerRelevance(question="What is Python?", answer="A language."),
         Contradiction(answer="Paris is in France.", context="Paris is in France."),
         Groundedness(answer="Paris is in France.", context="Paris is in France."),
+        NumericalFaithfulness(
+            answer="Paris is in France.", context="Paris is in France."
+        ),
         Toxicity(output="Have a nice day."),
     ],
 )
