@@ -1,12 +1,16 @@
+import asyncio
+from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from pathlib import Path
+from typing import Any, cast, override
 
 import pytest
 from giskard import agents
 from giskard.agents.chat import Chat
+from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.agents.generators.giskard_llm_generator import GiskardLLMGenerator
 from giskard.agents.templates.prompts_manager import PromptsManager
-from giskard.llm.types import ChatMessage
-from pydantic import BaseModel
+from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
+from pydantic import BaseModel, Field
 
 
 @pytest.mark.google
@@ -164,3 +168,132 @@ def test_chat_plain_string_is_not_jinja_by_default():
 
     wf_tpl = workflow.chat("{{ 1 + 1 }}", role="user", as_template=True)
     assert isinstance(wf_tpl.messages[0], agents.MessageTemplate)
+
+
+# ---------------------------------------------------------------------------
+# Stream cleanup — issue #2876
+# ---------------------------------------------------------------------------
+
+
+class ScriptedGenerator(BaseGenerator):
+    """Completes the first `fast_first` calls instantly, hangs the rest until cancelled.
+
+    Lets a test observe tasks that are still running when the caller stops listening.
+    """
+
+    fast_first: int = Field(default=0)
+    started: int = Field(default=0)
+    cancelled: int = Field(default=0)
+
+    @override
+    async def _call_model(
+        self,
+        messages: Sequence[ChatMessage],
+        params: GenerationParams,
+        metadata: dict[str, Any] | None = None,
+    ) -> CompletionResponse:
+        self.started += 1
+        if self.started <= self.fast_first:
+            return self._response("fast")
+
+        try:
+            await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            self.cancelled += 1
+            raise
+
+        return self._response("slow")
+
+    def _response(self, text: str) -> CompletionResponse:
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content=text),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ],
+            model="test-model",
+        )
+
+
+def _scripted_workflow(
+    fast_first: int,
+) -> tuple[agents.ChatWorkflow[Any], ScriptedGenerator]:
+    """Build a workflow whose generator hangs, so pending tasks can be observed."""
+    generator = ScriptedGenerator(fast_first=fast_first)
+    return agents.ChatWorkflow(generator=generator).chat(
+        "Hello!", role="user"
+    ), generator
+
+
+def _open_stream(
+    stream: AsyncIterator[Chat[Any]],
+) -> AsyncGenerator[Chat[Any], None]:
+    """Recover the async generator behind a streaming method.
+
+    `stream_many` / `stream_batch` are async generators, but they are annotated as plain
+    `AsyncIterator`, so `aclose()` has to be reached through a cast.
+    """
+    return cast(AsyncGenerator[Chat[Any], None], stream)
+
+
+async def test_stream_many_still_yields_every_result():
+    """Guard for #2876: the cleanup must not change the fully consumed case."""
+    workflow, generator = _scripted_workflow(fast_first=3)
+
+    chats = [chat async for chat in workflow.stream_many(3)]
+
+    assert len(chats) == 3
+    assert generator.cancelled == 0
+
+
+async def test_stream_many_stops_pending_tasks_when_consumer_is_cancelled():
+    """Regression for #2876: cancelling the consumer must stop the scheduled workflows."""
+    workflow, generator = _scripted_workflow(fast_first=0)
+
+    async def consume() -> None:
+        async for _ in workflow.stream_many(3):
+            pass
+
+    task = asyncio.create_task(consume())
+    await asyncio.sleep(0.3)
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert generator.started == 3
+    assert generator.cancelled == 3, (
+        "workflows scheduled by the stream outlived cancellation"
+    )
+
+
+async def test_stream_many_stops_pending_tasks_when_stream_is_closed():
+    """Regression for #2876: closing the stream must stop the workflows still running."""
+    workflow, generator = _scripted_workflow(fast_first=1)
+
+    stream = _open_stream(workflow.stream_many(3))
+    async for _ in stream:
+        break
+    await stream.aclose()
+
+    assert generator.started == 3
+    assert generator.cancelled == 2, (
+        "workflows scheduled by the stream outlived aclose()"
+    )
+
+
+async def test_stream_batch_stops_pending_tasks_when_stream_is_closed():
+    """Regression for #2876: `stream_batch` gets the same guarantee as `stream_many`."""
+    workflow, generator = _scripted_workflow(fast_first=1)
+
+    stream = _open_stream(workflow.stream_batch(inputs=[{"n": i} for i in range(3)]))
+    async for _ in stream:
+        break
+    await stream.aclose()
+
+    assert generator.started == 3
+    assert generator.cancelled == 2, (
+        "workflows scheduled by the stream outlived aclose()"
+    )
