@@ -44,7 +44,7 @@ def _dotenv_flags() -> dict[str, str]:
 
 
 def _flag_is_true(name: str) -> bool:
-    """True if ``name`` is truthy in the process env, else in cwd ``.env``."""
+    """Return whether ``name`` is truthy in the process env, else in cwd ``.env``."""
     value = os.environ.get(name)
     if value is None:
         value = _dotenv_flags().get(name)

@@ -24,10 +24,13 @@ MAX_RULES_PER_CATEGORY = 10
 class AdversarialCategory(BaseModel):
     """A named category of adversarial content used to guide rule generation.
 
-    Attributes:
-        name: Human-readable category label (e.g. ``"Illegal Activities"``).
-        description: Optional guidance sent to the LLM to constrain rule
-            generation to this category's scope.
+    Attributes
+    ----------
+    name : str
+        Human-readable category label (e.g. ``"Illegal Activities"``).
+    description : str | None
+        Optional guidance sent to the LLM to constrain rule generation to
+        this category's scope.
     """
 
     name: str
@@ -77,9 +80,11 @@ ADVERSARIAL_CATEGORIES = [
 class RuleGeneration(BaseModel):
     """Structured output returned by the rule-generation LLM pipeline.
 
-    Attributes:
-        rules: Ordered list of natural-language conformity rules produced for
-            a single :class:`AdversarialCategory`.
+    Attributes
+    ----------
+    rules : list[str]
+        Ordered list of natural-language conformity rules produced for a
+        single :class:`AdversarialCategory`.
     """
 
     rules: list[str] = Field(min_length=1)
@@ -101,9 +106,11 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
     ``tags`` (for example ``threat-type:harmful-content-generation``),
     applied per scenario via :meth:`~giskard.checks.core.scenario.Scenario.with_tags`.
 
-    Attributes:
-        max_turns: Maximum number of conversation turns per scenario.
-            Capped to ``1`` automatically when ``target_mode="singleturn"``.
+    Attributes
+    ----------
+    max_turns : int
+        Maximum number of conversation turns per scenario. Capped to ``1``
+        automatically when ``target_mode="singleturn"``.
     """
 
     max_turns: int = Field(default=3, ge=1)
@@ -129,21 +136,27 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
         reach the allocated count; the final list is truncated if the LLM
         over-produces.
 
-        Args:
-            description: Natural-language description of the agent under test,
-                forwarded to the rule-generation prompt as context.
-            languages: BCP-47 language codes stored in each scenario's
-                annotations for downstream filtering.
-            max_scenarios: Total scenario budget across all categories.
-                ``None`` uses :data:`DEFAULT_RULES_PER_CATEGORY` per category.
-            rng: Shared random generator for reproducible budget allocation.
-                A fresh ``np.random.default_rng()`` is created when ``None``.
-            target_mode: Desired conversation mode. When ``"singleturn"``,
-                each scenario is built with ``max_steps=1`` regardless of
-                :attr:`max_turns`. When ``"multiturn"`` (default), uses
-                :attr:`max_turns`.
+        Parameters
+        ----------
+        context : ScenarioContext
+            Carries ``description`` (natural-language description of the agent
+            under test, forwarded to the rule-generation prompt as context) and
+            ``languages`` (BCP-47 language codes stored in each scenario's
+            annotations for downstream filtering).
+        max_scenarios : int | None, optional
+            Total scenario budget across all categories. ``None`` uses
+            :data:`DEFAULT_RULES_PER_CATEGORY` per category.
+        rng : np.random.Generator | None, optional
+            Shared random generator for reproducible budget allocation. A
+            fresh ``np.random.default_rng()`` is created when ``None``.
+        target_mode : TargetMode
+            Desired conversation mode. When ``"singleturn"``, each scenario
+            is built with ``max_steps=1`` regardless of :attr:`max_turns`.
+            When ``"multiturn"`` (default), uses :attr:`max_turns`.
 
-        Returns:
+        Returns
+        -------
+        list[Scenario[Any, Any, Trace[Any, Any]]]
             One scenario per generated rule, ordered by category then rule.
         """
         effective_max_steps = self._effective_max_turns(self.max_turns, target_mode)

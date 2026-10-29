@@ -441,7 +441,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
 
     @logfire.instrument("chat_workflow.run")
     async def run(self, max_steps: int | None = None) -> Chat[OutputType]:
-        """Runs the workflow.
+        """Run the workflow.
 
         Parameters
         ----------

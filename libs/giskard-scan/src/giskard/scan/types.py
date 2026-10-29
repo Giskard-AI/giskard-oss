@@ -4,27 +4,34 @@ from typing import TypedDict
 class SharedScanOptions(TypedDict, total=False):
     """Optional execution settings shared by quality and vulnerability scans.
 
-    Attributes:
-        max_scenarios: Total upper bound on scenarios across all generators.
-            ``None`` lets each generator apply its own default.
-        seed: Integer seed used for reproducible scenario generation.
-        group_by: Result tag key used to group the printed report.
-            ``None`` prints the ungrouped report.
-        parallel: When ``True``, run generated scenarios concurrently against
-            the target (suite *execution*). Defaults to ``True`` for scans.
-            Distinct from scenario *generation*, which always runs generators
-            concurrently in :func:`~giskard.scan.catalog.generate_suite`.
-            Pass ``False`` to force serial execution. Note that
-            :meth:`~giskard.checks.scenarios.suite.Suite.run` itself defaults
-            to ``parallel=False``.
-        max_concurrency: Cap on concurrent scenarios when ``parallel=True``.
-            ``None`` runs all scenarios at once (provider rate limits become
-            the effective cap). When ``parallel=False``, a valid value has no
-            effect on scheduling, but invalid values are still rejected.
-            Defaults to ``None``.
-        return_exception: When ``True``, a scenario whose input generation fails
-            is recorded as an errored result and the scan continues. When
-            ``False``, the failure propagates and aborts the scan.
+    Attributes
+    ----------
+    max_scenarios : int | None
+        Total upper bound on scenarios across all generators.
+        ``None`` lets each generator apply its own default.
+    seed : int
+        Integer seed used for reproducible scenario generation.
+    group_by : str | None
+        Result tag key used to group the printed report.
+        ``None`` prints the ungrouped report.
+    parallel : bool
+        When ``True``, run generated scenarios concurrently against
+        the target (suite *execution*). Defaults to ``True`` for scans.
+        Distinct from scenario *generation*, which always runs generators
+        concurrently in :func:`~giskard.scan.catalog.generate_suite`.
+        Pass ``False`` to force serial execution. Note that
+        :meth:`~giskard.checks.scenarios.suite.Suite.run` itself defaults
+        to ``parallel=False``.
+    max_concurrency : int | None
+        Cap on concurrent scenarios when ``parallel=True``.
+        ``None`` runs all scenarios at once (provider rate limits become
+        the effective cap). When ``parallel=False``, a valid value has no
+        effect on scheduling, but invalid values are still rejected.
+        Defaults to ``None``.
+    return_exception : bool
+        When ``True``, a scenario whose input generation fails
+        is recorded as an errored result and the scan continues. When
+        ``False``, the failure propagates and aborts the scan.
     """
 
     max_scenarios: int | None
@@ -42,9 +49,11 @@ class ScanOptions(SharedScanOptions, total=False):
     passing these keys as explicit keyword arguments to
     :func:`~giskard.scan.vulnerability.vulnerability_scan`.
 
-    Attributes:
-        commercial_use: When ``True``, exclude generators whose datasets do not
-            permit commercial use. Defaults to ``False``.
+    Attributes
+    ----------
+    commercial_use : bool
+        When ``True``, exclude generators whose datasets do not
+        permit commercial use. Defaults to ``False``.
     """
 
     commercial_use: bool
@@ -91,17 +100,17 @@ def resolve_scan_options(
 
     Parameters
     ----------
-    max_scenarios : int or None
+    max_scenarios : int | None
         Total upper bound on scenarios across all generators.
     seed : int
         Integer seed used for reproducible scenario generation.
-    group_by : str or None
+    group_by : str | None
         Result tag key used to group the printed report.
     parallel : bool
         When ``True``, run generated scenarios concurrently against the target.
         This is suite *execution*; scenario *generation* always runs generators
         concurrently in :func:`~giskard.scan.catalog.generate_suite`.
-    max_concurrency : int or None
+    max_concurrency : int | None
         Cap on concurrent scenarios when ``parallel=True``. ``None`` runs all
         scenarios at once (provider rate limits become the effective cap).
         When ``parallel=False``, a valid value has no effect on scheduling,

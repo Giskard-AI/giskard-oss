@@ -143,8 +143,10 @@ class BaseRateLimiter(Discriminated, ABC):
 
     @override
     def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
-        """Return self so that deep-copying a generator doesn't duplicate
-        rate-limiter state (which contains unpicklable asyncio primitives)."""
+        """Return self so that deep-copying a generator doesn't duplicate.
+
+        rate-limiter state (which contains unpicklable asyncio primitives).
+        """
         return self
 
     @asynccontextmanager

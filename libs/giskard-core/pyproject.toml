@@ -25,7 +25,14 @@ pythonpath = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "W", "I", "F"]
-ignore = ["E501"]
+extend-select = ["D"]  # pydocstyle: validate docstring format (NumPy convention)
+ignore = ["E501", "D1"]  # D1: missing docstrings are not enforced yet
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
 
 [tool.ruff.lint.isort.sections]
 "my_packages" = ["giskard"]
