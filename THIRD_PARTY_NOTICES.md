@@ -186,7 +186,7 @@ Find a list of packages below
 - License: Apache Software License;; BSD License;; MIT License
 - Compatible: True
 
-### certifi-2026.10.23
+### certifi-2026.10.19
 
 - HomePage: https://github.com/certifi/python-certifi
 - Author: Kenneth Reitz
@@ -277,7 +277,7 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2026.9.0
+### fsspec-2026.6.0
 
 - HomePage:
 - Author:
@@ -452,7 +452,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### litellm-1.89.7
+### litellm-1.103.6
 
 - HomePage:
 - Author: BerriAI
@@ -662,7 +662,7 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### setuptools-84.2.1
+### setuptools-84.2.0
 
 - HomePage:
 - Author: Python Packaging Authority
