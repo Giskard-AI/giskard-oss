@@ -77,6 +77,18 @@ def test_from_anthropic_refusal_stop():
     assert ch.message.refusal == "Policy decline."
 
 
+def test_from_anthropic_context_window_exceeded_is_length():
+    """Stopping because the context window is full is a truncation, not a normal stop."""
+    raw = _message(
+        {
+            "content": [{"type": "text", "text": "Partial"}],
+            "stop_reason": "model_context_window_exceeded",
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    assert out.choices[0].finish_reason == "length"
+
+
 def test_from_anthropic_multiple_text_blocks_joined():
     """Several `text` blocks are joined with newlines in `message.content`."""
     raw = _message(

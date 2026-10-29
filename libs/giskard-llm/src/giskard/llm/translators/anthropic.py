@@ -310,6 +310,7 @@ class AnthropicChatConfigParams(_BaseModel):
 FINISH_REASON_MAP = {
     "end_turn": "stop",
     "max_tokens": "length",
+    "model_context_window_exceeded": "length",
     "tool_use": "tool_calls",
     "stop_sequence": "stop",
     "refusal": "stop",
