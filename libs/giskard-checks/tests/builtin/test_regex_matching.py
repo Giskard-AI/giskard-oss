@@ -284,8 +284,8 @@ async def test_empty_pattern_regex_mode() -> None:
         pattern="",
     )
     result = await check.run(Trace())
-    # Empty regex matches any string
-    assert result.status == CheckStatus.PASS
+    # An empty pattern matches any string: config error
+    assert result.status == CheckStatus.ERROR
 
 
 async def test_missing_pattern_validation() -> None:
