@@ -9,13 +9,21 @@ import httpx
 import pytest
 from giskard.agents import (
     BaseSOM,
+    Chat,
     SOMResponse,
     TemplateReference,
 )
 from giskard.agents.som import TypeSafeSOM
-from giskard.checks import CheckStatus, Conformity, Scenario, SOMJudge
+from giskard.checks import (
+    CheckStatus,
+    Conformity,
+    Interaction,
+    Scenario,
+    SOMJudge,
+    Trace,
+)
 from giskard.checks.judges.base import LLMCheckResult
-from giskard.llm.types import ChatMessage, Usage
+from giskard.llm.types import AssistantMessage, ChatMessage, Usage
 from pydantic import BaseModel, PrivateAttr, ValidationError
 
 
@@ -167,6 +175,33 @@ async def test_http_failure_remains_a_scenario_error(
     check = result.steps[0].results[0]
     assert check.status == CheckStatus.ERROR
     assert "HTTPStatusError" in check.details["traceback"]
+
+
+async def test_structured_output_chat_trace_does_not_crash_som_judge():
+    """A target that returns Chat.with_output must still be scoreable.
+
+    Conformity (and SOM) fences the whole Trace. Chat.output_model is a class,
+    so JSON dumping used to raise PydanticSerializationError and the check
+    never produced a verdict.
+    """
+
+    class Reply(BaseModel):
+        value: str
+
+    chat = Chat(
+        messages=[AssistantMessage(content='{"value": "Thank you!"}')],
+        output_model=Reply,
+    )
+    model = MockSOM(model="example-v1", probability=0.9)
+    result = await Conformity(rule="Be polite", judge=SOMJudge(model=model)).run(
+        Trace(interactions=[Interaction(inputs="Hello", outputs=chat)])
+    )
+
+    assert result.status == CheckStatus.PASS
+    assert len(model._calls) == 1
+    messages, question, _timeout = model._calls[0]
+    assert "Be polite" in question
+    assert any("Thank you!" in (message.text or "") for message in messages)
 
 
 async def test_invalid_prediction_remains_a_scenario_error():

@@ -20,6 +20,10 @@ def test_chat_output():
 
     assert isinstance(chat.output, Cheese)
     assert chat.output == Cheese(name="Camembert", region="Normandy")
+    dumped = chat.model_dump(mode="json")
+    assert dumped["output_model"] is None
+    assert dumped["messages"][1]["content"] == messages[1].content
+    assert chat.model_dump()["output_model"] is Cheese
 
 
 def test_chat_output_without_output_model():

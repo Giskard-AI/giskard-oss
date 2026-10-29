@@ -2,8 +2,10 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from giskard.agents import Chat
 from giskard.agents.templates import LLMFormattable, MessageTemplate, PromptsManager
 from giskard.agents.templates.environment import Trusted, fence
+from giskard.llm.types import AssistantMessage
 from pydantic import BaseModel
 
 
@@ -389,3 +391,22 @@ def test_llm_formattable_takes_precedence_over_pydantic():
     assert isinstance(message.content, str)
     assert "Protocol format" in message.content
     assert '"value"' not in message.content  # Should not be JSON
+
+
+def test_fence_chat_with_output_model():
+    """Structured-output Chat objects must fence without a serialization crash.
+
+    Judge templates dump the whole Trace as JSON. ``Chat.output_model`` is a
+    class, which pydantic cannot encode unless JSON dumps omit it.
+    """
+
+    class Reply(BaseModel):
+        value: str
+
+    chat = Chat(
+        messages=[AssistantMessage(content='{"value": "ok"}')],
+        output_model=Reply,
+    )
+    rendered = fence(chat)
+    assert "ok" in rendered
+    assert "ModelMetaclass" not in rendered
