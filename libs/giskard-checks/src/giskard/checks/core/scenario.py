@@ -3,6 +3,7 @@ from typing import Any, ClassVar, Self
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.experimental.missing_sentinel import MISSING
 
+from ._run_sync import run_sync as _run_sync
 from .check import Check
 from .input_generator import InputGenerator
 from .interaction import Interact, InteractionSpec, Trace
@@ -324,6 +325,26 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         """
         self.tags = tags
         return self
+
+    def run_sync(
+        self,
+        target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
+        return_exception: bool = False,
+        multiple_runs: int | None = None,
+    ) -> ScenarioResult[TraceType]:
+        """Blocking version of :meth:`run`, with the same arguments and result.
+
+        Each call creates a new event loop. Targets and checks that retain
+        loop-bound state, such as asyncio semaphores, cannot reuse that state
+        across calls. Use one async context and :meth:`run` for such objects.
+
+        Raises
+        ------
+        RuntimeError
+            If called while an asyncio event loop is already running. In that
+            case, use ``await scenario.run(...)`` instead.
+        """
+        return _run_sync(self.run, target, return_exception, multiple_runs)
 
     async def run(
         self,

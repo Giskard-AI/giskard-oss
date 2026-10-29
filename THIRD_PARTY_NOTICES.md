@@ -277,7 +277,7 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2026.9.0
+### fsspec-2026.6.0
 
 - HomePage:
 - Author:
@@ -452,7 +452,7 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### litellm-1.89.7
+### litellm-1.103.6
 
 - HomePage:
 - Author: BerriAI
