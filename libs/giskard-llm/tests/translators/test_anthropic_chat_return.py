@@ -260,3 +260,23 @@ def test_block_content_to_giskard_unknown_type_raises():
         _ = AnthropicChatTranslator.block_content_to_giskard(
             cast(ContentBlock, cast(object, SimpleNamespace(type="compaction")))
         )
+
+
+def test_from_anthropic_usage_counts_cached_prompt_tokens():
+    """`input_tokens` of Anthropic leaves out cache reads and cache writes."""
+    raw = _message(
+        {
+            "content": [{"type": "text", "text": "Hi"}],
+            "usage": {
+                "input_tokens": 20,
+                "output_tokens": 50,
+                "cache_read_input_tokens": 6000,
+                "cache_creation_input_tokens": 400,
+            },
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    assert out.usage is not None
+    assert out.usage.input_tokens == 6420
+    assert out.usage.output_tokens == 50
+    assert out.usage.total_tokens == 6470
