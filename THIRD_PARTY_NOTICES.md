@@ -277,7 +277,7 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2026.9.0
+### fsspec-2026.6.0
 
 - HomePage:
 - Author:
