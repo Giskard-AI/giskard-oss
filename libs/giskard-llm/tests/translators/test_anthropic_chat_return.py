@@ -16,7 +16,17 @@ pytest.importorskip("anthropic")
 from anthropic.types import Message
 from anthropic.types.content_block import ContentBlock
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
-from giskard.llm.types import TextContent
+from giskard.llm.types import (
+    ChatMessage,
+    ReasoningEncryptedDetail,
+    ReasoningTextDetail,
+    TextContent,
+    ToolMessage,
+    UserMessage,
+)
+
+from .sdk_payload_validation import validate_anthropic_message_create
+from .tool_turn_fixtures import TOOL_CALL_ID, TOOL_RESULT_CONTENT, WEATHER_TOOL
 
 pytestmark = pytest.mark.anthropic
 
@@ -185,12 +195,19 @@ def test_from_anthropic_thinking_then_text():
     )
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
     assert msg.reasoning == "The capital of France is Paris."
+    assert msg.reasoning_details == [
+        ReasoningTextDetail(
+            text="The capital of France is Paris.",
+            signature="sig_thinking_block",
+            format="anthropic-claude-v1",
+        )
+    ]
     assert msg.content == [TextContent(text="Paris is in France.")]
     assert msg.text == "Paris is in France."
 
 
 def test_from_anthropic_redacted_thinking_then_text():
-    """``redacted_thinking`` is skipped; it does not crash or populate ``reasoning``."""
+    """``redacted_thinking`` is kept opaque in ``reasoning_details``, not ``reasoning``."""
     raw = _message(
         {
             "content": [
@@ -201,6 +218,11 @@ def test_from_anthropic_redacted_thinking_then_text():
     )
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
     assert msg.reasoning is None
+    assert msg.reasoning_details == [
+        ReasoningEncryptedDetail(
+            data="opaque-redacted-payload", format="anthropic-claude-v1"
+        )
+    ]
     assert msg.content == [TextContent(text="Paris is in France.")]
     assert msg.text == "Paris is in France."
 
@@ -236,27 +258,110 @@ def test_from_anthropic_thinking_and_tool_use():
 
 
 def test_from_anthropic_redacted_thinking_only_is_dropped_not_raised():
-    """A response with only ``redacted_thinking`` does not crash and has nothing to report."""
+    """A response with only ``redacted_thinking`` does not crash and has no visible output."""
     raw = _message(
         {"content": [{"type": "redacted_thinking", "data": "opaque-encrypted-data"}]}
     )
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
     assert msg.reasoning is None
+    assert msg.reasoning_details == [
+        ReasoningEncryptedDetail(
+            data="opaque-encrypted-data", format="anthropic-claude-v1"
+        )
+    ]
     assert msg.content is None
     assert msg.tool_calls is None
 
 
 def test_from_anthropic_text_only_has_no_reasoning():
-    """A text-only response leaves ``message.reasoning`` unset."""
+    """A text-only response leaves ``message.reasoning`` / ``reasoning_details`` unset."""
     raw = _message({"content": [{"type": "text", "text": "Hello from Claude."}]})
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
     assert msg.reasoning is None
+    assert msg.reasoning_details is None
     assert msg.text == "Hello from Claude."
 
 
 def test_block_content_to_giskard_unknown_type_raises():
     """Unknown content-block types still raise so new Anthropic types stay visible."""
-    with pytest.raises(ValueError, match="Unsupported content block type: compaction"):
+    from giskard.llm.errors import UnsupportedContentError
+
+    with pytest.raises(UnsupportedContentError) as exc_info:
         _ = AnthropicChatTranslator.block_content_to_giskard(
             cast(ContentBlock, cast(object, SimpleNamespace(type="compaction")))
         )
+    assert exc_info.value.content_type == "compaction"
+
+
+_SERVER_TOOL_USE = {
+    "type": "server_tool_use",
+    "id": "srvtoolu_01",
+    "name": "web_search",
+    "input": {"query": "weather in Paris"},
+}
+
+
+def test_from_anthropic_unsupported_block_raises():
+    """Blocks we cannot represent raise :class:`UnsupportedContentError` by default."""
+    from giskard.llm.errors import UnsupportedContentError
+
+    raw = _message({"content": [_SERVER_TOOL_USE, {"type": "text", "text": "Answer."}]})
+    with pytest.raises(UnsupportedContentError) as exc_info:
+        AnthropicChatTranslator.from_anthropic(raw)
+    assert exc_info.value.content_type == "server_tool_use"
+    assert exc_info.value.provider == "anthropic"
+
+
+def test_from_anthropic_unsupported_block_dropped_with_warning(
+    caplog: pytest.LogCaptureFixture,
+):
+    """With ``ignore_unsupported_content`` the block is dropped and a warning logged."""
+    raw = _message({"content": [_SERVER_TOOL_USE, {"type": "text", "text": "Answer."}]})
+    with caplog.at_level("WARNING"):
+        msg = (
+            AnthropicChatTranslator.from_anthropic(raw, ignore_unsupported_content=True)
+            .choices[0]
+            .message
+        )
+    assert msg.content == [TextContent(text="Answer.")]
+    assert "server_tool_use" in caplog.text
+
+
+def test_thinking_tool_turn_passed_back_unchanged_replays_verbatim():
+    """A thinking + tool_use response, passed back as-is, replays its blocks in order."""
+    raw = _message(
+        {
+            "stop_reason": "tool_use",
+            "content": [
+                {"type": "thinking", "thinking": "Need weather.", "signature": "s1"},
+                {"type": "redacted_thinking", "data": "opaque"},
+                {
+                    "type": "tool_use",
+                    "id": TOOL_CALL_ID,
+                    "name": "get_weather",
+                    "input": {"city": "Paris"},
+                },
+            ],
+        }
+    )
+    assistant = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    messages: list[ChatMessage] = [
+        UserMessage(content="What's the weather in Paris?"),
+        assistant,
+        ToolMessage(content=TOOL_RESULT_CONTENT, tool_call_id=TOOL_CALL_ID),
+    ]
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL, messages, tools=[WEATHER_TOOL], thinking={"type": "adaptive"}
+    )
+
+    assert payload["messages"][1]["content"] == [
+        {"type": "thinking", "thinking": "Need weather.", "signature": "s1"},
+        {"type": "redacted_thinking", "data": "opaque"},
+        {
+            "type": "tool_use",
+            "id": TOOL_CALL_ID,
+            "name": "get_weather",
+            "input": {"city": "Paris"},
+        },
+    ]
+    validate_anthropic_message_create(payload)

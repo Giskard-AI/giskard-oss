@@ -50,6 +50,8 @@ Provider-specific kwargs:
     - ``default_headers``: extra headers passed through ``HttpOptions``
     - ``http_options``: advanced ``google.genai.types.HttpOptions`` override;
       explicit fields are preserved over convenience kwargs
+    - ``ignore_unsupported_content``: if True, drop response content giskard-llm
+      cannot represent (with a warning) instead of raising ``UnsupportedContentError``
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
@@ -191,6 +193,7 @@ class GoogleProvider:
         http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
         http_options: "HttpOptionsOrDict | None" = None,
+        ignore_unsupported_content: bool = False,
         **_kwargs: Any,
     ) -> None:
         if _kwargs:
@@ -198,6 +201,7 @@ class GoogleProvider:
                 "%s provider: ignoring unknown kwargs: %s", PROVIDER, sorted(_kwargs)
             )
         genai = _import_genai()
+        self._ignore_unsupported_content = ignore_unsupported_content
         resolved_key = (
             api_key
             or os.environ.get("GEMINI_API_KEY")
@@ -286,7 +290,12 @@ class GoogleProvider:
         except Exception as e:  # Broad catch: _map_error checks SDK types first, then applies timeout heuristic, then re-raises.
             self._map_error(e)
 
-        return GoogleChatTranslator.from_google(raw, model, len(messages))
+        return GoogleChatTranslator.from_google(
+            raw,
+            model,
+            len(messages),
+            ignore_unsupported_content=self._ignore_unsupported_content,
+        )
 
     async def embed(
         self,
@@ -382,4 +391,6 @@ class GoogleProvider:
         except Exception as e:  # Broad catch: _map_error checks SDK types first, then applies timeout heuristic, then re-raises.
             self._map_error(e)
 
-        return GoogleResponseTranslator.from_google(raw, model)
+        return GoogleResponseTranslator.from_google(
+            raw, model, ignore_unsupported_content=self._ignore_unsupported_content
+        )

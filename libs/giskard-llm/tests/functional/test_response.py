@@ -22,7 +22,7 @@ pytestmark = pytest.mark.functional
 # -- Provider parametrization -------------------------------------------------
 
 _RESPONSE_MODELS = {
-    "openai": os.getenv("TEST_OPENAI_MODEL", "openai/gpt-4.1-nano"),
+    "openai": os.getenv("TEST_OPENAI_MODEL", "openai/gpt-5.4-nano"),
     "google": os.getenv("TEST_GOOGLE_MODEL", "google/gemini-2.5-flash"),
     "azure_foundry_v1": os.getenv(
         "TEST_AZURE_FOUNDRY_V1_MODEL", "azure_foundry_v1/gpt-4.1-nano"

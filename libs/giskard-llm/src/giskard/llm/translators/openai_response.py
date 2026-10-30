@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, SerializationInfo, model_validator
 from ..errors import BadRequestError
 from ..types._serialization import close_object_schemas
 from ..utils import sanitize_schema_name
+from ._unsupported import keep_supported
 
 if TYPE_CHECKING:
     from openai.types.responses.response import Response
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
     from openai.types.responses.tool_param import ToolParam
 
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "max_tokens", "response_format"})
+_SUPPORTED_OUTPUT_TYPES = frozenset({"message", "function_call", "reasoning"})
 
 logger = logging.getLogger(__name__)
 PROVIDER = "openai"
@@ -175,5 +177,17 @@ class OpenAIResponseTranslator:
         )
 
     @staticmethod
-    def from_openai(raw: "Response") -> ResponseResult:
-        return ResponseResult.model_validate(raw.model_dump())
+    def from_openai(
+        raw: "Response",
+        *,
+        ignore_unsupported_content: bool = False,
+        provider: str = PROVIDER,
+    ) -> ResponseResult:
+        data = raw.model_dump()
+        data["output"] = keep_supported(
+            data.get("output") or [],
+            _SUPPORTED_OUTPUT_TYPES,
+            provider,
+            ignore_unsupported_content=ignore_unsupported_content,
+        )
+        return ResponseResult.model_validate(data)

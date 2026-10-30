@@ -17,6 +17,9 @@ from ..types import (
     CompletionContent,
     CompletionResponse,
     FunctionMessage,
+    ReasoningDetail,
+    ReasoningEncryptedDetail,
+    ReasoningTextDetail,
     RefusalContent,
     TextContent,
     ToolCall,
@@ -27,16 +30,22 @@ from ..types import (
 )
 from ..types._base import _BaseModel
 from ..utils import deserialize_arguments
+from ._unsupported import handle_unsupported_content
 
 if TYPE_CHECKING:
     from anthropic.types.content_block import ContentBlock
+    from anthropic.types.content_block_param import ContentBlockParam
     from anthropic.types.message import Message
     from anthropic.types.message_param import MessageParam
     from anthropic.types.model_param import ModelParam
     from anthropic.types.output_config_param import OutputConfigParam
+    from anthropic.types.redacted_thinking_block_param import (
+        RedactedThinkingBlockParam,
+    )
     from anthropic.types.text_block_param import TextBlockParam
+    from anthropic.types.thinking_block_param import ThinkingBlockParam
+    from anthropic.types.thinking_config_param import ThinkingConfigParam
     from anthropic.types.tool_union_param import ToolUnionParam
-    from anthropic.types.tool_use_block_param import ToolUseBlockParam
     from httpx2 import Timeout as httpxTimeout
 
     class CompletionCreateParams(TypedDict, total=False):
@@ -49,11 +58,15 @@ if TYPE_CHECKING:
         stop_sequences: Sequence[str]
         timeout: float | httpxTimeout | None
         output_config: OutputConfigParam
+        thinking: ThinkingConfigParam
 else:
     httpxTimeout = Any
 
 _PROVIDER = "anthropic/chat"
 _PROVIDER_NAME = "anthropic"
+# ``reasoning_details`` format tag for Anthropic thinking (OpenRouter convention).
+_REASONING_FORMAT = "anthropic-claude-v1"
+_THINKING_BLOCK_TYPES = frozenset({"thinking", "redacted_thinking"})
 logger = logging.getLogger(__name__)
 
 KNOWN_COMPLETION_PARAMS = frozenset(
@@ -66,6 +79,7 @@ KNOWN_COMPLETION_PARAMS = frozenset(
         "system",
         "output_config",
         "response_format",
+        "thinking",
     }
 )
 
@@ -132,11 +146,33 @@ def _completion_content_to_blocks(
     ]
 
 
+def _thinking_blocks(
+    details: Sequence[ReasoningDetail] | None,
+) -> "list[ThinkingBlockParam | RedactedThinkingBlockParam]":
+    """Signed Anthropic thinking to replay; unsigned or foreign reasoning is dropped."""
+    blocks: "list[ThinkingBlockParam | RedactedThinkingBlockParam]" = []
+    for detail in details or ():
+        if detail.format != _REASONING_FORMAT:
+            continue
+        if isinstance(detail, ReasoningTextDetail) and detail.signature:
+            blocks.append(
+                {
+                    "type": "thinking",
+                    "thinking": detail.text,
+                    "signature": detail.signature,
+                }
+            )
+        elif isinstance(detail, ReasoningEncryptedDetail):
+            blocks.append({"type": "redacted_thinking", "data": detail.data})
+    return blocks
+
+
 @AssistantMessage.register_serializer(_PROVIDER)
 def serialize_assistant_message(
     message: AssistantMessage, info: SerializationInfo
 ) -> "MessageParam":
-    blocks: "list[TextBlockParam | ToolUseBlockParam]" = []
+    # Anthropic requires thinking blocks to lead the assistant turn they belong to.
+    blocks: "list[ContentBlockParam]" = [*_thinking_blocks(message.reasoning_details)]
     if message.content is not None:
         blocks.extend(_completion_content_to_blocks(message.content, info))
     if (refusal := message.refusal) is not None:
@@ -211,6 +247,7 @@ class AnthropicChatConfigParams(_BaseModel):
     stop_sequences: Sequence[str] | None = None
     timeout: float | httpxTimeout | None = None
     output_config: dict[str, object] | None = None
+    thinking: dict[str, object] | None = None
 
     @field_validator("timeout", mode="before")
     @classmethod
@@ -240,12 +277,13 @@ class AnthropicChatConfigParams(_BaseModel):
                 merged_messages.append(message)
                 continue
 
-            prev_content = _str_to_text_blocks(last_message["content"])
-            curr_content = _str_to_text_blocks(message["content"])
-            merged_messages[-1] = {
-                **last_message,
-                "content": prev_content + curr_content,
-            }
+            content = _str_to_text_blocks(last_message["content"])
+            content += _str_to_text_blocks(message["content"])
+            if message["role"] == "assistant":
+                # The merged turn must still lead with thinking; sort is stable, so
+                # thinking and other blocks each keep their relative order.
+                content.sort(key=lambda b: b.get("type") not in _THINKING_BLOCK_TYPES)
+            merged_messages[-1] = {**last_message, "content": content}
 
         return merged_messages
 
@@ -358,8 +396,8 @@ class AnthropicChatTranslator:
 
     @staticmethod
     def block_content_to_giskard(
-        block: "ContentBlock",
-    ) -> CompletionContent | ToolCall:
+        block: "ContentBlock", *, ignore_unsupported_content: bool = False
+    ) -> CompletionContent | ToolCall | None:
         if block.type == "text":
             return TextContent(text=block.text)
         elif block.type == "tool_use":
@@ -371,39 +409,63 @@ class AnthropicChatTranslator:
                     arguments=deserialize_arguments(block.input),
                 ),
             )
-        else:
-            raise ValueError(f"Unsupported content block type: {block.type}")
+        handle_unsupported_content(
+            _PROVIDER_NAME,
+            block.type,
+            ignore_unsupported_content=ignore_unsupported_content,
+        )
+        return None
 
     @staticmethod
     def blocks_to_giskard(
-        blocks: "Sequence[ContentBlock]",
-    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall], str | None]:
-        """Split blocks into content, tool calls and joined readable thinking.
+        blocks: "Sequence[ContentBlock]", *, ignore_unsupported_content: bool = False
+    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall], list[ReasoningDetail]]:
+        """Split blocks into content, tool calls and reasoning details.
 
-        ``redacted_thinking`` is opaque and skipped.
+        ``thinking`` blocks keep their signature and ``redacted_thinking`` its opaque
+        payload, so they can be replayed verbatim.
         """
         content: list[CompletionContent] = []
         tool_calls: list[ToolCall] = []
-        thoughts: list[str] = []
+        reasoning_details: list[ReasoningDetail] = []
         for block in blocks:
             if block.type == "thinking":
-                if block.thinking:
-                    thoughts.append(block.thinking)
-            elif block.type != "redacted_thinking":
-                converted = AnthropicChatTranslator.block_content_to_giskard(block)
+                reasoning_details.append(
+                    ReasoningTextDetail(
+                        text=block.thinking,
+                        signature=block.signature,
+                        format=_REASONING_FORMAT,
+                    )
+                )
+            elif block.type == "redacted_thinking":
+                reasoning_details.append(
+                    ReasoningEncryptedDetail(data=block.data, format=_REASONING_FORMAT)
+                )
+            else:
+                converted = AnthropicChatTranslator.block_content_to_giskard(
+                    block, ignore_unsupported_content=ignore_unsupported_content
+                )
                 if isinstance(converted, ToolCall):
                     tool_calls.append(converted)
-                else:
+                elif converted is not None:
                     content.append(converted)
-        return content, tool_calls, "\n".join(thoughts) or None
+        return content, tool_calls, reasoning_details
 
     @staticmethod
     def from_anthropic(
-        raw: "Message",
+        raw: "Message", *, ignore_unsupported_content: bool = False
     ) -> CompletionResponse:
         """Convert raw SDK response to CompletionResponse."""
-        content, tool_calls, reasoning = AnthropicChatTranslator.blocks_to_giskard(
-            raw.content
+        content, tool_calls, reasoning_details = (
+            AnthropicChatTranslator.blocks_to_giskard(
+                raw.content, ignore_unsupported_content=ignore_unsupported_content
+            )
+        )
+        # Readable thinking only; ``redacted_thinking`` is opaque.
+        reasoning = "\n".join(
+            d.text
+            for d in reasoning_details
+            if isinstance(d, ReasoningTextDetail) and d.text
         )
 
         finish_reason = (
@@ -425,7 +487,8 @@ class AnthropicChatTranslator:
             content=content if content else None,
             refusal=refusal_out,
             tool_calls=tool_calls or None,
-            reasoning=reasoning,
+            reasoning=reasoning or None,
+            reasoning_details=reasoning_details or None,
         )
 
         usage = None

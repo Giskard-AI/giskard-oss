@@ -28,6 +28,8 @@ Provider-specific kwargs:
     - ``base_url``: Azure endpoint URL
     - ``http_client``: caller-owned async HTTP client passed to the SDK; not closed by giskard-llm
     - ``default_headers``: extra headers merged into every SDK request
+    - ``ignore_unsupported_content``: if True, drop response content giskard-llm
+      cannot represent (with a warning) instead of raising ``UnsupportedContentError``
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false, reportMissingSuperCall=false
@@ -60,6 +62,7 @@ class AzureOpenAIProvider(OpenAIProvider):
         timeout: float | None = None,
         http_client: "AsyncClient | None" = None,
         default_headers: Mapping[str, str] | None = None,
+        ignore_unsupported_content: bool = False,
         **_kwargs: Any,
     ) -> None:
         try:
@@ -78,6 +81,7 @@ class AzureOpenAIProvider(OpenAIProvider):
             "AZURE_API_VERSION", "2024-10-21"
         )
 
+        self._ignore_unsupported_content = ignore_unsupported_content
         self._client = openai.AsyncAzureOpenAI(
             **compact(
                 api_key=resolved_key,
