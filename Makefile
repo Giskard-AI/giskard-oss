@@ -157,6 +157,12 @@ format: ## Format code with ruff
 	uv run ruff format .
 	uv run ruff check --fix .
 
+# Advisory structural-duplication report (pylint R0801 only, no other pylint rules).
+# Not part of `make check`: CI runs it with continue-on-error during the trial period.
+check-duplication: ## Report duplicated code blocks (>= 6 similar lines) across libs/*/src
+	uv run pylint --disable=all --enable=duplicate-code --min-similarity-lines=6 \
+		--ignore-imports=yes --ignore-signatures=yes --score=n libs/*/src/giskard
+
 check-format: ## Check if code is formatted correctly
 	uv run ruff format --check .
 

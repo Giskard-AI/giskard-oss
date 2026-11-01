@@ -140,6 +140,7 @@ dev = [
     "pip-audit==2.10.1",
     "deptry==0.24.0",
     "diff-cover==10.6.0",
+    "pylint==4.1.3",
 ]
 garak-test = [
     { include-group = "test" },
