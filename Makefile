@@ -75,8 +75,13 @@ test-unit: ## Run unit tests only (excludes functional), optional PACKAGE=<name>
 test-functional: ## Run functional tests only (requires API keys), optional PACKAGE=<name> PROVIDER=<name>
 	$(call pytest-each-lib,-m "functional$(if $(PROVIDER), and $(PROVIDER))")
 
-install-no-providers: ## Install giskard-llm without provider SDKs (for no_providers tests)
+# Two steps because the `test` group lives on the workspace root, not on giskard-llm,
+# so `uv sync --package giskard-llm --group test` is rejected. The first (exact) sync
+# leaves only giskard-llm and its core deps, removing any provider SDKs; the second adds
+# the locked test tools (pytest-asyncio, ...) with --inexact so it removes nothing.
+install-no-providers: ## Install giskard-llm + test group without provider SDKs (for no_providers tests)
 	uv sync --package giskard-llm
+	uv sync --only-group test --inexact
 
 install-minimal: ## Install with test group only (no provider SDKs, all packages)
 	uv sync --only-group test
@@ -109,8 +114,14 @@ test-examples: ## Run canonical examples and README snippet lint
 	uv run pytest examples tools -q
 	uv run python tools/lint_readme_snippets.py
 
-test-no-providers: ## Run tests that verify behavior when provider SDKs are missing
-	uv run pytest libs/giskard-llm -m "no_providers"
+# Run after `make install-no-providers`. --no-sync is required: a plain `uv run` re-syncs
+# the full workspace, reinstalls openai/google-genai/anthropic, and conftest then skips
+# every no_providers test. test_smoke.py is ignored because it calls
+# find_spec("google.genai") at import time, which raises ModuleNotFoundError without the
+# `google` namespace package; it has no no_providers tests, so nothing is lost.
+test-no-providers: ## Run tests that verify behavior when provider SDKs are missing (requires: make install-no-providers)
+	uv run --no-sync pytest libs/giskard-llm -m "no_providers" \
+		--ignore=libs/giskard-llm/tests/test_smoke.py
 
 test-garak: ## Run garak integration tests (requires: make install-garak-test)
 	uv run pytest libs/giskard-scan/tests/integrations/garak
