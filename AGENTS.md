@@ -21,7 +21,7 @@ giskard-oss — behavioral config for interactive coding assistants with a human
 
 ### 4. Verification Before Done
 – Never mark a task complete without proving it works
-– Run: `make format && make check && make test-unit PACKAGE=<affected-lib>`
+– Run: `make format && make check && make diff-cover PACKAGE=<affected-lib>` (`diff-cover` runs the unit tests too)
 – Show actual output. Never assume tests pass.
 – Ask yourself: "Would a staff engineer approve this?"
 
@@ -49,6 +49,14 @@ giskard-oss — behavioral config for interactive coding assistants with a human
 – No Laziness: find root causes; no band-aids, no temporary fixes; senior developer standards
 – Minimal Impact: only touch what's necessary; no side effects; no reformatting untouched lines
 
+## Code Quality Gates
+Enforced in CI for every contributor; this section only tells you how to pass them.
+– Complexity: every function has McCabe complexity ≤ 10 (ruff `C901`, threshold in the root `pyproject.toml`). The PostToolUse hook blocks edits that exceed it. Fix by splitting the function, not by raising the limit.
+– Changed-line coverage: ≥ 80% of the lines your change adds or modifies must be covered by unit tests (`make diff-cover PACKAGE=<lib>`). Only changed lines count; untouched legacy code never fails you.
+– Duplication: `make check-duplication` (pylint `R0801`) is advisory. Don't add new duplicated blocks; extract a shared helper instead.
+– Bypasses (`# noqa: C901`, `# pragma: no cover`) need a same-line justification and a mention in the PR description. Unjustified bypasses get rejected in review.
+– Trial: these gates started 2026-11-01 for 4 weeks (owner: Kevin). Expect thresholds to be revisited at the end of the trial.
+
 ## Cursor Cloud specific instructions
 
 Non-obvious context for cloud agents (startup refresh is `make install` then `make install-tools`; `uv` is on `PATH` for login shells via `~/.bashrc`).
@@ -56,6 +64,6 @@ Non-obvious context for cloud agents (startup refresh is `make install` then `ma
 – This repo is a `uv` workspace monorepo of pure Python libraries (`libs/giskard-*`). There is no server, daemon, or CLI to start — "running" the product means importing the libraries from Python or running `pytest`. Prefer Makefile targets over raw `uv`/`pytest` (`make help`).
 – Import namespace is `giskard.<sublib>` (e.g. `import giskard.checks`), not `giskard_checks`.
 – Do not run full `make setup` in this VM: its `pre-commit-install` step fails with `Cowardly refusing to install hooks with core.hooksPath set`. That is expected (global `core.hooksPath`) and harmless — use `make install` + `make install-tools` instead; git hooks are not needed to validate work.
-– Lint/test/build/run all work without secrets: `make lint`, `make test-unit [PACKAGE=<lib>]`, and importing the libs. Unit tests exclude anything marked `functional`.
+– Lint/test/build/run all work with no API keys set (`make lint`, `make test-unit [PACKAGE=<lib>]`, and importing the libs). Unit tests exclude anything marked `functional`.
 – Functional/integration tests are excluded by default and require live LLM provider API keys (e.g. `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `ANTHROPIC_API_KEY`); `giskard-scan` may also reach Hugging Face Hub. Do not expect these to run without those secrets and network access.
 – `make check` runs `security` (`pip-audit`) and license checks (`check-licenses`/`check-notices`) that reach the network (PyPI / license metadata); if offline these steps can fail even when the code is fine.
