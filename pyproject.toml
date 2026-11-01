@@ -101,6 +101,15 @@ markers = [
     "no_providers: tests that run without any provider SDK installed",
 ]
 
+# Shared ruff settings. Each lib's pyproject `extend`s this file, but a lib-level
+# `select` replaces (not merges) the rule list, so every lib also lists "C901" in its own
+# `select`. The threshold lives only here.
+[tool.ruff.lint]
+extend-select = ["C901"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
 [dependency-groups]
 test = [
     "pytest==9.1.1",

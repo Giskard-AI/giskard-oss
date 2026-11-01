@@ -61,8 +61,11 @@ markers = [
     "uses_ambient_env: opt out of the GISKARD_* environment isolation fixture",
 ]
 
+[tool.ruff]
+extend = "../../pyproject.toml"
+
 [tool.ruff.lint]
-select = ["E", "W", "I", "F"]
+select = ["E", "W", "I", "F", "C901"]
 ignore = ["E501"]
 
 [tool.ruff.lint.isort.sections]
