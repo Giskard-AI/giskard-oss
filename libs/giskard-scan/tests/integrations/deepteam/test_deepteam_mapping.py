@@ -1,5 +1,7 @@
 """Tests for RTTestCase -> ScenarioResult translation."""
 
+import math
+
 import pytest
 
 pytest.importorskip("deepteam")
@@ -64,6 +66,32 @@ async def test_missing_score_maps_to_skip_not_failure():
     assert check.status == "skip"
     assert not scenario.failed
     assert scenario.skipped
+
+
+@pytest.mark.parametrize(
+    "score",
+    [math.nan, -1.0, 2.0, math.inf, -math.inf, True, False, "invalid"],
+    ids=[
+        "nan",
+        "below_range",
+        "above_range",
+        "inf",
+        "neg_inf",
+        "bool_true",
+        "bool_false",
+        "str_score",
+    ],
+)
+async def test_invalid_score_maps_to_error(score: object) -> None:
+    """Non-finite or out-of-range scores must be graded as ERROR, not FAIL or PASS."""
+    cb = ScanTargetCallback(target=lambda x: x)
+    scenario = await _adapter._testcase_to_scenario(_TC(score=score), cb)
+    check = _check(scenario)
+    assert check.errored
+    assert not check.passed
+    assert not check.failed
+    assert check.message == "deepteam returned invalid score"
+    assert check.metrics == []
 
 
 async def test_details_carry_attack_method_and_risk_category():
