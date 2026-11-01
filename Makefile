@@ -72,6 +72,19 @@ test: ## Run all tests (unit + functional), optional PACKAGE=<name>
 test-unit: ## Run unit tests only (excludes functional), optional PACKAGE=<name>
 	$(call pytest-each-lib,tests src -m "not functional")
 
+# Changed-line coverage gate: the unit tests run with coverage, then diff-cover fails if
+# less than DIFF_COVER_FAIL_UNDER% of the lines changed since DIFF_COVER_COMPARE are
+# covered. Only changed lines count, so untouched legacy code never fails a PR. CI
+# compares against the PR merge commit's first parent (the base branch tip).
+DIFF_COVER_COMPARE ?= origin/main
+DIFF_COVER_FAIL_UNDER := 80
+
+diff-cover: ## Unit tests + fail if <80% of changed lines are covered, optional PACKAGE=<name> DIFF_COVER_COMPARE=<ref>
+	$(call pytest-each-lib,tests src -m "not functional" --cov=src \
+		--cov-config=../../pyproject.toml --cov-report=xml:coverage.xml)
+	$(foreach lib,$(TEST_LIBS),uv run diff-cover libs/$(lib)/coverage.xml \
+		--compare-branch=$(DIFF_COVER_COMPARE) --fail-under=$(DIFF_COVER_FAIL_UNDER) &&) true
+
 test-functional: ## Run functional tests only (requires API keys), optional PACKAGE=<name> PROVIDER=<name>
 	$(call pytest-each-lib,-m "functional$(if $(PROVIDER), and $(PROVIDER))")
 

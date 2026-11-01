@@ -110,6 +110,23 @@ extend-select = ["C901"]
 [tool.ruff.lint.mccabe]
 max-complexity = 10
 
+# Coverage settings for `make diff-cover`, passed to every lib via --cov-config.
+[tool.coverage.run]
+# giskard-scan's optional-extra integrations are skipped by unit tests when their extra
+# is missing (see libs/giskard-scan/conftest.py) and are exercised by the
+# integration-tests workflow instead, so they stay out of unit coverage.
+omit = [
+    "*/giskard/scan/integrations/garak/*",
+    "*/giskard/scan/integrations/lidar/*",
+    "*/giskard/scan/integrations/deepteam/*",
+]
+
+[tool.coverage.report]
+# `giskard` is a PEP 420 namespace package (no __init__.py). Without this, coverage
+# never discovers modules that no test imports, so a brand-new untested file would
+# be invisible to diff-cover instead of reported at 0%.
+include_namespace_packages = true
+
 [dependency-groups]
 test = [
     "pytest==9.1.1",
@@ -122,6 +139,7 @@ dev = [
     "giskard[full]",
     "pip-audit==2.10.1",
     "deptry==0.24.0",
+    "diff-cover==10.6.0",
 ]
 garak-test = [
     { include-group = "test" },
