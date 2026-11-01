@@ -184,6 +184,56 @@ def _import_interactions_errors() -> Any:
         return None
 
 
+def _map_genai_error(e: Exception) -> LLMError | None:
+    """Map the standard ``google.genai.errors`` hierarchy (Chat Completions / Embeddings)."""
+    genai_errors = _import_genai_errors()
+    if isinstance(e, genai_errors.ClientError):
+        status = getattr(e, "code", 400)
+        if status == 429:
+            return RateLimitError(429, str(e), PROVIDER)
+        if status in (401, 403) or "API_KEY_INVALID" in str(e):
+            return AuthenticationError(status, str(e), PROVIDER)
+        return BadRequestError(status, str(e), PROVIDER)
+    if isinstance(e, genai_errors.ServerError):
+        return ServerError(getattr(e, "code", 500), str(e), PROVIDER)
+    if isinstance(e, genai_errors.APIError):
+        return LLMError(getattr(e, "code", 500), str(e), PROVIDER)
+    return None
+
+
+def _map_interactions_error(e: Exception) -> LLMError | None:
+    """Map the separate ``google.genai._interactions`` hierarchy (Interactions API)."""
+    ix = _import_interactions_errors()
+    if ix is None:
+        return None
+    status = getattr(e, "status_code", 0)
+    if isinstance(e, (ix.AuthenticationError, ix.PermissionDeniedError)):
+        return AuthenticationError(status or 401, str(e), PROVIDER)
+    if isinstance(e, ix.RateLimitError):
+        return RateLimitError(status or 429, str(e), PROVIDER)
+    if isinstance(e, ix.InternalServerError):
+        return ServerError(status or 500, str(e), PROVIDER)
+    if isinstance(e, ix.APIStatusError):
+        if "API_KEY_INVALID" in str(e):
+            return AuthenticationError(status or 401, str(e), PROVIDER)
+        return BadRequestError(status or 400, str(e), PROVIDER)
+    # Must precede APIConnectionError: APITimeoutError subclasses it.
+    if isinstance(e, ix.APITimeoutError):
+        return LLMTimeoutError(408, str(e), PROVIDER)
+    if isinstance(e, ix.APIConnectionError):
+        return LLMError(0, str(e), PROVIDER)
+    if isinstance(e, ix.APIError):
+        return LLMError(status or 500, str(e), PROVIDER)
+    return None
+
+
+def _map_timeout_heuristic(e: Exception) -> LLMTimeoutError | None:
+    """Fallback for non-SDK exceptions (e.g. raw httpx) that signal a timeout."""
+    if "timed out" in str(e).lower() or "timeout" in type(e).__name__.lower():
+        return LLMTimeoutError(408, str(e), PROVIDER)
+    return None
+
+
 class GoogleProvider:
     def __init__(
         self,
@@ -219,47 +269,14 @@ class GoogleProvider:
         Chat Completions / Embeddings) and the separate
         ``google.genai._interactions`` hierarchy (used by Interactions API).
         """
-        genai_errors = _import_genai_errors()
-        if isinstance(e, genai_errors.ClientError):
-            status = getattr(e, "code", 400)
-            if status == 429:
-                raise RateLimitError(429, str(e), PROVIDER) from e
-            if status in (401, 403) or "API_KEY_INVALID" in str(e):
-                raise AuthenticationError(status, str(e), PROVIDER) from e
-            raise BadRequestError(status, str(e), PROVIDER) from e
-        if isinstance(e, genai_errors.ServerError):
-            raise ServerError(getattr(e, "code", 500), str(e), PROVIDER) from e
-        if isinstance(e, genai_errors.APIError):
-            raise LLMError(getattr(e, "code", 500), str(e), PROVIDER) from e
-
-        ix = _import_interactions_errors()
-        if ix is not None:
-            status = getattr(e, "status_code", 0)
-            if isinstance(e, ix.AuthenticationError) or isinstance(
-                e, ix.PermissionDeniedError
-            ):
-                raise AuthenticationError(status or 401, str(e), PROVIDER) from e
-            if isinstance(e, ix.RateLimitError):
-                raise RateLimitError(status or 429, str(e), PROVIDER) from e
-            if isinstance(e, ix.InternalServerError):
-                raise ServerError(status or 500, str(e), PROVIDER) from e
-            if isinstance(e, ix.APIStatusError):
-                if "API_KEY_INVALID" in str(e):
-                    raise AuthenticationError(status or 401, str(e), PROVIDER) from e
-                raise BadRequestError(status or 400, str(e), PROVIDER) from e
-            # Must precede APIConnectionError: APITimeoutError subclasses it.
-            if isinstance(e, ix.APITimeoutError):
-                raise LLMTimeoutError(408, str(e), PROVIDER) from e
-            if isinstance(e, ix.APIConnectionError):
-                raise LLMError(0, str(e), PROVIDER) from e
-            if isinstance(e, ix.APIError):
-                raise LLMError(
-                    getattr(e, "status_code", None) or 500, str(e), PROVIDER
-                ) from e
-
-        if "timed out" in str(e).lower() or "timeout" in type(e).__name__.lower():
-            raise LLMTimeoutError(408, str(e), PROVIDER) from e
-        raise
+        mapped = (
+            _map_genai_error(e)
+            or _map_interactions_error(e)
+            or _map_timeout_heuristic(e)
+        )
+        if mapped is None:
+            raise
+        raise mapped from e
 
     async def complete(
         self,
