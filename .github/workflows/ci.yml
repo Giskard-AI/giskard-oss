@@ -31,6 +31,9 @@ jobs:
       # check-notices scan; without them licensecheck cannot read their license metadata.
       - run: make install install-tools
       - run: make check
+      # Advisory only: reports duplicated blocks but never fails the build.
+      - run: make check-duplication
+        continue-on-error: true
 
   test-examples:
     name: test-examples
@@ -64,16 +67,24 @@ jobs:
         package: [giskard-core, giskard-llm, giskard-agents, giskard-checks, giskard-scan]
     env:
       PACKAGE: ${{ matrix.package }}
+      # Changed-line coverage runs once per lib (3.12 leg of PRs) instead of plain test-unit.
+      DIFF_COVER: ${{ github.event_name == 'pull_request' && matrix.python-version == '3.12' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # On pull_request, HEAD is the merge commit; depth 2 brings its first parent
+          # (the base branch tip), which is all diff-cover needs to compute the PR diff.
+          fetch-depth: 2
       - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
       - run: make install
-      - run: make test-unit PACKAGE=$PACKAGE
+      - if: env.DIFF_COVER != 'true'
+        run: make test-unit PACKAGE=$PACKAGE
+      - if: env.DIFF_COVER == 'true'
+        run: make diff-cover PACKAGE=$PACKAGE DIFF_COVER_COMPARE=HEAD^1
 
   test-minimal:
     name: test-minimal / ${{ matrix.package }}

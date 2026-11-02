@@ -23,8 +23,11 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 pythonpath = ["src"]
 
+[tool.ruff]
+extend = "../../pyproject.toml"
+
 [tool.ruff.lint]
-select = ["E", "W", "I", "F"]
+select = ["E", "W", "I", "F", "C901"]
 ignore = ["E501"]
 
 [tool.ruff.lint.isort.sections]

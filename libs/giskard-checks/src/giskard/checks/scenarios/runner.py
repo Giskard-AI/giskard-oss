@@ -104,6 +104,28 @@ def _skipped_check_results_for_step[InputType, OutputType, TraceType: Trace[Any,
     ]
 
 
+def _skipped_remaining_step_results[InputType, OutputType, TraceType: Trace[Any, Any]](
+    steps: list[Step[InputType, OutputType, TraceType]],
+    first_skipped: int,
+    trace: TraceType,
+) -> list[TestCaseResult]:
+    """SKIP results for ``steps[first_skipped:]``, which never ran after a failure."""
+    # Skipped steps own no new interaction; point them at the trace as it stood
+    # when execution stopped so the index is never left unset.
+    last_interaction_index = len(trace.interactions) - 1 if trace.interactions else None
+    return [
+        TestCaseResult(
+            results=_skipped_check_results_for_step(
+                steps[i],
+                f"Step {i + 1} was skipped due to previous failure",
+            ),
+            duration_ms=0,
+            last_interaction_index=last_interaction_index,
+        )
+        for i in range(first_skipped, len(steps))
+    ]
+
+
 class ScenarioRunner:
     """Execute scenarios by running their steps sequentially.
 
@@ -243,22 +265,9 @@ class ScenarioRunner:
             if not step_result.passed:
                 break
 
-        if len(steps_results) < len(steps):
-            # Skipped steps own no new interaction; point them at the trace as it stood
-            # when execution stopped so the index is never left unset.
-            skipped_last_interaction_index = (
-                len(trace.interactions) - 1 if trace.interactions else None
-            )
-            for i in range(len(steps_results), len(steps)):
-                step_result = TestCaseResult(
-                    results=_skipped_check_results_for_step(
-                        steps[i],
-                        f"Step {i + 1} was skipped due to previous failure",
-                    ),
-                    duration_ms=0,
-                    last_interaction_index=skipped_last_interaction_index,
-                )
-                steps_results.append(step_result)
+        steps_results.extend(
+            _skipped_remaining_step_results(steps, len(steps_results), trace)
+        )
 
         end_time = time.perf_counter()
         duration_ms = int((end_time - start_time) * 1000)

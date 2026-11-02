@@ -59,43 +59,44 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     - Tests marked with a provider name skip when that SDK is missing.
     - Tests marked ``no_providers`` skip when any provider SDK is installed.
     """
-    provider_filter = _parse_test_provider()
-    if provider_filter is not None:
-        allowed, tp_disp = provider_filter
-        for item in items:
-            present = {name for name in _PROVIDER_PACKAGES if name in item.keywords}
-            if present and present.isdisjoint(allowed):
-                item.add_marker(
-                    pytest.mark.skip(
-                        reason=(
-                            f"Not selected by TEST_PROVIDER={tp_disp!r} "
-                            f"(allowed marks: {sorted(allowed)})"
-                        )
-                    )
-                )
+    _skip_unselected_providers(items)
+    _skip_missing_sdks(items)
+    _skip_no_providers_tests(items)
 
+
+def _skip_unselected_providers(items: list[pytest.Item]) -> None:
+    provider_filter = _parse_test_provider()
+    if provider_filter is None:
+        return
+    allowed, tp_disp = provider_filter
+    reason = (
+        f"Not selected by TEST_PROVIDER={tp_disp!r} (allowed marks: {sorted(allowed)})"
+    )
+    for item in items:
+        present = {name for name in _PROVIDER_PACKAGES if name in item.keywords}
+        if present and present.isdisjoint(allowed):
+            item.add_marker(pytest.mark.skip(reason=reason))
+
+
+def _skip_missing_sdks(items: list[pytest.Item]) -> None:
     installed_cache: dict[str, bool] = {}
     for item in items:
         for mark_name, package in _PROVIDER_PACKAGES.items():
-            if mark_name in item.keywords:
-                if package not in installed_cache:
-                    installed_cache[package] = _is_installed(package)
-                if not installed_cache[package]:
-                    item.add_marker(
-                        pytest.mark.skip(
-                            reason=f"Provider SDK '{package}' not installed"
-                        )
-                    )
-
-    if "no_providers" not in {kw for item in items for kw in item.keywords}:
-        return
-
-    any_installed = any(_is_installed(p) for p in _ANY_PROVIDER_PACKAGES)
-    if any_installed:
-        for item in items:
-            if "no_providers" in item.keywords:
+            if mark_name not in item.keywords:
+                continue
+            if package not in installed_cache:
+                installed_cache[package] = _is_installed(package)
+            if not installed_cache[package]:
                 item.add_marker(
-                    pytest.mark.skip(
-                        reason="no_providers tests require no provider SDKs installed"
-                    )
+                    pytest.mark.skip(reason=f"Provider SDK '{package}' not installed")
                 )
+
+
+def _skip_no_providers_tests(items: list[pytest.Item]) -> None:
+    no_provider_items = [item for item in items if "no_providers" in item.keywords]
+    if not no_provider_items:
+        return
+    if any(_is_installed(p) for p in _ANY_PROVIDER_PACKAGES):
+        reason = "no_providers tests require no provider SDKs installed"
+        for item in no_provider_items:
+            item.add_marker(pytest.mark.skip(reason=reason))

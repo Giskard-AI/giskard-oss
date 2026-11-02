@@ -69,5 +69,8 @@ markers = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/giskard"]
 
+[tool.ruff]
+extend = "../../pyproject.toml"
+
 [tool.ruff.lint]
-select = ["I", "F401"]
+select = ["I", "F401", "C901"]
