@@ -11,22 +11,17 @@ permissions: {}
 jobs:
   guard:
     name: guard
-    if: github.event.label.name == 'safe for merge'
+    # Approver logins; contains() compares case-insensitively.
+    if: >-
+      github.event.label.name == 'safe for merge' &&
+      !contains(fromJSON('["kevinmessiaen", "henchaves", "pierlj", "hartorn"]'), github.event.sender.login)
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write # remove label from PR
     steps:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        env:
-          ACTOR: ${{ github.event.sender.login }}
         with:
           script: |
-            // Approver logins from the maintainer list. Compared lowercase.
-            const allowed = ['kevinmessiaen', 'henchaves', 'pierlj', 'hartorn'];
-            const actor = (process.env.ACTOR || '').toLowerCase();
-            if (allowed.includes(actor)) {
-              return;
-            }
             try {
               await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
