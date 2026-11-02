@@ -6,9 +6,7 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+# No concurrency group: any later label event on the PR would cancel a guard run before it removes the label.
 
 jobs:
   guard:
@@ -29,9 +27,16 @@ jobs:
             if (allowed.includes(actor)) {
               return;
             }
-            await github.rest.issues.removeLabel({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              name: 'safe for merge'
-            });
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                name: 'safe for merge'
+              });
+            } catch (error) {
+              // Label already removed (e.g. by another guard run).
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
