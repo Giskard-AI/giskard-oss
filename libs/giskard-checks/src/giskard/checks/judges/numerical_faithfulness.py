@@ -1,0 +1,151 @@
+from typing import Any, override
+
+from giskard.agents import TemplateReference
+from pydantic import Field
+from pydantic.experimental.missing_sentinel import MISSING
+
+from ..core import Trace
+from ..core.check import Check
+from ..core.extraction import JSONPathStr, provided_or_resolve
+from ..core.result import CheckResult
+from ._inputs import error_if_unresolved_answer_or_context
+from .base import BaseLLMCheck, format_prompt_text, trace_with_current_turn
+
+
+@Check.register("numerical_faithfulness")
+class NumericalFaithfulness[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
+    BaseLLMCheck[InputType, OutputType, TraceType]
+):
+    """LLM-based check that detects unfaithful numerical values in an answer.
+
+    Targets a class of RAG hallucination where an answer reproduces the context
+    qualitatively but gets its numbers wrong (e.g. "1.25%" where the context
+    says "12.5%", "1M" instead of "10M"). It uses an LLM judge that extracts
+    every numerical value from the answer — including textual numbers,
+    percentages, decimals, scientific notation, and magnitudes with units — and
+    verifies that each one is faithfully supported by the reference context,
+    tolerating equivalent representations ("50%" vs "0.5", "five million" vs
+    "5,000,000", "1.5M" vs "1,500,000"). Numbers present only in the context
+    (omissions from the answer) are not penalized.
+
+    The check shares the ``answer``/``target_key`` and
+    ``context``/``context_key`` inputs with :class:`Groundedness` and returns
+    ERROR (rather than FAIL) when either key fails to resolve, so a broken
+    configuration cannot be laundered into a green result via :class:`Not`.
+
+    Attributes
+    ----------
+    answer : str | MISSING
+        The answer text to evaluate. If omitted, extracted from the trace using
+        ``target_key``.
+    target_key : JSONPathStr
+        JSONPath expression to extract the answer from the trace
+        (default: ``"trace.last.outputs"``).
+
+        Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath
+        expressions.
+    context : str | list[str] | MISSING
+        Context documents whose numerical values the answer must faithfully
+        reproduce. If omitted, extracted from the trace using ``context_key``.
+    context_key : JSONPathStr
+        JSONPath expression to extract the context from the trace
+        (default: ``"trace.last.metadata.context"``).
+
+        Can use `trace.last` (preferred) or `trace.interactions[-1]` for JSONPath
+        expressions.
+    strict : bool
+        Whether numbers derived from context values (sums, differences, ratios,
+        growth rates, ...) count as unsupported (default: ``True``). Set to
+        ``False`` to accept correctly computed values that are not stated
+        verbatim in the context.
+    judge : BaseJudge or None
+        Judge backend (inherited from BaseLLMCheck). Legacy ``generator=`` is
+        migrated to ``judge`` automatically.
+
+    Examples
+    --------
+    >>> from giskard.agents import Generator
+    >>> from giskard.checks import LLMChatJudge
+    >>> check = NumericalFaithfulness(
+    ...     answer="Revenue grew 1.25% to 1M users.",
+    ...     context=["Revenue grew 12.5% to 10,000,000 users."],
+    ...     judge=LLMChatJudge(generator=Generator(model="openai/gpt-4o")),
+    ... )
+    """
+
+    answer: str | MISSING = Field(
+        default=MISSING, description="Input source for the answer to evaluate"
+    )
+    target_key: JSONPathStr = Field(
+        default="trace.last.outputs",
+        description=("Key to extract the answer from the trace."),
+    )
+    context: str | list[str] | MISSING = Field(
+        default=MISSING, description="Input source for the reference context"
+    )
+    context_key: JSONPathStr = Field(
+        default="trace.last.metadata.context",
+        description="Key to extract the context from the trace",
+    )
+    strict: bool = Field(
+        default=True,
+        description=(
+            "Whether numbers derived from context values count as unsupported. "
+            "Set to False to accept correctly computed values."
+        ),
+    )
+
+    @override
+    def get_prompt(self) -> TemplateReference:
+        return TemplateReference(
+            template_name="giskard.checks::judges/numerical_faithfulness.j2"
+        )
+
+    @override
+    async def run(self, trace: TraceType) -> CheckResult:
+        """Return ERROR when answer/context keys do not resolve; else run the judge."""
+        if early := error_if_unresolved_answer_or_context(
+            trace,
+            answer=self.answer,
+            answer_key=self.target_key,
+            context=self.context,
+            context_key=self.context_key,
+        ):
+            return early
+        return await super().run(trace)
+
+    @override
+    async def get_inputs(self, trace: Trace[InputType, OutputType]) -> dict[str, Any]:
+        """Build template variables from resolved inputs.
+
+        Parameters
+        ----------
+        trace : Trace
+            Trace for resolving inputs.
+
+        Returns
+        -------
+        dict[str, Any]
+            Template variables with ``answer``, ``context``, ``strict``, and
+            ``trace`` (``trace`` is the shared SOM conversation input).
+        """
+        answer = format_prompt_text(
+            provided_or_resolve(trace, key=self.target_key, value=self.answer)
+        )
+        context = format_prompt_text(
+            provided_or_resolve(trace, key=self.context_key, value=self.context)
+        )
+        return {
+            "answer": answer,
+            "context": context,
+            "strict": self.strict,
+            "trace": trace,
+        }
+
+    @override
+    def get_som_trace(
+        self, trace: TraceType, inputs: dict[str, Any]
+    ) -> Trace[Any, Any]:
+        return trace_with_current_turn(
+            trace, inputs=inputs["context"], outputs=inputs["answer"]
+        )

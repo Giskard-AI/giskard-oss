@@ -12,6 +12,7 @@ from giskard.checks.core.check import Check
 from giskard.checks.judges.answer_relevance import AnswerRelevance
 from giskard.checks.judges.contradiction import Contradiction
 from giskard.checks.judges.groundedness import Groundedness
+from giskard.checks.judges.numerical_faithfulness import NumericalFaithfulness
 from giskard.checks.judges.toxicity import Toxicity
 from pydantic import ValidationError
 
@@ -30,6 +31,7 @@ CASES: list[tuple[type[Check[Any, Any, Any]], dict[str, Any]]] = [
     (Groundedness, {}),
     (Contradiction, {}),
     (AnswerRelevance, {}),
+    (NumericalFaithfulness, {}),
 ]
 
 IDS = [case[0].__name__ for case in CASES]
