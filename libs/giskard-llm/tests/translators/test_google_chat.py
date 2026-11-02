@@ -399,6 +399,55 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
     validate_google_contents(payload["contents"])
 
 
+@pytest.mark.google
+def test_safety_settings_forwarded_to_config():
+    """``safety_settings`` is a known completion param, so it must reach ``config``.
+
+    Regression: the param was listed in ``KNOWN_COMPLETION_PARAMS`` but had no field on
+    ``GoogleChatConfigParams``, so pydantic dropped it as an extra key -- no error, and no
+    "ignoring unknown completion params" warning either. A caller lowering Gemini's block
+    thresholds (e.g. ``BLOCK_NONE``) silently got the stock settings back.
+    """
+    types = pytest.importorskip("google.genai.types")
+    settings = [
+        types.SafetySetting(
+            category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold=types.HarmBlockThreshold.BLOCK_NONE,
+        )
+    ]
+    payload = GoogleChatTranslator.to_google(
+        _MODEL, [UserMessage(content="Hello.")], safety_settings=settings
+    )
+
+    cfg = payload["config"]
+    assert cfg.get("safety_settings") is not None
+    assert types.GenerateContentConfig(**cfg).safety_settings == settings
+
+
+@pytest.mark.google
+def test_safety_settings_accepts_dicts():
+    """The SDK takes ``SafetySetting`` dicts too, so that form must survive as well."""
+    types = pytest.importorskip("google.genai.types")
+    payload = GoogleChatTranslator.to_google(
+        _MODEL,
+        [UserMessage(content="Hello.")],
+        safety_settings=[
+            {
+                "category": "HARM_CATEGORY_HARASSMENT",
+                "threshold": "BLOCK_NONE",
+            }
+        ],
+    )
+
+    cfg = types.GenerateContentConfig(**payload["config"])
+    assert cfg.safety_settings == [
+        types.SafetySetting(
+            category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold=types.HarmBlockThreshold.BLOCK_NONE,
+        )
+    ]
+
+
 def test_assistant_text_thought_signature_is_replayed():
     """A captured text-part ``thought_signature`` is replayed verbatim."""
     messages: list[ChatMessage] = [
