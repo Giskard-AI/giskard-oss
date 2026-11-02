@@ -254,13 +254,29 @@ class BaseGenerator(Discriminated, ABC):
         Parameters
         ----------
         **kwargs
-            The parameters to set. All fields are optional.
+            The parameters to set. All fields are optional. Unknown field
+            names are rejected by ``GenerationParams`` (``extra="forbid"``).
 
         Returns
         -------
         Self
             A new generator with the given parameters.
+
+        Raises
+        ------
+        ValidationError
+            If *kwargs* contains a field that ``GenerationParams`` does not
+            declare (for example a typo).
         """
         generator = self.model_copy()
+        unknown = set(kwargs) - set(GenerationParams.model_fields)
+        if unknown:
+            # Reject unknown keys with the same ValidationError pydantic would
+            # raise under extra="forbid". Known keys still use model_copy so
+            # existing value semantics (including previously accepted types
+            # that construction would reject) stay unchanged.
+            GenerationParams.model_validate(
+                {key: kwargs[key] for key in sorted(unknown)}
+            )
         generator.params = generator.params.model_copy(update=kwargs)
         return generator
