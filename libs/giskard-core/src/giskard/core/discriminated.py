@@ -88,7 +88,7 @@ class Discriminated(BaseModel):
 
     @computed_field
     def kind(self) -> str | None:
-        """The discriminator field identifying the concrete type.
+        """Return the discriminator field identifying the concrete type.
 
         Returns
         -------

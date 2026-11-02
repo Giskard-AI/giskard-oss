@@ -22,11 +22,15 @@ class ScenarioContext(BaseModel):
     run. Per-generator values (scenario budget, RNG) are passed as separate
     parameters to ``generate_scenario`` and are not part of this object.
 
-    Attributes:
-        description: Natural-language description of the agent under test.
-        languages: BCP-47 language codes the agent is expected to handle.
-        knowledge_base: Optional document context, ``None`` when the run has
-            no knowledge base. Generators that do not use it ignore it.
+    Attributes
+    ----------
+    description : str
+        Natural-language description of the agent under test.
+    languages : list[str]
+        BCP-47 language codes the agent is expected to handle.
+    knowledge_base : KnowledgeBase | None, optional
+        Optional document context, ``None`` when the run has no knowledge base.
+        Generators that do not use it ignore it.
     """
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
@@ -53,7 +57,9 @@ class ScenarioGenerator(BaseModel):
     def allow_commercial_use(self) -> bool:
         """Whether the generator allows commercial use.
 
-        Returns:
+        Returns
+        -------
+        bool
             True if the generator allows commercial use, False otherwise.
         """
         return True
@@ -81,7 +87,9 @@ class ScenarioGenerator(BaseModel):
                 ``"multiturn"`` generates multi-turn test cases. Defaults to
                 :data:`DEFAULT_TARGET_MODE`.
 
-        Returns:
+        Returns
+        -------
+        list[Scenario]
             A list of :class:`~giskard.checks.core.scenario.Scenario` objects
             ready to be collected into a :class:`~giskard.checks.scenarios.Suite`.
         """
@@ -120,9 +128,11 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
 
     Subclasses must implement :meth:`load_scenarios`.
 
-    Attributes:
-        tags: Tags applied to every loaded scenario via
-            :meth:`~giskard.checks.core.scenario.Scenario.with_tags`.
+    Attributes
+    ----------
+    tags : list[str]
+        Tags applied to every loaded scenario via
+        :meth:`~giskard.checks.core.scenario.Scenario.with_tags`.
     """
 
     tags: list[str] = Field(default_factory=list)
@@ -132,7 +142,9 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Load scenarios, annotating each with ``description`` and ``languages``.
 
-        Returns:
+        Returns
+        -------
+        list[Scenario]
             A list of scenarios.
         """
         raise NotImplementedError
@@ -155,7 +167,9 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
             languages: Forwarded into each scenario's annotations.
             source: Human-readable origin (path or repo file) used in error messages.
 
-        Returns:
+        Returns
+        -------
+        list[Scenario]
             A list of annotated scenarios.
         """
         scenarios: list[Scenario[Any, Any, Trace[Any, Any]]] = []
@@ -201,7 +215,9 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
                 step; ``"multiturn"`` keeps the dataset's own turn budgets.
                 Defaults to :data:`DEFAULT_TARGET_MODE`.
 
-        Returns:
+        Returns
+        -------
+        list[Scenario]
             A list of annotated :class:`~giskard.checks.core.scenario.Scenario`
             objects, ordered by their original dataset position.
         """
@@ -254,9 +270,11 @@ class LocalDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
     ``languages``.  When ``max_scenarios`` is set and smaller than the dataset
     size, a random subset is drawn without replacement using ``rng``.
 
-    Attributes:
-        dataset_name: Stem of the ``.jsonl`` file inside the package
-            ``data/`` directory (e.g. ``"prompt_injection"``).
+    Attributes
+    ----------
+    dataset_name : str
+        Stem of the ``.jsonl`` file inside the package ``data/`` directory
+        (e.g. ``"prompt_injection"``).
     """
 
     dataset_name: str
