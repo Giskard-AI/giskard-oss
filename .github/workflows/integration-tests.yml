@@ -47,8 +47,11 @@ jobs:
           # External contributors: only when a maintainer adds the 'safe for build' label
           # Same maintainer rule as guard-maintainer-labels.yml: admin or maintain role on this repo
           if [[ "$EVENT_ACTION" == "labeled" && "$LABEL_NAME" == "safe for build" ]]; then
-            ROLE=$(gh api "repos/$REPO/collaborators/$LABEL_SENDER/permission" --jq .role_name 2>/dev/null || true)
-            if [[ "$ROLE" =~ ^(admin|maintain)$ ]]; then
+            if ! IS_MAINTAINER=$(gh api "repos/$REPO/collaborators/$LABEL_SENDER/permission" --jq '.user.permissions | .admin or .maintain'); then
+              echo "::error::Could not read the role of $LABEL_SENDER."
+              exit 1
+            fi
+            if [[ "$IS_MAINTAINER" == "true" ]]; then
               echo "External contributor — authorized via 'safe for build' label from maintainer $LABEL_SENDER."
               exit 0
             fi

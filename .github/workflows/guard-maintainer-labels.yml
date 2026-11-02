@@ -22,13 +22,17 @@ jobs:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
-            // Maintainers are collaborators with the admin or maintain role on this repo.
+            // Maintainers are collaborators with the admin or maintain role on this repo
+            // (permission flags, so custom roles based on these count too).
             const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
               owner: context.repo.owner,
               repo: context.repo.repo,
               username: context.payload.sender.login
-            }).catch(() => ({ data: {} }));
-            if (['admin', 'maintain'].includes(data.role_name)) {
+            }).catch((error) => {
+              core.warning(`Could not read the role of ${context.payload.sender.login}: ${error.message}`);
+              return { data: {} };
+            });
+            if (data.user?.permissions?.admin || data.user?.permissions?.maintain) {
               return;
             }
             try {
