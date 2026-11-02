@@ -1,0 +1,37 @@
+name: Guard 'safe for merge' label
+
+on:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] no checkout, no code execution — only removes a label applied by a non-maintainer
+    types: [labeled]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: guard
+    if: github.event.label.name == 'safe for merge'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write # remove label from PR
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          ACTOR: ${{ github.event.sender.login }}
+        with:
+          script: |
+            // Approver logins from the maintainer list. Compared lowercase.
+            const allowed = ['kevinmessiaen', 'henchaves', 'pierlj', 'hartorn'];
+            const actor = (process.env.ACTOR || '').toLowerCase();
+            if (allowed.includes(actor)) {
+              return;
+            }
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              name: 'safe for merge'
+            });
