@@ -430,10 +430,16 @@ class AnthropicChatTranslator:
 
         usage = None
         if raw.usage:
+            # Anthropic's input_tokens excludes the cached part of the prompt.
+            input_tokens = (
+                raw.usage.input_tokens
+                + (raw.usage.cache_read_input_tokens or 0)
+                + (raw.usage.cache_creation_input_tokens or 0)
+            )
             usage = Usage(
-                input_tokens=raw.usage.input_tokens,
+                input_tokens=input_tokens,
                 output_tokens=raw.usage.output_tokens,
-                total_tokens=raw.usage.input_tokens + raw.usage.output_tokens,
+                total_tokens=input_tokens + raw.usage.output_tokens,
             )
 
         return CompletionResponse(
