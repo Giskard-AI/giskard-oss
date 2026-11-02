@@ -107,7 +107,7 @@ markers = [
 [dependency-groups]
 test = [
     "pytest==9.1.1",
-    "pytest-asyncio==1.4.0",
+    "pytest-asyncio==1.4.1",
     "pytest-cov==7.1.0",
     "pytest-timeout==2.4.0",
 ]
@@ -115,7 +115,7 @@ dev = [
     { include-group = "test" },
     "giskard[full]",
     "pip-audit==2.10.1",
-    "deptry==0.24.0",
+    "deptry==0.25.1",
 ]
 garak-test = [
     { include-group = "test" },
