@@ -1,7 +1,12 @@
 import time
 import traceback
 
-from giskard.core import scoped_telemetry, telemetry_capture, telemetry_tag
+from giskard.core import (
+    scoped_telemetry,
+    telemetry_capture,
+    telemetry_finished,
+    telemetry_tag,
+)
 
 from .._telemetry_props import (
     check_kind_counts_from_sequence,
@@ -83,30 +88,30 @@ class TestCaseRunner:
             properties=shape_props,
         )
 
-        check_results: list[CheckResult] = []
-        for check in checks_list:
-            result = await _run_check(test_case.trace, check, return_exception)
-            check_results.append(result)
-
-        end_time = time.perf_counter()
-        total_duration_ms = int((end_time - start_time) * 1000)
-
-        tc_result = TestCaseResult(
-            results=check_results,
-            duration_ms=total_duration_ms,
-        )
-
-        telemetry_capture(
+        # Report a finish for every start, including errors and cancellation.
+        with telemetry_finished(
             "checks_test_case_run_finished",
-            properties={
-                **shape_props,
-                "outcome_status": tc_result.status.value,
-                "duration_ms": total_duration_ms,
-                "return_exception_mode": return_exception,
-            },
-        )
+            {**shape_props, "return_exception_mode": return_exception},
+        ) as finished:
+            check_results: list[CheckResult] = []
+            for check in checks_list:
+                result = await _run_check(test_case.trace, check, return_exception)
+                check_results.append(result)
 
-        return tc_result
+            end_time = time.perf_counter()
+            total_duration_ms = int((end_time - start_time) * 1000)
+
+            tc_result = TestCaseResult(
+                results=check_results,
+                duration_ms=total_duration_ms,
+            )
+
+            finished.update(
+                outcome="completed",
+                outcome_status=tc_result.status.value,
+                duration_ms=total_duration_ms,
+            )
+            return tc_result
 
 
 _default_runner = TestCaseRunner()

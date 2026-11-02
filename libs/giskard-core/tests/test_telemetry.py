@@ -1,3 +1,4 @@
+import asyncio
 import importlib
 import json
 import os
@@ -74,7 +75,7 @@ def test_should_disable_reads_process_env(var, value, _clean_opt_out_env, monkey
         b"GISKARD_TELEMETRY_DISABLED=1 # opt out\n",
         b'DO_NOT_TRACK="1" # opt out\n',
         b"GISKARD_TELEMETRY_DISABLED=0\nGISKARD_TELEMETRY_DISABLED=1\n",
-        b"GISKARD_TELEMETRY_DISABLED=1\nNOTE=caf\xe9\n",  # latin-1 elsewhere
+        b"GISKARD_TELEMETRY_DISABLED=1\nNOTE=caf\xe9\n",  # latin-1 elsewhere  # pragma: allowlist secret
     ],
 )
 def test_should_disable_reads_dotenv(content, _clean_opt_out_env):
@@ -378,3 +379,69 @@ def test_late_opt_out_does_not_hang_exit(tmp_path):
     assert payload["send"] is False
     assert payload["disabled"] is True
     assert payload["running"] == [False]
+
+
+_CI_ENV_VARS = (
+    "CI",
+    *(env_var for env_var, _ in telemetry_mod._CI_PROVIDER_ENV_VARS),
+)
+
+
+@pytest.fixture
+def _clean_ci_env(monkeypatch):
+    for name in _CI_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(telemetry_mod, "ENV_INFORMATION", {})
+
+
+@pytest.mark.parametrize(
+    ("env_var", "provider"),
+    [
+        ("GITHUB_ACTIONS", "github_actions"),
+        ("GITLAB_CI", "gitlab"),
+        ("JENKINS_URL", "jenkins"),
+        ("CIRCLECI", "circleci"),
+    ],
+)
+def test_ci_provider_detected_from_provider_env(
+    env_var, provider, _clean_ci_env, monkeypatch
+):
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.setenv(env_var, "1")
+
+    info = telemetry_mod._get_env_information()
+
+    assert info["environment"] == "ci"
+    assert info["ci_provider"] == provider
+
+
+def test_ci_provider_falls_back_to_other_for_generic_ci_flag(
+    _clean_ci_env, monkeypatch
+):
+    monkeypatch.setenv("CI", "true")
+
+    assert telemetry_mod._get_env_information()["ci_provider"] == "other"
+
+
+def test_ci_provider_absent_outside_ci(_clean_ci_env):
+    info = telemetry_mod._get_env_information()
+
+    assert "ci_provider" not in info
+    assert info["environment"] == "local"
+
+
+def test_env_information_flags_pytest_runs(_clean_ci_env):
+    assert telemetry_mod._get_env_information()["is_test_run"] is True
+
+
+@pytest.mark.parametrize(
+    ("exc", "expected"),
+    [
+        (asyncio.CancelledError(), "cancelled"),
+        (KeyboardInterrupt(), "cancelled"),
+        (RuntimeError("boom"), "error"),
+        (SystemExit(1), "error"),
+    ],
+)
+def test_telemetry_outcome_classifies_exceptions(exc, expected):
+    assert telemetry_mod.telemetry_outcome(exc) == expected
