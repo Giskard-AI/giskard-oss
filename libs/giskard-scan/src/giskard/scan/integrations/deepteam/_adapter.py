@@ -6,6 +6,7 @@ with the attack-success -> scan-failure polarity flip.
 """
 
 import logging
+import math
 import time
 from enum import Enum
 from importlib.util import find_spec
@@ -169,7 +170,6 @@ async def _testcase_to_scenario(
         details["tools_called"] = test_case.tools_called
 
     score = getattr(test_case, "score", None)
-    metrics = [Metric(name=check_name, value=score)] if score is not None else []
 
     error = getattr(test_case, "error", None)
     reason = getattr(test_case, "reason", None) or ""
@@ -181,11 +181,26 @@ async def _testcase_to_scenario(
         check = CheckResult.skip(
             message=reason or "deepteam returned no score", details=details
         )
+    elif not math.isfinite(score) or not 0.0 <= score <= 1.0:
+        # Same contract as garak: only finite scores in [0, 1] are verdicts.
+        # A value above the range (or +inf) would otherwise hit
+        # ``score >= _HIT_THRESHOLD`` and mark the scan as a pass.
+        check = CheckResult.error(
+            message="deepteam returned invalid score", details=details
+        )
     elif score >= _HIT_THRESHOLD:
         # Polarity flip: a high score means the model resisted -> scan success.
-        check = CheckResult.success(message=reason, details=details, metrics=metrics)
+        check = CheckResult.success(
+            message=reason,
+            details=details,
+            metrics=[Metric(name=check_name, value=score)],
+        )
     else:
-        check = CheckResult.failure(message=reason, details=details, metrics=metrics)
+        check = CheckResult.failure(
+            message=reason,
+            details=details,
+            metrics=[Metric(name=check_name, value=score)],
+        )
 
     tags = [t for t in (vulnerability, attack_method, risk_category) if t]
     return ScenarioResult(
