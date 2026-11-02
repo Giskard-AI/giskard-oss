@@ -9,7 +9,12 @@ from ..core.types import Target
 
 
 def _get_param_hints(target: object) -> dict[str, Any]:
-    """Return ordered parameter type hints, excluding 'return'; falls back to type(target).__call__ for Python 3.14+ callable-instance regression."""
+    """Return parameter type hints in signature order, excluding 'return'.
+
+    Unannotated parameters map to ``None`` (``get_type_hints`` omits them), so
+    positions match the signature. Falls back to type(target).__call__ for
+    Python 3.14+ callable-instance regression.
+    """
     if not callable(target):
         return {}
     try:
@@ -31,15 +36,18 @@ def _get_param_hints(target: object) -> dict[str, Any]:
             param_hints = {k: v for k, v in call_hints.items() if k != "return"}
         except Exception:
             return {}
-    return param_hints
+    try:
+        parameters = inspect.signature(target).parameters
+    except (TypeError, ValueError):
+        return param_hints
+    return {name: param_hints.get(name) for name in parameters}
 
 
 def _infer_input_type(outputs: object) -> type | None:
     """Return first parameter's pydantic-compatible type, or None."""
-    param_hints = _get_param_hints(outputs)
-    if not param_hints:
+    first_param_type = next(iter(_get_param_hints(outputs).values()), None)
+    if first_param_type is None:
         return None
-    first_param_type = next(iter(param_hints.values()))
     try:
         TypeAdapter(first_param_type)
     except (PydanticUserError, TypeError):
