@@ -9,8 +9,9 @@ integrations.
 """
 
 import asyncio
+import math
 from collections.abc import Coroutine, Iterable
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeGuard
 
 from giskard.checks import Interaction, Trace
 
@@ -84,3 +85,25 @@ def reject_unexpected_kwargs(tool: str, kwargs: dict[str, Any]) -> None:
             f"third_party_scan(tool={tool!r}) got unexpected keyword "
             f"argument(s): {unexpected}"
         )
+
+
+def is_valid_score(score: object) -> TypeGuard[float]:
+    """Validate that a scanner score is a finite real number in [0.0, 1.0].
+
+    Parameters
+    ----------
+    score : object
+        The score value returned by a third-party scanner detector or judge.
+
+    Returns
+    -------
+    bool
+        True if `score` is a finite int or float in [0.0, 1.0] and not a boolean;
+        False otherwise.
+    """
+    return (
+        isinstance(score, (int, float))
+        and not isinstance(score, bool)
+        and math.isfinite(score)
+        and 0.0 <= score <= 1.0
+    )

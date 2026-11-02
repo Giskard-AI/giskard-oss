@@ -6,7 +6,6 @@ with the attack-success -> scan-failure polarity flip.
 """
 
 import logging
-import math
 import time
 from enum import Enum
 from importlib.util import find_spec
@@ -25,7 +24,11 @@ from giskard.checks import (
 )
 
 from ...generators.base import DEFAULT_TARGET_MODE
-from .._shared import reject_unexpected_kwargs, trace_from_role_content_turns
+from .._shared import (
+    is_valid_score,
+    reject_unexpected_kwargs,
+    trace_from_role_content_turns,
+)
 from ._bridge import ScanTargetCallback
 from ._selection import SkipMarker
 
@@ -180,12 +183,7 @@ async def _testcase_to_scenario(
         check = CheckResult.skip(
             message=reason or "deepteam returned no score", details=details
         )
-    elif (
-        not isinstance(score, (int, float))
-        or isinstance(score, bool)
-        or not math.isfinite(score)
-        or not 0.0 <= score <= 1.0
-    ):
+    elif not is_valid_score(score):
         check = CheckResult.error(
             message="deepteam returned invalid score", details=details
         )
