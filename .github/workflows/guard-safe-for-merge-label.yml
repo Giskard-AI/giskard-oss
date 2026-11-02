@@ -6,7 +6,10 @@ on:
 
 permissions: {}
 
-# No concurrency group: any later label event on the PR would cancel a guard run before it removes the label.
+# Keyed by label: a shared per-PR group would let any later label event cancel the guard before it removes the label.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}-${{ github.event.label.name }}
+  cancel-in-progress: true
 
 jobs:
   guard:
