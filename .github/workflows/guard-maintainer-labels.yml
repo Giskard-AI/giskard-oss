@@ -1,4 +1,4 @@
-name: Guard 'safe for merge' label
+name: Guard maintainer labels
 
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] no checkout, no code execution — only removes a label applied by a non-maintainer
@@ -14,10 +14,7 @@ concurrency:
 jobs:
   guard:
     name: guard
-    # Approver logins; contains() compares case-insensitively.
-    if: >-
-      github.event.label.name == 'safe for merge' &&
-      !contains(fromJSON('["kevinmessiaen", "henchaves", "pierlj", "hartorn"]'), github.event.sender.login)
+    if: contains(fromJSON('["safe for build", "safe for merge"]'), github.event.label.name)
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write # remove label from PR
@@ -25,12 +22,21 @@ jobs:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
+            // Maintainers are collaborators with the admin or maintain role on this repo.
+            const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: context.payload.sender.login
+            }).catch(() => ({ data: {} }));
+            if (['admin', 'maintain'].includes(data.role_name)) {
+              return;
+            }
             try {
               await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.payload.pull_request.number,
-                name: 'safe for merge'
+                name: context.payload.label.name
               });
             } catch (error) {
               // Label already removed (e.g. by another guard run).

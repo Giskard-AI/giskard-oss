@@ -25,6 +25,8 @@ jobs:
           AUTHOR_ASSOC: ${{ github.event.pull_request.author_association }}
           EVENT_ACTION: ${{ github.event.action }}
           LABEL_NAME: ${{ github.event.label.name }}
+          LABEL_SENDER: ${{ github.event.sender.login }}
+          REPO: ${{ github.repository }}
         run: |
           # Manual dispatch: verify the actor belongs to the org
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
@@ -43,9 +45,15 @@ jobs:
           fi
 
           # External contributors: only when a maintainer adds the 'safe for build' label
+          # Same maintainer rule as guard-maintainer-labels.yml: admin or maintain role on this repo
           if [[ "$EVENT_ACTION" == "labeled" && "$LABEL_NAME" == "safe for build" ]]; then
-            echo "External contributor — authorized via 'safe for build' label."
-            exit 0
+            ROLE=$(gh api "repos/$REPO/collaborators/$LABEL_SENDER/permission" --jq .role_name 2>/dev/null || true)
+            if [[ "$ROLE" =~ ^(admin|maintain)$ ]]; then
+              echo "External contributor — authorized via 'safe for build' label from maintainer $LABEL_SENDER."
+              exit 0
+            fi
+            echo "::error::'safe for build' was added by $LABEL_SENDER, who is not a maintainer."
+            exit 1
           fi
 
           echo "::error::External contributors require a maintainer to add the 'safe for build' label."

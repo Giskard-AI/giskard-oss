@@ -1,0 +1,41 @@
+name: Reset maintainer labels
+
+on:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] no checkout, no code execution — only removes labels
+    types: [synchronize]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  remove-maintainer-labels:
+    name: remove-maintainer-labels
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'safe for build') ||
+      contains(github.event.pull_request.labels.*.name, 'safe for merge')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write # remove labels from PR
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const labels = context.payload.pull_request.labels.map((label) => label.name);
+            for (const name of ['safe for build', 'safe for merge'].filter((name) => labels.includes(name))) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.pull_request.number,
+                  name
+                });
+              } catch (error) {
+                // Label already removed (e.g. by the guard).
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
+            }
