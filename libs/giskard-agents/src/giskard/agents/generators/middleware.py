@@ -74,7 +74,7 @@ class RetryMiddleware(CompletionMiddleware):
     retry_policy: RetryPolicy = Field(default_factory=RetryPolicy)
 
     def _should_retry(self, err: Exception) -> bool:  # noqa: ARG002
-        """Return ``True`` if *err* warrants a retry.  Default: retry all."""
+        """Return ``True`` if *err* warrants a retry. Default: retry all Exceptions."""
         return True
 
     async def call(
@@ -101,7 +101,9 @@ class RetryMiddleware(CompletionMiddleware):
     def _tenacity_retry_condition(self, retry_state: t.RetryCallState) -> bool:
         if retry_state.outcome is None or not retry_state.outcome.failed:
             return False
-        return self._should_retry(retry_state.outcome.exception())  # pyright: ignore[reportArgumentType]
+        error = retry_state.outcome.exception()
+        # Cancellation and other BaseException control flow must propagate unchanged.
+        return isinstance(error, Exception) and self._should_retry(error)
 
 
 @CompletionMiddleware.register("rate_limiter")
