@@ -25,7 +25,7 @@ async def test_openai_multi_system_works():
         provider="openai",
         api_key="os.environ/OPENAI_API_KEY",  # pragma: allowlist secret
     )
-    model = os.getenv("TEST_OPENAI_MODEL", "openai/gpt-4.1-nano")
+    model = os.getenv("TEST_OPENAI_MODEL", "openai/gpt-5.4-nano")
     resp = await client.acompletion(model, _MULTI_SYSTEM_MESSAGES)
     assert resp.choices[0].message.content
 

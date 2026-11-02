@@ -215,3 +215,119 @@ def test_from_openai_two_choices():
     assert out.choices[0].message.content == "A"
     assert out.choices[1].index == 1
     assert out.choices[1].message.content == "B"
+
+
+# -- Reasoning (OpenAI-compatible extension: OpenRouter / vLLM / DeepSeek) ----------
+
+
+def _completion_with_message(**extras: object) -> ChatCompletion:
+    """Build a completion whose message carries non-official extras, as the SDK keeps them."""
+    return ChatCompletion(
+        id="chatcmpl-reasoning",
+        choices=[
+            Choice(
+                index=0,
+                finish_reason="stop",
+                message=ChatCompletionMessage.model_validate(
+                    {"role": "assistant", "content": "42", **extras}
+                ),
+            )
+        ],
+        created=0,
+        model=_MODEL,
+        object="chat.completion",
+    )
+
+
+@pytest.mark.parametrize("field", ["reasoning", "reasoning_content"])
+def test_from_openai_reasoning_plaintext(field: str):
+    """vLLM ``reasoning`` and DeepSeek ``reasoning_content`` both land on ``reasoning``."""
+    raw = _completion_with_message(**{field: "Let me think step by step."})
+    msg = OpenAIChatTranslator.from_openai(raw).choices[0].message
+    assert msg.reasoning == "Let me think step by step."
+    assert msg.text == "42"
+    assert "think step by step" not in msg.transcript
+
+
+def test_from_openai_reasoning_details():
+    """Each OpenRouter ``reasoning_details`` item type parses with its fields preserved."""
+    from giskard.llm.types import (
+        ReasoningEncryptedDetail,
+        ReasoningSummaryDetail,
+        ReasoningTextDetail,
+    )
+
+    raw = _completion_with_message(
+        reasoning="Thinking...",
+        reasoning_details=[
+            {
+                "type": "reasoning.text",
+                "text": "Thinking...",
+                "signature": "sig",
+                "id": "r1",
+                "format": "anthropic-claude-v1",
+                "index": 0,
+            },
+            {
+                "type": "reasoning.summary",
+                "summary": "Short summary",
+                "id": None,
+                "format": "openai-responses-v1",
+            },
+            {
+                "type": "reasoning.encrypted",
+                "data": "opaque",
+                "id": "r3",
+                "format": "google-gemini-v1",
+            },
+        ],
+    )
+    msg = OpenAIChatTranslator.from_openai(raw).choices[0].message
+    assert msg.reasoning_details == [
+        ReasoningTextDetail(
+            text="Thinking...",
+            signature="sig",
+            id="r1",
+            format="anthropic-claude-v1",
+            index=0,
+        ),
+        ReasoningSummaryDetail(summary="Short summary", format="openai-responses-v1"),
+        ReasoningEncryptedDetail(data="opaque", id="r3", format="google-gemini-v1"),
+    ]
+    assert msg.text == "42"
+    assert "Thinking" not in msg.transcript
+    assert "Short summary" not in msg.transcript
+
+
+def test_from_openai_unknown_reasoning_detail_raises():
+    """An unknown ``reasoning_details`` type is not silently dropped by default."""
+    from giskard.llm.errors import UnsupportedContentError
+
+    raw = _completion_with_message(
+        reasoning_details=[{"type": "reasoning.future", "payload": "x"}]
+    )
+    with pytest.raises(UnsupportedContentError, match="reasoning.future") as exc_info:
+        OpenAIChatTranslator.from_openai(raw)
+    assert exc_info.value.status_code == 0
+    assert exc_info.value.content_type == "reasoning_details:reasoning.future"
+
+
+def test_from_openai_unknown_reasoning_detail_dropped_with_warning(
+    caplog: pytest.LogCaptureFixture,
+):
+    """With ``ignore_unsupported_content`` the unknown item is dropped and a warning logged."""
+    raw = _completion_with_message(
+        reasoning_details=[
+            {"type": "reasoning.future", "payload": "x"},
+            {"type": "reasoning.encrypted", "data": "opaque", "format": "unknown"},
+        ]
+    )
+    with caplog.at_level("WARNING"):
+        msg = (
+            OpenAIChatTranslator.from_openai(raw, ignore_unsupported_content=True)
+            .choices[0]
+            .message
+        )
+    assert msg.reasoning_details is not None
+    assert [d.type for d in msg.reasoning_details] == ["reasoning.encrypted"]
+    assert "reasoning.future" in caplog.text
