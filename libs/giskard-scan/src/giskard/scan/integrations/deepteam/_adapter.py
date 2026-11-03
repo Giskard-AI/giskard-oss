@@ -163,6 +163,7 @@ async def _testcase_to_scenario(
         "input": getattr(test_case, "input", None),
         "actual_output": getattr(test_case, "actual_output", None),
         "reason": getattr(test_case, "reason", None),
+        "score": getattr(test_case, "score", None),
         "simulation_cost": getattr(test_case, "simulation_cost", None),
         "evaluation_cost": getattr(test_case, "evaluation_cost", None),
         "token_cost": getattr(test_case, "token_cost", None),
@@ -184,8 +185,10 @@ async def _testcase_to_scenario(
             message=reason or "deepteam returned no score", details=details
         )
     elif not is_valid_score(score):
+        error_msg = f"deepteam returned invalid score: {score!r}"
         check = CheckResult.error(
-            message="deepteam returned invalid score", details=details
+            message=f"{reason} ({error_msg})" if reason else error_msg,
+            details=details,
         )
     else:
         metrics = [Metric(name=check_name, value=float(score))]

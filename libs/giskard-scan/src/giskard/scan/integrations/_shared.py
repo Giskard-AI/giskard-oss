@@ -10,6 +10,7 @@ integrations.
 
 import asyncio
 import math
+import numbers
 from collections.abc import Coroutine, Iterable
 from typing import Any, Protocol, TypeGuard
 
@@ -98,12 +99,15 @@ def is_valid_score(score: object) -> TypeGuard[float]:
     Returns
     -------
     bool
-        True if `score` is a finite int or float in [0.0, 1.0] and not a boolean;
-        False otherwise.
+        True if `score` is a finite real number (int, float, numpy scalar) in [0.0, 1.0]
+        and not a boolean; False otherwise.
     """
-    return (
-        isinstance(score, (int, float))
-        and not isinstance(score, bool)
-        and math.isfinite(score)
-        and 0.0 <= score <= 1.0
-    )
+    if isinstance(score, bool) or type(score).__name__ in ("bool", "bool_"):
+        return False
+    if not isinstance(score, numbers.Real):
+        return False
+    try:
+        val = float(score)  # type: ignore[arg-type]
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return math.isfinite(val) and 0.0 <= val <= 1.0

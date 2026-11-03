@@ -384,6 +384,7 @@ def _score_to_check(
         return CheckResult.skip(message="detector returned no score", details=details)
 
     if not is_valid_score(score):
+        details["score"] = score
         return CheckResult.error(
             message="detector returned invalid score", details=details
         )
