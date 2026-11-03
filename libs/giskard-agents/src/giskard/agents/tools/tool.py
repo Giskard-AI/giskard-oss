@@ -176,10 +176,11 @@ class Tool(BaseModel):
             # Extra keys not in model_fields are dropped (Pydantic extra='ignore').
             if self._params_model is not None:
                 validated = self._params_model.model_validate(arguments)
+                # Pydantic resolves input aliases to the callable's parameter names.
                 arguments = {
                     name: getattr(validated, name)
                     for name in self._params_model.model_fields
-                    if name in arguments
+                    if name in validated.model_fields_set
                 }
 
             if ctx and self.run_context_param:
