@@ -2,6 +2,7 @@
 
 from typing import Any, override
 
+import numpy as np
 from giskard.checks import DatasetInputGenerator, Interact, Scenario, Trace
 from pydantic import Field
 
@@ -55,9 +56,15 @@ class GCGInjectionScenarioGenerator(HuggingFaceDatasetScenarioGenerator):
 
     @override
     def load_scenarios(
-        self, description: str, languages: list[str]
+        self,
+        description: str,
+        languages: list[str],
+        max_scenarios: int | None = None,
+        rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
-        base_scenarios = super().load_scenarios(description, languages)
+        base_scenarios = super().load_scenarios(
+            description, languages, max_scenarios, rng
+        )
         return [
             self._with_suffix(
                 scenario, _SUFFIXES[index % len(_SUFFIXES)], index % len(_SUFFIXES)

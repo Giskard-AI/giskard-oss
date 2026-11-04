@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any, Literal, override
 
@@ -8,6 +8,12 @@ import numpy as np
 from giskard.checks import BaseLLMGenerator, Interact, Scenario, Trace
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from ..utils.dataset_loader import (
+    get_or_load_cached,
+    is_dataset_cache_active,
+    iter_jsonl,
+    reservoir_sample,
+)
 from ..utils.knowledge_base import KnowledgeBase
 
 logger = logging.getLogger(__name__)
@@ -128,7 +134,11 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
     tags: list[str] = Field(default_factory=list)
 
     def load_scenarios(
-        self, description: str, languages: list[str]
+        self,
+        description: str,
+        languages: list[str],
+        max_scenarios: int | None = None,
+        rng: np.random.Generator | None = None,
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Load scenarios, annotating each with ``description`` and ``languages``.
 
@@ -136,6 +146,77 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
             A list of scenarios.
         """
         raise NotImplementedError
+
+    def _dataset_identity(self) -> object:
+        """Return a hashable identity for suite-scoped dataset caching."""
+        raise NotImplementedError
+
+    def _dataset_cache_key(
+        self, description: str, languages: list[str]
+    ) -> tuple[Any, ...]:
+        return (self._dataset_identity(), description, tuple(languages))
+
+    def _iter_dataset_records(
+        self, description: str, languages: list[str]
+    ) -> Iterator[tuple[dict[str, Any], str]]:
+        raise NotImplementedError
+
+    def _parse_records(
+        self,
+        records: Iterable[tuple[dict[str, Any], str]],
+        description: str,
+        languages: list[str],
+    ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+        scenarios: list[Scenario[Any, Any, Trace[Any, Any]]] = []
+        for record, source in records:
+            try:
+                scenario = Scenario.model_validate(record)
+            except ValidationError as e:
+                raise ValueError(f"Malformed JSON in {source}: {e}") from e
+            scenario = scenario.with_annotations(
+                {
+                    **scenario.annotations,
+                    "description": description,
+                    "languages": languages,
+                }
+            )
+            if self.tags:
+                scenario = scenario.with_tags(self.tags)
+            scenarios.append(scenario)
+        return scenarios
+
+    def _load_scenarios_with_sampling(
+        self,
+        description: str,
+        languages: list[str],
+        max_scenarios: int | None = None,
+        rng: np.random.Generator | None = None,
+    ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+        def loader() -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+            return self._parse_records(
+                self._iter_dataset_records(description, languages),
+                description,
+                languages,
+            )
+
+        if is_dataset_cache_active():
+            all_scenarios = get_or_load_cached(
+                self._dataset_cache_key(description, languages), loader
+            )
+            if max_scenarios is not None and max_scenarios < len(all_scenarios):
+                rng = rng if rng is not None else np.random.default_rng()
+                indices = rng.choice(
+                    len(all_scenarios), size=max_scenarios, replace=False
+                )
+                return [all_scenarios[i] for i in sorted(indices)]
+            return list(all_scenarios)
+
+        records = self._iter_dataset_records(description, languages)
+        if max_scenarios is not None:
+            rng = rng if rng is not None else np.random.default_rng()
+            selected = reservoir_sample(records, max_scenarios, rng)
+            return self._parse_records(selected, description, languages)
+        return self._parse_records(records, description, languages)
 
     def _parse_scenarios(
         self,
@@ -205,21 +286,16 @@ class BaseDatasetScenarioGenerator(ScenarioGenerator):
             A list of annotated :class:`~giskard.checks.core.scenario.Scenario`
             objects, ordered by their original dataset position.
         """
-        # load_scenarios does blocking I/O (file reads, and network for the HF
-        # subclass). Generators run concurrently via asyncio.TaskGroup, so offload
-        # to a thread to avoid stalling the event loop and the other generators.
-        scenarios = await asyncio.to_thread(
-            self.load_scenarios, context.description, context.languages
-        )
-
-        max_scenarios = (
+        effective_max = (
             max_scenarios if max_scenarios is not None else _DEFAULT_MAX_SCENARIOS
         )
-
-        if max_scenarios < len(scenarios):
-            rng = rng if rng is not None else np.random.default_rng()
-            indices = rng.choice(len(scenarios), size=max_scenarios, replace=False)
-            scenarios = [scenarios[i] for i in sorted(indices)]
+        scenarios = await asyncio.to_thread(
+            self.load_scenarios,
+            context.description,
+            context.languages,
+            effective_max,
+            rng,
+        )
 
         if target_mode == "singleturn":
             for scenario in scenarios:
@@ -262,20 +338,30 @@ class LocalDatasetScenarioGenerator(BaseDatasetScenarioGenerator):
     dataset_name: str
 
     @override
-    def load_scenarios(
-        self, description: str, languages: list[str]
-    ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
-        path = _DATA_DIR / f"{self.dataset_name}.jsonl"
+    def _dataset_identity(self) -> object:
+        return self.dataset_name
 
+    @override
+    def _iter_dataset_records(
+        self, description: str, languages: list[str]
+    ) -> Iterator[tuple[dict[str, Any], str]]:
+        path = _DATA_DIR / f"{self.dataset_name}.jsonl"
         if not path.exists():
             raise RuntimeError(
                 f"Dataset file not found: {path}. This may indicate a broken installation — try reinstalling the package."
             )
+        source = str(path)
+        for record in iter_jsonl(path):
+            yield record, source
 
-        with path.open(encoding="utf-8") as f:
-            return self._parse_scenarios(
-                f,
-                description=description,
-                languages=languages,
-                source=str(path),
-            )
+    @override
+    def load_scenarios(
+        self,
+        description: str,
+        languages: list[str],
+        max_scenarios: int | None = None,
+        rng: np.random.Generator | None = None,
+    ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
+        return self._load_scenarios_with_sampling(
+            description, languages, max_scenarios, rng
+        )
