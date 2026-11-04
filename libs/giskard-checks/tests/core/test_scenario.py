@@ -21,6 +21,8 @@ from giskard.checks import (
     from_fn,
 )
 from giskard.checks.scenarios.runner import ScenarioRunner
+from pydantic import Field
+from pydantic.experimental.missing_sentinel import MISSING
 
 # Mock Components for Testing
 
@@ -1567,3 +1569,289 @@ async def test_scenario_result_tags_snapshot_independent_from_original():
     result = await scenario.run()
     scenario.tags.append("Category:Bar")  # mutate the original list
     assert result.tags == ["Category:Foo"]  # snapshot unchanged
+
+
+# ---------------------------------------------------------------------------
+# Setup/teardown hooks (G-29) and InteractionSpec.bind_target() (G-15)
+# ---------------------------------------------------------------------------
+
+
+@InteractionSpec.register("bind_target_recorder")
+class BindTargetRecorderSpec(InteractionSpec[str, str, Trace[str, str]]):
+    """InteractionSpec that records the target handed to ``bind_target``.
+
+    Mirrors ``MockInteractionSpec`` but overrides ``bind_target`` so we can
+    assert the runner forwards the run/scenario target to custom specs via the
+    new hook (instead of the previous ``isinstance(interact, Interact)``
+    special case).
+    """
+
+    interactions: list[Interaction[str, str]]
+    trace_received: Trace[str, str] | None = None
+    bound_targets: list[object] = Field(default_factory=list)
+
+    @override
+    async def generate(
+        self, trace: Trace[str, str]
+    ) -> AsyncGenerator[Interaction[str, str], Trace[str, str]]:
+        """Generate interactions."""
+        self.trace_received = trace
+        for interaction in self.interactions:
+            trace = yield interaction
+
+    @override
+    def bind_target(
+        self,
+        target: object | MISSING,
+    ) -> "BindTargetRecorderSpec":
+        """Record the target and return self unchanged."""
+        self.bound_targets.append(target)
+        return self
+
+
+class TestScenarioSetupTeardown:
+    """Test Scenario.setup / Scenario.teardown fixture hooks (G-29)."""
+
+    async def test_setup_called_before_steps(self):
+        """setup runs once before the first step on a passing scenario."""
+        calls: list[str] = []
+
+        scenario = Scenario("setup_only").with_setup(lambda: calls.append("setup"))
+        result = await scenario.run()
+
+        assert result.passed
+        assert calls == ["setup"]
+
+    async def test_teardown_called_after_steps(self):
+        """teardown runs once after the last step on a passing scenario."""
+        calls: list[str] = []
+
+        scenario = (
+            Scenario("teardown_only")
+            .interact("hi", lambda inputs: inputs)
+            .with_teardown(lambda: calls.append("teardown"))
+        )
+        result = await scenario.run()
+
+        assert result.passed
+        assert calls == ["teardown"]
+
+    async def test_setup_then_target_then_teardown_order(self):
+        """setup runs before interactions and teardown after them."""
+        calls: list[str] = []
+
+        def target(inputs: str) -> str:
+            calls.append(f"target:{inputs}")
+            return inputs
+
+        scenario = (
+            Scenario("order")
+            .with_setup(lambda: calls.append("setup"))
+            .interact("hi", target)
+            .with_teardown(lambda: calls.append("teardown"))
+        )
+        result = await scenario.run()
+
+        assert result.passed
+        assert calls == ["setup", "target:hi", "teardown"]
+
+    async def test_teardown_runs_on_check_error(self):
+        """teardown runs even when a check raises and the error propagates."""
+        calls: list[str] = []
+
+        scenario = (
+            Scenario("err")
+            .with_setup(lambda: calls.append("setup"))
+            .check(FailingComponent(error_message="boom"))
+            .with_teardown(lambda: calls.append("teardown"))
+        )
+
+        with pytest.raises(ValueError, match="boom"):
+            await scenario.run()
+
+        assert calls == ["setup", "teardown"]
+
+    async def test_teardown_runs_on_input_generation_error(self):
+        """teardown runs when an interaction generator fails (return_exception=True)."""
+        calls: list[str] = []
+
+        scenario = (
+            Scenario("gen_err")
+            .with_setup(lambda: calls.append("setup"))
+            .add_interaction(GeneratorErrorComponent())
+            .with_teardown(lambda: calls.append("teardown"))
+        )
+        result = await scenario.run(return_exception=True)
+
+        assert result.errored
+        assert calls == ["setup", "teardown"]
+
+    async def test_teardown_runs_on_check_failure_break(self):
+        """teardown runs on the stop-on-first-failure path (a check FAILs, no error)."""
+        calls: list[str] = []
+
+        scenario = (
+            Scenario("fail_break")
+            .with_setup(lambda: calls.append("setup"))
+            .interact("hi", lambda inputs: inputs)
+            .check(MockCheck(result=CheckResult.failure(message="no match")))
+            .with_teardown(lambda: calls.append("teardown"))
+        )
+        result = await scenario.run()
+
+        assert result.failed
+        assert not result.passed
+        assert calls == ["setup", "teardown"]
+
+    async def test_setup_runs_once_per_attempt_with_multiple_runs(self):
+        """setup (and teardown) run for each fresh-trace attempt."""
+        calls: list[str] = []
+
+        scenario = (
+            Scenario("multi", multiple_runs=2)
+            .with_setup(lambda: calls.append("setup"))
+            .interact("hi", lambda inputs: inputs)
+            .with_teardown(lambda: calls.append("teardown"))
+        )
+        result = await scenario.run()
+
+        assert result.passed
+        assert result.runs_executed == 2
+        assert calls == ["setup", "teardown", "setup", "teardown"]
+
+    async def test_async_setup_and_teardown_are_awaited(self):
+        """Async setup/teardown hooks are awaited by the runner."""
+        calls: list[str] = []
+
+        async def setup() -> None:
+            calls.append("setup")
+
+        async def teardown() -> None:
+            calls.append("teardown")
+
+        scenario = (
+            Scenario("async_hooks")
+            .with_setup(setup)
+            .interact("hi", lambda inputs: inputs)
+            .with_teardown(teardown)
+        )
+        result = await scenario.run()
+
+        assert result.passed
+        assert calls == ["setup", "teardown"]
+
+    async def test_setup_raising_propagates_and_teardown_not_called(self):
+        """A failing setup propagates and teardown is not invoked (pytest-style)."""
+        calls: list[str] = []
+
+        def boom() -> None:
+            calls.append("setup")
+            raise RuntimeError("setup failed")
+
+        scenario = (
+            Scenario("setup_boom")
+            .with_setup(boom)
+            .interact("hi", lambda inputs: inputs)
+            .with_teardown(lambda: calls.append("teardown"))
+        )
+
+        with pytest.raises(RuntimeError, match="setup failed"):
+            await scenario.run()
+
+        assert calls == ["setup"]
+
+    async def test_setup_teardown_not_serialized(self):
+        """Callable hooks are excluded from model_dump (not persistable)."""
+        scenario = (
+            Scenario("no_serialize")
+            .with_setup(lambda: None)
+            .with_teardown(lambda: None)
+            .interact("hi", "hi")
+            .check(Equals(expected_value="hi", target_key="trace.last.outputs"))
+        )
+        dumped = scenario.model_dump()
+        assert "setup" not in dumped
+        assert "teardown" not in dumped
+
+    def test_with_setup_returns_self(self):
+        scenario = Scenario("s")
+        assert scenario.with_setup(lambda: None) is scenario
+
+    def test_with_teardown_returns_self(self):
+        scenario = Scenario("s")
+        assert scenario.with_teardown(lambda: None) is scenario
+
+    def test_setup_teardown_default_none(self):
+        scenario = Scenario("s")
+        assert scenario.setup is None
+        assert scenario.teardown is None
+
+
+class TestInteractionSpecBindTarget:
+    """Test the InteractionSpec.bind_target() hook (G-15)."""
+
+    async def test_custom_spec_receives_target_via_bind_target(self):
+        """A custom InteractionSpec overriding bind_target receives the run target."""
+        interaction = Interaction(inputs="hi", outputs="out")
+        spec = BindTargetRecorderSpec(interactions=[interaction])
+
+        def sut(inputs: str) -> str:
+            return f"Echo: {inputs}"
+
+        result = await Scenario("custom_bind").add_interaction(spec).run(target=sut)
+
+        assert result.passed
+        assert spec.bound_targets == [sut]
+
+    async def test_custom_spec_receives_scenario_level_target(self):
+        """bind_target is also called for the scenario-level target."""
+        interaction = Interaction(inputs="hi", outputs="out")
+        spec = BindTargetRecorderSpec(interactions=[interaction])
+
+        def sut(inputs: str) -> str:
+            return inputs
+
+        scenario = Scenario("scenario_level_bind", target=sut).add_interaction(spec)
+        result = await scenario.run()
+
+        assert result.passed
+        assert spec.bound_targets == [sut]
+
+    async def test_default_bind_target_is_noop_for_non_interact_specs(self):
+        """InteractionSpecs that don't override bind_target run unchanged with a target."""
+        # MockInteractionSpec does not override bind_target; the default no-op
+        # returns self, so the target must not interfere with its interactions.
+        interaction = Interaction(inputs="x", outputs="y")
+        spec = MockInteractionSpec(interactions=[interaction])
+
+        def sut(inputs: str) -> str:
+            return "SHOULD_NOT_BE_USED"
+
+        result = await Scenario("noop_bind").add_interaction(spec).run(target=sut)
+
+        assert result.passed
+        assert result.final_trace.interactions == [interaction]
+
+    async def test_interact_bind_target_fills_missing_outputs(self):
+        """Interact with MISSING outputs still binds the target via bind_target."""
+        result = await (
+            Scenario("interact_bind")
+            .interact("hello")  # outputs MISSING -> target binds
+            .check(
+                Equals(expected_value="Echo: hello", target_key="trace.last.outputs")
+            )
+            .run(target=lambda inputs: f"Echo: {inputs}")
+        )
+        assert result.passed
+
+    async def test_interact_bind_target_leaves_set_outputs_untouched(self):
+        """Interact with explicit outputs is not overwritten by bind_target."""
+        spec = Interact(inputs="hi", outputs="explicit")
+        bound = spec.bind_target(lambda inputs: "SHOULD_NOT_APPLY")
+        assert bound is spec
+        assert bound.outputs == "explicit"
+
+    async def test_default_bind_target_returns_self(self):
+        """The base InteractionSpec.bind_target no-op returns the same instance."""
+        spec = MockInteractionSpec(interactions=[Interaction(inputs="x", outputs="y")])
+        assert spec.bind_target(lambda inputs: inputs) is spec

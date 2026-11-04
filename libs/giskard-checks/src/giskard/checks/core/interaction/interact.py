@@ -205,6 +205,25 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         return self
 
     @override
+    def bind_target(
+        self,
+        target: Target[InputType, OutputType, TraceType] | MISSING,
+    ) -> "Interact[InputType, OutputType, TraceType]":
+        """Bind a target to ``MISSING`` outputs, returning a bound copy.
+
+        When ``outputs`` is already set, the spec is left untouched (returned
+        as-is). When ``outputs`` is ``MISSING``, a copy is made and its outputs
+        are replaced with ``target`` so ``generate()`` can resolve them against
+        the SUT. This is the hook the runner uses in place of the previous
+        ``isinstance(interact, Interact)`` special case, so any ``Interact``
+        subclass (and any custom spec that overrides ``bind_target``) gets
+        target binding for free.
+        """
+        if self.outputs is MISSING and target is not MISSING:
+            return self.model_copy().set_outputs(target)
+        return self
+
+    @override
     async def generate(
         self, trace: TraceType
     ) -> AsyncGenerator[Interaction[InputType, OutputType], TraceType]:
