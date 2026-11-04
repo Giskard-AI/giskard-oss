@@ -239,6 +239,31 @@ class _StepRunner:
         return choice.message
 
 
+async def _cancel_pending(tasks: list[asyncio.Task[Any]]) -> None:
+    """Cancel unfinished tasks and wait for them to stop.
+
+    Parameters
+    ----------
+    tasks : list[asyncio.Task]
+        Tasks scheduled by a streaming method.
+
+    Notes
+    -----
+    A stream consumer can stop listening before every scheduled task has finished: it may
+    ``break`` out of the loop and ``aclose()`` the stream, or it may simply be cancelled.
+    Without this cleanup the remaining workflows keep running — and can keep calling models
+    and tools — even though nobody is consuming their results any more.
+    """
+    pending = [task for task in tasks if not task.done()]
+    if not pending:
+        return
+
+    for task in pending:
+        task.cancel()
+
+    await asyncio.gather(*pending, return_exceptions=True)
+
+
 class ChatWorkflow(BaseModel, Generic[OutputType]):
     """A workflow for handling chat completions.
 
@@ -580,16 +605,21 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         Chat
             Chat objects as they complete.
         """
-        tasks = [self.run(max_steps=max_steps) for _ in range(n)]
+        tasks: list[asyncio.Task[Chat[OutputType]]] = [
+            asyncio.ensure_future(self.run(max_steps=max_steps)) for _ in range(n)
+        ]
 
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
+        try:
+            for coro in asyncio.as_completed(tasks):
+                result = await coro
 
-            # Skip failed chats if the error policy is SKIP
-            if result.failed and self.error_policy == ErrorPolicy.SKIP:
-                continue
+                # Skip failed chats if the error policy is SKIP
+                if result.failed and self.error_policy == ErrorPolicy.SKIP:
+                    continue
 
-            yield result
+                yield result
+        finally:
+            await _cancel_pending(tasks)
 
     async def stream_batch(
         self, inputs: list[dict[str, Any]], max_steps: int | None = None
@@ -612,16 +642,22 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
             self.model_copy(update={"inputs": {**self.inputs, **params}})
             for params in inputs
         ]
-        tasks = [workflow.run(max_steps=max_steps) for workflow in workflows]
+        tasks: list[asyncio.Task[Chat[OutputType]]] = [
+            asyncio.ensure_future(workflow.run(max_steps=max_steps))
+            for workflow in workflows
+        ]
 
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
+        try:
+            for coro in asyncio.as_completed(tasks):
+                result = await coro
 
-            # Skip failed chats if the error policy is SKIP
-            if result.failed and self.error_policy == ErrorPolicy.SKIP:
-                continue
+                # Skip failed chats if the error policy is SKIP
+                if result.failed and self.error_policy == ErrorPolicy.SKIP:
+                    continue
 
-            yield result
+                yield result
+        finally:
+            await _cancel_pending(tasks)
 
     async def _render_messages(self) -> list[ChatMessage]:
         rendered_messages = []
