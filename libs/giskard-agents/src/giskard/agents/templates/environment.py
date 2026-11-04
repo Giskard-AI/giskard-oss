@@ -45,7 +45,9 @@ def _render_value(value: Any) -> str:
     if isinstance(value, LLMFormattable):
         value = value._repr_prompt_()
     elif isinstance(value, BaseModel):
-        return json.dumps(value.model_dump(mode="json"), indent=4)
+        # Classes and other non-JSON values (e.g. Chat.output_model) must not
+        # crash judge templates that fence a Trace.
+        return json.dumps(value.model_dump(mode="json", fallback=str), indent=4)
     if value is None:
         return ""
     return value if isinstance(value, str) else str(value)
