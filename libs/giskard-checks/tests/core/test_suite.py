@@ -4,7 +4,7 @@ from contextlib import nullcontext
 from typing import Any
 
 import pytest
-from giskard.checks import Equals, Scenario, Suite
+from giskard.checks import Equals, Scenario, Suite, from_fn
 from giskard.checks.core.interaction import Interaction, Trace
 from giskard.checks.core.result import (
     CheckResult,
@@ -217,6 +217,71 @@ async def test_suite_append_chaining():
     assert len(result.results) == 2
     assert result.results[0].scenario_name == "a"
     assert result.results[1].scenario_name == "b"
+
+
+@pytest.mark.asyncio
+async def test_suite_multiple_runs_with_min_pass_rate():
+    """``Suite.run`` forwards ``multiple_runs``/``min_pass_rate`` to each scenario.
+
+    Each scenario is run ``multiple_runs`` times; a scenario counts as passed
+    only if its empirical pass rate meets ``min_pass_rate``. The suite pass rate
+    then reflects scenarios that met their threshold.
+    """
+    flaky_calls = 0
+    stable_calls = 0
+
+    def flaky_fn(trace: Trace[Any, Any]) -> CheckResult:
+        nonlocal flaky_calls
+        flaky_calls += 1
+        return CheckResult.success() if flaky_calls % 2 else CheckResult.failure()
+
+    def stable_fn(trace: Trace[Any, Any]) -> CheckResult:
+        nonlocal stable_calls
+        stable_calls += 1
+        return CheckResult.success()
+
+    flaky = Scenario("flaky").check(from_fn(flaky_fn))
+    stable = Scenario("stable").check(from_fn(stable_fn))
+
+    suite = Suite(name="multi_run_suite").append(flaky).append(stable)
+
+    result = await suite.run(multiple_runs=4, min_pass_rate=0.5, verbose=False)
+
+    # Every scenario ran all attempts (no short-circuit).
+    assert flaky_calls == 4
+    assert stable_calls == 4
+    assert len(result.results) == 2
+    # flaky: 2/4 passed -> 0.5 >= 0.5 -> passed; stable: 4/4 -> passed.
+    assert result.results[0].pass_rate == 0.5
+    assert result.results[0].passed
+    assert result.results[1].pass_rate == 1.0
+    assert result.results[1].passed
+    # Both scenarios met the threshold.
+    assert result.passed_count == 2
+    assert result.failed_count == 0
+    assert result.pass_rate == 1.0
+
+
+@pytest.mark.asyncio
+async def test_suite_multiple_runs_with_min_pass_rate_fails_below_threshold():
+    """A scenario below its threshold fails the suite's pass rate."""
+    calls = 0
+
+    def mostly_failing_fn(trace: Trace[Any, Any]) -> CheckResult:
+        nonlocal calls
+        calls += 1
+        return CheckResult.success() if calls == 1 else CheckResult.failure()
+
+    scenario = Scenario("mostly_failing").check(from_fn(mostly_failing_fn))
+    suite = Suite(name="failing_suite").append(scenario)
+
+    result = await suite.run(multiple_runs=4, min_pass_rate=0.75, verbose=False)
+
+    assert calls == 4
+    assert result.results[0].pass_rate == 0.25
+    assert result.results[0].failed  # 0.25 < 0.75
+    assert result.failed_count == 1
+    assert result.pass_rate == 0.0
 
 
 def test_suite_result_rich_console_respects_max_reported_failures_env(
