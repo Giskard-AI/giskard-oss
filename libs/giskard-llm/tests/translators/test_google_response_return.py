@@ -88,6 +88,30 @@ def test_from_google_text_output():
     assert out.output_text == "Hello from Interactions."
 
 
+def test_from_google_usage_folds_thought_and_tool_use_tokens():
+    """Thought and tool-use tokens are billed output/input; keep input + output == total."""
+    raw = _interaction(
+        [
+            ModelOutputStep(
+                type="model_output",
+                content=[TextContent(type="text", text="ok")],
+            )
+        ],
+        usage=Usage(
+            total_input_tokens=10,
+            total_tool_use_tokens=5,
+            total_output_tokens=20,
+            total_thought_tokens=30,
+            total_tokens=65,
+        ),
+    )
+    out = GoogleResponseTranslator.from_google(raw, _MODEL)
+    assert out.usage is not None
+    assert out.usage.input_tokens == 15
+    assert out.usage.output_tokens == 50
+    assert out.usage.total_tokens == 65
+
+
 def test_from_google_omit_usage():
     """``usage`` may be absent; ``from_google`` leaves ``ResponseResult.usage`` empty."""
     raw = _interaction(
