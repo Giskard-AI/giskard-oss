@@ -515,7 +515,7 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### opentelemetry-api-1.43.0
+### opentelemetry-api-1.45.1
 
 - HomePage:
 - Author: OpenTelemetry Authors
