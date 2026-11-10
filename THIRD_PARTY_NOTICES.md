@@ -494,7 +494,7 @@ Find a list of packages below
 - License: Apache License 2.0
 - Compatible: True
 
-### nltk-3.10.3
+### nltk-3.10.4
 
 - HomePage: https://www.nltk.org/
 - Author: NLTK Team
@@ -515,7 +515,7 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### opentelemetry-api-1.43.0
+### opentelemetry-api-1.45.1
 
 - HomePage:
 - Author: OpenTelemetry Authors
