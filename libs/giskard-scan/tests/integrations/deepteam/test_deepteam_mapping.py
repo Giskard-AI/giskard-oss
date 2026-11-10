@@ -1,5 +1,8 @@
 """Tests for RTTestCase -> ScenarioResult translation."""
 
+import math
+
+import numpy as np
 import pytest
 
 pytest.importorskip("deepteam")
@@ -64,6 +67,81 @@ async def test_missing_score_maps_to_skip_not_failure():
     assert check.status == "skip"
     assert not scenario.failed
     assert scenario.skipped
+
+
+@pytest.mark.parametrize(
+    "score",
+    [math.nan, -1.0, 2.0, math.inf, -math.inf, True, False, "invalid"],
+    ids=[
+        "nan",
+        "below_range",
+        "above_range",
+        "inf",
+        "neg_inf",
+        "bool_true",
+        "bool_false",
+        "str_score",
+    ],
+)
+async def test_invalid_score_maps_to_error(score: object) -> None:
+    """Non-finite or out-of-range scores must be graded as ERROR, not FAIL or PASS."""
+    cb = ScanTargetCallback(target=lambda x: x)
+    scenario = await _adapter._testcase_to_scenario(_TC(score=score, reason=None), cb)
+    check = _check(scenario)
+    assert check.errored
+    assert not check.passed
+    assert not check.failed
+    assert "deepteam returned invalid score" in check.message
+    if isinstance(score, float) and math.isnan(score):
+        assert math.isnan(check.details["score"])
+    else:
+        assert check.details["score"] == score
+    assert check.metrics == []
+
+
+async def test_invalid_score_preserves_reason_and_score():
+    """Score and reason must be retained in details and message on error."""
+    cb = ScanTargetCallback(target=lambda x: x)
+    scenario = await _adapter._testcase_to_scenario(
+        _TC(score=math.nan, reason="judge execution failed"), cb
+    )
+    check = _check(scenario)
+    assert check.errored
+    assert "judge execution failed" in check.message
+    assert "deepteam returned invalid score" in check.message
+    assert check.details["reason"] == "judge execution failed"
+    assert math.isnan(check.details["score"])
+
+
+@pytest.mark.parametrize(
+    ("score", "expected_status"),
+    [
+        (1.0, "pass"),
+        (0.0, "fail"),
+        (np.float32(1.0), "pass"),
+        (np.float64(1.0), "pass"),
+        (np.float32(0.0), "fail"),
+        (np.float64(0.5), "fail"),
+        (np.int32(1), "pass"),
+        (np.int32(0), "fail"),
+    ],
+    ids=[
+        "pass_score",
+        "fail_score",
+        "np_float32_pass",
+        "np_float64_pass",
+        "np_float32_fail",
+        "np_float64_fail",
+        "np_int32_pass",
+        "np_int32_fail",
+    ],
+)
+async def test_numeric_score_retained_in_details(score: object, expected_status: str):
+    cb = ScanTargetCallback(target=lambda x: x)
+    scenario = await _adapter._testcase_to_scenario(_TC(score=score), cb)
+    check = _check(scenario)
+    assert check.status == expected_status
+    assert check.details["score"] == score
 
 
 async def test_details_carry_attack_method_and_risk_category():
