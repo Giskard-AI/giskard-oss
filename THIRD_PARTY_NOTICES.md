@@ -389,7 +389,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### idna-3.18
+### idna-3.20
 
 - HomePage:
 - Author: Kim Davies
