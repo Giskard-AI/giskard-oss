@@ -63,8 +63,12 @@ full = ["giskard[all-llms,all-checks,scan,litellm]"]
 required-version = ">=0.11.8"
 # Wait 7 days before resolving newly published package versions.
 exclude-newer = "7 days"
-# garak caps datasets<4; datasets 3.6.0 caps fsspec<=2025.3.0 (CVE-2026-104851 fix: 2026.6.0).
-override-dependencies = ["fsspec>=2026.6.0"]
+# pyasn1 0.6.5 (2026-10-27) fixes CVE-2026-119194..119197 but is inside the 7-day window.
+# Remove this exemption after 2026-11-03, once 0.6.5 clears exclude-newer on its own.
+exclude-newer-package = { pyasn1 = false }
+# garak <=0.17.0 caps datasets<4, blocking the path-traversal fix (5.0.1). garak main already
+# requires datasets>=5.0.1 (NVIDIA/garak#2297); drop this once a release ships it.
+override-dependencies = ["datasets>=5.0.1"]
 
 [tool.uv.workspace]
 members = [
@@ -103,7 +107,7 @@ markers = [
 [dependency-groups]
 test = [
     "pytest==9.1.1",
-    "pytest-asyncio==1.4.0",
+    "pytest-asyncio==1.4.1",
     "pytest-cov==7.1.0",
     "pytest-timeout==2.4.0",
 ]
@@ -111,7 +115,7 @@ dev = [
     { include-group = "test" },
     "giskard[full]",
     "pip-audit==2.10.1",
-    "deptry==0.24.0",
+    "deptry==0.25.1",
 ]
 garak-test = [
     { include-group = "test" },

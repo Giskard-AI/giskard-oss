@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Sequence
 from typing import Any, override
 from unittest.mock import AsyncMock, patch
@@ -48,6 +49,82 @@ def _make_generator(**retry_kwargs: Any) -> MockGenerator:
     policy = RetryPolicy(**retry_kwargs) if retry_kwargs else RetryPolicy()
     mw = _RetriableOnlyMiddleware(retry_policy=policy)
     return MockGenerator(middlewares=[mw])
+
+
+def _make_cancellable_generator() -> tuple[MockGenerator, asyncio.Event]:
+    """Block the first model call, but let any unintended retry finish."""
+    generator = MockGenerator(retry_policy=RetryPolicy(base_delay=0))
+    entered = asyncio.Event()
+
+    async def complete(
+        messages: Sequence[ChatMessage], params: GenerationParams
+    ) -> CompletionResponse:
+        if generator._call_model_mock.await_count == 1:
+            entered.set()
+            await asyncio.Event().wait()
+        return CompletionResponse(
+            choices=[
+                Choice(
+                    message=AssistantMessage(content="Unexpected retry"),
+                    finish_reason="stop",
+                    index=0,
+                )
+            ]
+        )
+
+    generator._call_model_mock.side_effect = complete
+    return generator, entered
+
+
+async def test_cancelled_completion_is_not_retried():
+    """A caller's cancellation must stop the active completion."""
+    generator, entered = _make_cancellable_generator()
+    task = asyncio.create_task(generator.complete([]))
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert task.cancelled()
+        assert generator._call_model_mock.await_count == 1
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+async def test_completion_deadline_is_not_swallowed():
+    """Retrying must not turn an expired asyncio timeout into success."""
+    generator, _ = _make_cancellable_generator()
+    with pytest.raises(TimeoutError):
+        async with asyncio.timeout(0):
+            await generator.complete([])
+    assert generator._call_model_mock.await_count == 1
+
+
+class _AbortGeneration(BaseException):
+    """Stand in for non-Exception control flow without interrupting pytest."""
+
+
+@pytest.mark.parametrize("error", [asyncio.CancelledError(), _AbortGeneration()])
+async def test_control_flow_does_not_reach_retry_predicate(error: BaseException):
+    """Even a permissive custom retry predicate only receives Exceptions."""
+    generator = MockGenerator(retry_policy=RetryPolicy(base_delay=0))
+    generator._call_model_mock.side_effect = error
+    with patch.object(RetryMiddleware, "_should_retry", return_value=True) as retry:
+        with pytest.raises(type(error)) as exc_info:
+            await generator.complete([])
+        assert exc_info.value is error
+        retry.assert_not_called()
+    assert generator._call_model_mock.await_count == 1
+
+
+async def test_default_policy_still_retries_ordinary_exceptions():
+    """The generic middleware continues to retry regular model failures."""
+    generator = MockGenerator(retry_policy=RetryPolicy(base_delay=0))
+    response = CompletionResponse(choices=[])
+    generator._call_model_mock.side_effect = [ValueError("Transient failure"), response]
+    assert await generator.complete([]) is response
+    assert generator._call_model_mock.await_count == 2
 
 
 async def test_raises_exception_after_retries_exhausted():

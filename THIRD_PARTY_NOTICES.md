@@ -277,7 +277,7 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2026.9.0
+### fsspec-2026.6.0
 
 - HomePage:
 - Author:
@@ -389,7 +389,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### idna-3.18
+### idna-3.20
 
 - HomePage:
 - Author: Kim Davies
@@ -543,7 +543,7 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### pyasn1-0.6.4
+### pyasn1-0.6.5
 
 - HomePage:
 - Author: Ilya Etingof
