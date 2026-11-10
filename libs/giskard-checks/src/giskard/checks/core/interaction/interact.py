@@ -83,10 +83,10 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         Output specification, or ``MISSING`` (default) to bind the scenario or
         ``run()`` target at execution time. Can also be a static value or callable.
         Callables receive the current ``InputType`` and optionally the current ``Trace``.
-        Can return an ``Interaction`` object directly to override default metadata.
+        Can return an ``Interaction`` object directly to add its own metadata.
     metadata : dict[str, Any]
-        Default metadata to attach to interactions. Can be overridden if `outputs`
-        returns an `Interaction` object directly.
+        Default metadata to attach to interactions. When `outputs` returns an
+        `Interaction`, its metadata is merged over this one (its keys win).
 
     Examples
     --------
@@ -241,8 +241,10 @@ class Interact[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
         inputs: InputType,
         outputs: OutputType | Interaction[InputType, OutputType],
     ) -> Interaction[InputType, OutputType]:
-        return (
-            outputs
-            if isinstance(outputs, Interaction)
-            else Interaction(inputs=inputs, outputs=outputs, metadata=self.metadata)
-        )
+        if isinstance(outputs, Interaction):
+            # Keep the step's metadata (e.g. a scan's reference context); the
+            # target's own keys win on a clash.
+            return outputs.model_copy(
+                update={"metadata": {**self.metadata, **outputs.metadata}}
+            )
+        return Interaction(inputs=inputs, outputs=outputs, metadata=self.metadata)
