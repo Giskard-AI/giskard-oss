@@ -116,7 +116,7 @@ Find a list of packages below
 - License: Python Software Foundation License
 - Compatible: True
 
-### aiohttp-3.14.3
+### aiohttp-3.14.5
 
 - HomePage:
 - Author:
@@ -186,7 +186,7 @@ Find a list of packages below
 - License: Apache Software License;; BSD License;; MIT License
 - Compatible: True
 
-### certifi-2026.6.17
+### certifi-2026.10.19
 
 - HomePage: https://github.com/certifi/python-certifi
 - Author: Kenneth Reitz
@@ -263,7 +263,7 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### filelock-3.29.4
+### filelock-4.2.4
 
 - HomePage:
 - Author:
@@ -277,7 +277,7 @@ Find a list of packages below
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2026.9.0
+### fsspec-2026.6.0
 
 - HomePage:
 - Author:
@@ -389,7 +389,7 @@ Find a list of packages below
 - License: MIT License
 - Compatible: True
 
-### idna-3.18
+### idna-3.20
 
 - HomePage:
 - Author: Kim Davies
@@ -452,14 +452,14 @@ Find a list of packages below
 - License: MIT
 - Compatible: True
 
-### litellm-1.89.7
+### litellm-1.103.6
 
 - HomePage:
 - Author: BerriAI
 - License: MIT
 - Compatible: True
 
-### logfire-api-4.37.0
+### logfire-api-5.2.0
 
 - HomePage:
 - Author: Pydantic Team
@@ -494,7 +494,7 @@ Find a list of packages below
 - License: Apache License 2.0
 - Compatible: True
 
-### nltk-3.10.3
+### nltk-3.10.4
 
 - HomePage: https://www.nltk.org/
 - Author: NLTK Team
@@ -515,7 +515,7 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### opentelemetry-api-1.43.0
+### opentelemetry-api-1.45.1
 
 - HomePage:
 - Author: OpenTelemetry Authors
@@ -543,7 +543,7 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### pyasn1-0.6.4
+### pyasn1-0.6.5
 
 - HomePage:
 - Author: Ilya Etingof
@@ -662,7 +662,7 @@ Find a list of packages below
 - License: Apache Software License
 - Compatible: True
 
-### setuptools-83.0.0
+### setuptools-84.2.0
 
 - HomePage:
 - Author: Python Packaging Authority
@@ -753,7 +753,7 @@ Find a list of packages below
 - License: BSD License
 - Compatible: True
 
-### yarl-1.24.2
+### yarl-1.25.1
 
 - HomePage: https://github.com/aio-libs/yarl
 - Author: Andrew Svetlov

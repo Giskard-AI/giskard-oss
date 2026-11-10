@@ -3,12 +3,18 @@ from pathlib import Path
 from typing import Any, Literal, Protocol, runtime_checkable
 
 from giskard.llm import chat
-from jinja2 import BaseLoader, StrictUndefined, nodes
+from jinja2 import BaseLoader, StrictUndefined, Undefined, nodes
 from jinja2.exceptions import TemplateNotFound
 from jinja2.ext import Extension
 from jinja2.loaders import FileSystemLoader, PrefixLoader
 from jinja2.sandbox import SandboxedEnvironment
 from pydantic import BaseModel
+
+from .policy import (
+    get_template_policy,
+    is_strictly_safe_access,
+    is_strictly_safe_callable,
+)
 
 
 @runtime_checkable
@@ -117,7 +123,71 @@ def fence(value: Any) -> Trusted:
     return Trusted(_escape(_render_value(value)))
 
 
-_inline_env = SandboxedEnvironment(
+def _is_strict() -> bool:
+    return get_template_policy() == "strict"
+
+
+class PromptSandboxedEnvironment(SandboxedEnvironment):
+    """Sandbox that also enforces the active template policy.
+
+    Under the strict policy, attribute reads, item reads and calls are all
+    checked against :mod:`~giskard.agents.templates.policy`. The policy is read
+    at render time, so environments created before
+    :func:`~giskard.agents.templates.policy.set_template_policy` is called
+    still honour it.
+    """
+
+    def is_safe_attribute(self, obj: Any, attr: str, value: Any) -> bool:
+        return super().is_safe_attribute(obj, attr, value) and (
+            not _is_strict() or is_strictly_safe_access(obj, attr, value)
+        )
+
+    def is_safe_callable(self, obj: Any) -> bool:
+        return super().is_safe_callable(obj) and (
+            not _is_strict() or is_strictly_safe_callable(obj)
+        )
+
+    # Jinja checks attribute reads with ``is_safe_attribute`` but returns item
+    # lookups (``x[key]``, and ``x.key`` when ``x`` has no such attribute)
+    # unchecked; under the strict policy they get the same check, without the
+    # private-name rule (``d['_k']`` is plain data).
+
+    def getitem(self, obj: Any, argument: Any) -> Any:
+        if _is_strict():
+            try:
+                value = obj[argument]
+            except (TypeError, LookupError):
+                pass  # No such item: Jinja falls back to a checked attribute read.
+            else:
+                return self._checked_item(obj, argument, value)
+        return super().getitem(obj, argument)
+
+    def getattr(self, obj: Any, attribute: str) -> Any:
+        if not _is_strict():
+            return super().getattr(obj, attribute)
+        try:
+            value = getattr(obj, attribute)
+        except AttributeError:
+            try:
+                value = obj[attribute]
+            except (TypeError, LookupError):
+                return self.undefined(obj=obj, name=attribute)
+            return self._checked_item(obj, attribute, value)
+        # Same as SandboxedEnvironment.getattr once the attribute is resolved.
+        fmt = self.wrap_str_format(value)
+        if fmt is not None:
+            return fmt
+        if self.is_safe_attribute(obj, attribute, value):
+            return value
+        return self.unsafe_undefined(obj, attribute)
+
+    def _checked_item(self, obj: Any, key: Any, value: Any) -> Any:
+        if isinstance(value, Undefined) or is_strictly_safe_access(obj, key, value):
+            return value
+        return self.unsafe_undefined(obj, key)
+
+
+_inline_env = PromptSandboxedEnvironment(
     trim_blocks=True,
     lstrip_blocks=True,
     keep_trailing_newline=True,
@@ -175,9 +245,11 @@ class PromptsLoader(PrefixLoader):
         return loader, name
 
 
-def create_message_environment(loader_mapping: dict[str, Path]) -> SandboxedEnvironment:
+def create_message_environment(
+    loader_mapping: dict[str, Path],
+) -> PromptSandboxedEnvironment:
     """Create a Jinja2 environment with MessageExtension."""
-    env = SandboxedEnvironment(
+    env = PromptSandboxedEnvironment(
         loader=PromptsLoader(
             {
                 namespace: FileSystemLoader(path)

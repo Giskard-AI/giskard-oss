@@ -145,6 +145,31 @@ class Discriminated(BaseModel):
         return frozenset(_REGISTRY._subclasses.get(base_cls, {}))
 
     @classmethod
+    def _resolve_unregistered_kind(cls, kind: str, value: dict[str, Any]) -> Any:
+        """Resolve a payload whose ``kind`` is not registered for this family.
+
+        Called on the ``@discriminated_base`` class when validation meets an
+        unknown kind. Returning ``None`` (the default) raises the usual
+        "not registered" error; a base may override this to substitute a
+        placeholder instead. It only runs on a registry miss, so a kind that
+        is registered always resolves to its real class.
+
+        Parameters
+        ----------
+        kind : str
+            The unregistered discriminator value.
+        value : dict[str, Any]
+            The raw payload being validated, ``kind`` included.
+
+        Returns
+        -------
+        Any
+            A validated instance to use in place of the payload, or ``None``
+            to raise.
+        """
+        return None
+
+    @classmethod
     def register(cls, kind: str) -> Callable[[type[T]], type[T]]:
         def decorator(subclass: type[T]) -> type[T]:
             _REGISTRY.register_subclass(cls, subclass, kind)
@@ -180,6 +205,9 @@ class Discriminated(BaseModel):
 
             registered = _REGISTRY._subclasses.get(origin)
             if registered is None or kind not in registered:
+                fallback = origin._resolve_unregistered_kind(kind, value)
+                if fallback is not None:
+                    return fallback
                 raise ValueError(f"Kind {kind} is not registered for class {origin}")
 
             return registered[kind].model_validate(value)

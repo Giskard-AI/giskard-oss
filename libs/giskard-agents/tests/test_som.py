@@ -134,6 +134,19 @@ async def test_native_prediction_preserves_tool_call_evidence(mock_api):
     ]
 
 
+async def test_native_prediction_does_not_send_reasoning(mock_api):
+    requests = mock_api()
+    messages: list[ChatMessage] = [
+        UserMessage(content="Hi"),
+        AssistantMessage(content="Hello.", reasoning="Greet back."),
+    ]
+
+    await TypeSafeSOM(model="jev").predict(messages, QUESTION)
+
+    body = json.loads(requests[0].content)
+    assert body["state"][1] == {"role": "assistant", "content": "Hello."}
+
+
 @pytest.mark.parametrize("probability", [0, 0.5, 1])
 async def test_prediction_preserves_probability_without_a_threshold(
     mock_api, probability

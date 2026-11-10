@@ -16,7 +16,7 @@ from giskard.agents.generators.litellm_generator import (
     LiteLLMRetryMiddleware,
     RetryPolicy,
 )
-from giskard.llm.types import UserMessageParam
+from giskard.llm.types import AssistantMessage, UserMessage, UserMessageParam
 from pydantic import BaseModel
 
 litellm = pytest.importorskip("litellm")
@@ -91,6 +91,23 @@ async def test_litellm_generator_sanitizes_response_format_schema_name(
     assert isinstance(response_format, dict)
     name = response_format["json_schema"]["name"]
     assert re.fullmatch(r"[a-zA-Z0-9_-]+", name), name
+
+
+async def test_litellm_generator_does_not_send_reasoning(
+    mock_acompletion: Any,
+) -> None:
+    """Assistant ``reasoning`` is not an OpenAI message field and is never sent."""
+    generator = LiteLLMGenerator(model="azure/gpt-4o")
+    await generator.complete(
+        messages=[
+            UserMessage(content="Hi"),
+            AssistantMessage(content="Hello.", reasoning="Greet back."),
+            UserMessage(content="Bye"),
+        ]
+    )
+
+    sent = mock_acompletion.call_args.kwargs["messages"]
+    assert sent[1] == {"role": "assistant", "content": "Hello."}
 
 
 @pytest.mark.parametrize(

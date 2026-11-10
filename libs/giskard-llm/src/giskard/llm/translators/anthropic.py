@@ -377,28 +377,34 @@ class AnthropicChatTranslator:
     @staticmethod
     def blocks_to_giskard(
         blocks: "Sequence[ContentBlock]",
-    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
-        content_and_tool_calls = [
-            AnthropicChatTranslator.block_content_to_giskard(block) for block in blocks
-        ]
-        content = [
-            content
-            for content in content_and_tool_calls
-            if not isinstance(content, ToolCall)
-        ]
-        tool_calls = [
-            tool_call
-            for tool_call in content_and_tool_calls
-            if isinstance(tool_call, ToolCall)
-        ]
-        return content, tool_calls
+    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall], str | None]:
+        """Split blocks into content, tool calls and joined readable thinking.
+
+        ``redacted_thinking`` is opaque and skipped.
+        """
+        content: list[CompletionContent] = []
+        tool_calls: list[ToolCall] = []
+        thoughts: list[str] = []
+        for block in blocks:
+            if block.type == "thinking":
+                if block.thinking:
+                    thoughts.append(block.thinking)
+            elif block.type != "redacted_thinking":
+                converted = AnthropicChatTranslator.block_content_to_giskard(block)
+                if isinstance(converted, ToolCall):
+                    tool_calls.append(converted)
+                else:
+                    content.append(converted)
+        return content, tool_calls, "\n".join(thoughts) or None
 
     @staticmethod
     def from_anthropic(
         raw: "Message",
     ) -> CompletionResponse:
         """Convert raw SDK response to CompletionResponse."""
-        content, tool_calls = AnthropicChatTranslator.blocks_to_giskard(raw.content)
+        content, tool_calls, reasoning = AnthropicChatTranslator.blocks_to_giskard(
+            raw.content
+        )
 
         finish_reason = (
             FINISH_REASON_MAP.get(raw.stop_reason, "stop") if raw.stop_reason else None
@@ -419,6 +425,7 @@ class AnthropicChatTranslator:
             content=content if content else None,
             refusal=refusal_out,
             tool_calls=tool_calls or None,
+            reasoning=reasoning,
         )
 
         usage = None

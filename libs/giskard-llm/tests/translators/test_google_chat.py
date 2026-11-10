@@ -153,10 +153,10 @@ def test_two_instructions_then_user(instruction_role: Literal["system", "develop
 
 
 def test_user_assistant_user():
-    """User and model turns map to ``user`` / ``model`` content entries."""
+    """User and model turns map to ``user`` / ``model`` content entries; ``reasoning`` is not replayed."""
     messages: list[ChatMessage] = [
         UserMessage(content="First user."),
-        AssistantMessage(content="Assistant reply."),
+        AssistantMessage(content="Assistant reply.", reasoning="Private reasoning."),
         UserMessage(content="Second user."),
     ]
     payload = GoogleChatTranslator.to_google(_MODEL, messages)

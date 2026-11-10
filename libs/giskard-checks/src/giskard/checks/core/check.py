@@ -31,6 +31,19 @@ class Check[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportM
     name: str | None = Field(default=None, description="Check name")
     description: str | None = Field(default=None, description="Check description")
 
+    @classmethod
+    def _resolve_unregistered_kind(cls, kind: str, value: dict[str, Any]) -> Any:
+        """Load unregistered Hub checks (``hub_*``) as skipped placeholders.
+
+        Any other unregistered kind (e.g. a custom check whose module was not
+        imported) still raises.
+        """
+        from .unavailable import HUB_KIND_PREFIX, UnavailableHubCheck
+
+        if not kind.startswith(HUB_KIND_PREFIX):
+            return None
+        return UnavailableHubCheck.from_payload(kind, value)
+
     def to_spec(self) -> dict[str, Any]:
         """Return the check configuration in the Giskard Hub wire format."""
         return self.model_dump(

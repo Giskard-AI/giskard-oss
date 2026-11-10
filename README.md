@@ -87,8 +87,9 @@ Built-in evals include string matching, comparisons, regex, semantic similarity,
 
 ### Quickstart
 
+In a script without a running event loop:
+
 ```python
-import asyncio
 from giskard.checks import Scenario, Groundedness
 
 
@@ -96,22 +97,25 @@ def get_answer(inputs: str) -> str:
     return "Paris"  # replace with your model / agent
 
 
-async def main() -> None:
-    scenario = (
-        Scenario("test_france_capital")
-        .interact(inputs="What is the capital of France?", outputs=get_answer)
-        .check(
-            Groundedness(
-                name="answer is grounded",
-                context="France is in Western Europe. Its capital is Paris.",
-            )
+scenario = (
+    Scenario("test_france_capital")
+    .interact(inputs="What is the capital of France?", outputs=get_answer)
+    .check(
+        Groundedness(
+            name="answer is grounded",
+            context="France is in Western Europe. Its capital is Paris.",
         )
     )
-    result = await scenario.run()
-    result.print_report()
+)
+result = scenario.run_sync()
+result.print_report()
+```
 
+In a notebook cell or inside an async function, await the scenario instead:
 
-asyncio.run(main())
+```python
+result = await scenario.run()
+result.print_report()
 ```
 
 `Groundedness` is an LLM judge — install a provider extra (e.g. `pip install "giskard[openai]"`) and set the matching API key. Default model: `openai/gpt-4o-mini`.

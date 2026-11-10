@@ -3,6 +3,7 @@
 import asyncio
 import concurrent.futures
 import logging
+import math
 import time
 from collections import defaultdict
 from collections.abc import Iterable
@@ -382,6 +383,11 @@ def _score_to_check(
     details = _detector_details(detector_label)
     if score is None:
         return CheckResult.skip(message="detector returned no score", details=details)
+
+    if not math.isfinite(score) or not 0.0 <= score <= 1.0:
+        return CheckResult.error(
+            message="detector returned invalid score", details=details
+        )
 
     metrics = [Metric(name=detector_label, value=score)]
     if score > _HIT_THRESHOLD:
