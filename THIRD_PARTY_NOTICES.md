@@ -494,7 +494,7 @@ Find a list of packages below
 - License: Apache License 2.0
 - Compatible: True
 
-### nltk-3.10.3
+### nltk-3.10.4
 
 - HomePage: https://www.nltk.org/
 - Author: NLTK Team
