@@ -1,8 +1,9 @@
 import asyncio
+import copy
 import hashlib
 import json
 from collections.abc import AsyncGenerator, Mapping, Sequence, Set
-from typing import Any, override
+from typing import Any, cast, override
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -72,7 +73,14 @@ def _replace(value: Any, prompt: str) -> tuple[Any, bool]:
         for k, v in value.items():
             out[k], hit = _replace(v, prompt)
             replaced |= hit
-        return type(value)(**out), replaced
+        if isinstance(value, dict):
+            # Preserve dict-subclass state, such as a defaultdict factory.
+            result = copy.copy(value)
+            for key, item in out.items():
+                result[key] = item
+            return result, replaced
+        # Mapping does not prescribe its concrete type's constructor signature.
+        return cast(Any, type(value))(out), replaced
     if isinstance(value, (Sequence, Set)) and not isinstance(value, (str, bytes)):
         replaced = False
         items: list[Any] = []
