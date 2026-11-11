@@ -6,10 +6,12 @@ from typing import List
 from uuid import UUID
 
 import pytest
+from typing import Annotated
+
 from giskard import agents
 from giskard.agents.generators import BaseGenerator
 from giskard.agents.tools import Tool, tool
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 def test_tool_decorator():
@@ -428,3 +430,25 @@ async def test_tool_run_primitive_types_unchanged(args, expected):
 
     result = await search.run(args)
     assert result == expected
+
+
+async def test_tool_run_passes_alias_validated_values():
+    """Regression for Giskard-AI/giskard#2924."""
+
+    @tool(catch=None)
+    def destination(city: Annotated[str, Field(alias="location")] = "Paris") -> str:
+        """Read a destination city."""
+        return city
+
+    assert await destination.run({"location": "LA"}) == "LA"
+
+
+async def test_tool_run_optional_alias_keeps_python_default():
+    """Omitted alias should still apply the wrapped function default."""
+
+    @tool(catch=None)
+    def destination(city: Annotated[str, Field(alias="location")] = "Paris") -> str:
+        """Read a destination city."""
+        return city
+
+    assert await destination.run({}) == "Paris"
