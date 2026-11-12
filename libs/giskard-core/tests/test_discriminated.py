@@ -2,7 +2,7 @@ from typing import Any, Generic, TypeVar
 
 import pytest
 from giskard.core import Discriminated, discriminated_base
-from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError, create_model
 
 
 @discriminated_base
@@ -371,3 +371,34 @@ def test_fallback_returning_none_raises():
         ValueError, match=f"Kind cactus is not registered for class {Plant}"
     ):
         Plant.model_validate({"kind": "cactus"})
+
+
+@pytest.mark.parametrize("base", [Animal, GenericAnimal, GenericAnimal[int]])
+@pytest.mark.parametrize("validation", ["model", "adapter", "nested"])
+def test_discriminated_rejects_unrelated_family_instance(base, validation):
+    chair = Chair(name="Chair", color="Red")
+    with pytest.raises(ValidationError):
+        if validation == "model":
+            base.model_validate(chair)
+        elif validation == "adapter":
+            TypeAdapter(base).validate_python(chair)
+        else:
+            holder = create_model("Holder", item=(base, ...))
+            holder(item=chair)
+
+
+@pytest.mark.parametrize(
+    "base,instance",
+    [
+        (Animal, Cat(name="Whiskers")),
+        (GenericAnimal, GenericDog[int](name="Buddy", value=100, breed="Labrador")),
+        (
+            GenericAnimal[int],
+            GenericDog[int](name="Buddy", value=100, breed="Labrador"),
+        ),
+        (Plant, UnknownPlant(original_kind="wild_fern")),
+    ],
+)
+def test_discriminated_preserves_family_instance_identity(base, instance):
+    assert base.model_validate(instance) is instance
+    assert TypeAdapter(base).validate_python(instance) is instance
