@@ -1,2 +1,5 @@
+# R&D reviews every change. Later lines override this one for their paths.
+* @Giskard-AI/r-d
+
 ### Limit any modification to .github folder to have an owner review
 .github   @Giskard-AI/open-source-maintainers
