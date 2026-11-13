@@ -74,7 +74,7 @@ def test_should_disable_reads_process_env(var, value, _clean_opt_out_env, monkey
         b"GISKARD_TELEMETRY_DISABLED=1 # opt out\n",
         b'DO_NOT_TRACK="1" # opt out\n',
         b"GISKARD_TELEMETRY_DISABLED=0\nGISKARD_TELEMETRY_DISABLED=1\n",
-        b"GISKARD_TELEMETRY_DISABLED=1\nNOTE=caf\xe9\n",  # latin-1 elsewhere
+        b"GISKARD_TELEMETRY_DISABLED=1\nNOTE=caf\xe9\n",  # latin-1 elsewhere  # pragma: allowlist secret
     ],
 )
 def test_should_disable_reads_dotenv(content, _clean_opt_out_env):
