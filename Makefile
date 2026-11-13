@@ -187,8 +187,10 @@ LICENSECHECK_FLAGS := --extras $(LICENSECHECK_EXTRAS) --skip-dependencies $(LIBS
 	--ignore-packages $(LICENSECHECK_IGNORE)
 # licensecheck markdown output is not byte-stable (trailing whitespace, blank-line
 # runs), so canonicalize it before writing/diffing: strip trailing whitespace and
-# collapse consecutive blank lines.
-NORMALIZE := sed -e 's/[[:space:]]*$$//' | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}'
+# collapse consecutive blank lines. Also drop the version from each `### <name>-<version>`
+# heading so a uv.lock bump (Renovate) does not stale the file: check-notices still
+# fails when a package is added or removed, or its license/author/homepage changes.
+NORMALIZE := sed -e 's/[[:space:]]*$$//' -e 's/^\(\#\#\# .*\)-[^-]*$$/\1/' | awk '/^$$/{blank++; next} {for(i=0;i<blank;i++) print ""; blank=0; print}'
 
 generate-notices: ## Generate THIRD_PARTY_NOTICES.md
 	$(LICENSECHECK) $(LICENSECHECK_FLAGS) \
