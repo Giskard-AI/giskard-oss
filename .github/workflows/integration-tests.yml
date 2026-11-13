@@ -96,7 +96,7 @@ jobs:
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          enable-cache: true
+          enable-cache: false
           python-version: ${{ matrix.python-version }}
       - run: make install
       - name: Install backend extras
@@ -158,7 +158,7 @@ jobs:
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          enable-cache: true
+          enable-cache: false
           python-version: ${{ matrix.python-version }}
       - run: make install
       - name: Install provider SDK
@@ -201,7 +201,7 @@ jobs:
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          enable-cache: true
+          enable-cache: false
           python-version: ${{ matrix.python-version }}
       - run: make install
       - name: Install provider SDK
@@ -237,7 +237,7 @@ jobs:
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          enable-cache: true
+          enable-cache: false
           python-version: ${{ matrix.python-version }}
       - run: make install-garak-test
       - run: make test-garak
@@ -266,7 +266,7 @@ jobs:
           allow-unsafe-pr-checkout: true
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          enable-cache: true
+          enable-cache: false
           python-version: ${{ matrix.python-version }}
       - run: make install-deepteam-test
       # deepteam simulates and judges every attack with an LLM, so unlike garak
