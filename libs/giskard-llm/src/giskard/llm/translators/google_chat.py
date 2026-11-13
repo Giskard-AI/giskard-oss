@@ -27,6 +27,7 @@ from ..types import (
     UserMessage,
 )
 from ..types._base import _BaseModel
+from ._unsupported import handle_unsupported_content
 
 if TYPE_CHECKING:
     from google.genai.types import (
@@ -328,8 +329,12 @@ class GoogleChatTranslator:
 
     @staticmethod
     def part_content_to_giskard(
-        part: "Part", num_messages: int, part_index: int
-    ) -> CompletionContent | ToolCall:
+        part: "Part",
+        num_messages: int,
+        part_index: int,
+        *,
+        ignore_unsupported_content: bool = False,
+    ) -> CompletionContent | ToolCall | None:
         if part.text is not None:
             return TextContent(text=part.text, thought_signature=part.thought_signature)
         if part.function_call is not None:
@@ -343,32 +348,44 @@ class GoogleChatTranslator:
                 ),
                 thought_signature=part.thought_signature,
             )
-        raise ValueError(f"Unsupported part content type: {part}")
+        # Parts have no type tag: report which fields are set (e.g. code_execution_result).
+        handle_unsupported_content(
+            PROVIDER,
+            ",".join(sorted(name for name, value in part if value is not None))
+            or "empty",
+            ignore_unsupported_content=ignore_unsupported_content,
+        )
+        return None
 
     @staticmethod
     def parts_to_giskard(
         parts: "Sequence[Part]",
         num_messages: int,
+        *,
+        ignore_unsupported_content: bool = False,
     ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
-        content_and_tool_calls = [
-            GoogleChatTranslator.part_content_to_giskard(part, num_messages, part_index)
-            for part_index, part in enumerate(parts)
-        ]
-        content = [
-            content
-            for content in content_and_tool_calls
-            if not isinstance(content, ToolCall)
-        ]
-        tool_calls = [
-            tool_call
-            for tool_call in content_and_tool_calls
-            if isinstance(tool_call, ToolCall)
-        ]
+        content: list[CompletionContent] = []
+        tool_calls: list[ToolCall] = []
+        for part_index, part in enumerate(parts):
+            converted = GoogleChatTranslator.part_content_to_giskard(
+                part,
+                num_messages,
+                part_index,
+                ignore_unsupported_content=ignore_unsupported_content,
+            )
+            if isinstance(converted, ToolCall):
+                tool_calls.append(converted)
+            elif converted is not None:
+                content.append(converted)
         return content, tool_calls
 
     @staticmethod
     def from_google(
-        raw: "GenerateContentResponse", model: str, num_messages: int
+        raw: "GenerateContentResponse",
+        model: str,
+        num_messages: int,
+        *,
+        ignore_unsupported_content: bool = False,
     ) -> CompletionResponse:
         choices: list[Choice] = []
         if not raw.candidates:
@@ -400,6 +417,7 @@ class GoogleChatTranslator:
                 content, tool_calls = GoogleChatTranslator.parts_to_giskard(
                     candidate.content.parts,
                     num_messages,
+                    ignore_unsupported_content=ignore_unsupported_content,
                 )
                 if tool_calls:
                     finish_reason = "tool_calls"

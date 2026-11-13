@@ -1,5 +1,7 @@
 from typing import Literal
 
+from pydantic import Field
+
 from ._base import ArgumentDict, _BaseModel
 
 # -- Response Input types -------------------------------------------------------------
@@ -99,9 +101,39 @@ class ResponseOutputMessage(_BaseModel):
         return "\n".join(refusals) if refusals else None
 
 
+class ResponseReasoningSummary(_BaseModel):
+    """``summary_text`` part of a Responses ``reasoning`` item."""
+
+    type: Literal["summary_text"] = "summary_text"
+    text: str
+
+
+class ResponseReasoningText(_BaseModel):
+    """``reasoning_text`` part of a Responses ``reasoning`` item."""
+
+    type: Literal["reasoning_text"] = "reasoning_text"
+    text: str
+
+
+class ResponseReasoningItem(_BaseModel):
+    """Responses ``reasoning`` item, valid both as output and as input.
+
+    Mirrors the OpenAI shape so it round-trips unchanged (``id`` and
+    ``encrypted_content`` included). Never contributes to ``output_text``.
+    """
+
+    type: Literal["reasoning"] = "reasoning"
+    id: str
+    summary: list[ResponseReasoningSummary] = Field(default_factory=list)
+    content: list[ResponseReasoningText] | None = None
+    encrypted_content: str | None = None
+    status: Literal["in_progress", "completed", "incomplete"] | None = None
+
+
 ResponseInputItem = (
     ResponseFunctionCallOutput
     | ResponseFunctionToolCall
     | ResponseEasyInputMessage
     | ResponseOutputMessage
+    | ResponseReasoningItem
 )

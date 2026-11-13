@@ -338,3 +338,47 @@ def test_response_format_pydantic_class_becomes_text_response_format():
         "schema": Answer.model_json_schema(),
     }
     validate_google_interaction_params(payload)
+
+
+def test_reasoning_item_serializes_to_thought_step():
+    """A reasoning item replays as a ``thought`` step (summary + signature)."""
+    from giskard.llm.types import ResponseReasoningItem, ResponseReasoningSummary
+
+    payload = GoogleResponseTranslator.to_google(
+        _MODEL,
+        [
+            _message("user", "Hi"),
+            ResponseReasoningItem(
+                id="thought_int_0",
+                summary=[ResponseReasoningSummary(text="Greeting")],
+                encrypted_content="sig-abc",
+            ),
+            ResponseOutputMessage(content=[ResponseOutputText(text="Hello")]),
+            _message("user", "Bye"),
+        ],
+    )
+    assert list(payload["input"])[1] == {
+        "type": "thought",
+        "summary": [{"type": "text", "text": "Greeting"}],
+        "signature": "sig-abc",
+    }
+    validate_google_interaction_params(payload)
+
+
+def test_reasoning_item_without_summary_falls_back_to_content():
+    """Raw reasoning text is replayed as the summary rather than dropped."""
+    from giskard.llm.types import ResponseReasoningItem, ResponseReasoningText
+
+    payload = GoogleResponseTranslator.to_google(
+        _MODEL,
+        [
+            _message("user", "Hi"),
+            ResponseReasoningItem(
+                id="rs_1", content=[ResponseReasoningText(text="Raw thinking")]
+            ),
+        ],
+    )
+    assert list(payload["input"])[1] == {
+        "type": "thought",
+        "summary": [{"type": "text", "text": "Raw thinking"}],
+    }

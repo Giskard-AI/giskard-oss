@@ -15,6 +15,7 @@ from giskard.agents.som import TypeSafeSOM
 from giskard.llm.types import (
     AssistantMessage,
     ChatMessage,
+    ReasoningTextDetail,
     SystemMessage,
     ToolCall,
     ToolCallFunction,
@@ -138,7 +139,11 @@ async def test_native_prediction_does_not_send_reasoning(mock_api):
     requests = mock_api()
     messages: list[ChatMessage] = [
         UserMessage(content="Hi"),
-        AssistantMessage(content="Hello.", reasoning="Greet back."),
+        AssistantMessage(
+            content="Hello.",
+            reasoning="Greet back.",
+            reasoning_details=[ReasoningTextDetail(text="Greet back.", signature="s")],
+        ),
     ]
 
     await TypeSafeSOM(model="jev").predict(messages, QUESTION)
