@@ -1,3 +1,5 @@
+import asyncio
+import sys
 from collections.abc import Sequence
 from typing import Any, override
 
@@ -401,6 +403,19 @@ async def test_quality_scan_emits_privacy_safe_product_telemetry(
         "telemetry_capture",
         lambda event, *, properties: events.append((event, properties)),
     )
+    monkeypatch.setattr(
+        sys.modules["giskard.core.telemetry.telemetry"],
+        "telemetry_capture",
+        # Finish events are captured by the core helper; keep only this module's.
+        lambda event,
+        *,
+        properties,
+        _record=(lambda event, *, properties: events.append((event, properties))): (
+            _record(event, properties=properties)
+            if event.startswith("scan_run")
+            else None
+        ),
+    )
     monkeypatch.setattr(quality_module, "telemetry_tag", lambda *_: None)
 
     result = await quality_scan(
@@ -449,6 +464,19 @@ async def test_quality_scan_allowlists_caller_controlled_telemetry_values(
         "telemetry_capture",
         lambda event, *, properties: events.append((event, properties)),
     )
+    monkeypatch.setattr(
+        sys.modules["giskard.core.telemetry.telemetry"],
+        "telemetry_capture",
+        # Finish events are captured by the core helper; keep only this module's.
+        lambda event,
+        *,
+        properties,
+        _record=(lambda event, *, properties: events.append((event, properties))): (
+            _record(event, properties=properties)
+            if event.startswith("scan_run")
+            else None
+        ),
+    )
     monkeypatch.setattr(quality_module, "telemetry_tag", lambda *_: None)
     monkeypatch.setattr(SuiteResult, "print_report", lambda self, **_: None)
 
@@ -482,6 +510,19 @@ async def test_quality_scan_finishes_telemetry_when_scan_raises(
         "telemetry_capture",
         lambda event, *, properties: events.append((event, properties)),
     )
+    monkeypatch.setattr(
+        sys.modules["giskard.core.telemetry.telemetry"],
+        "telemetry_capture",
+        # Finish events are captured by the core helper; keep only this module's.
+        lambda event,
+        *,
+        properties,
+        _record=(lambda event, *, properties: events.append((event, properties))): (
+            _record(event, properties=properties)
+            if event.startswith("scan_run")
+            else None
+        ),
+    )
     monkeypatch.setattr(quality_module, "telemetry_tag", lambda *_: None)
 
     private_error = "private-scan-failure"
@@ -511,3 +552,76 @@ async def test_quality_scan_finishes_telemetry_when_scan_raises(
     ]
     assert events[1][1] == {**events[0][1], "outcome": "error"}
     assert private_error not in repr(events)
+
+
+@pytest.mark.parametrize(
+    ("raised", "expected_outcome"),
+    [
+        (asyncio.CancelledError, "cancelled"),
+        (KeyboardInterrupt, "cancelled"),
+    ],
+)
+async def test_quality_scan_finishes_telemetry_when_interrupted(
+    monkeypatch: pytest.MonkeyPatch,
+    raised: type[BaseException],
+    expected_outcome: str,
+):
+    events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        quality_module,
+        "telemetry_capture",
+        lambda event, *, properties: events.append((event, properties)),
+    )
+    monkeypatch.setattr(
+        sys.modules["giskard.core.telemetry.telemetry"],
+        "telemetry_capture",
+        # Finish events are captured by the core helper; keep only this module's.
+        lambda event,
+        *,
+        properties,
+        _record=(lambda event, *, properties: events.append((event, properties))): (
+            _record(event, properties=properties)
+            if event.startswith("scan_run")
+            else None
+        ),
+    )
+    monkeypatch.setattr(quality_module, "telemetry_tag", lambda *_: None)
+
+    async def generate_suite_spy(**_: object) -> None:
+        raise raised()
+
+    monkeypatch.setattr(quality_module, "generate_suite", generate_suite_spy)
+
+    with pytest.warns(RuntimeWarning, match="received no knowledge base"):
+        with pytest.raises(raised):
+            await quality_scan(
+                target=lambda inputs: inputs,
+                description="description",
+                languages=[],
+            )
+
+    assert [event for event, _ in events] == [
+        "scan_run_started",
+        "scan_run_finished",
+    ]
+    assert events[1][1] == {**events[0][1], "outcome": expected_outcome}
+
+
+async def test_quality_scan_tags_component_before_validating_options(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    tags: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        quality_module, "telemetry_tag", lambda key, value: tags.append((key, value))
+    )
+
+    with pytest.raises(ValueError):
+        await quality_scan(
+            target=lambda inputs: inputs,
+            description="description",
+            languages=[],
+            max_concurrency=0,
+        )
+
+    assert ("giskard_component", "scan") in tags
+    assert ("giskard_operation", "quality_scan") in tags

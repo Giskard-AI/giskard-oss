@@ -1,4 +1,5 @@
 import asyncio
+import sys
 import time
 from contextlib import nullcontext
 from typing import Any
@@ -480,6 +481,16 @@ async def test_suite_parallel_telemetry_includes_flag(monkeypatch):
         capture,
     )
     monkeypatch.setattr(
+        sys.modules["giskard.core.telemetry.telemetry"],
+        "telemetry_capture",
+        # Finish events are captured by the core helper; keep only this module's.
+        lambda event, *, properties, _record=(capture): (
+            _record(event, properties=properties)
+            if event.startswith("checks_suite_run")
+            else None
+        ),
+    )
+    monkeypatch.setattr(
         "giskard.checks.scenarios.suite.telemetry_run_context",
         nullcontext,
     )
@@ -909,3 +920,52 @@ def test_parse_tag_no_colon():
 
 def test_group_stats_importable_from_top_level():
     from giskard.checks import GroupedSuiteResult, GroupStats  # noqa: F401
+
+
+@pytest.mark.parametrize(
+    ("raised", "expected_outcome"),
+    [(RuntimeError, "error"), (asyncio.CancelledError, "cancelled")],
+)
+@pytest.mark.asyncio
+async def test_suite_reports_finish_when_run_raises(
+    monkeypatch, raised, expected_outcome
+):
+    events = []
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite.telemetry_capture",
+        lambda event, *, properties: events.append((event, properties)),
+    )
+    monkeypatch.setattr(
+        sys.modules["giskard.core.telemetry.telemetry"],
+        "telemetry_capture",
+        # Finish events are captured by the core helper; keep only this module's.
+        lambda event,
+        *,
+        properties,
+        _record=(lambda event, *, properties: events.append((event, properties))): (
+            _record(event, properties=properties)
+            if event.startswith("checks_suite_run")
+            else None
+        ),
+    )
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite.telemetry_run_context", nullcontext
+    )
+    monkeypatch.setattr(
+        "giskard.checks.scenarios.suite.telemetry_tag", lambda *a, **k: None
+    )
+
+    def target(inputs):
+        raise raised()
+
+    suite = Suite(name="raising_suite", target=target)
+    suite.append(Scenario("a").interact("hello"))
+
+    with pytest.raises(raised):
+        await suite.run(parallel=False)
+
+    assert [event for event, _ in events] == [
+        "checks_suite_run_started",
+        "checks_suite_run_finished",
+    ]
+    assert events[1][1]["outcome"] == expected_outcome

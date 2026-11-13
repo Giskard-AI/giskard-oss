@@ -4,7 +4,12 @@ import logging
 import warnings
 
 from giskard.checks import SuiteResult, Target, Trace
-from giskard.core import scoped_telemetry, telemetry_capture, telemetry_tag
+from giskard.core import (
+    scoped_telemetry,
+    telemetry_capture,
+    telemetry_finished,
+    telemetry_tag,
+)
 
 from ._telemetry import safe_bool, safe_target_mode, scenario_budget
 from .catalog import generate_suite
@@ -102,6 +107,9 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     SuiteResult
         The completed suite result with a generated quality recommendation.
     """
+    # Tag before validating so a rejected option still reports its component.
+    telemetry_tag("giskard_component", "scan")
+    telemetry_tag("giskard_operation", "quality_scan")
     opts = resolve_scan_options(
         max_scenarios=max_scenarios,
         seed=seed,
@@ -114,8 +122,6 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     knowledge_base = normalize_knowledge_base(
         _warn_if_missing_knowledge_base(knowledge_base)
     )
-    telemetry_tag("giskard_component", "scan")
-    telemetry_tag("giskard_operation", "quality_scan")
     telemetry_properties: dict[str, object] = {
         "integration": "giskard-scan",
         "scan_type": "quality",
@@ -127,7 +133,8 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
     }
     telemetry_capture("scan_run_started", properties=telemetry_properties)
 
-    try:
+    # Report a finish for every start, including errors and cancellation.
+    with telemetry_finished("scan_run_finished", telemetry_properties) as finished:
         suite = await generate_suite(
             description=description,
             languages=languages,
@@ -144,31 +151,21 @@ async def quality_scan[InputType, OutputType, TraceType: Trace](  # pyright: ign
             max_concurrency=opts["max_concurrency"],
             return_exception=opts["return_exception"],
         )
-    except Exception:
-        telemetry_capture(
-            "scan_run_finished",
-            properties={**telemetry_properties, "outcome": "error"},
+        try:
+            recommendation = await generate_quality_recommendation(result)
+        except Exception:
+            logger.exception("Quality recommendation generation failed")
+            recommendation = ""
+        quality_result = result.model_copy(update={"recommendation": recommendation})
+        finished.update(
+            outcome="completed",
+            duration_ms=quality_result.duration_ms,
+            scenario_count=len(quality_result.results),
+            passed_count=quality_result.passed_count,
+            failed_count=quality_result.failed_count,
+            errored_count=quality_result.errored_count,
+            skipped_count=quality_result.skipped_count,
         )
-        raise
-    try:
-        recommendation = await generate_quality_recommendation(result)
-    except Exception:
-        logger.exception("Quality recommendation generation failed")
-        recommendation = ""
-    quality_result = result.model_copy(update={"recommendation": recommendation})
-    telemetry_capture(
-        "scan_run_finished",
-        properties={
-            **telemetry_properties,
-            "outcome": "completed",
-            "duration_ms": quality_result.duration_ms,
-            "scenario_count": len(quality_result.results),
-            "passed_count": quality_result.passed_count,
-            "failed_count": quality_result.failed_count,
-            "errored_count": quality_result.errored_count,
-            "skipped_count": quality_result.skipped_count,
-        },
-    )
     quality_result.print_report(group_by=opts["group_by"])
     return quality_result
 
