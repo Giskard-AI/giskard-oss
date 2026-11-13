@@ -68,6 +68,7 @@ from .judges import (
     Groundedness,
     LLMCheckResult,
     LLMJudge,
+    NumericalFaithfulness,
     Toxicity,
 )
 from .scenarios.runner import ScenarioRunner
@@ -149,6 +150,7 @@ __all__ = [
     "from_fn",
     "Groundedness",
     "LLMJudge",
+    "NumericalFaithfulness",
     "Readability",
     "SemanticSimilarity",
     "SOMJudge",

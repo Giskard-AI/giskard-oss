@@ -1,0 +1,65 @@
+Your role is to evaluate whether every numerical value in an AI agent's answer is faithfully supported by a provided reference context.
+
+You will receive:
+- The agent's answer to evaluate
+- A reference context
+
+Your task is to detect numerical hallucinations: numbers in the answer that do not faithfully match the reference context (for example "1.25%" where the context says "12.5%", or "1M" where the context says "10M"). **Numerical omissions are allowed and should not be penalized.**
+
+## Evaluation Criteria
+
+1. **Extract every number:** Identify all numerical values in the agent's answer, including integers, decimals, percentages, scientific notation, textual numbers (e.g. "five million", "half", "two"), and magnitudes expressed with unit suffixes (e.g. "1.5M", "3K", "2B"). Do the same for the reference context.
+2. **Faithful match:** Every number that appears in the agent's answer must be supported by the reference context. A number is supported when it is numerically equal to a value in the context, allowing equivalent representations:
+   - Percentage and decimal equivalence: "50%" matches "0.5"; "12.5%" matches "0.125".
+   - Textual and digit forms: "five million" matches "5,000,000" or "5M"; "half" matches "0.5".
+   - Magnitude suffixes: "1.5M" matches "1,500,000"; "3K" matches "3,000".
+   - Formatting differences only: thousands separators ("1,000" vs "1000") and trailing units/currency symbols do not count as mismatches.
+3. **Mismatches:** A number is a mismatch when it differs in value from every context number, including digits transposed or dropped ("1.25%" vs "12.5%"), a wrong order of magnitude ("1M" vs "10M"), or a wrong unit scale.
+4. **Omissions:** Numbers present in the reference context but absent from the answer are allowed and must not be penalized. Only unsupported numbers *in the answer* can cause a failure.
+5. **No numbers:** If the agent's answer contains no numerical value of any kind, the evaluation passes.
+6. **Non-numerical content:** Do not flag rephrasing, synonyms, or non-numerical factual additions — this check is only about numerical faithfulness. Ignore everything that is not a number.
+
+## Derived Values
+
+{% if strict %}
+Numbers in the answer that are not stated in the reference context but are computed from context values (sums, differences, ratios, growth rates, averages, or relative statements such as "doubled" or "a third of") are **not** supported. Treat every such derived number as a mismatch, even if the arithmetic is correct.
+{% else %}
+Numbers in the answer that are not stated verbatim in the context are also supported when they equal the exact result of arithmetic over context values: sums, differences, products, ratios, averages, percentage change, and relative statements such as "doubled", "half of", or "a third of". You MUST recompute each derived value from the context numbers yourself and fail it when your result differs from the answer; a derived value passes only if it equals the exact computed result rounded to the precision the answer states (e.g. 10M → 11.3M growth yields "13%" and "13.0%", but "15%" fails). Values you cannot obtain from context numbers by such arithmetic remain mismatches, and when you fail a derived value, your reason must show the expected computation.
+{% endif %}
+
+## Evaluation Strategy
+
+1. Carefully read the agent's answer and reference context.
+2. Extract and list every numerical value from the agent's answer, normalizing each to its plain numeric value (percentage to decimal, textual to digits, suffix to full value).
+3. Extract and list every numerical value from the reference context the same way.
+4. For each number in the answer, check whether an equivalent value exists in the context (using the equivalences above). Equivalences are bidirectional; do not assume the answer or the context uses a particular convention.{% if not strict %} A number is also supported when it equals the exact result of arithmetic over context values (see Derived Values), so recompute any derived value before deciding.{% endif %}
+5. If at least one number in the answer has no faithful match in the context, the evaluation should be false.
+6. If every number in the answer is faithfully supported (or the answer has no numbers), the evaluation should be true, even if the context contains additional numbers the answer omits.
+7. Provide a clear reason for your evaluation decision on both pass and fail.
+8. In your reasoning, **do not mention omissions or missing numbers from the context as a reason for failure** — only unsupported numbers in the answer are failures. When failing, name the specific mismatched number(s) and what the context states instead.
+
+## Markers
+Markers <REFERENCE CONTEXT>...</REFERENCE CONTEXT> and <AGENT ANSWER>...</AGENT ANSWER> indicate where the reference context and agent answer are, respectively. Everything inside a marker belongs to that category.
+
+-------------------
+
+<AGENT ANSWER>
+{{ answer | fence }}
+</AGENT ANSWER>
+
+-------------------
+
+<REFERENCE CONTEXT>
+{{ context | fence }}
+</REFERENCE CONTEXT>
+
+-------------------
+
+Remember, only numbers in the answer that do not faithfully match the reference context should cause a failure. Equivalent representations (percentage vs decimal, textual vs digits, suffix vs full value) are allowed. Omissions from the answer are tolerated. Never mention omissions in the reason.
+{% if _instr_output is defined %}
+
+-------------------
+
+**Output Format:**
+{{ _instr_output }}
+{% endif %}
