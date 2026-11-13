@@ -332,8 +332,16 @@ async def test_empty_keyword() -> None:
     """Test behavior with empty keyword."""
     check = StringMatching(text="Hello", keyword="")
     result = await check.run(Trace())
-    # Empty string should be found in any text
-    assert result.status == CheckStatus.PASS
+    # An empty keyword would pass without testing anything: config error
+    assert result.status == CheckStatus.ERROR
+
+
+async def test_whitespace_only_keyword() -> None:
+    """Test behavior with whitespace-only keyword."""
+    check = StringMatching(text="Hello", keyword="   ")
+    result = await check.run(Trace())
+    # Whitespace normalizes to an empty keyword: config error
+    assert result.status == CheckStatus.ERROR
 
 
 async def test_unicode_e_acute_nfc_nfd_matching() -> None:
