@@ -11,7 +11,8 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr, field_validator
 class Document(BaseModel):
     """Document stored in a scan knowledge base.
 
-    Attributes:
+    Attributes
+    ----------
         content: Text content used for question generation and grounding.
         embeddings: Optional embedding vector. Missing vectors are computed
             lazily when nearest-neighbor retrieval is requested.
@@ -47,7 +48,8 @@ class KnowledgeBase(WithEmbeddingMixin):
         Args:
             texts: Text chunks to wrap as :class:`Document` objects.
 
-        Returns:
+        Returns
+        -------
             A knowledge base containing one document per input text.
         """
         return cls(documents=tuple(Document(content=text) for text in texts))
@@ -94,12 +96,17 @@ class KnowledgeBase(WithEmbeddingMixin):
     ) -> list[Document]:
         """Return the documents closest to a seed document by cosine similarity.
 
-        Args:
-            seed_index: Index of the seed document in ``documents``.
-            max_documents: Maximum number of documents to return, including the
-                seed document itself.
+        Parameters
+        ----------
+        seed_index : int
+            Index of the seed document in ``documents``.
+        max_documents : int
+            Maximum number of documents to return, including the
+            seed document itself.
 
-        Returns:
+        Returns
+        -------
+        list[Document]
             Documents sorted from highest to lowest cosine similarity.
         """
         if not 0 <= seed_index < len(self.documents):
@@ -119,11 +126,16 @@ class KnowledgeBase(WithEmbeddingMixin):
     ) -> list[Document]:
         """Return the documents closest to arbitrary text by cosine similarity.
 
-        Args:
-            text: Query text to embed and compare with the knowledge base.
-            max_documents: Maximum number of documents to return.
+        Parameters
+        ----------
+        text : str
+            Query text to embed and compare with the knowledge base.
+        max_documents : int
+            Maximum number of documents to return.
 
-        Returns:
+        Returns
+        -------
+        list[Document]
             Documents sorted from highest to lowest cosine similarity.
         """
         if max_documents <= 0:
@@ -200,7 +212,8 @@ def normalize_knowledge_base(
         knowledge_base: Either an existing knowledge base, raw text documents,
             or ``None``.
 
-    Returns:
+    Returns
+    -------
         A :class:`KnowledgeBase` instance, or ``None`` when no input was
         provided.
     """

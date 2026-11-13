@@ -68,6 +68,14 @@ make test      # pytest for packages under libs/
 
 Run `make help` for other targets (for example scoped tests with `PACKAGE=giskard-checks`).
 
+### Docstrings
+
+Public APIs use [NumPy-style](https://numpydoc.readthedocs.io/en/latest/format.html) docstrings, enforced by `make lint` (ruff pydocstyle). House conventions the linter doesn't check:
+
+- Document parameter types (`name : type`), matching the annotations; write `X | None` (plus `, optional` if defaulted) when `None` is accepted.
+- Add an `Examples` section for non-obvious usage.
+- Missing docstrings aren't flagged yet, but new public APIs should have one.
+
 See also [`.cursor/rules/documentation.mdc`](.cursor/rules/documentation.mdc) for module-level and inline comment guidance.
 
 ### Public examples

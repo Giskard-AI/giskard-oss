@@ -10,7 +10,6 @@ async def _to_async_generator[YieldType, SendType](
     sync_generator: Generator[YieldType, SendType, None],
 ) -> AsyncGenerator[YieldType, SendType]:
     """Convert a synchronous generator to an async generator."""
-
     iterator = iter(sync_generator)
 
     try:

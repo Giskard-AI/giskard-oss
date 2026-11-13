@@ -35,10 +35,13 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
     class owns seed document sampling, nearest-neighbor retrieval, language
     sampling, turn-budget handling, and the default contradiction scenario shape.
 
-    Attributes:
-        context_documents: Maximum number of nearest-neighbor documents used as
-            private reference context for each scenario.
-        max_turns: Maximum number of user-simulator turns per scenario.
+    Attributes
+    ----------
+    context_documents : int
+        Maximum number of nearest-neighbor documents used as private reference
+        context for each scenario.
+    max_turns : int
+        Maximum number of user-simulator turns per scenario.
     """
 
     scenario_name_prefix: ClassVar[str] = ""
@@ -67,17 +70,24 @@ class KnowledgeBaseScenarioGenerator(ScenarioGenerator):
     ) -> list[Scenario[Any, Any, Trace[Any, Any]]]:
         """Generate scenarios from nearest-neighbor knowledge base contexts.
 
-        Args:
-            context: Run-wide context; its ``knowledge_base`` drives sampling.
-                When ``None``, an empty list is returned.
-            max_scenarios: Maximum number of scenarios to generate. ``None``
-                uses :data:`DEFAULT_KNOWLEDGE_BASE_SCENARIOS`.
-            rng: Random generator used for reproducible seed document sampling.
-            target_mode: Desired conversation mode. ``"singleturn"`` caps the
-                user simulator to one turn; ``"multiturn"`` (default) allows
-                follow-up turns up to ``max_turns``.
+        Parameters
+        ----------
+        context : ScenarioContext
+            Run-wide context; its ``knowledge_base`` drives sampling. When
+            ``None``, an empty list is returned.
+        max_scenarios : int | None, optional
+            Maximum number of scenarios to generate. ``None`` uses
+            :data:`DEFAULT_KNOWLEDGE_BASE_SCENARIOS`.
+        rng : np.random.Generator | None, optional
+            Random generator used for reproducible seed document sampling.
+        target_mode : TargetMode, optional
+            Desired conversation mode. ``"singleturn"`` caps the user
+            simulator to one turn; ``"multiturn"`` (default) allows follow-up
+            turns up to ``max_turns``.
 
-        Returns:
+        Returns
+        -------
+        list[Scenario]
             Generated scenarios, or an empty list when the context carries no
             knowledge base.
         """

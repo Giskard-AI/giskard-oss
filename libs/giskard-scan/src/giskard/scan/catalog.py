@@ -94,7 +94,9 @@ async def generate_suite(
             generators that use knowledge-base context. Raw strings are
             normalized to a :class:`KnowledgeBase`.
 
-    Returns:
+    Returns
+    -------
+    Suite
         A Suite containing all generated scenarios, ready for execution.
     """
     if max_scenarios is not None and max_scenarios < 0:
