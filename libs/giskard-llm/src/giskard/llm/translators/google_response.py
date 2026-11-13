@@ -298,10 +298,16 @@ class GoogleResponseTranslator:
 
         usage = None
         if raw.usage:
+            # Thought tokens are generated (and billed) output, and tool-use tokens
+            # count on the input side; fold them in, as the generateContent
+            # translator does, so input + output == total when the model thinks.
+            u = raw.usage
+            input_tokens = (u.total_input_tokens or 0) + (u.total_tool_use_tokens or 0)
+            output_tokens = (u.total_output_tokens or 0) + (u.total_thought_tokens or 0)
             usage = Usage(
-                input_tokens=raw.usage.total_input_tokens or 0,
-                output_tokens=raw.usage.total_output_tokens or 0,
-                total_tokens=raw.usage.total_tokens or 0,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=u.total_tokens or (input_tokens + output_tokens),
             )
 
         return ResponseResult(
