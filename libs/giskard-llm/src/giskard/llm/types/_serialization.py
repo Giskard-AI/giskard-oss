@@ -42,12 +42,52 @@ def get_serializer[T: BaseModel](
 
 
 def close_object_schemas(schema: Any) -> Any:
-    """Close object schemas recursively, preserving explicit map value schemas."""
+    """Close object schemas without rewriting literal instance values.
+
+    Parameters
+    ----------
+    schema : Any
+        Schema or sequence of schemas to update in place.
+
+    Returns
+    -------
+    Any
+        The input, with object schemas closed unless they explicitly allow keys.
+    """
     if isinstance(schema, dict):
         if schema.get("type") == "object":
             schema.setdefault("additionalProperties", False)
-        for value in schema.values():
-            close_object_schemas(value)
+        for keyword in (
+            "$defs",
+            "definitions",
+            "properties",
+            "patternProperties",
+            "dependentSchemas",
+            "dependencies",
+        ):
+            subschemas = schema.get(keyword)
+            if isinstance(subschemas, dict):
+                for value in subschemas.values():
+                    close_object_schemas(value)
+        for keyword in (
+            "additionalProperties",
+            "unevaluatedProperties",
+            "propertyNames",
+            "items",
+            "additionalItems",
+            "contains",
+            "unevaluatedItems",
+            "contentSchema",
+            "allOf",
+            "anyOf",
+            "oneOf",
+            "prefixItems",
+            "not",
+            "if",
+            "then",
+            "else",
+        ):
+            close_object_schemas(schema.get(keyword))
     elif isinstance(schema, list):
         for value in schema:
             close_object_schemas(value)
