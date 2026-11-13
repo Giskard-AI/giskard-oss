@@ -761,7 +761,12 @@ async def test_anthropic_validate_multi_system_with_merge(mock_import):
     mock_raw.content = [SimpleNamespace(type="text", text="Hello")]
     mock_raw.stop_reason = "end_turn"
     mock_raw.model = "claude-3"
-    mock_raw.usage = SimpleNamespace(input_tokens=10, output_tokens=5)
+    mock_raw.usage = SimpleNamespace(
+        input_tokens=10,
+        output_tokens=5,
+        cache_read_input_tokens=None,
+        cache_creation_input_tokens=None,
+    )
     provider._client.messages.create = AsyncMock(return_value=mock_raw)
 
     resp = await provider.complete(
@@ -787,7 +792,12 @@ async def test_anthropic_validate_consecutive_developers_ok(mock_import):
     mock_raw.content = [SimpleNamespace(type="text", text="Hello")]
     mock_raw.stop_reason = "end_turn"
     mock_raw.model = "claude-3"
-    mock_raw.usage = SimpleNamespace(input_tokens=10, output_tokens=5)
+    mock_raw.usage = SimpleNamespace(
+        input_tokens=10,
+        output_tokens=5,
+        cache_read_input_tokens=None,
+        cache_creation_input_tokens=None,
+    )
     provider._client.messages.create = AsyncMock(return_value=mock_raw)
 
     resp = await provider.complete(
@@ -846,7 +856,12 @@ async def test_anthropic_validate_developer_content_as_content_blocks(mock_impor
     mock_raw.content = [SimpleNamespace(type="text", text="Hello")]
     mock_raw.stop_reason = "end_turn"
     mock_raw.model = "claude-3"
-    mock_raw.usage = SimpleNamespace(input_tokens=10, output_tokens=5)
+    mock_raw.usage = SimpleNamespace(
+        input_tokens=10,
+        output_tokens=5,
+        cache_read_input_tokens=None,
+        cache_creation_input_tokens=None,
+    )
     provider._client.messages.create = AsyncMock(return_value=mock_raw)
 
     resp = await provider.complete(
