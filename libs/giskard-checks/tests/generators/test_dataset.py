@@ -1,4 +1,6 @@
 import json
+from collections import Counter, OrderedDict, UserDict, defaultdict
+from types import MappingProxyType
 from typing import Any
 
 import pytest
@@ -87,6 +89,60 @@ def test_substitute_prompt_in_nested_list_of_dicts():
 def test_substitute_prompt_in_plain_dict():
     out = substitute_prompt({"q": PROMPT_PLACEHOLDER, "lang": "en"}, "X")
     assert out == {"q": "X", "lang": "en"}
+
+
+@pytest.mark.parametrize(
+    "mapping_factory",
+    [
+        dict,
+        OrderedDict,
+        UserDict,
+        MappingProxyType,
+        pytest.param(lambda data: defaultdict(list, data), id="defaultdict"),
+    ],
+)
+def test_substitute_prompt_preserves_non_string_mapping_keys(mapping_factory):
+    key = (1, "question")
+    message = mapping_factory({key: [PROMPT_PLACEHOLDER], 2: "unchanged"})
+
+    result = substitute_prompt(message, "hello")
+
+    assert type(result) is type(message)
+    assert list(result) == [key, 2]
+    assert result == {key: ["hello"], 2: "unchanged"}
+    assert result is not message
+    result[key].append("new item")
+    assert message[key] == [PROMPT_PLACEHOLDER]
+
+
+@pytest.mark.parametrize("factory", [None, list])
+def test_substitute_prompt_preserves_defaultdict_factory(factory):
+    message = defaultdict(factory, {"question": PROMPT_PLACEHOLDER})
+
+    result = substitute_prompt(message, "hello")
+
+    assert isinstance(result, defaultdict)
+    assert result.default_factory is factory
+    assert result["question"] == "hello"
+    if factory is None:
+        with pytest.raises(KeyError):
+            result["missing"]
+    else:
+        assert result["missing"] == []
+    assert "missing" not in message
+    assert message["question"] == PROMPT_PLACEHOLDER
+
+
+def test_substitute_prompt_preserves_counter_values():
+    message = {"question": PROMPT_PLACEHOLDER, "counts": Counter({"a": 1, "b": 2})}
+
+    result = substitute_prompt(message, "hello")
+
+    assert result["question"] == "hello"
+    assert isinstance(result["counts"], Counter)
+    assert result["counts"] == Counter({"a": 1, "b": 2})
+    assert result["counts"] is not message["counts"]
+    assert message["counts"] == Counter({"a": 1, "b": 2})
 
 
 @pytest.mark.parametrize(
@@ -195,6 +251,30 @@ async def test_structured_schema_injects_prompt():
     # only ever sees the schema. A regression that leaks it (e.g. passing the
     # prompt as a template var) would defeat the whole design.
     assert prompt not in str(gen.calls)
+
+
+async def test_structured_integer_keyed_mapping_injects_prompt():
+    class RankedMessages(BaseModel):
+        messages: dict[int, str]
+
+    gen = MockGenerator(
+        responses=[_mapping_response({"messages": {"1": PROMPT_PLACEHOLDER}})]
+    )
+    first = DatasetInputGenerator(generator=gen, prompt="first prompt")
+    second = DatasetInputGenerator(generator=gen, prompt="second prompt")
+
+    first_value = await anext(first(LLMTrace(), input_type=RankedMessages))
+    second_value = await anext(second(LLMTrace(), input_type=RankedMessages))
+
+    assert isinstance(first_value, RankedMessages)
+    assert isinstance(second_value, RankedMessages)
+    assert first_value.messages == {1: "first prompt"}
+    assert second_value.messages == {1: "second prompt"}
+    assert type(next(iter(first_value.messages))) is int
+    assert first_value.messages is not second_value.messages
+    assert len(gen.calls) == 1
+    assert "first prompt" not in str(gen.calls)
+    assert "second prompt" not in str(gen.calls)
 
 
 async def test_structured_embedded_placeholder():
