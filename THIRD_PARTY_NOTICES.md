@@ -109,658 +109,658 @@ Find a list of packages below
 |✔|yarl|
 |✔|zipp|
 
-### aiohappyeyeballs-2.6.2
+### aiohappyeyeballs
 
 - HomePage:
 - Author: J. Nick Koston
 - License: Python Software Foundation License
 - Compatible: True
 
-### aiohttp-3.14.5
+### aiohttp
 
 - HomePage:
 - Author:
 - License: Apache-2.0;; MIT
 - Compatible: True
 
-### aiosignal-1.4.0
+### aiosignal
 
 - HomePage: https://github.com/aio-libs/aiosignal
 - Author:
 - License: Apache Software License
 - Compatible: True
 
-### annotated-types-0.7.0
+### annotated-types
 
 - HomePage:
 - Author: Adrian Garcia Badaracco
 - License: MIT License
 - Compatible: True
 
-### anthropic-1.2.0
+### anthropic
 
 - HomePage:
 - Author: Anthropic
 - License: MIT License
 - Compatible: True
 
-### anyio-4.14.2
+### anyio
 
 - HomePage:
 - Author: Alex Grönholm
 - License: MIT
 - Compatible: True
 
-### attrs-26.1.0
+### attrs
 
 - HomePage:
 - Author: Hynek Schlawack
 - License: MIT
 - Compatible: True
 
-### backoff-2.2.1
+### backoff
 
 - HomePage: https://github.com/litl/backoff
 - Author: Bob Green
 - License: MIT License
 - Compatible: True
 
-### boto3-1.43.38
+### boto3
 
 - HomePage: https://github.com/boto/boto3
 - Author: Amazon Web Services
 - License: Apache-2.0
 - Compatible: True
 
-### botocore-1.43.38
+### botocore
 
 - HomePage: https://github.com/boto/botocore
 - Author: Amazon Web Services
 - License: Apache-2.0
 - Compatible: True
 
-### celine-regorus-0.9.1.post20260227075446
+### celine-regorus
 
 - HomePage:
 - Author:
 - License: Apache Software License;; BSD License;; MIT License
 - Compatible: True
 
-### certifi-2026.10.19
+### certifi
 
 - HomePage: https://github.com/certifi/python-certifi
 - Author: Kenneth Reitz
 - License: Mozilla Public License 2.0 _MPL 2.0_
 - Compatible: True
 
-### cffi-2.0.0
+### cffi
 
 - HomePage:
 - Author: Armin Rigo, Maciej Fijalkowski
 - License: MIT
 - Compatible: True
 
-### charset-normalizer-3.4.7
+### charset-normalizer
 
 - HomePage:
 - Author: "Ahmed R. TAHRI"
 - License: MIT
 - Compatible: True
 
-### click-8.3.3
+### click
 
 - HomePage:
 - Author:
 - License: BSD-3-Clause
 - Compatible: True
 
-### cloudpickle-3.1.2
+### cloudpickle
 
 - HomePage: https://github.com/cloudpipe/cloudpickle
 - Author: The cloudpickle developer team
 - License: BSD License
 - Compatible: True
 
-### colorama-0.4.6
+### colorama
 
 - HomePage:
 - Author: Jonathan Hartley
 - License: BSD License
 - Compatible: True
 
-### cryptography-50.0.0
+### cryptography
 
 - HomePage:
 - Author: The Python Cryptographic Authority and individual contributors
 - License: Apache-2.0;; BSD-3-Clause
 - Compatible: True
 
-### defusedxml-0.7.1
+### defusedxml
 
 - HomePage: https://github.com/tiran/defusedxml
 - Author: Christian Heimes
 - License: Python Software Foundation License
 - Compatible: True
 
-### distro-1.9.0
+### distro
 
 - HomePage: https://github.com/python-distro/distro
 - Author: Nir Cohen
 - License: Apache Software License
 - Compatible: True
 
-### docstring-parser-0.18.0
+### docstring-parser
 
 - HomePage:
 - Author: Marcin Kurczewski
 - License: MIT License
 - Compatible: True
 
-### fastuuid-0.14.0
+### fastuuid
 
 - HomePage:
 - Author:
 - License: BSD License
 - Compatible: True
 
-### filelock-4.2.4
+### filelock
 
 - HomePage:
 - Author:
 - License: MIT
 - Compatible: True
 
-### frozenlist-1.8.0
+### frozenlist
 
 - HomePage: https://github.com/aio-libs/frozenlist
 - Author:
 - License: Apache-2.0
 - Compatible: True
 
-### fsspec-2026.6.0
+### fsspec
 
 - HomePage:
 - Author:
 - License: BSD-3-Clause
 - Compatible: True
 
-### google-auth-2.55.0
+### google-auth
 
 - HomePage: https://github.com/googleapis/google-cloud-python/tree/main/packages/google-auth
 - Author: Google Cloud Platform
 - License: Apache Software License
 - Compatible: True
 
-### google-genai-2.4.0
+### google-genai
 
 - HomePage:
 - Author: Google LLC
 - License: Apache-2.0
 - Compatible: True
 
-### griffe-2.1.0
+### griffe
 
 - HomePage:
 - Author: Timothée Mazzucotelli
 - License: ISC
 - Compatible: True
 
-### griffecli-2.1.0
+### griffecli
 
 - HomePage:
 - Author: Timothée Mazzucotelli
 - License: ISC
 - Compatible: True
 
-### griffelib-2.1.0
+### griffelib
 
 - HomePage:
 - Author: Timothée Mazzucotelli
 - License: ISC
 - Compatible: True
 
-### h11-0.16.0
+### h11
 
 - HomePage: https://github.com/python-hyper/h11
 - Author: Nathaniel J. Smith
 - License: MIT License
 - Compatible: True
 
-### h2-4.4.1
+### h2
 
 - HomePage:
 - Author: Cory Benfield
 - License: MIT
 - Compatible: True
 
-### hf-xet-1.5.1
+### hf-xet
 
 - HomePage:
 - Author:
 - License: Apache-2.0
 - Compatible: True
 
-### hpack-4.2.0
+### hpack
 
 - HomePage:
 - Author: Cory Benfield
 - License: MIT
 - Compatible: True
 
-### httpcore-1.0.9
+### httpcore
 
 - HomePage:
 - Author: Tom Christie
 - License: BSD-3-Clause
 - Compatible: True
 
-### httpcore2-2.12.0
+### httpcore2
 
 - HomePage:
 - Author: Tom Christie
 - License: BSD-3-Clause
 - Compatible: True
 
-### httpx-0.28.1
+### httpx
 
 - HomePage:
 - Author: Tom Christie
 - License: BSD License
 - Compatible: True
 
-### httpx2-2.12.0
+### httpx2
 
 - HomePage:
 - Author: Tom Christie
 - License: BSD-3-Clause
 - Compatible: True
 
-### huggingface-hub-1.16.1
+### huggingface-hub
 
 - HomePage: https://github.com/huggingface/huggingface_hub
 - Author: Hugging Face, Inc.
 - License: Apache Software License
 - Compatible: True
 
-### hyperframe-6.1.0
+### hyperframe
 
 - HomePage:
 - Author: Cory Benfield
 - License: MIT License
 - Compatible: True
 
-### idna-3.20
+### idna
 
 - HomePage:
 - Author: Kim Davies
 - License: BSD-3-Clause
 - Compatible: True
 
-### importlib-metadata-8.9.0
+### importlib-metadata
 
 - HomePage:
 - Author: "Jason R. Coombs"
 - License: Apache-2.0
 - Compatible: True
 
-### jinja2-3.1.6
+### jinja2
 
 - HomePage:
 - Author:
 - License: BSD License
 - Compatible: True
 
-### jiter-0.15.0
+### jiter
 
 - HomePage: https://github.com/pydantic/jiter/
 - Author: Samuel Colvin
 - License: MIT
 - Compatible: True
 
-### jmespath-1.1.0
+### jmespath
 
 - HomePage: https://github.com/jmespath/jmespath.py
 - Author: James Saryerwinnie
 - License: MIT License
 - Compatible: True
 
-### joblib-1.5.3
+### joblib
 
 - HomePage:
 - Author: Gael Varoquaux
 - License: BSD-3-Clause
 - Compatible: True
 
-### jsonpath-ng-1.8.0
+### jsonpath-ng
 
 - HomePage: https://github.com/h2non/jsonpath-ng
 - Author: Tomas Aparicio
 - License: Apache Software License
 - Compatible: True
 
-### jsonschema-4.26.0
+### jsonschema
 
 - HomePage:
 - Author: Julian Berman
 - License: MIT
 - Compatible: True
 
-### jsonschema-specifications-2025.9.1
+### jsonschema-specifications
 
 - HomePage:
 - Author: Julian Berman
 - License: MIT
 - Compatible: True
 
-### litellm-1.103.6
+### litellm
 
 - HomePage:
 - Author: BerriAI
 - License: MIT
 - Compatible: True
 
-### logfire-api-5.2.0
+### logfire-api
 
 - HomePage:
 - Author: Pydantic Team
 - License: MIT
 - Compatible: True
 
-### markdown-it-py-4.2.0
+### markdown-it-py
 
 - HomePage:
 - Author: Chris Sewell
 - License: MIT License
 - Compatible: True
 
-### markupsafe-3.0.3
+### markupsafe
 
 - HomePage:
 - Author:
 - License: BSD-3-Clause
 - Compatible: True
 
-### mdurl-0.1.2
+### mdurl
 
 - HomePage:
 - Author: Taneli Hukkinen
 - License: MIT License
 - Compatible: True
 
-### multidict-6.9.1
+### multidict
 
 - HomePage: https://github.com/aio-libs/multidict
 - Author: Andrew Svetlov
 - License: Apache License 2.0
 - Compatible: True
 
-### nltk-3.10.4
+### nltk
 
 - HomePage: https://www.nltk.org/
 - Author: NLTK Team
 - License: Apache Software License
 - Compatible: True
 
-### numpy-2.4.6
+### numpy
 
 - HomePage:
 - Author: Travis E. Oliphant et al.
 - License: 0BSD;; BSD-3-Clause;; CC0-1.0;; MIT;; Zlib
 - Compatible: True
 
-### openai-2.54.0
+### openai
 
 - HomePage:
 - Author: OpenAI
 - License: Apache Software License
 - Compatible: True
 
-### opentelemetry-api-1.45.1
+### opentelemetry-api
 
 - HomePage:
 - Author: OpenTelemetry Authors
 - License: Apache-2.0
 - Compatible: True
 
-### packaging-26.2
+### packaging
 
 - HomePage:
 - Author: Donald Stufft
 - License: Apache-2.0;; BSD-2-Clause
 - Compatible: True
 
-### posthog-7.20.2
+### posthog
 
 - HomePage: https://github.com/posthog/posthog-python
 - Author: Posthog
 - License: MIT License
 - Compatible: True
 
-### propcache-0.5.2
+### propcache
 
 - HomePage: https://github.com/aio-libs/propcache
 - Author: Andrew Svetlov
 - License: Apache Software License
 - Compatible: True
 
-### pyasn1-0.6.5
+### pyasn1
 
 - HomePage:
 - Author: Ilya Etingof
 - License: BSD-2-Clause
 - Compatible: True
 
-### pyasn1-modules-0.4.2
+### pyasn1-modules
 
 - HomePage: https://github.com/pyasn1/pyasn1-modules
 - Author: Ilya Etingof
 - License: BSD License
 - Compatible: True
 
-### pycparser-3.0
+### pycparser
 
 - HomePage:
 - Author: Eli Bendersky
 - License: BSD-3-Clause
 - Compatible: True
 
-### pydantic-2.13.4
+### pydantic
 
 - HomePage:
 - Author: Samuel Colvin
 - License: MIT
 - Compatible: True
 
-### pydantic-core-2.46.4
+### pydantic-core
 
 - HomePage: https://github.com/pydantic/pydantic
 - Author: Samuel Colvin
 - License: MIT
 - Compatible: True
 
-### pydantic-settings-2.14.2
+### pydantic-settings
 
 - HomePage:
 - Author: Samuel Colvin
 - License: MIT
 - Compatible: True
 
-### pygments-2.20.0
+### pygments
 
 - HomePage:
 - Author: Georg Brandl
 - License: BSD-2-Clause
 - Compatible: True
 
-### pyphen-0.17.2
+### pyphen
 
 - HomePage:
 - Author: Guillaume Ayoub
 - License: GNU General Public License v2;; GNU Lesser General Public License v2;; Mozilla Public License 1.1 _MPL 1.1_;; later _GPLv2__;; later _LGPLv2__
 - Compatible: True
 
-### python-dateutil-2.9.0.post0
+### python-dateutil
 
 - HomePage: https://github.com/dateutil/dateutil
 - Author: Gustavo Niemeyer
 - License: Apache Software License;; BSD License
 - Compatible: True
 
-### python-dotenv-1.2.2
+### python-dotenv
 
 - HomePage:
 - Author: Saurabh Kumar
 - License: BSD-3-Clause
 - Compatible: True
 
-### pyyaml-6.0.3
+### pyyaml
 
 - HomePage: https://pyyaml.org/
 - Author: Kirill Simonov
 - License: MIT License
 - Compatible: True
 
-### referencing-0.37.0
+### referencing
 
 - HomePage:
 - Author: Julian Berman
 - License: MIT
 - Compatible: True
 
-### regex-2026.5.9
+### regex
 
 - HomePage:
 - Author: Matthew Barnett
 - License: Apache-2.0;; CNRI-Python
 - Compatible: True
 
-### requests-2.34.2
+### requests
 
 - HomePage:
 - Author: Kenneth Reitz
 - License: Apache Software License
 - Compatible: True
 
-### rich-15.0.0
+### rich
 
 - HomePage:
 - Author: Will McGugan
 - License: MIT License
 - Compatible: True
 
-### rpds-py-2026.5.1
+### rpds-py
 
 - HomePage:
 - Author: Julian Berman
 - License: MIT
 - Compatible: True
 
-### s3transfer-0.19.0
+### s3transfer
 
 - HomePage: https://github.com/boto/s3transfer
 - Author: Amazon Web Services
 - License: Apache Software License
 - Compatible: True
 
-### setuptools-84.2.0
+### setuptools
 
 - HomePage:
 - Author: Python Packaging Authority
 - License: MIT
 - Compatible: True
 
-### six-1.17.0
+### six
 
 - HomePage: https://github.com/benjaminp/six
 - Author: Benjamin Peterson
 - License: MIT License
 - Compatible: True
 
-### sniffio-1.3.1
+### sniffio
 
 - HomePage:
 - Author: "Nathaniel J. Smith"
 - License: Apache Software License;; MIT License
 - Compatible: True
 
-### tenacity-9.1.4
+### tenacity
 
 - HomePage: https://github.com/jd/tenacity
 - Author: Julien Danjou
 - License: Apache Software License
 - Compatible: True
 
-### textstat-0.7.13
+### textstat
 
 - HomePage: https://github.com/textstat/textstat
 - Author: Shivam Bansal, Chaitanya Aggarwal
 - License: MIT
 - Compatible: True
 
-### tiktoken-0.13.0
+### tiktoken
 
 - HomePage:
 - Author: Shantanu Jain
 - License: MIT License
 - Compatible: True
 
-### tokenizers-0.22.2
+### tokenizers
 
 - HomePage:
 - Author: Nicolas Patry
 - License: Apache Software License
 - Compatible: True
 
-### tqdm-4.68.3
+### tqdm
 
 - HomePage:
 - Author:
 - License: MIT;; MPL-2.0
 - Compatible: True
 
-### truststore-0.10.4
+### truststore
 
 - HomePage:
 - Author: Seth Michael Larson
 - License: MIT
 - Compatible: True
 
-### typing-extensions-4.15.0
+### typing-extensions
 
 - HomePage:
 - Author: "Guido van Rossum, Jukka Lehtosalo, Łukasz Langa, Michael Lee"
 - License: PSF-2.0
 - Compatible: True
 
-### typing-inspection-0.4.2
+### typing-inspection
 
 - HomePage:
 - Author: Victorien Plot
 - License: MIT
 - Compatible: True
 
-### urllib3-2.8.0
+### urllib3
 
 - HomePage:
 - Author: Andrey Petrov
 - License: MIT
 - Compatible: True
 
-### websockets-15.0.1
+### websockets
 
 - HomePage:
 - Author: Aymeric Augustin
 - License: BSD License
 - Compatible: True
 
-### yarl-1.25.1
+### yarl
 
 - HomePage: https://github.com/aio-libs/yarl
 - Author: Andrew Svetlov
 - License: Apache-2.0
 - Compatible: True
 
-### zipp-4.1.0
+### zipp
 
 - HomePage:
 - Author: "Jason R. Coombs"
