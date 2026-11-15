@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, override
 
 import httpx
+import huggingface_hub.utils as hf_utils
 from giskard.checks import Scenario, Trace
 from huggingface_hub import DatasetCard, hf_hub_download, list_repo_files
 from huggingface_hub.errors import (
@@ -17,11 +18,17 @@ from .base import BaseDatasetScenarioGenerator
 
 logger = logging.getLogger(__name__)
 
+# huggingface-hub v2 raises transport errors from httpx2 (re-exported as
+# ``huggingface_hub.utils.httpx``); v1 raises them from httpx directly.
+_hf_httpx = getattr(hf_utils, "httpx", httpx)
+
 _HUB_UNAVAILABLE_ERRORS = (
     LocalEntryNotFoundError,
     OfflineModeIsEnabled,
     httpx.NetworkError,
     httpx.ProxyError,
+    _hf_httpx.NetworkError,
+    _hf_httpx.ProxyError,
 )
 _HUB_LOAD_ERRORS = _HUB_UNAVAILABLE_ERRORS + (HfHubHTTPError,)
 
