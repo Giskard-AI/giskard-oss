@@ -151,6 +151,45 @@ async def test_readability_fails_for_non_string_value(fake_textstat: None) -> No
     assert result.details["value"] == "{'text': 'x'}"
 
 
+@pytest.mark.parametrize("text", ["", "   ", "\n\t "])
+@pytest.mark.parametrize(
+    ("metric", "threshold"),
+    [
+        ("flesch_kincaid_grade", {"max_score": 8}),
+        ("flesch_reading_ease", {"min_score": 60}),
+    ],
+)
+async def test_readability_errors_on_empty_text(
+    fake_textstat: None, text: str, metric: ReadabilityMetric, threshold: dict
+) -> None:
+    check = Readability(metric=metric, **threshold)
+    trace = Trace(interactions=[Interaction(inputs="Prompt", outputs=text)])
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "empty or whitespace-only" in result.message
+    assert result.metrics == []
+
+
+@pytest.mark.parametrize("score", [float("nan"), float("inf"), float("-inf")])
+async def test_readability_errors_on_non_finite_score(
+    monkeypatch: pytest.MonkeyPatch, score: float
+) -> None:
+    module = SimpleNamespace(flesch_kincaid_grade=lambda text: score)
+    monkeypatch.setitem(__import__("sys").modules, "textstat", module)
+    check = Readability(metric="flesch_kincaid_grade", max_score=8)
+    trace = Trace(interactions=[Interaction(inputs="Prompt", outputs="Some text.")])
+
+    result = await check.run(trace)
+
+    assert result.status == CheckStatus.ERROR
+    assert result.message is not None
+    assert "not a finite number" in result.message
+    assert result.metrics == []
+
+
 async def test_readability_returns_error_when_metric_computation_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
