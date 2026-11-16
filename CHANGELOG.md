@@ -53,6 +53,16 @@ in-place upgrade of the v2 API.
   opt out.
 - `giskard.checks.set_default_generator` accepts a model identifier string
   (e.g. `"openai/gpt-4o-mini"`) in addition to a `BaseGenerator` instance.
+- `giskard-agents`: `validate_template` checks an inline message template
+  against allowed and required variables, and
+  `python -m giskard.agents.templates.validate` exposes it as a CLI that reads
+  a JSON array of templates on stdin and writes a JSON array of results.
+
+### Changed
+
+- `giskard-core` imports `posthog` only when telemetry is enabled.
+- `giskard-agents` loads its exports lazily, so `giskard.agents.templates`
+  imports on its own.
 
 ### Fixed
 
