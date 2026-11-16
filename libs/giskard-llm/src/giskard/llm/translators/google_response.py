@@ -3,8 +3,15 @@ from collections.abc import Iterable, Sequence
 from functools import partial
 from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 
+from giskard.llm.errors import BadRequestError
 from giskard.llm.types._base import _BaseModel
-from pydantic import BaseModel, SerializationInfo, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    SerializationInfo,
+    field_serializer,
+    model_validator,
+)
 
 from ..types import (
     ResponseEasyInputMessage,
@@ -21,6 +28,7 @@ from ..types import (
     ResponseResult,
     ToolDef,
     Usage,
+    normalize_reasoning_effort,
 )
 from ..utils import deserialize_arguments
 from ._unsupported import handle_unsupported_content
@@ -61,7 +69,16 @@ _PROVIDER = "google/response"
 PROVIDER = "google"
 # Provenance tag on ResponseReasoningItem.format; keeps other providers from replaying it.
 _REASONING_FORMAT = "google-interactions-v1"
-KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "timeout", "response_format"})
+_SUPPORTED_REASONING_EFFORTS = frozenset({"minimal", "low", "medium", "high"})
+KNOWN_RESPONSE_PARAMS = frozenset(
+    {
+        "temperature",
+        "timeout",
+        "response_format",
+        "reasoning_effort",
+        "generation_config",
+    }
+)
 
 
 logger = logging.getLogger(__name__)
@@ -205,6 +222,8 @@ def _extract_system_instruction(input: str | Sequence[ResponseInputItem]) -> str
 
 
 class GoogleResponseGenerationConfigParam(_BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     temperature: float | None = None
 
 
@@ -246,9 +265,46 @@ class GoogleResponseParams(_BaseModel):
         if instructions_parts:
             v["system_instruction"] = "\n".join(instructions_parts)
 
-        # Move temperature to generation_config
-        if "temperature" in v:
-            v["generation_config"] = {"temperature": v.pop("temperature")}
+        raw_gen_config = v.get("generation_config")
+        if raw_gen_config is not None:
+            if isinstance(raw_gen_config, BaseModel):
+                gen_config = raw_gen_config.model_dump(exclude_none=True)
+            elif isinstance(raw_gen_config, dict):
+                gen_config = dict(raw_gen_config)
+            else:
+                raise BadRequestError(400, "generation_config must be a dict", PROVIDER)
+        else:
+            gen_config = {}
+
+        temperature = v.pop("temperature", None)
+        if temperature is not None:
+            gen_config["temperature"] = temperature
+
+        raw_effort = v.pop("reasoning_effort", None)
+        if raw_effort is not None:
+            try:
+                effort = normalize_reasoning_effort(raw_effort)
+            except ValueError as exc:
+                raise BadRequestError(400, str(exc), PROVIDER) from exc
+            if effort not in _SUPPORTED_REASONING_EFFORTS:
+                raise BadRequestError(
+                    400,
+                    f"Google does not support reasoning_effort={effort!r}; "
+                    "supported levels: minimal, low, medium, high",
+                    PROVIDER,
+                )
+            if gen_config.get("thinking_level") is not None:
+                raise BadRequestError(
+                    400,
+                    "Cannot specify both reasoning_effort and generation_config['thinking_level']",
+                    PROVIDER,
+                )
+            gen_config["thinking_level"] = effort.lower()
+
+        if gen_config or raw_gen_config is not None:
+            v["generation_config"] = gen_config
+        else:
+            v.pop("generation_config", None)
 
         # Setup response_format for JSON output
         if (

@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, Any, cast
 
 from giskard.llm.types import (
+    NormalizedReasoningEffort,
     ResponseInputItem,
     ResponseReasoningItem,
     ResponseResult,
@@ -30,7 +31,9 @@ if TYPE_CHECKING:
     )
     from openai.types.responses.tool_param import ToolParam
 
-KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "max_tokens", "response_format"})
+KNOWN_RESPONSE_PARAMS = frozenset(
+    {"temperature", "max_tokens", "response_format", "reasoning_effort", "reasoning"}
+)
 _SUPPORTED_OUTPUT_TYPES = frozenset({"message", "function_call", "reasoning"})
 
 logger = logging.getLogger(__name__)
@@ -117,6 +120,10 @@ class OpenAIResponseParams(_BaseModel):
     temperature: float | None = None
     max_output_tokens: int | None = Field(default=None, validation_alias="max_tokens")
     text: dict[str, Any] | None = None
+    reasoning: dict[str, Any] | None = None
+    reasoning_effort: NormalizedReasoningEffort | None = Field(
+        default=None, exclude=True
+    )
 
     @field_validator("input", mode="after")
     @classmethod
@@ -169,6 +176,22 @@ class OpenAIResponseParams(_BaseModel):
                 PROVIDER,
             )
         return v
+
+    @model_validator(mode="after")
+    def _merge_reasoning(self) -> "OpenAIResponseParams":
+        if self.reasoning_effort is None:
+            return self
+        if self.reasoning is None:
+            self.reasoning = {"effort": self.reasoning_effort}
+            return self
+        if self.reasoning.get("effort") is not None:
+            raise BadRequestError(
+                400,
+                "Cannot specify both reasoning_effort and reasoning['effort']",
+                PROVIDER,
+            )
+        self.reasoning = {**self.reasoning, "effort": self.reasoning_effort}
+        return self
 
 
 class OpenAIResponseTranslator:

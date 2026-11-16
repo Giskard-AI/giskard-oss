@@ -17,11 +17,16 @@ For **return** mapping -> :class:`~giskard.llm.types.ResponseResult`, see ``test
 For **generateContent** -> :class:`~giskard.llm.types.CompletionResponse`, see ``test_google_chat_return.py``.
 """
 
-from typing import Literal
+import logging
+from typing import Any, Literal, cast
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from giskard.llm.errors import BadRequestError
+from giskard.llm.routing import LLMClient
 from giskard.llm.translators.google_response import GoogleResponseTranslator
 from giskard.llm.types import (
+    ReasoningEffort,
     ResponseEasyInputMessage,
     ResponseInputItem,
     ResponseOutputMessage,
@@ -382,3 +387,175 @@ def test_reasoning_item_without_summary_falls_back_to_content():
         "type": "thought",
         "summary": [{"type": "text", "text": "Raw thinking"}],
     }
+
+
+@pytest.mark.parametrize(
+    ("raw_effort", "expected_level"),
+    [
+        pytest.param("minimal", "minimal", id="minimal"),
+        pytest.param("low", "low", id="low"),
+        pytest.param("medium", "medium", id="medium"),
+        pytest.param("high", "high", id="high"),
+        pytest.param("HIGH", "high", id="upper-case"),
+        pytest.param("MeDiUm", "medium", id="mixed-case"),
+    ],
+)
+def test_reasoning_effort_supported_levels_emit_lower_thinking_level(
+    raw_effort: str, expected_level: ReasoningEffort, caplog: pytest.LogCaptureFixture
+):
+    """Supported levels set ``generation_config['thinking_level']`` in lowercase."""
+    with caplog.at_level(
+        logging.WARNING, logger="giskard.llm.translators.google_response"
+    ):
+        payload = GoogleResponseTranslator.to_google(
+            _MODEL, "Hello.", reasoning_effort=raw_effort
+        )
+    assert "reasoning_effort" not in payload
+    assert payload.get("generation_config") == {"thinking_level": expected_level}
+    assert "reasoning_effort" not in " ".join(r.message for r in caplog.records)
+    validate_google_interaction_params(payload)
+
+
+def test_reasoning_effort_none_omitted():
+    """Explicit ``reasoning_effort=None`` omits ``generation_config``."""
+    payload = GoogleResponseTranslator.to_google(
+        _MODEL, "Hello.", reasoning_effort=None
+    )
+    assert "generation_config" not in payload
+    assert "reasoning_effort" not in payload
+    validate_google_interaction_params(payload)
+
+
+def test_generation_config_merges_with_temperature_and_reasoning_effort(
+    caplog: pytest.LogCaptureFixture,
+):
+    """``generation_config`` preserves explicit keys alongside ``temperature`` and ``thinking_level``."""
+    escape = {"thinking_summaries": "auto", "top_p": 0.9}
+    with caplog.at_level(
+        logging.WARNING, logger="giskard.llm.translators.google_response"
+    ):
+        payload = GoogleResponseTranslator.to_google(
+            _MODEL,
+            "Hello.",
+            temperature=0.4,
+            reasoning_effort="HIGH",
+            generation_config=escape,
+        )
+    assert payload.get("generation_config") == {
+        "thinking_summaries": "auto",
+        "top_p": 0.9,
+        "temperature": 0.4,
+        "thinking_level": "high",
+    }
+    assert escape == {"thinking_summaries": "auto", "top_p": 0.9}
+    assert "generation_config" not in " ".join(r.message for r in caplog.records)
+    validate_google_interaction_params(payload)
+
+
+def test_generation_config_escape_hatch_only_merges_with_temperature():
+    """Explicit ``generation_config`` without ``reasoning_effort`` is preserved alongside ``temperature``."""
+    payload = GoogleResponseTranslator.to_google(
+        _MODEL,
+        "Hello.",
+        temperature=0.2,
+        generation_config={"thinking_summaries": "none", "seed": 42},
+    )
+    assert payload.get("generation_config") == {
+        "thinking_summaries": "none",
+        "seed": 42,
+        "temperature": 0.2,
+    }
+    validate_google_interaction_params(payload)
+
+
+@pytest.mark.parametrize(
+    "invalid_effort",
+    [
+        pytest.param("none", id="unsupported-none"),
+        pytest.param("xhigh", id="unsupported-xhigh"),
+        pytest.param("max", id="unsupported-max"),
+        pytest.param("MAX", id="unsupported-max-upper"),
+        pytest.param("ultra", id="invalid-string"),
+        pytest.param("", id="empty-string"),
+    ],
+)
+def test_reasoning_effort_rejects_unsupported_and_invalid_at_translator_seam(
+    invalid_effort: str,
+):
+    """Unsupported and invalid levels raise ``BadRequestError(400, ..., 'google')``."""
+    with pytest.raises(BadRequestError) as exc_info:
+        GoogleResponseTranslator.to_google(
+            _MODEL, "Hello.", reasoning_effort=invalid_effort
+        )
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.provider == "google"
+
+
+def test_reasoning_effort_and_generation_config_thinking_level_conflict_raises():
+    """Passing both ``reasoning_effort`` and ``generation_config['thinking_level']`` raises 400."""
+    with pytest.raises(BadRequestError) as exc_info:
+        GoogleResponseTranslator.to_google(
+            _MODEL,
+            "Hello.",
+            reasoning_effort="high",
+            generation_config={"thinking_level": "low"},
+        )
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.provider == "google"
+
+
+@pytest.mark.parametrize("prefix", ["google", "gemini"])
+async def test_client_aresponse_google_forwards_and_rejects_before_sdk(
+    prefix: str, monkeypatch: pytest.MonkeyPatch
+):
+    """``LLMClient.aresponse`` forwards merged generation_config and rejects 400 before SDK."""
+    from types import SimpleNamespace
+
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    client = LLMClient()
+    provider = client._get_provider(prefix)
+    sdk_resp = SimpleNamespace(
+        id="int_1",
+        steps=[
+            SimpleNamespace(
+                type="model_output",
+                content=[SimpleNamespace(type="text", text="Ok")],
+            )
+        ],
+        usage=None,
+    )
+    create_mock = AsyncMock(return_value=sdk_resp)
+    cast(Any, provider)._client = MagicMock(
+        aio=MagicMock(interactions=MagicMock(create=create_mock))
+    )
+
+    await client.aresponse(
+        f"{prefix}/{_MODEL}",
+        "Hi",
+        temperature=0.3,
+        reasoning_effort="HIGH",
+        generation_config={"thinking_summaries": "auto"},
+    )
+    assert create_mock.call_args.kwargs["generation_config"] == {
+        "thinking_summaries": "auto",
+        "temperature": 0.3,
+        "thinking_level": "high",
+    }
+
+    bad_cases: tuple[dict[str, Any], ...] = (
+        {"reasoning_effort": "none"},
+        {"reasoning_effort": "xhigh"},
+        {"reasoning_effort": "max"},
+        {"reasoning_effort": "ultra"},
+        {
+            "reasoning_effort": "high",
+            "generation_config": {"thinking_level": "low"},
+        },
+    )
+    for bad_kwargs in bad_cases:
+        create_mock.reset_mock()
+        with pytest.raises(BadRequestError) as exc_info:
+            await client.aresponse(f"{prefix}/{_MODEL}", "Hi", **bad_kwargs)
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.provider == "google"
+        create_mock.assert_not_called()

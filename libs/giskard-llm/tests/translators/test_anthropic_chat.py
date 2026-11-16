@@ -5,14 +5,18 @@ Request shape: https://docs.anthropic.com/en/api/messages
 
 import logging
 from typing import Any, Literal, cast
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from giskard.llm.errors import BadRequestError
+from giskard.llm.routing import LLMClient
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
 from giskard.llm.types import (
     AssistantMessage,
     ChatMessage,
     DeveloperMessage,
     FunctionMessage,
+    ReasoningEffort,
     ReasoningEncryptedDetail,
     ReasoningSummaryDetail,
     ReasoningTextDetail,
@@ -675,3 +679,195 @@ def test_response_format_dict_uses_anthropic_output_config_shape():
     }
     assert "response_format" not in payload
     validate_anthropic_message_create(payload)
+
+
+@pytest.mark.parametrize(
+    ("raw_effort", "expected"),
+    [
+        pytest.param("low", "low", id="low"),
+        pytest.param("medium", "medium", id="medium"),
+        pytest.param("high", "high", id="high"),
+        pytest.param("xhigh", "xhigh", id="xhigh"),
+        pytest.param("max", "max", id="max"),
+        pytest.param("HIGH", "high", id="upper-case"),
+        pytest.param("xHiGh", "xhigh", id="mixed-case"),
+    ],
+)
+def test_reasoning_effort_supported_levels_set_output_config_and_adaptive_thinking(
+    raw_effort: str, expected: ReasoningEffort, caplog: pytest.LogCaptureFixture
+):
+    """Supported levels set ``output_config['effort']`` and auto-inject adaptive thinking."""
+    with caplog.at_level(logging.WARNING, logger="giskard.llm.translators.anthropic"):
+        payload = AnthropicChatTranslator.to_anthropic(
+            _MODEL, [UserMessage(content="Hi.")], reasoning_effort=raw_effort
+        )
+    assert "reasoning_effort" not in payload
+    assert payload.get("output_config") == {"effort": expected}
+    assert payload.get("thinking") == {"type": "adaptive"}
+    assert "reasoning_effort" not in " ".join(r.message for r in caplog.records)
+    validate_anthropic_message_create(payload)
+
+
+def test_reasoning_effort_none_omitted_and_no_thinking_injected():
+    """Explicit ``reasoning_effort=None`` omits ``output_config`` and does not inject ``thinking``."""
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL, [UserMessage(content="Hi.")], reasoning_effort=None
+    )
+    assert "reasoning_effort" not in payload
+    assert "output_config" not in payload
+    assert "thinking" not in payload
+    validate_anthropic_message_create(payload)
+
+
+def test_reasoning_effort_merges_with_response_format_pydantic():
+    """``output_config['effort']`` and ``output_config['format']`` from ``response_format`` coexist."""
+    pytest.importorskip("anthropic")
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL,
+        [UserMessage(content="Hi.")],
+        reasoning_effort="HIGH",
+        response_format=NestedOutputModel,
+    )
+    output_config = cast(dict[str, Any], cast(object, payload.get("output_config")))
+    assert output_config["effort"] == "high"
+    assert output_config["format"]["type"] == "json_schema"
+    assert payload.get("thinking") == {"type": "adaptive"}
+    validate_anthropic_message_create(payload)
+
+
+def test_reasoning_effort_merges_with_explicit_output_config_format():
+    """``reasoning_effort`` merges into explicit ``output_config`` preserving ``format``."""
+    output_config_in = {
+        "format": {
+            "type": "json_schema",
+            "schema": {"type": "object", "properties": {"a": {"type": "string"}}},
+        }
+    }
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL,
+        [UserMessage(content="Hi.")],
+        reasoning_effort="medium",
+        output_config=output_config_in,
+    )
+    assert payload.get("output_config") == {
+        "format": output_config_in["format"],
+        "effort": "medium",
+    }
+    assert "effort" not in output_config_in
+    assert payload.get("thinking") == {"type": "adaptive"}
+    validate_anthropic_message_create(payload)
+
+
+def test_response_format_preserves_explicit_output_config_effort():
+    """``response_format`` merges into explicit ``output_config`` without dropping ``effort``."""
+    pytest.importorskip("anthropic")
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL,
+        [UserMessage(content="Hi.")],
+        output_config={"effort": "low"},
+        response_format=NestedOutputModel,
+    )
+    output_config = cast(dict[str, Any], cast(object, payload.get("output_config")))
+    assert output_config["effort"] == "low"
+    assert output_config["format"]["type"] == "json_schema"
+    assert "thinking" not in payload
+    validate_anthropic_message_create(payload)
+
+
+def test_reasoning_effort_preserves_explicit_thinking():
+    """Explicit ``thinking`` escape hatch is preserved untouched alongside ``reasoning_effort``."""
+    explicit_thinking = {"type": "enabled", "budget_tokens": 2048}
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL,
+        [UserMessage(content="Hi.")],
+        reasoning_effort="high",
+        thinking=explicit_thinking,
+    )
+    assert payload.get("thinking") == {"type": "enabled", "budget_tokens": 2048}
+    assert payload.get("output_config") == {"effort": "high"}
+    validate_anthropic_message_create(payload)
+
+
+@pytest.mark.parametrize(
+    "invalid_effort",
+    [
+        pytest.param("none", id="unsupported-none"),
+        pytest.param("NONE", id="unsupported-none-upper"),
+        pytest.param("minimal", id="unsupported-minimal"),
+        pytest.param("ultra", id="invalid-string"),
+        pytest.param("", id="empty-string"),
+    ],
+)
+def test_reasoning_effort_rejects_unsupported_and_invalid_at_translator_seam(
+    invalid_effort: str,
+):
+    """Unsupported and invalid levels raise ``BadRequestError(400, ..., 'anthropic')``."""
+    with pytest.raises(BadRequestError) as exc_info:
+        AnthropicChatTranslator.to_anthropic(
+            _MODEL, [UserMessage(content="Hi.")], reasoning_effort=invalid_effort
+        )
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.provider == "anthropic"
+
+
+def test_reasoning_effort_and_output_config_effort_conflict_raises():
+    """Providing both ``reasoning_effort`` and ``output_config['effort']`` raises 400."""
+    with pytest.raises(BadRequestError) as exc_info:
+        AnthropicChatTranslator.to_anthropic(
+            _MODEL,
+            [UserMessage(content="Hi.")],
+            reasoning_effort="high",
+            output_config={"effort": "low"},
+        )
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.provider == "anthropic"
+
+
+async def test_client_acompletion_anthropic_forwards_and_rejects_before_sdk(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """``LLMClient.acompletion`` forwards merged params and raises 400 before calling SDK."""
+    from anthropic.types import Message
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    client = LLMClient()
+    provider = client._get_provider("anthropic")
+    sdk_resp = Message.model_validate(
+        {
+            "id": "msg_1",
+            "type": "message",
+            "role": "assistant",
+            "model": _MODEL,
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+            "content": [{"type": "text", "text": "Ok"}],
+        }
+    )
+    create_mock = AsyncMock(return_value=sdk_resp)
+    cast(Any, provider)._client = MagicMock(messages=MagicMock(create=create_mock))
+
+    await client.acompletion(
+        f"anthropic/{_MODEL}",
+        [{"role": "user", "content": "Hi"}],
+        reasoning_effort="HIGH",
+    )
+    assert create_mock.call_args.kwargs["output_config"] == {"effort": "high"}
+    assert create_mock.call_args.kwargs["thinking"] == {"type": "adaptive"}
+
+    bad_cases: tuple[dict[str, Any], ...] = (
+        {"reasoning_effort": "none"},
+        {"reasoning_effort": "minimal"},
+        {"reasoning_effort": "ultra"},
+        {"reasoning_effort": "high", "output_config": {"effort": "low"}},
+    )
+    for bad_kwargs in bad_cases:
+        create_mock.reset_mock()
+        with pytest.raises(BadRequestError) as exc_info:
+            await client.acompletion(
+                f"anthropic/{_MODEL}",
+                [{"role": "user", "content": "Hi"}],
+                **bad_kwargs,
+            )
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.provider == "anthropic"
+        create_mock.assert_not_called()
