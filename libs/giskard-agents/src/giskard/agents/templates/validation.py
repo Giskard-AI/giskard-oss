@@ -12,6 +12,16 @@ _LOADER_TAGS: tuple[tuple[type[nodes.Node], str], ...] = (
     (nodes.Extends, "extends"),
 )
 
+# Filters that take another filter or test by name, and the position of that
+# name among their positional arguments.
+_NAMED_CALLEES: dict[str, tuple[str, int]] = {
+    "map": ("filter", 0),
+    "select": ("test", 0),
+    "reject": ("test", 0),
+    "selectattr": ("test", 1),
+    "rejectattr": ("test", 1),
+}
+
 
 class TemplateValidationError(ValueError):
     """Raised when a template could not be rendered as an inline message template."""
@@ -77,6 +87,9 @@ def _validate(
         raise TemplateValidationError(
             f"not a valid template: {error.message}", error.lineno
         ) from error
+    except ValueError as error:
+        # The lexer's int() rejects literals over Python's digit limit.
+        raise TemplateValidationError(f"not a valid template: {error}") from error
 
     for node_type, tag in _LOADER_TAGS:
         found = ast.find(node_type)
@@ -96,15 +109,15 @@ def _validate(
     # Jinja defers unknown filters and tests inside ``if`` blocks and inline
     # conditionals to render time, so compiling alone does not catch them.
     for node in ast.find_all((nodes.Filter, nodes.Test)):
-        is_filter = isinstance(node, nodes.Filter)
-        known = _inline_env.filters if is_filter else _inline_env.tests
-        if node.name not in known:
-            kind = "filter" if is_filter else "test"
-            raise TemplateValidationError(
-                f"not a valid template: No {kind} named {node.name!r}.", node.lineno
-            )
+        for kind, name in _callee_names(node):
+            known = _inline_env.filters if kind == "filter" else _inline_env.tests
+            if name not in known:
+                raise TemplateValidationError(
+                    f"not a valid template: No {kind} named {name!r}.", node.lineno
+                )
 
-    used = meta.find_undeclared_variables(ast) - set(_inline_env.globals)
+    # Excludes environment globals (``range``, ``namespace``...).
+    used = meta.find_undeclared_variables(ast)
     extra = used - set(variables)
     if extra:
         raise TemplateValidationError(
@@ -114,3 +127,19 @@ def _validate(
     for name in required:
         if name not in used:
             raise TemplateValidationError(f"must use the variable '{name}'")
+
+
+def _callee_names(node: nodes.Filter | nodes.Test) -> list[tuple[str, str]]:
+    """Kind and name of ``node``, plus any filter or test it takes by name."""
+    names = [("filter" if isinstance(node, nodes.Filter) else "test", node.name)]
+    callee = _NAMED_CALLEES.get(node.name) if isinstance(node, nodes.Filter) else None
+    if callee is None or (
+        node.name == "map" and any(kw.key == "attribute" for kw in node.kwargs)
+    ):
+        return names
+    kind, position = callee
+    if len(node.args) > position:
+        arg = node.args[position]
+        if isinstance(arg, nodes.Const) and isinstance(arg.value, str):
+            names.append((kind, arg.value))
+    return names

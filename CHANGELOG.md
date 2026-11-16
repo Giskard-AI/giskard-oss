@@ -54,9 +54,7 @@ in-place upgrade of the v2 API.
 - `giskard.checks.set_default_generator` accepts a model identifier string
   (e.g. `"openai/gpt-4o-mini"`) in addition to a `BaseGenerator` instance.
 - `giskard-agents` (1.0.7): `validate_template` checks an inline message template
-  against allowed and required variables, and
-  `python -m giskard.agents.templates.validate` exposes it as a CLI that reads
-  a JSON array of templates on stdin and writes a JSON array of results.
+  against allowed and required variables.
 
 ### Changed
 

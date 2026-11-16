@@ -150,8 +150,8 @@ _anonymous_id = _get_or_create_anonymous_id()
 # dashboards, while _anonymous_id keeps them all linked to the same user.
 _process_session_id = str(uuid.uuid4())
 
-# send=False when opted out: no consumer thread, no atexit join, no HTTP,
-# so a firewalled ``eu.i.posthog.com`` is never contacted.
+# Opted out at import: a no-op stand-in, so posthog is never imported and no
+# consumer thread, atexit join or HTTP request ever reaches ``eu.i.posthog.com``.
 _disabled_at_import = _should_disable()
 
 

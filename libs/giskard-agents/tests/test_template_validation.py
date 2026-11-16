@@ -37,6 +37,8 @@ VALID = [
     "{% for t in trace.interactions if t.outputs %}{{ t }}{% endfor %}",
     "{% macro m() %}x{% endmacro %}{{ m() }}{{ trace }}",
     "{% block b %}{{ trace }}{% endblock %}",
+    "{{ trace.interactions | map(attribute='outputs') | map('upper') | join }}",
+    "{{ trace.interactions | selectattr('outputs', 'string') | list | length }}",
 ]
 INVALID = [
     ("{% if trace %}a{% elseif trace.last %}b{% endif %}", "not a valid template"),
@@ -58,6 +60,13 @@ INVALID = [
         "{% for t in trace.interactions %}{{ t }}{% else %}{{ loop }}{% endfor %}",
         "found: loop",
     ),
+    ("{{ trace.interactions | map('nosuch') | list }}", "No filter named 'nosuch'"),
+    ("{{ trace.interactions | select('nosuch') | list }}", "No test named 'nosuch'"),
+    (
+        "{{ trace.interactions | rejectattr('outputs', 'nosuch') | list }}",
+        "No test named 'nosuch'",
+    ),
+    ("{{ 1" + "0" * 5000 + " }}{{ trace }}", "not a valid template"),
     ("{% if 1 %}" * 100 + "{{ trace }}" + "{% endif %}" * 100, "nested too deeply"),
     ("{{" + "(" * 1990 + "1" + ")" * 1990 + "}}{{ trace }}", "nested too deeply"),
 ]
