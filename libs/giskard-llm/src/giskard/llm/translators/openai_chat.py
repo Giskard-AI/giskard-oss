@@ -125,4 +125,11 @@ class OpenAIChatTranslator:
                     ignore_unsupported_content=ignore_unsupported_content,
                     label_prefix="reasoning_details:",
                 )
+        if isinstance(usage := data.get("usage"), dict):
+            details = usage.get("completion_tokens_details")
+            if (
+                isinstance(details, dict)
+                and (reasoning_tokens := details.get("reasoning_tokens")) is not None
+            ):
+                usage["reasoning_tokens"] = reasoning_tokens
         return CompletionResponse.model_validate(data)

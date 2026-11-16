@@ -1,3 +1,4 @@
+import pytest
 from giskard.llm.types import (
     AssistantMessage,
     Choice,
@@ -164,3 +165,117 @@ def test_response_result_output_text_excludes_reasoning():
     )
     assert result.output_text == "42"
     assert [r.id for r in result.reasoning] == ["rs_1"]
+
+
+def test_reasoning_effort_exports_and_levels():
+    """ReasoningEffort is exported from both giskard.llm and giskard.llm.types."""
+    from typing import get_args
+
+    from giskard.llm import ReasoningEffort as TopLevelReasoningEffort
+    from giskard.llm.types import ReasoningEffort
+
+    assert TopLevelReasoningEffort is ReasoningEffort
+    assert get_args(ReasoningEffort) == (
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+    )
+
+
+@pytest.mark.parametrize(
+    ("raw_value", "expected"),
+    [
+        pytest.param("none", "none", id="none-lower"),
+        pytest.param("minimal", "minimal", id="minimal-lower"),
+        pytest.param("low", "low", id="low-lower"),
+        pytest.param("medium", "medium", id="medium-lower"),
+        pytest.param("high", "high", id="high-lower"),
+        pytest.param("xhigh", "xhigh", id="xhigh-lower"),
+        pytest.param("max", "max", id="max-lower"),
+        pytest.param("HIGH", "high", id="upper-case"),
+        pytest.param("Medium", "medium", id="title-case"),
+        pytest.param("xHiGh", "xhigh", id="mixed-case"),
+    ],
+)
+def test_normalized_reasoning_effort_accepts_and_lowercases(
+    raw_value: str, expected: str
+):
+    from giskard.llm.types import NormalizedReasoningEffort, normalize_reasoning_effort
+    from pydantic import BaseModel
+
+    class _Cfg(BaseModel):
+        reasoning_effort: NormalizedReasoningEffort | None = None
+
+    assert (
+        _Cfg.model_validate({"reasoning_effort": raw_value}).reasoning_effort
+        == expected
+    )
+    assert normalize_reasoning_effort(raw_value) == expected
+
+
+@pytest.mark.parametrize(
+    "invalid_value",
+    [
+        pytest.param("ultra", id="unknown-level"),
+        pytest.param("", id="empty-string"),
+        pytest.param(" high ", id="whitespace-padded"),
+        pytest.param(123, id="int"),
+        pytest.param(True, id="bool"),
+        pytest.param(["high"], id="list"),
+        pytest.param(None, id="none-non-optional"),
+    ],
+)
+def test_normalized_reasoning_effort_rejects_invalid(invalid_value: object):
+    from giskard.llm.types import NormalizedReasoningEffort, normalize_reasoning_effort
+    from pydantic import BaseModel, ValidationError
+
+    class _Cfg(BaseModel):
+        reasoning_effort: NormalizedReasoningEffort
+
+    with pytest.raises(ValidationError):
+        _Cfg.model_validate({"reasoning_effort": invalid_value})
+
+    with pytest.raises(ValueError):
+        normalize_reasoning_effort(invalid_value)
+
+
+def test_normalized_reasoning_effort_optional_accepts_none():
+    from giskard.llm.types import NormalizedReasoningEffort
+    from pydantic import BaseModel
+
+    class _Cfg(BaseModel):
+        reasoning_effort: NormalizedReasoningEffort | None = None
+
+    assert _Cfg().reasoning_effort is None
+    assert _Cfg.model_validate({"reasoning_effort": None}).reasoning_effort is None
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected_value", "expected_in_dump"),
+    [
+        pytest.param({}, None, False, id="default-none-omitted"),
+        pytest.param(
+            {"reasoning_tokens": None}, None, False, id="explicit-none-omitted"
+        ),
+        pytest.param({"reasoning_tokens": 0}, 0, True, id="zero-preserved"),
+        pytest.param({"reasoning_tokens": 42}, 42, True, id="positive-preserved"),
+    ],
+)
+def test_usage_reasoning_tokens_default_and_serialization(
+    kwargs: dict[str, object], expected_value: int | None, expected_in_dump: bool
+):
+    """``Usage.reasoning_tokens`` defaults to ``None`` and is omitted when ``None``."""
+    from giskard.llm.types import Usage
+
+    usage = Usage.model_validate(
+        {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15, **kwargs}
+    )
+    assert usage.reasoning_tokens == expected_value
+    dump = usage.model_dump()
+    assert ("reasoning_tokens" in dump) is expected_in_dump
+    if expected_in_dump:
+        assert dump["reasoning_tokens"] == expected_value

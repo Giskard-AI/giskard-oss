@@ -365,3 +365,46 @@ def test_thinking_tool_turn_passed_back_unchanged_replays_verbatim():
         },
     ]
     validate_anthropic_message_create(payload)
+
+
+@pytest.mark.parametrize(
+    ("usage_payload", "expected_reasoning_tokens"),
+    [
+        pytest.param(
+            {
+                "input_tokens": 10,
+                "output_tokens": 25,
+                "output_tokens_details": {"thinking_tokens": 15},
+            },
+            15,
+            id="thinking-tokens-present",
+        ),
+        pytest.param(
+            {
+                "input_tokens": 10,
+                "output_tokens": 5,
+                "output_tokens_details": {"thinking_tokens": 0},
+            },
+            0,
+            id="thinking-tokens-zero",
+        ),
+        pytest.param(
+            {"input_tokens": 10, "output_tokens": 5},
+            None,
+            id="no-output-tokens-details",
+        ),
+    ],
+)
+def test_from_anthropic_usage_reasoning_tokens(
+    usage_payload: dict[str, object], expected_reasoning_tokens: int | None
+):
+    """Maps ``usage.output_tokens_details.thinking_tokens`` to ``Usage.reasoning_tokens``."""
+    raw = _message(
+        {
+            "content": [{"type": "text", "text": "Answer."}],
+            "usage": usage_payload,
+        }
+    )
+    out = AnthropicChatTranslator.from_anthropic(raw)
+    assert out.usage is not None
+    assert out.usage.reasoning_tokens == expected_reasoning_tokens

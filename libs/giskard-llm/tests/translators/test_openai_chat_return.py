@@ -20,7 +20,7 @@ from openai.types.chat.chat_completion_message_function_tool_call import (
     ChatCompletionMessageFunctionToolCall,
     Function,
 )
-from openai.types.completion_usage import CompletionUsage
+from openai.types.completion_usage import CompletionTokensDetails, CompletionUsage
 
 pytestmark = pytest.mark.openai
 
@@ -331,3 +331,56 @@ def test_from_openai_unknown_reasoning_detail_dropped_with_warning(
     assert msg.reasoning_details is not None
     assert [d.type for d in msg.reasoning_details] == ["reasoning.encrypted"]
     assert "reasoning.future" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("details", "expected_reasoning_tokens"),
+    [
+        pytest.param(
+            CompletionTokensDetails(reasoning_tokens=42),
+            42,
+            id="reasoning-tokens-present",
+        ),
+        pytest.param(
+            CompletionTokensDetails(reasoning_tokens=0),
+            0,
+            id="reasoning-tokens-zero",
+        ),
+        pytest.param(
+            CompletionTokensDetails(audio_tokens=3),
+            None,
+            id="details-without-reasoning-tokens",
+        ),
+        pytest.param(
+            None,
+            None,
+            id="no-completion-tokens-details",
+        ),
+    ],
+)
+def test_from_openai_usage_reasoning_tokens(
+    details: CompletionTokensDetails | None, expected_reasoning_tokens: int | None
+):
+    """Maps ``completion_tokens_details.reasoning_tokens`` to ``Usage.reasoning_tokens``."""
+    raw = ChatCompletion(
+        id="chatcmpl-usage",
+        choices=[
+            Choice(
+                index=0,
+                finish_reason="stop",
+                message=ChatCompletionMessage(role="assistant", content="42"),
+            )
+        ],
+        created=0,
+        model=_MODEL,
+        object="chat.completion",
+        usage=CompletionUsage(
+            prompt_tokens=10,
+            completion_tokens=50,
+            total_tokens=60,
+            completion_tokens_details=details,
+        ),
+    )
+    out = OpenAIChatTranslator.from_openai(raw)
+    assert out.usage is not None
+    assert out.usage.reasoning_tokens == expected_reasoning_tokens
