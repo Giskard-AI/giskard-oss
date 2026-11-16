@@ -51,6 +51,15 @@ INVALID = [
     ('{% extends "x" %}', "'extends' tags are not allowed"),
     ("{{ trace }}{{ secret }}", "found: secret"),
     ("hello", "must use the variable 'trace'"),
+    ("{{ trace }}{{ loop }}", "found: loop"),
+    ("{{ trace }}{{ loop.index }}", "found: loop"),
+    ("{% for t in trace.interactions if loop %}{{ t }}{% endfor %}", "found: loop"),
+    (
+        "{% for t in trace.interactions %}{{ t }}{% else %}{{ loop }}{% endfor %}",
+        "found: loop",
+    ),
+    ("{% if 1 %}" * 100 + "{{ trace }}" + "{% endif %}" * 100, "nested too deeply"),
+    ("{{" + "(" * 1990 + "1" + ")" * 1990 + "}}{{ trace }}", "nested too deeply"),
 ]
 
 
@@ -77,3 +86,9 @@ def test_result_does_not_depend_on_policy():
         validate_template(VALID[0], variables={"trace"}, required={"trace"})
         with pytest.raises(TemplateValidationError):
             validate_template("{{ trace | nosuch }}", variables={"trace"})
+
+
+def test_required_outside_variables_is_a_caller_bug():
+    with pytest.raises(ValueError, match="other") as error:
+        validate_template("{{ trace }}", variables={"trace"}, required={"other"})
+    assert not isinstance(error.value, TemplateValidationError)

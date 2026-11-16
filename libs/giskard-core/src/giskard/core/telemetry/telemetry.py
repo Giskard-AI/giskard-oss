@@ -165,8 +165,10 @@ class _DisabledTelemetry:
     disabled: bool = True
     disable_geoip: bool = True
     send: bool = False
-    consumers: list[Any] = []
-    queue: "Queue[Any]" = Queue()
+
+    def __init__(self) -> None:
+        self.consumers: list[Any] = []
+        self.queue: "Queue[Any]" = Queue()
 
     def capture(self, *args: object, **kwargs: object) -> None:
         return None
@@ -196,13 +198,13 @@ else:
     )
 
 
-def telemetry_tag(key: str, value: str) -> None:
+def telemetry_tag(name: str, value: Any) -> None:
     """Attach a tag to the current telemetry context; no-op when disabled."""
     if telemetry.disabled:
         return
     from posthog import tag
 
-    tag(key, value)
+    tag(name, value)
 
 
 def disable_telemetry() -> None:

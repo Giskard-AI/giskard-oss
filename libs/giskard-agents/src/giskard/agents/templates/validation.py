@@ -46,11 +46,31 @@ def validate_template(
 
     Raises
     ------
+    ValueError
+        If a name in ``required`` is not in ``variables`` (a caller bug).
     TemplateValidationError
         If the template is not valid, uses a loader tag (``include``,
         ``import``, ``from``, ``extends``), reads a variable outside
         ``variables`` or does not read a variable in ``required``.
     """
+    unreachable = sorted(set(required) - set(variables))
+    if unreachable:
+        raise ValueError(
+            f"required variables not in variables: {', '.join(unreachable)}"
+        )
+    try:
+        _validate(source, variables, required)
+    except (SyntaxError, RecursionError) as error:
+        # Jinja compiles to Python source: deep nesting overflows the parser
+        # or the interpreter stack before Jinja can report anything.
+        raise TemplateValidationError(
+            "not a valid template: nested too deeply"
+        ) from error
+
+
+def _validate(
+    source: str, variables: Collection[str], required: Collection[str]
+) -> None:
     try:
         ast = _inline_env.parse(source)
     except TemplateSyntaxError as error:
@@ -84,7 +104,7 @@ def validate_template(
                 f"not a valid template: No {kind} named {node.name!r}.", node.lineno
             )
 
-    used = meta.find_undeclared_variables(ast) - set(_inline_env.globals) - {"loop"}
+    used = meta.find_undeclared_variables(ast) - set(_inline_env.globals)
     extra = used - set(variables)
     if extra:
         raise TemplateValidationError(

@@ -40,6 +40,24 @@ def test_public_names_still_resolve():
     for name in ga.__all__:
         assert getattr(ga, name) is not None
     assert {"ChatWorkflow", "Generator", "MessageTemplate"} <= set(dir(ga))
+    assert {"__version__", "__name__"} <= set(dir(ga))
+
+
+def test_lazy_table_matches_all():
+    import giskard.agents as ga
+
+    assert set(ga._LAZY) == set(ga.__all__) - {"__version__"}
+
+
+def test_submodule_attribute_access_stays_lazy():
+    result = _run(
+        "import sys, giskard.agents as a\n"
+        "assert 'giskard.agents.generators' not in sys.modules\n"
+        "a.generators.BaseGenerator; a.workflow.ChatWorkflow\n"
+        "print('ok')"
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "ok"
 
 
 def test_unknown_name_raises_attribute_error():

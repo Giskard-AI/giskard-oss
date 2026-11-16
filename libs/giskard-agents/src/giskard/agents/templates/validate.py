@@ -11,17 +11,10 @@ JSON array of strings.
 import argparse
 import json
 import sys
-from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from giskard.agents.templates import TemplateValidationError, validate_template
-
-
-def _package_version() -> str:
-    try:
-        return version("giskard-agents")
-    except PackageNotFoundError:
-        return "unknown"
+from giskard.core.utils import get_lib_version
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -32,7 +25,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--variables", nargs="+", required=True, metavar="NAME")
     parser.add_argument("--required", nargs="*", default=[], metavar="NAME")
     parser.add_argument(
-        "--version", action="version", version=f"giskard-agents {_package_version()}"
+        "--version",
+        action="version",
+        version=f"giskard-agents {get_lib_version('giskard-agents')}",
     )
     return parser
 
@@ -42,11 +37,26 @@ def _check(source: str, variables: list[str], required: list[str]) -> dict[str, 
         validate_template(source, variables=variables, required=required)
     except TemplateValidationError as exc:
         return {"ok": False, "error": exc.message, "line": exc.lineno}
+    except (SyntaxError, RecursionError):
+        # Defensive: validate_template already maps these; never crash the batch.
+        return {
+            "ok": False,
+            "error": "not a valid template: nested too deeply",
+            "line": None,
+        }
     return {"ok": True}
 
 
 def main() -> int:
-    args = _parser().parse_args()
+    parser = _parser()
+    args = parser.parse_args()
+    unreachable = sorted(set(args.required) - set(args.variables))
+    if unreachable:
+        print(
+            f"--required names not in --variables: {', '.join(unreachable)}",
+            file=sys.stderr,
+        )
+        return 2
     try:
         templates = json.loads(sys.stdin.read())
     except json.JSONDecodeError as exc:

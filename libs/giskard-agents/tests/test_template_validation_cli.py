@@ -52,3 +52,19 @@ def test_version():
     result = _cli("", "--version")
     assert result.returncode == 0
     assert result.stdout.startswith("giskard-agents ")
+
+
+def test_deeply_nested_template_does_not_crash_batch():
+    deep = "{{" + "(" * 1990 + "1" + ")" * 1990 + "}}{{ trace }}"
+    nested = "{% if 1 %}" * 100 + "{{ trace }}" + "{% endif %}" * 100
+    result = _cli(json.dumps([deep, "{{ trace }}", nested]), "--variables", "trace")
+    assert result.returncode == 0, result.stderr
+    out = json.loads(result.stdout)
+    assert [item["ok"] for item in out] == [False, True, False]
+    assert out[0]["error"].startswith("not a valid template:")
+
+
+def test_required_outside_variables_exits_2():
+    result = _cli("[]", "--variables", "trace", "--required", "other")
+    assert result.returncode == 2
+    assert "other" in result.stderr

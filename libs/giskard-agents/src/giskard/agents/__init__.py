@@ -51,6 +51,21 @@ _LAZY: dict[str, str] = {
     "TemplateReference": ".workflow",
 }
 
+_SUBMODULES = frozenset(
+    {
+        "chat",
+        "context",
+        "embeddings",
+        "errors",
+        "generators",
+        "pipeline",
+        "som",
+        "templates",
+        "tools",
+        "workflow",
+    }
+)
+
 __version__ = get_lib_version("giskard-agents")
 
 __all__ = [
@@ -85,6 +100,8 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
+    if name in _SUBMODULES:
+        return import_module(f".{name}", __name__)
     module = _LAZY.get(name)
     if module is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -94,4 +111,4 @@ def __getattr__(name: str) -> Any:
 
 
 def __dir__() -> list[str]:
-    return list(__all__)
+    return sorted(set(globals()) | set(__all__))

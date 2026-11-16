@@ -380,7 +380,8 @@ def test_late_opt_out_does_not_hang_exit(tmp_path):
     assert payload["running"] == [False]
 
 
-def test_opt_out_before_import_does_not_import_posthog(tmp_path):
+@pytest.mark.parametrize("flag", ["DO_NOT_TRACK", "GISKARD_TELEMETRY_DISABLED"])
+def test_opt_out_before_import_does_not_import_posthog(tmp_path, flag):
     code = (
         "import sys, giskard.core as c\n"
         "from giskard.core import telemetry_tag, telemetry_capture, telemetry_run_context, disable_telemetry\n"
@@ -390,7 +391,7 @@ def test_opt_out_before_import_does_not_import_posthog(tmp_path):
         "assert c.telemetry.disabled\n"
         "assert 'posthog' not in sys.modules, 'posthog imported'\n"
     )
-    env = {**os.environ, "DO_NOT_TRACK": "1", "HOME": str(tmp_path)}
+    env = {**os.environ, flag: "1", "HOME": str(tmp_path)}
     result = subprocess.run(
         [sys.executable, "-I", "-c", code],
         cwd=tmp_path,
