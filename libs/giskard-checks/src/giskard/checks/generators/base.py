@@ -1,5 +1,5 @@
-from collections.abc import AsyncGenerator
-from typing import Any, Self, override
+from collections.abc import AsyncGenerator, Collection
+from typing import Any, ClassVar, Self, override
 
 from giskard.agents import (
     ChatWorkflow,
@@ -7,6 +7,7 @@ from giskard.agents import (
     ModelRefusalError,
     TemplateReference,
     WorkflowError,
+    validate_template,
 )
 from giskard.llm import chat
 from giskard.llm.types import ChatMessage
@@ -151,6 +152,13 @@ class LLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgume
     >>> gen = LLMGenerator(prompt_path="giskard.checks::generators/user_simulator.j2")
     """
 
+    prompt_variables: ClassVar[frozenset[str]] = frozenset({"trace", "_instr_output"})
+    """Variables an inline template ``prompt`` may read.
+
+    Subclasses that override :meth:`get_inputs` must list the keys it returns.
+    ``_instr_output`` holds the output-format instructions.
+    """
+
     prompt: str | None = Field(default=None, description="Inline prompt string.")
     as_template: bool = Field(
         default=False,
@@ -169,6 +177,27 @@ class LLMGenerator[TraceType: Trace](  # pyright: ignore[reportMissingTypeArgume
                 "Cannot provide both 'prompt' and 'prompt_path' - choose one"
             )
         return self
+
+    @classmethod
+    def validate_prompt(cls, prompt: str, *, required: Collection[str] = ()) -> None:
+        """Check that ``prompt`` can be rendered with ``as_template=True``.
+
+        Parameters
+        ----------
+        prompt : str
+            Inline prompt template.
+        required : Collection[str]
+            Variables the prompt must read, e.g. ``("trace",)``.
+
+        Raises
+        ------
+        ValueError
+            If a name in ``required`` is not in :attr:`prompt_variables`.
+        giskard.agents.templates.TemplateValidationError
+            If the prompt is not a valid inline template or reads a variable
+            outside :attr:`prompt_variables`.
+        """
+        validate_template(prompt, variables=cls.prompt_variables, required=required)
 
     @override
     def get_prompt(self) -> ChatMessage | TemplateReference | MessageTemplate:

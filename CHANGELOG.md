@@ -57,6 +57,9 @@ in-place upgrade of the v2 API.
   against allowed and required variables, and
   `python -m giskard.agents.templates.validate` exposes it as a CLI that reads
   a JSON array of templates on stdin and writes a JSON array of results.
+- `giskard-checks`: `LLMJudge.validate_prompt` and `LLMGenerator.validate_prompt`
+  check an inline prompt against the variables that class supplies, listed in
+  its `prompt_variables`.
 
 ### Changed
 
