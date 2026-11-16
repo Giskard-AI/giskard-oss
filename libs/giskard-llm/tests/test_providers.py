@@ -1171,7 +1171,12 @@ async def test_anthropic_complete_forwards_ignore_unsupported_content(ignore: bo
             "stop_reason": "end_turn",
             "usage": {"input_tokens": 1, "output_tokens": 1},
             "content": [
-                {"type": "thinking", "thinking": "Hmm.", "signature": "sig"},
+                {
+                    "type": "server_tool_use",
+                    "id": "srvtoolu_01",
+                    "name": "web_search",
+                    "input": {"query": "weather"},
+                },
                 {"type": "text", "text": "Answer."},
             ],
         }
