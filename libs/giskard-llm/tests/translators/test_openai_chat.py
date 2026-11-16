@@ -4,15 +4,20 @@ Request shape: https://platform.openai.com/docs/api-reference/chat/create
 """
 
 import json
+import logging
 from typing import Any, Literal, cast
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from giskard.llm.errors import BadRequestError
+from giskard.llm.routing import LLMClient
 from giskard.llm.translators.openai_chat import OpenAIChatTranslator
 from giskard.llm.types import (
     AssistantMessage,
     ChatMessage,
     DeveloperMessage,
     FunctionMessage,
+    ReasoningEffort,
     RefusalContent,
     SystemMessage,
     TextContent,
@@ -470,3 +475,97 @@ def test_assistant_reasoning_is_stripped_for_official_api():
     # The caller's message is left untouched.
     assert cast(AssistantMessage, messages[1]).reasoning == "Multiply."
     validate_openai_completion_params(payload)
+
+
+@pytest.mark.parametrize(
+    ("raw_effort", "expected"),
+    [
+        pytest.param("none", "none", id="none"),
+        pytest.param("minimal", "minimal", id="minimal"),
+        pytest.param("low", "low", id="low"),
+        pytest.param("medium", "medium", id="medium"),
+        pytest.param("high", "high", id="high"),
+        pytest.param("xhigh", "xhigh", id="xhigh"),
+        pytest.param("max", "max", id="max"),
+        pytest.param("HIGH", "high", id="upper-case"),
+        pytest.param("xHiGh", "xhigh", id="mixed-case"),
+    ],
+)
+def test_reasoning_effort_canonical_levels_emitted(
+    raw_effort: str, expected: ReasoningEffort, caplog: pytest.LogCaptureFixture
+):
+    """All 7 canonical levels are whitelisted, case-normalized, and emitted top-level."""
+    with caplog.at_level(logging.WARNING, logger="giskard.llm.translators.openai_chat"):
+        payload = OpenAIChatTranslator.to_openai(
+            _MODEL, [UserMessage(content="Hi.")], reasoning_effort=raw_effort
+        )
+    assert payload.get("reasoning_effort") == expected
+    assert "reasoning_effort" not in " ".join(r.message for r in caplog.records)
+    validate_openai_completion_params(payload)
+
+
+def test_reasoning_effort_none_omitted():
+    """Explicit ``reasoning_effort=None`` omits the field from the wire payload."""
+    payload = OpenAIChatTranslator.to_openai(
+        _MODEL, [UserMessage(content="Hi.")], reasoning_effort=None
+    )
+    assert "reasoning_effort" not in payload
+    validate_openai_completion_params(payload)
+
+
+@pytest.mark.parametrize(
+    "model_id",
+    [
+        pytest.param("openai/gpt-5", id="openai"),
+        pytest.param("azure/gpt-5", id="azure"),
+        pytest.param("azure_ai/gpt-5", id="azure_ai"),
+    ],
+)
+async def test_client_acompletion_forwards_and_rejects_reasoning_effort(
+    model_id: str, monkeypatch: pytest.MonkeyPatch
+):
+    """``LLMClient.acompletion`` forwards normalized effort and rejects invalid before SDK."""
+    from openai.types.chat.chat_completion import ChatCompletion, Choice
+    from openai.types.chat.chat_completion_message import ChatCompletionMessage
+
+    if model_id.startswith("azure_ai/"):
+        monkeypatch.setenv("AZURE_AI_API_KEY", "k")
+        monkeypatch.setenv("AZURE_AI_ENDPOINT", "https://x.services.ai.azure.com")
+    elif model_id.startswith("azure/"):
+        monkeypatch.setenv("AZURE_API_KEY", "k")
+        monkeypatch.setenv("AZURE_API_BASE", "https://x.openai.azure.com")
+    else:
+        monkeypatch.setenv("OPENAI_API_KEY", "k")
+
+    client = LLMClient()
+    provider = client._get_provider(model_id.split("/")[0])
+    sdk_resp = ChatCompletion(
+        id="chatcmpl-1",
+        choices=[
+            Choice(
+                index=0,
+                finish_reason="stop",
+                message=ChatCompletionMessage(role="assistant", content="Ok"),
+            )
+        ],
+        created=0,
+        model="gpt-5",
+        object="chat.completion",
+    )
+    create_mock = AsyncMock(return_value=sdk_resp)
+    cast(Any, provider)._client = MagicMock(
+        chat=MagicMock(completions=MagicMock(create=create_mock))
+    )
+
+    await client.acompletion(
+        model_id, [{"role": "user", "content": "Hi"}], reasoning_effort="HIGH"
+    )
+    assert create_mock.call_args.kwargs["reasoning_effort"] == "high"
+
+    create_mock.reset_mock()
+    with pytest.raises(BadRequestError) as exc_info:
+        await client.acompletion(
+            model_id, [{"role": "user", "content": "Hi"}], reasoning_effort="ultra"
+        )
+    assert exc_info.value.status_code == 400
+    create_mock.assert_not_called()

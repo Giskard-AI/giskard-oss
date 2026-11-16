@@ -31,6 +31,14 @@ def validate_google_contents(contents: object) -> None:
         _ = Content.model_validate(to_validate)
 
 
+def validate_google_generate_content_config(config: object) -> None:
+    if importlib.util.find_spec("google.genai") is None:
+        return
+    from google.genai.types import GenerateContentConfig
+
+    _ = GenerateContentConfig.model_validate(config)
+
+
 def validate_anthropic_message_create(payload: object) -> None:
     if importlib.util.find_spec("anthropic") is None:
         return

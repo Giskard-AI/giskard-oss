@@ -10,6 +10,7 @@ from pydantic import (
     model_validator,
 )
 
+from ..errors import BadRequestError
 from ..types import (
     AssistantMessage,
     ChatMessage,
@@ -27,6 +28,7 @@ from ..types import (
     ToolDef,
     ToolMessage,
     Usage,
+    normalize_reasoning_effort,
 )
 from ..types._base import _BaseModel
 from ..utils import deserialize_arguments
@@ -67,6 +69,7 @@ _PROVIDER_NAME = "anthropic"
 # ``reasoning_details`` format tag for Anthropic thinking (OpenRouter convention).
 _REASONING_FORMAT = "anthropic-claude-v1"
 _THINKING_BLOCK_TYPES = frozenset({"thinking", "redacted_thinking"})
+_SUPPORTED_REASONING_EFFORTS = frozenset({"low", "medium", "high", "xhigh", "max"})
 logger = logging.getLogger(__name__)
 
 KNOWN_COMPLETION_PARAMS = frozenset(
@@ -80,6 +83,7 @@ KNOWN_COMPLETION_PARAMS = frozenset(
         "output_config",
         "response_format",
         "thinking",
+        "reasoning_effort",
     }
 )
 
@@ -305,6 +309,14 @@ class AnthropicChatConfigParams(_BaseModel):
             m for m in v["messages"] if m.role not in ("system", "developer")
         ]
 
+        # Setup output_config from response_format and/or reasoning_effort
+        raw_output_config = v.get("output_config")
+        if raw_output_config is not None and not isinstance(raw_output_config, dict):
+            raise BadRequestError(400, "output_config must be a dict", _PROVIDER_NAME)
+        output_config: dict[str, object] = (
+            dict(raw_output_config) if raw_output_config is not None else {}
+        )
+
         # Setup response_format for JSON output
         if "response_format" in v:
             if isinstance(v["response_format"], type) and issubclass(
@@ -315,16 +327,14 @@ class AnthropicChatConfigParams(_BaseModel):
                 original_schema = v["response_format"].model_json_schema()
                 schema = transform_schema(original_schema)
                 _restore_supported_constraints(original_schema, schema)
-                v["output_config"] = {
-                    "format": {
-                        "type": "json_schema",
-                        "schema": schema,
-                    }
+                output_config["format"] = {
+                    "type": "json_schema",
+                    "schema": schema,
                 }
             elif isinstance(v["response_format"], dict):
                 response_format = v["response_format"]
                 if "format" in response_format:
-                    v["output_config"] = response_format
+                    output_config = {**output_config, **response_format}
                 elif response_format.get("type") == "json_schema":
                     schema = response_format.get("schema")
                     if schema is None and isinstance(
@@ -335,12 +345,39 @@ class AnthropicChatConfigParams(_BaseModel):
                         raise ValueError(
                             "response_format json_schema must contain a schema object"
                         )
-                    v["output_config"] = {
-                        "format": {"type": "json_schema", "schema": schema}
+                    output_config["format"] = {
+                        "type": "json_schema",
+                        "schema": schema,
                     }
                 else:
                     raise ValueError("unsupported Anthropic response_format dict")
             v.pop("response_format", None)
+
+        raw_effort = v.pop("reasoning_effort", None)
+        if raw_effort is not None:
+            try:
+                effort = normalize_reasoning_effort(raw_effort)
+            except ValueError as exc:
+                raise BadRequestError(400, str(exc), _PROVIDER_NAME) from exc
+            if effort not in _SUPPORTED_REASONING_EFFORTS:
+                raise BadRequestError(
+                    400,
+                    f"Anthropic does not support reasoning_effort={effort!r}; "
+                    "supported levels: low, medium, high, xhigh, max",
+                    _PROVIDER_NAME,
+                )
+            if output_config.get("effort") is not None:
+                raise BadRequestError(
+                    400,
+                    "Cannot specify both reasoning_effort and output_config['effort']",
+                    _PROVIDER_NAME,
+                )
+            output_config["effort"] = effort
+            if v.get("thinking") is None:
+                v["thinking"] = {"type": "adaptive"}
+
+        if output_config or raw_output_config is not None:
+            v["output_config"] = output_config
 
         return v
 

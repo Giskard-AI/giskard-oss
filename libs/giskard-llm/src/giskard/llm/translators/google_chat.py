@@ -10,6 +10,7 @@ from pydantic import (
     model_validator,
 )
 
+from ..errors import BadRequestError
 from ..types import (
     AssistantMessage,
     ChatMessage,
@@ -27,6 +28,7 @@ from ..types import (
     ToolMessage,
     Usage,
     UserMessage,
+    normalize_reasoning_effort,
 )
 from ..types._base import _BaseModel
 from ._unsupported import handle_unsupported_content
@@ -51,9 +53,24 @@ if TYPE_CHECKING:
 _PROVIDER = "google/chat"
 PROVIDER = "google"
 _REASONING_FORMAT = "google-gemini-v1"
+_SUPPORTED_REASONING_EFFORTS = frozenset({"minimal", "low", "medium", "high"})
+_THINKING_CONFLICT_KEYS = (
+    "thinking_level",
+    "thinkingLevel",
+    "thinking_budget",
+    "thinkingBudget",
+)
 
 KNOWN_COMPLETION_PARAMS = frozenset(
-    {"temperature", "max_tokens", "tools", "response_format", "safety_settings"}
+    {
+        "temperature",
+        "max_tokens",
+        "tools",
+        "response_format",
+        "safety_settings",
+        "reasoning_effort",
+        "thinking_config",
+    }
 )
 
 # Sentinel that skips Gemini 3 thought-signature validation when we have no real
@@ -215,6 +232,7 @@ class GoogleChatConfigParams(_BaseModel):
     max_output_tokens: int | None = Field(default=None, validation_alias="max_tokens")
     response_mime_type: Literal["application/json"] | None = None
     response_schema: type[BaseModel] | None = None
+    thinking_config: dict[str, Any] | None = None
 
 
 class GoogleChatParams(_BaseModel):
@@ -251,7 +269,49 @@ class GoogleChatParams(_BaseModel):
 
         v = v.copy()
 
-        v["config"] = v.get("config", {})
+        config = dict(v.get("config", {}))
+
+        raw_thinking_config = config.get("thinking_config")
+        if raw_thinking_config is not None:
+            if isinstance(raw_thinking_config, BaseModel):
+                raw_thinking_config = raw_thinking_config.model_dump(exclude_none=True)
+            elif not isinstance(raw_thinking_config, dict):
+                raise BadRequestError(400, "thinking_config must be a dict", PROVIDER)
+            else:
+                raw_thinking_config = dict(raw_thinking_config)
+            config["thinking_config"] = raw_thinking_config
+
+        raw_effort = config.pop("reasoning_effort", None)
+        if raw_effort is not None:
+            try:
+                effort = normalize_reasoning_effort(raw_effort)
+            except ValueError as exc:
+                raise BadRequestError(400, str(exc), PROVIDER) from exc
+            if effort not in _SUPPORTED_REASONING_EFFORTS:
+                raise BadRequestError(
+                    400,
+                    f"Google does not support reasoning_effort={effort!r}; "
+                    "supported levels: minimal, low, medium, high",
+                    PROVIDER,
+                )
+            if raw_thinking_config is not None:
+                if any(
+                    raw_thinking_config.get(k) is not None
+                    for k in _THINKING_CONFLICT_KEYS
+                ):
+                    raise BadRequestError(
+                        400,
+                        "Cannot specify both reasoning_effort and thinking_config level/budget",
+                        PROVIDER,
+                    )
+                config["thinking_config"] = {
+                    **raw_thinking_config,
+                    "thinking_level": effort.upper(),
+                }
+            else:
+                config["thinking_config"] = {"thinking_level": effort.upper()}
+
+        v["config"] = config
 
         # Extract system instruction from messages
         system_instruction = _extract_system_instruction(v["contents"])
