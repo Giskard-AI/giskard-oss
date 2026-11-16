@@ -137,6 +137,23 @@ class Tool(BaseModel):
         """
         return self.fn(*args, **kwargs)
 
+    def _serialize_result(self, res: Any) -> str:
+        """Serialize a tool result to a string.
+
+        Parameters
+        ----------
+        res : Any
+            The value to serialize.
+
+        Returns
+        -------
+        str
+            The serialized result.
+        """
+        if self._return_adapter is not None:
+            res = self._return_adapter.dump_python(res, mode="json")
+        return res if isinstance(res, str) else json.dumps(res)
+
     @logfire.instrument("tool.run")
     async def run(
         self, arguments: dict[str, Any], ctx: RunContext | None = None
@@ -156,7 +173,9 @@ class Tool(BaseModel):
         is serialized to JSON-safe Python via ``TypeAdapter.dump_python`` (this
         handles ``BaseModel``, ``datetime``, ``UUID``, ``list[BaseModel]``,
         etc.). String results are returned as-is; everything else is
-        ``json.dumps``'d.
+        ``json.dumps``'d. A serialization failure is routed through
+        ``self.catch`` like a function error, so ``run()`` still returns a
+        string (or propagates when ``catch`` is ``None``).
 
         Parameters
         ----------
@@ -199,10 +218,19 @@ class Tool(BaseModel):
             logfire.error("tool.run.error", error=res)
             return str(res)
 
-        if self._return_adapter is not None:
-            res = self._return_adapter.dump_python(res, mode="json")
-
-        return res if isinstance(res, str) else json.dumps(res)
+        try:
+            return self._serialize_result(res)
+        except Exception as error:
+            if self.catch is None:
+                raise
+            res = self.catch(error)
+            if isinstance(res, Error):
+                logfire.error("tool.run.error", error=res)
+                return str(res)
+            try:
+                return self._serialize_result(res)
+            except Exception:
+                return str(res)
 
 
 class ToolMethod:
