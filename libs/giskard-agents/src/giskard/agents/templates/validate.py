@@ -37,13 +37,6 @@ def _check(source: str, variables: list[str], required: list[str]) -> dict[str, 
         validate_template(source, variables=variables, required=required)
     except TemplateValidationError as exc:
         return {"ok": False, "error": exc.message, "line": exc.lineno}
-    except (SyntaxError, RecursionError):
-        # Defensive: validate_template already maps these; never crash the batch.
-        return {
-            "ok": False,
-            "error": "not a valid template: nested too deeply",
-            "line": None,
-        }
     return {"ok": True}
 
 
