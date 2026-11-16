@@ -74,7 +74,7 @@ def test_should_disable_reads_process_env(var, value, _clean_opt_out_env, monkey
         b"GISKARD_TELEMETRY_DISABLED=1 # opt out\n",
         b'DO_NOT_TRACK="1" # opt out\n',
         b"GISKARD_TELEMETRY_DISABLED=0\nGISKARD_TELEMETRY_DISABLED=1\n",
-        b"GISKARD_TELEMETRY_DISABLED=1\nNOTE=caf\xe9\n",  # latin-1 elsewhere
+        b"GISKARD_TELEMETRY_DISABLED=1\nNOTE=caf\xe9\n",  # latin-1 elsewhere  # pragma: allowlist secret
     ],
 )
 def test_should_disable_reads_dotenv(content, _clean_opt_out_env):
@@ -221,7 +221,7 @@ print(
             "disabled": bool(telemetry.disabled),
             "send": bool(telemetry.send),
             "anonymous_id_is_none": _anonymous_id is None,
-            "queue_size": telemetry.queue.qsize(),
+            "queue_size": telemetry.queue.qsize() if hasattr(telemetry, "queue") else 0,
             "consumer_alive": [c.is_alive() for c in (telemetry.consumers or [])],
             "http_urls": [c["url"] for c in calls],
         }
@@ -378,3 +378,36 @@ def test_late_opt_out_does_not_hang_exit(tmp_path):
     assert payload["send"] is False
     assert payload["disabled"] is True
     assert payload["running"] == [False]
+
+
+_NO_POSTHOG_PROBE = r"""
+import json
+import sys
+
+from giskard.core import (
+    disable_telemetry,
+    telemetry_capture,
+    telemetry_run_context,
+    telemetry_tag,
+)
+from giskard.core.telemetry.telemetry import telemetry
+
+telemetry_tag("k", "v")
+telemetry_capture("e")
+with telemetry_run_context():
+    pass
+disable_telemetry()
+print(
+    json.dumps(
+        {"disabled": telemetry.disabled, "posthog_loaded": "posthog" in sys.modules}
+    )
+)
+"""
+
+
+@pytest.mark.parametrize("flag", ["DO_NOT_TRACK", "GISKARD_TELEMETRY_DISABLED"])
+def test_opt_out_before_import_does_not_import_posthog(tmp_path, flag):
+    payload = _run_probe(_NO_POSTHOG_PROBE, tmp_path, {flag: "1"})
+    assert payload["disabled"] is True
+    assert payload["posthog_loaded"] is False
+    assert payload["id_file_exists"] is False

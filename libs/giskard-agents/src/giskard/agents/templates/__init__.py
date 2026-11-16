@@ -13,6 +13,7 @@ from .prompts_manager import (
     remove_prompts_path,
     set_default_prompts_path,
 )
+from .validation import TemplateValidationError, validate_template
 
 __all__ = [
     "LLMFormattable",
@@ -27,4 +28,6 @@ __all__ = [
     "get_template_policy",
     "set_template_policy",
     "strict_templates",
+    "TemplateValidationError",
+    "validate_template",
 ]
