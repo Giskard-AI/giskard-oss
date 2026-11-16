@@ -12,12 +12,14 @@ if TYPE_CHECKING:
     from .som import BaseSOM, SOMResponse, resolve_som
     from .templates import (
         MessageTemplate,
+        TemplateValidationError,
         add_prompts_path,
         get_prompts_manager,
         remove_prompts_path,
         set_default_prompts_path,
         set_template_policy,
         strict_templates,
+        validate_template,
     )
     from .tools import Tool, tool
     from .workflow import ChatWorkflow, ErrorPolicy, StepType, TemplateReference
@@ -43,6 +45,8 @@ _LAZY: dict[str, str] = {
     "set_default_prompts_path": ".templates",
     "set_template_policy": ".templates",
     "strict_templates": ".templates",
+    "TemplateValidationError": ".templates",
+    "validate_template": ".templates",
     "Tool": ".tools",
     "tool": ".tools",
     "ChatWorkflow": ".workflow",
@@ -88,6 +92,8 @@ __all__ = [
     "get_prompts_manager",
     "set_template_policy",
     "strict_templates",
+    "TemplateValidationError",
+    "validate_template",
     "RunContext",
     "ErrorPolicy",
     "WorkflowError",

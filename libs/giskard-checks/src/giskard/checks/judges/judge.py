@@ -1,6 +1,7 @@
-from typing import Self, override
+from collections.abc import Collection
+from typing import ClassVar, Self, override
 
-from giskard.agents import MessageTemplate, TemplateReference
+from giskard.agents import MessageTemplate, TemplateReference, validate_template
 from giskard.llm.types import ChatMessage
 from pydantic import Field, model_validator
 
@@ -75,12 +76,41 @@ class LLMJudge[InputType, OutputType, TraceType: Trace](  # pyright: ignore[repo
     will raise a `ValueError`.
     """
 
+    prompt_variables: ClassVar[frozenset[str]] = frozenset({"trace"})
+    """Variables an inline ``prompt`` may read with every judge backend.
+
+    Subclasses that override :meth:`get_inputs` must list the keys it returns.
+    ``include_trace`` (SOM judges only) and ``_instr_output`` (LLM judges
+    only) are left out because one backend does not set them.
+    """
+
     prompt: str | None = Field(
         default=None, description="Inline prompt content for the LLM check"
     )
     prompt_path: str | None = Field(
         default=None, description="Path to a file containing the prompt template"
     )
+
+    @classmethod
+    def validate_prompt(cls, prompt: str, *, required: Collection[str] = ()) -> None:
+        """Check that ``prompt`` can be rendered as this check's inline prompt.
+
+        Parameters
+        ----------
+        prompt : str
+            Inline prompt template.
+        required : Collection[str]
+            Variables the prompt must read, e.g. ``("trace",)``.
+
+        Raises
+        ------
+        ValueError
+            If a name in ``required`` is not in :attr:`prompt_variables`.
+        giskard.agents.templates.TemplateValidationError
+            If the prompt is not a valid inline template or reads a variable
+            outside :attr:`prompt_variables`.
+        """
+        validate_template(prompt, variables=cls.prompt_variables, required=required)
 
     @override
     def get_prompt(self) -> str | ChatMessage | MessageTemplate | TemplateReference:
