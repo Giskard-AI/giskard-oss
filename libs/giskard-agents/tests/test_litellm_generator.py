@@ -76,6 +76,83 @@ async def test_litellm_generator_forwards_params(mock_acompletion: Any) -> None:
     assert kwargs["max_tokens"] == 50
 
 
+@pytest.mark.parametrize(
+    ("source", "explicit_temperature"),
+    [
+        pytest.param("constructor", None, id="constructor-omit-temp"),
+        pytest.param("with_params", None, id="with-params-omit-temp"),
+        pytest.param("call_params", None, id="call-params-omit-temp"),
+        pytest.param("with_params", 0.4, id="with-params-explicit-temp"),
+    ],
+)
+async def test_litellm_generator_forwards_reasoning_effort_and_temperature(
+    mock_acompletion: Any,
+    source: str,
+    explicit_temperature: float | None,
+) -> None:
+    """``LiteLLMGenerator`` forwards normalized ``reasoning_effort`` and omits unset ``temperature``."""
+    extra: dict[str, Any] = (
+        {"temperature": explicit_temperature}
+        if explicit_temperature is not None
+        else {}
+    )
+    if source == "constructor":
+        generator = LiteLLMGenerator(
+            model="test-model",
+            params=GenerationParams.model_validate(
+                {"reasoning_effort": "HIGH", **extra}
+            ),
+        )
+        call_params = None
+    elif source == "with_params":
+        generator = LiteLLMGenerator(model="test-model").with_params(
+            reasoning_effort="HIGH", **extra
+        )
+        call_params = None
+    else:
+        generator = LiteLLMGenerator(model="test-model")
+        call_params = GenerationParams.model_validate(
+            {"reasoning_effort": "HIGH", **extra}
+        )
+
+    await generator.complete(messages=_USER_MESSAGE, params=call_params)
+
+    kwargs = mock_acompletion.call_args.kwargs
+    assert kwargs["reasoning_effort"] == "high"
+    if explicit_temperature is None:
+        assert "temperature" not in kwargs
+    else:
+        assert kwargs["temperature"] == explicit_temperature
+
+
+@pytest.mark.parametrize(
+    "clear_via",
+    [
+        pytest.param("with_params", id="clear-via-with-params"),
+        pytest.param("call_params", id="clear-via-call-params"),
+    ],
+)
+async def test_litellm_generator_clear_reasoning_effort_with_none(
+    mock_acompletion: Any,
+    clear_via: str,
+) -> None:
+    """Explicit ``reasoning_effort=None`` clears an earlier setting without error."""
+    generator = LiteLLMGenerator(model="test-model").with_params(
+        reasoning_effort="high"
+    )
+    if clear_via == "with_params":
+        generator = generator.with_params(reasoning_effort=None)
+        call_params = None
+    else:
+        call_params = GenerationParams(reasoning_effort=None)
+
+    await generator.complete(messages=_USER_MESSAGE, params=call_params)
+
+    kwargs = mock_acompletion.call_args.kwargs
+    assert kwargs.get("reasoning_effort") is None
+    assert "temperature" not in kwargs
+
+
 async def test_litellm_generator_sanitizes_response_format_schema_name(
     mock_acompletion: Any,
 ) -> None:

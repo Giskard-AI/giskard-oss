@@ -18,7 +18,7 @@ from giskard.llm.types import (
     ToolCall,
     ToolCallFunction,
 )
-from pydantic import Field
+from pydantic import BaseModel, Field, ValidationError
 
 
 @pytest.fixture
@@ -208,6 +208,251 @@ async def test_generator_with_params_overwrite(mock_response: CompletionResponse
             call_kwargs["timeout"] == 60
         )  # Overwritten by the complete() call's params.
         assert call_kwargs["model"] == "test-model"
+
+
+# ---------------------------------------------------------------------------
+# GenerationParams validation, reasoning_effort, and wire omission
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("raw_effort", "expected"),
+    [
+        pytest.param("none", "none", id="none"),
+        pytest.param("minimal", "minimal", id="minimal"),
+        pytest.param("low", "low", id="low"),
+        pytest.param("medium", "medium", id="medium"),
+        pytest.param("high", "high", id="high"),
+        pytest.param("xhigh", "xhigh", id="xhigh"),
+        pytest.param("max", "max", id="max"),
+        pytest.param("HIGH", "high", id="uppercase-normalized"),
+        pytest.param("MeDiUm", "medium", id="mixed-case-normalized"),
+    ],
+)
+def test_generation_params_accepts_and_normalizes_reasoning_effort(
+    raw_effort: str, expected: str
+):
+    params = GenerationParams.model_validate({"reasoning_effort": raw_effort})
+    assert params.reasoning_effort == expected
+
+
+@pytest.mark.parametrize(
+    "invalid_effort",
+    [
+        pytest.param("ultra", id="unknown-level"),
+        pytest.param("default", id="provider-only-default"),
+        pytest.param("", id="empty-string"),
+        pytest.param(3, id="non-string"),
+    ],
+)
+def test_generation_params_rejects_invalid_reasoning_effort(invalid_effort: Any):
+    with pytest.raises(ValidationError, match="reasoning_effort"):
+        GenerationParams(reasoning_effort=invalid_effort)
+
+
+def test_generation_params_forbids_unknown_keys():
+    with pytest.raises(ValidationError, match="temperautre"):
+        GenerationParams.model_validate({"temperautre": 0.5})
+
+
+@pytest.mark.parametrize(
+    ("base_kwargs", "override_kwargs", "expected_effort", "expected_set_fields"),
+    [
+        pytest.param(
+            {"reasoning_effort": "low"},
+            None,
+            "low",
+            {"reasoning_effort"},
+            id="none-override-preserves-base",
+        ),
+        pytest.param(
+            {"reasoning_effort": "low"},
+            {"reasoning_effort": "HIGH"},
+            "high",
+            {"reasoning_effort", "tools"},
+            id="override-replaces-and-normalizes",
+        ),
+        pytest.param(
+            {"reasoning_effort": "high", "temperature": 0.2},
+            {"max_tokens": 128},
+            "high",
+            {"reasoning_effort", "temperature", "max_tokens", "tools"},
+            id="unset-override-effort-preserves-base",
+        ),
+        pytest.param(
+            {"reasoning_effort": "high"},
+            {"reasoning_effort": None},
+            None,
+            {"reasoning_effort", "tools"},
+            id="explicit-none-clears-base",
+        ),
+    ],
+)
+def test_generation_params_merge_reasoning_effort(
+    base_kwargs: dict[str, Any],
+    override_kwargs: dict[str, Any] | None,
+    expected_effort: str | None,
+    expected_set_fields: set[str],
+):
+    base = GenerationParams(**base_kwargs)
+    overrides = (
+        GenerationParams(**override_kwargs) if override_kwargs is not None else None
+    )
+    merged = base.merge(overrides)
+
+    assert merged.reasoning_effort == expected_effort
+    assert merged.model_fields_set == expected_set_fields
+
+
+def test_generation_params_merge_concatenates_tools_and_keeps_response_format():
+    @tool
+    def t1(x: str) -> str:
+        """Tool 1.
+
+        Parameters
+        ----------
+        x : str
+            Input.
+        """
+        return x
+
+    @tool
+    def t2(x: str) -> str:
+        """Tool 2.
+
+        Parameters
+        ----------
+        x : str
+            Input.
+        """
+        return x
+
+    class Output(BaseModel):  # type: ignore[name-defined]
+        answer: str
+
+    base = GenerationParams(tools=[t1], reasoning_effort="low")
+    overrides = GenerationParams(
+        tools=[t2], reasoning_effort="high", response_format=Output
+    )
+    merged = base.merge(overrides)
+
+    assert merged.tools == [t1, t2]
+    assert merged.reasoning_effort == "high"
+    assert merged.response_format is Output
+
+
+@pytest.mark.parametrize(
+    "bad_kwargs",
+    [
+        pytest.param({"reasoning_effort": "ultra"}, id="invalid-reasoning-effort"),
+        pytest.param({"temperautre": 0.5}, id="unknown-key"),
+    ],
+)
+def test_generator_with_params_validates_updates(bad_kwargs: dict[str, Any]):
+    generator = GiskardLLMGenerator(model="test-model")
+    with pytest.raises(ValidationError):
+        generator.with_params(**bad_kwargs)
+
+
+def test_generator_with_params_preserves_unset_temperature():
+    generator = GiskardLLMGenerator(model="test-model")
+    updated = generator.with_params(reasoning_effort="HIGH")
+
+    assert updated.params.reasoning_effort == "high"
+    assert "reasoning_effort" in updated.params.model_fields_set
+    assert "temperature" not in updated.params.model_fields_set
+    assert updated.params.model_dump(exclude={"tools"}, exclude_unset=True) == {
+        "reasoning_effort": "high"
+    }
+
+
+@pytest.mark.parametrize(
+    ("source", "explicit_temperature"),
+    [
+        pytest.param("constructor", None, id="constructor-omit-temp"),
+        pytest.param("with_params", None, id="with-params-omit-temp"),
+        pytest.param("call_params", None, id="call-params-omit-temp"),
+        pytest.param("with_params", 0.25, id="with-params-explicit-temp"),
+    ],
+)
+async def test_giskard_llm_generator_forwards_reasoning_effort_and_temperature(
+    mock_response: CompletionResponse,
+    source: str,
+    explicit_temperature: float | None,
+):
+    extra: dict[str, Any] = (
+        {"temperature": explicit_temperature}
+        if explicit_temperature is not None
+        else {}
+    )
+    if source == "constructor":
+        generator = GiskardLLMGenerator(
+            model="test-model",
+            params=GenerationParams.model_validate(
+                {"reasoning_effort": "HIGH", **extra}
+            ),
+        )
+        call_params = None
+    elif source == "with_params":
+        generator = GiskardLLMGenerator(model="test-model").with_params(
+            reasoning_effort="HIGH", **extra
+        )
+        call_params = None
+    else:
+        generator = GiskardLLMGenerator(model="test-model")
+        call_params = GenerationParams.model_validate(
+            {"reasoning_effort": "HIGH", **extra}
+        )
+
+    with patch(
+        "giskard.agents.generators.giskard_llm_generator.acompletion",
+        return_value=mock_response,
+    ) as mock_acompletion:
+        await generator.complete(
+            messages=[{"role": "user", "content": "Test message"}],
+            params=call_params,
+        )
+
+    call_kwargs = mock_acompletion.call_args.kwargs
+    assert call_kwargs["reasoning_effort"] == "high"
+    if explicit_temperature is None:
+        assert "temperature" not in call_kwargs
+    else:
+        assert call_kwargs["temperature"] == explicit_temperature
+
+
+@pytest.mark.parametrize(
+    "clear_via",
+    [
+        pytest.param("with_params", id="clear-via-with-params"),
+        pytest.param("call_params", id="clear-via-call-params"),
+    ],
+)
+async def test_giskard_llm_generator_clear_reasoning_effort_with_none(
+    mock_response: CompletionResponse,
+    clear_via: str,
+):
+    generator = GiskardLLMGenerator(model="test-model").with_params(
+        reasoning_effort="high"
+    )
+    if clear_via == "with_params":
+        generator = generator.with_params(reasoning_effort=None)
+        call_params = None
+    else:
+        call_params = GenerationParams(reasoning_effort=None)
+
+    with patch(
+        "giskard.agents.generators.giskard_llm_generator.acompletion",
+        return_value=mock_response,
+    ) as mock_acompletion:
+        await generator.complete(
+            messages=[{"role": "user", "content": "Test message"}],
+            params=call_params,
+        )
+
+    call_kwargs = mock_acompletion.call_args.kwargs
+    assert call_kwargs.get("reasoning_effort") is None
+    assert "temperature" not in call_kwargs
 
 
 # ---------------------------------------------------------------------------
