@@ -25,7 +25,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          enable-cache: true
+          enable-cache: false
           python-version: "3.12"
       # install-licensecheck pulls in the garak/deepteam trees that check-licenses and
       # check-notices scan; without them licensecheck cannot read their license metadata.
@@ -45,7 +45,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          enable-cache: true
+          enable-cache: false
           python-version: "3.12"
       - run: make install
       - run: make test-examples
@@ -70,7 +70,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          enable-cache: true
+          enable-cache: false
           python-version: ${{ matrix.python-version }}
       - run: make install
       - run: make test-unit PACKAGE=$PACKAGE
@@ -94,7 +94,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          enable-cache: true
+          enable-cache: false
           python-version: "3.12"
       - run: make install-minimal
       - run: make test-unit-minimal PACKAGE=$PACKAGE
@@ -112,7 +112,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          enable-cache: true
+          enable-cache: false
           python-version: "3.12"
       - run: make install-no-providers
       - run: make test-no-providers
