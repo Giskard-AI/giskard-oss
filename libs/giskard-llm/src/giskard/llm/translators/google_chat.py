@@ -304,8 +304,13 @@ class GoogleChatParams(_BaseModel):
                         "Cannot specify both reasoning_effort and thinking_config level/budget",
                         PROVIDER,
                     )
+                stripped_thinking_config = {
+                    k: val
+                    for k, val in raw_thinking_config.items()
+                    if not (k in _THINKING_CONFLICT_KEYS and val is None)
+                }
                 config["thinking_config"] = {
-                    **raw_thinking_config,
+                    **stripped_thinking_config,
                     "thinking_level": effort.upper(),
                 }
             else:

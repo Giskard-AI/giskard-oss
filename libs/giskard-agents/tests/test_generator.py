@@ -327,7 +327,7 @@ def test_generation_params_merge_concatenates_tools_and_keeps_response_format():
         """
         return x
 
-    class Output(BaseModel):  # type: ignore[name-defined]
+    class Output(BaseModel):
         answer: str
 
     base = GenerationParams(tools=[t1], reasoning_effort="low")
