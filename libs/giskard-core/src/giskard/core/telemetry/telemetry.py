@@ -10,7 +10,6 @@ import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from queue import Queue
 from typing import TYPE_CHECKING, Any, cast
 
 from ..utils import GISKARD_LIBS_VERSIONS, is_true_env_str
@@ -103,7 +102,7 @@ def _get_env_information() -> dict[str, str]:
 def _set_tags() -> None:
     env_information = _get_env_information()
     for key, value in env_information.items():
-        telemetry_tag(key, value)
+        telemetry.tag(key, value)
 
 
 def _get_or_create_anonymous_id() -> str | None:
@@ -150,10 +149,6 @@ _anonymous_id = _get_or_create_anonymous_id()
 # dashboards, while _anonymous_id keeps them all linked to the same user.
 _process_session_id = str(uuid.uuid4())
 
-# Opted out at import: a no-op stand-in, so posthog is never imported and no
-# consumer thread, atexit join or HTTP request ever reaches ``eu.i.posthog.com``.
-_disabled_at_import = _should_disable()
-
 
 class _DisabledTelemetry:
     """Stand-in for the PostHog client when opted out at import.
@@ -165,10 +160,7 @@ class _DisabledTelemetry:
     disabled: bool = True
     disable_geoip: bool = True
     send: bool = False
-
-    def __init__(self) -> None:
-        self.consumers: list[Any] = []
-        self.queue: "Queue[Any]" = Queue()
+    consumers: tuple[()] = ()
 
     def capture(self, *args: object, **kwargs: object) -> None:
         return None
@@ -182,9 +174,20 @@ class _DisabledTelemetry:
     def new_context(self, **kwargs: object) -> contextlib.AbstractContextManager[None]:
         return contextlib.nullcontext()
 
+    def tag(self, name: str, value: Any) -> None:
+        return None
+
+    def identify_context(self, distinct_id: str) -> None:
+        return None
+
+    def set_context_session(self, session_id: str) -> None:
+        return None
+
 
 telemetry: "Posthog | _DisabledTelemetry"
-if _disabled_at_import:
+# Opted out at import: a no-op stand-in, so posthog is never imported and no
+# consumer thread, atexit join or HTTP request ever reaches ``eu.i.posthog.com``.
+if _should_disable():
     telemetry = _DisabledTelemetry()
 else:
     from posthog import Posthog
@@ -192,19 +195,13 @@ else:
     telemetry = Posthog(
         project_api_key="phc_Asp36pe4X5WMqeJ4aMMV4gq5LGdGw69mdYSdEYGpbxm2",  # pragma: allowlist secret
         host="https://eu.i.posthog.com",
-        disabled=False,
         disable_geoip=_should_disable_geoip(),
-        send=True,
     )
 
 
 def telemetry_tag(name: str, value: Any) -> None:
-    """Attach a tag to the current telemetry context; no-op when disabled."""
-    if telemetry.disabled:
-        return
-    from posthog import tag
-
-    tag(name, value)
+    """Attach a tag to the current telemetry context."""
+    telemetry.tag(name, value)
 
 
 def disable_telemetry() -> None:
@@ -276,12 +273,9 @@ def telemetry_run_context() -> Iterator[None]:
     try:
         _apply_env_opt_out()
         with telemetry.new_context(capture_exceptions=False):
-            if not telemetry.disabled:
-                from posthog import identify_context, set_context_session
-
-                if _anonymous_id is not None:
-                    identify_context(_anonymous_id)
-                set_context_session(_process_session_id)
+            if _anonymous_id is not None:
+                telemetry.identify_context(_anonymous_id)
+            telemetry.set_context_session(_process_session_id)
             _set_tags()
             try:
                 yield

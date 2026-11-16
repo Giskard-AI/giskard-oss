@@ -51,20 +51,8 @@ _LAZY: dict[str, str] = {
     "TemplateReference": ".workflow",
 }
 
-_SUBMODULES = frozenset(
-    {
-        "chat",
-        "context",
-        "embeddings",
-        "errors",
-        "generators",
-        "pipeline",
-        "som",
-        "templates",
-        "tools",
-        "workflow",
-    }
-)
+# Submodules reachable as attributes: every export's module, plus ``pipeline``.
+_SUBMODULES = frozenset({module[1:] for module in _LAZY.values()} | {"pipeline"})
 
 __version__ = get_lib_version("giskard-agents")
 

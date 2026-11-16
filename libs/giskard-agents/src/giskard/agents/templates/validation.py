@@ -133,9 +133,7 @@ def _callee_names(node: nodes.Filter | nodes.Test) -> list[tuple[str, str]]:
     """Kind and name of ``node``, plus any filter or test it takes by name."""
     names = [("filter" if isinstance(node, nodes.Filter) else "test", node.name)]
     callee = _NAMED_CALLEES.get(node.name) if isinstance(node, nodes.Filter) else None
-    if callee is None or (
-        node.name == "map" and any(kw.key == "attribute" for kw in node.kwargs)
-    ):
+    if callee is None:
         return names
     kind, position = callee
     if len(node.args) > position:
