@@ -67,6 +67,11 @@ in-place upgrade of the v2 API.
 - `Interact.generate()` now uses the live `inputs`/`outputs` fields after
   `model_copy(update=...)`. GCG scans previously sent the unsuffixed HarmBench
   prompt because the copied Interact kept a stale input provider.
+- `giskard-agents` (next 1.0.x patch): `validate_template` no longer evaluates
+  constant expressions while compiling, so a short template such as
+  `{{ 'a' * 10**10 }}` or `{{ 'x' | center(10**9) }}` can no longer exhaust CPU
+  or memory during validation. Running out of memory while compiling now raises
+  `TemplateValidationError`.
 
 ### Installation
 

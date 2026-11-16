@@ -1,4 +1,7 @@
+import os
 import re
+import subprocess
+import sys
 from dataclasses import dataclass, field
 
 import pytest
@@ -7,6 +10,7 @@ from giskard.agents.templates import (
     TemplateValidationError,
     strict_templates,
     validate_template,
+    validation,
 )
 
 
@@ -101,3 +105,85 @@ def test_required_outside_variables_is_a_caller_bug():
     with pytest.raises(ValueError, match="other") as error:
         validate_template("{{ trace }}", variables={"trace"}, required={"other"})
     assert not isinstance(error.value, TemplateValidationError)
+
+
+# Jinja folds constant expressions while compiling, so validating these used to
+# build gigabyte strings or huge integers before rendering was ever attempted.
+# Each is valid, and well under the 4000-character limit for judge templates.
+EXPENSIVE_CONSTANTS = [
+    "{{ 'a' * 300000000 }}",
+    "{{ ('a' + 'b') * 300000000 }}",
+    "{{ ('a' ~ 'b') * 300000000 }}",
+    "{{ '%s' % ('a' * 300000000) }}",
+    "{{ 10 ** 100000000 }}",
+    "{{ 2 ** 30000000 // 3 }}",
+    "{{ 9 ** 9 ** 9 }}",
+    "{{ -(10 ** 100000000) }}",
+    "{{ 'x' | center(1000000000) }}",
+    "{{ 'x' | center(10 ** 9) }}",
+    "{{ 'a\nb' | indent(1000000000) }}",
+    "{{ ('a ' * 50000000) | wordwrap(1) }}",
+    "{{ ('a' * 10000) | replace('a', 'a' * 100000) }}",
+    "{{ ('a' * 100000) | join('b' * 10000) }}",
+    "{{ ('a' * 100000000) | batch(1) | list }}",
+    "{{ 'a' | truncate(10 ** 9) | center(10 ** 9) }}",
+    "{% if 'a' * 300000000 is string %}x{% endif %}",
+    "{% set x = 'a' * 300000000 %}",
+    "{% for i in ['a' * 300000000] %}{{ i }}{% endfor %}",
+    "{% block b %}{{ 'a' * 300000000 }}{% endblock %}",
+    "{% macro m() %}{{ 'x' | center(1000000000) }}{% endmacro %}",
+    "{% autoescape 'a' * 300000000 %}x{% endautoescape %}",
+    "{% filter center(1000000000) %}x{% endfilter %}",
+]
+
+_VALIDATE_UNDER_MEMORY_CAP = """
+import resource, sys, time
+resource.setrlimit(resource.RLIMIT_AS, (1 << 30, 1 << 30))
+from giskard.agents.templates import TemplateValidationError, validate_template
+start = time.perf_counter()
+try:
+    validate_template(sys.argv[1], variables={"trace"}, required={"trace"})
+except TemplateValidationError:
+    pass
+print(time.perf_counter() - start)
+"""
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="needs RLIMIT_AS")
+@pytest.mark.parametrize("source", EXPENSIVE_CONSTANTS)
+def test_constant_expressions_are_not_evaluated(source):
+    # A subprocess with 1 GiB of address space, so a regression fails the
+    # test (with a MemoryError, or by being slow) instead of the machine.
+    result = subprocess.run(
+        [sys.executable, "-c", _VALIDATE_UNDER_MEMORY_CAP, "{{ trace }}" + source],
+        env={**os.environ, "DO_NOT_TRACK": "1"},
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert float(result.stdout) < 0.5
+
+
+def test_constant_expressions_still_validate_and_render():
+    source = "{{ trace }}{{ 'ab' * 2 ~ -1 }}{{ 'x' | center(5) }}{{ 2 ** 3 // 3 % 2 }}"
+    validate_template(source, variables={"trace"}, required={"trace"})
+    rendered = MessageTemplate(role="user", content_template=source).render(
+        trace=_Trace()
+    )
+    assert rendered.content == "a\nbabab-1  x  0"
+
+
+def test_unknown_filter_with_constant_arguments_is_rejected():
+    with pytest.raises(TemplateValidationError, match="No filter named 'nosuch'"):
+        validate_template("{{ trace }}{{ 'x' | nosuch(2 * 3) }}", variables={"trace"})
+
+
+@pytest.mark.parametrize("error", [MemoryError, OverflowError])
+def test_resource_errors_are_validation_errors(monkeypatch, error):
+    def compile(*args, **kwargs):
+        raise error()
+
+    monkeypatch.setattr(validation._validation_env, "compile", compile)
+    with pytest.raises(TemplateValidationError, match="too large"):
+        validate_template("{{ trace }}", variables={"trace"})
