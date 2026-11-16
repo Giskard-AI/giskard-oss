@@ -7,7 +7,7 @@ license = { text = "MIT" }
 authors = [{ name = "Giskard R&D", email = "rnd@giskard.ai" }]
 requires-python = ">=3.12"
 dependencies = [
-    "giskard-core>=1.0.3,<2",
+    "giskard-core>=1.0.4,<2",
     "pydantic>=2.11.0,<3",
     # Imported directly in translators/providers; shipped transitively by the
     # provider SDKs (openai/anthropic/google), declared explicitly so the direct
