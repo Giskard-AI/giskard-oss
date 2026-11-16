@@ -554,6 +554,45 @@ def test_thinking_config_escape_hatch_only_passes_through():
 
 
 @pytest.mark.parametrize(
+    "thinking_config",
+    [
+        pytest.param(
+            {"thinkingLevel": None, "include_thoughts": True},
+            id="camel-thinking-level-none",
+        ),
+        pytest.param(
+            {"thinking_level": None, "include_thoughts": True},
+            id="snake-thinking-level-none",
+        ),
+        pytest.param(
+            {"thinkingBudget": None, "include_thoughts": True},
+            id="camel-thinking-budget-none",
+        ),
+        pytest.param(
+            {"thinking_budget": None, "include_thoughts": True},
+            id="snake-thinking-budget-none",
+        ),
+    ],
+)
+def test_thinking_config_none_conflict_keys_stripped_when_merging_reasoning_effort(
+    thinking_config: dict[str, Any],
+):
+    """``None``-valued conflict keys are stripped before merging ``thinking_level``."""
+    payload = GoogleChatTranslator.to_google(
+        _MODEL,
+        [UserMessage(content="Hi.")],
+        reasoning_effort="high",
+        thinking_config=thinking_config,
+    )
+    cfg = payload.get("config", {})
+    assert cfg.get("thinking_config") == {
+        "include_thoughts": True,
+        "thinking_level": "HIGH",
+    }
+    validate_google_generate_content_config(cfg)
+
+
+@pytest.mark.parametrize(
     "invalid_effort",
     [
         pytest.param("none", id="unsupported-none"),
