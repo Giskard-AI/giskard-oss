@@ -69,6 +69,40 @@ def test_generator_serialization():
     assert deserialized.params.response_format is None
 
 
+@pytest.mark.parametrize(
+    ("raw_effort", "expected_effort"),
+    [
+        pytest.param("high", "high", id="lowercase-effort"),
+        pytest.param("MEDIUM", "medium", id="normalized-effort"),
+        pytest.param(None, None, id="none-effort"),
+    ],
+)
+def test_generator_serialization_with_reasoning_effort(
+    raw_effort: str | None, expected_effort: str | None
+):
+    """Generators with ``reasoning_effort`` round-trip cleanly through JSON."""
+    original = GiskardLLMGenerator(model="test-model").with_params(
+        reasoning_effort=raw_effort
+    )
+    serialized = original.model_dump_json()
+    deserialized = BaseGenerator.model_validate_json(serialized)
+
+    assert isinstance(deserialized, GiskardLLMGenerator)
+    assert deserialized.params.reasoning_effort == expected_effort
+
+
+def test_generator_rejects_unknown_key_in_params():
+    """A typo'd key inside ``params`` must fail loudly."""
+    payload = {
+        "kind": "giskard_llm",
+        "model": "gpt-4",
+        "params": {"temperautre": 0.5},
+    }
+
+    with pytest.raises(ValidationError, match="temperautre"):
+        BaseGenerator.model_validate(payload)
+
+
 async def test_generator_serialization_custom_generator():
     """Test basic generator serialization and deserialization."""
 
