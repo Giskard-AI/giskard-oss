@@ -493,10 +493,16 @@ class AnthropicChatTranslator:
 
         usage = None
         if raw.usage:
+            details = getattr(raw.usage, "output_tokens_details", None)
             usage = Usage(
                 input_tokens=raw.usage.input_tokens,
                 output_tokens=raw.usage.output_tokens,
                 total_tokens=raw.usage.input_tokens + raw.usage.output_tokens,
+                reasoning_tokens=(
+                    getattr(details, "thinking_tokens", None)
+                    if details is not None
+                    else None
+                ),
             )
 
         return CompletionResponse(

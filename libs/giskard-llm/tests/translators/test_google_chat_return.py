@@ -12,7 +12,7 @@ import pytest
 pytest.importorskip("google.genai")
 
 from giskard.llm.translators.google_chat import GoogleChatTranslator
-from giskard.llm.types import TextContent
+from giskard.llm.types import ReasoningTextDetail, TextContent
 from google.genai import types
 
 pytestmark = pytest.mark.google
@@ -84,6 +84,43 @@ def test_from_google_thinking_tokens_counted_in_output():
     assert out.usage.output_tokens == 25
     assert out.usage.total_tokens == 35
     assert out.usage.input_tokens + out.usage.output_tokens == out.usage.total_tokens
+
+
+@pytest.mark.parametrize(
+    ("thoughts_token_count", "expected_output_tokens", "expected_reasoning_tokens"),
+    [
+        pytest.param(20, 25, 20, id="thoughts-present"),
+        pytest.param(0, 5, 0, id="thoughts-zero"),
+        pytest.param(None, 5, None, id="thoughts-omitted"),
+    ],
+)
+def test_from_google_usage_reasoning_tokens(
+    thoughts_token_count: int | None,
+    expected_output_tokens: int,
+    expected_reasoning_tokens: int | None,
+):
+    """Maps ``thoughts_token_count`` to ``Usage.reasoning_tokens`` while folding into ``output_tokens``."""
+    usage_metadata: dict[str, object] = {
+        "prompt_token_count": 10,
+        "candidates_token_count": 5,
+    }
+    if thoughts_token_count is not None:
+        usage_metadata["thoughts_token_count"] = thoughts_token_count
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Answer."}]},
+                    "finish_reason": "STOP",
+                }
+            ],
+            "usage_metadata": usage_metadata,
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    assert out.usage is not None
+    assert out.usage.output_tokens == expected_output_tokens
+    assert out.usage.reasoning_tokens == expected_reasoning_tokens
 
 
 def test_from_google_tool_use_prompt_tokens_counted_in_input():
@@ -342,14 +379,19 @@ def test_from_google_refusal_uses_finish_message_when_present():
     assert out.choices[0].message.refusal == "Blocked for safety."
 
 
-def _signature_only_thought() -> types.GenerateContentResponse:
+def _unsupported_code_execution_part() -> types.GenerateContentResponse:
     return _raw(
         {
             "candidates": [
                 {
                     "content": {
                         "parts": [
-                            {"thought": True, "thought_signature": b"sig"},
+                            {
+                                "code_execution_result": {
+                                    "outcome": "OUTCOME_OK",
+                                    "output": "42",
+                                }
+                            },
                             {"text": "Answer."},
                         ]
                     },
@@ -361,12 +403,12 @@ def _signature_only_thought() -> types.GenerateContentResponse:
 
 
 def test_from_google_unsupported_part_raises():
-    """A part we cannot represent (signature-only thought) raises by default."""
+    """A part we cannot represent (e.g. code_execution_result) raises by default."""
     from giskard.llm.errors import UnsupportedContentError
 
     with pytest.raises(UnsupportedContentError) as exc_info:
-        GoogleChatTranslator.from_google(_signature_only_thought(), _MODEL, 1)
-    assert exc_info.value.content_type == "thought,thought_signature"
+        GoogleChatTranslator.from_google(_unsupported_code_execution_part(), _MODEL, 1)
+    assert exc_info.value.content_type == "code_execution_result"
 
 
 def test_from_google_unsupported_part_dropped_with_warning(
@@ -375,7 +417,172 @@ def test_from_google_unsupported_part_dropped_with_warning(
     """With ``ignore_unsupported_content`` the part is dropped and a warning logged."""
     with caplog.at_level("WARNING"):
         out = GoogleChatTranslator.from_google(
-            _signature_only_thought(), _MODEL, 1, ignore_unsupported_content=True
+            _unsupported_code_execution_part(),
+            _MODEL,
+            1,
+            ignore_unsupported_content=True,
         )
     assert out.choices[0].message.content == [TextContent(text="Answer.")]
-    assert "thought_signature" in caplog.text
+    assert "code_execution_result" in caplog.text
+
+
+# -- Thought part isolation ----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    (
+        "parts",
+        "expected_reasoning",
+        "expected_details",
+        "expected_content",
+        "expected_text",
+    ),
+    [
+        pytest.param(
+            [
+                {"thought": True, "text": "Internal deliberation."},
+                {"text": "Final answer."},
+            ],
+            "Internal deliberation.",
+            [
+                ReasoningTextDetail(
+                    format="google-gemini-v1", text="Internal deliberation."
+                )
+            ],
+            [TextContent(text="Final answer.")],
+            "Final answer.",
+            id="single-thought-and-answer",
+        ),
+        pytest.param(
+            [
+                {"thought": True, "text": "Step 1"},
+                {"thought": True, "text": ""},
+                {"thought": True, "text": "Step 2"},
+                {"text": "Answer."},
+            ],
+            "Step 1\nStep 2",
+            [
+                ReasoningTextDetail(format="google-gemini-v1", text="Step 1"),
+                ReasoningTextDetail(format="google-gemini-v1", text="Step 2"),
+            ],
+            [TextContent(text="Answer.")],
+            "Answer.",
+            id="multiple-thoughts-joined-skipping-empty",
+        ),
+        pytest.param(
+            [
+                {"thought": True, "thought_signature": b"sig"},
+                {"text": "Answer."},
+            ],
+            None,
+            None,
+            [TextContent(text="Answer.")],
+            "Answer.",
+            id="signature-only-thought",
+        ),
+        pytest.param(
+            [
+                {"thought": True, "text": ""},
+                {"text": "Answer."},
+            ],
+            None,
+            None,
+            [TextContent(text="Answer.")],
+            "Answer.",
+            id="empty-text-thought-only",
+        ),
+        pytest.param(
+            [{"thought": True, "text": "Only private thinking."}],
+            "Only private thinking.",
+            [
+                ReasoningTextDetail(
+                    format="google-gemini-v1", text="Only private thinking."
+                )
+            ],
+            None,
+            None,
+            id="thought-only-no-visible-content",
+        ),
+        pytest.param(
+            [
+                {"thought": True, "text": "Signed thought.", "thought_signature": b"s"},
+                {"text": "Answer."},
+            ],
+            "Signed thought.",
+            [ReasoningTextDetail(format="google-gemini-v1", text="Signed thought.")],
+            [TextContent(text="Answer.")],
+            "Answer.",
+            id="thought-with-text-and-signature",
+        ),
+        pytest.param(
+            [{"thought": False, "text": "Explicitly visible."}],
+            None,
+            None,
+            [TextContent(text="Explicitly visible.")],
+            "Explicitly visible.",
+            id="thought-false-remains-visible-content",
+        ),
+    ],
+)
+def test_from_google_thought_part_isolation(
+    parts: list[dict[str, object]],
+    expected_reasoning: str | None,
+    expected_details: list[ReasoningTextDetail] | None,
+    expected_content: list[TextContent] | None,
+    expected_text: str | None,
+):
+    """Thought parts route to ``reasoning`` / ``reasoning_details`` and never leak into ``content`` / ``text`` / ``transcript``."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {"parts": parts},
+                    "finish_reason": "STOP",
+                }
+            ]
+        }
+    )
+    msg = GoogleChatTranslator.from_google(raw, _MODEL, 1).choices[0].message
+    assert msg.reasoning == expected_reasoning
+    assert msg.reasoning_details == expected_details
+    assert msg.content == expected_content
+    assert msg.text == expected_text
+    if expected_reasoning is not None:
+        for line in expected_reasoning.splitlines():
+            assert line not in msg.transcript
+
+
+def test_from_google_thought_part_and_function_call():
+    """Thought ahead of a ``function_call`` routes to ``reasoning`` and preserves the tool call."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"thought": True, "text": "Need to check weather."},
+                            {
+                                "function_call": {
+                                    "name": "get_weather",
+                                    "args": {"city": "Paris"},
+                                }
+                            },
+                        ]
+                    },
+                    "finish_reason": "STOP",
+                }
+            ]
+        }
+    )
+    choice = GoogleChatTranslator.from_google(raw, _MODEL, 1).choices[0]
+    msg = choice.message
+    assert choice.finish_reason == "tool_calls"
+    assert msg.reasoning == "Need to check weather."
+    assert msg.reasoning_details == [
+        ReasoningTextDetail(format="google-gemini-v1", text="Need to check weather.")
+    ]
+    assert msg.content is None
+    assert msg.text is None
+    assert msg.tool_calls is not None
+    assert msg.tool_calls[0].function.name == "get_weather"
+    assert "Need to check weather" not in msg.transcript

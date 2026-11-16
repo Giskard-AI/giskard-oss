@@ -25,6 +25,7 @@ from .types import (
     EmbeddingUsage,
     FunctionCallOutputParam,
     FunctionDefParam,
+    ReasoningEffort,
     ResponseFunctionToolCall,
     ResponseOutputItem,
     ResponseOutputText,
@@ -58,6 +59,7 @@ __all__ = [
     "CompletionResponse",
     "Choice",
     "ChatMessageParam",
+    "ReasoningEffort",
     "Usage",
     # Types — Tools
     "ToolCall",

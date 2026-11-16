@@ -223,4 +223,11 @@ class OpenAIResponseTranslator:
             provider,
             ignore_unsupported_content=ignore_unsupported_content,
         )
+        if isinstance(usage := data.get("usage"), dict):
+            details = usage.get("output_tokens_details")
+            if (
+                isinstance(details, dict)
+                and (reasoning_tokens := details.get("reasoning_tokens")) is not None
+            ):
+                usage["reasoning_tokens"] = reasoning_tokens
         return ResponseResult.model_validate(data)

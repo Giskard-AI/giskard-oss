@@ -359,6 +359,7 @@ class GoogleResponseTranslator:
                 input_tokens=raw.usage.total_input_tokens or 0,
                 output_tokens=raw.usage.total_output_tokens or 0,
                 total_tokens=raw.usage.total_tokens or 0,
+                reasoning_tokens=getattr(raw.usage, "total_thought_tokens", None),
             )
 
         return ResponseResult(
