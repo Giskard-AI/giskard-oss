@@ -1,9 +1,34 @@
 from collections.abc import Collection
+from typing import Any, NoReturn
 
-from jinja2 import meta, nodes
+from jinja2 import meta, nodes, pass_context
 from jinja2.exceptions import TemplateAssertionError, TemplateSyntaxError
 
 from .environment import _inline_env
+
+
+@pass_context
+def _not_folded(*args: Any, **kwargs: Any) -> NoReturn:
+    raise AssertionError("templates are never rendered with _validation_env")
+
+
+# Jinja's code generator evaluates constant expressions at compile time, even
+# with ``optimized=False``, so compiling an untrusted template could run
+# ``'a' * 10**10`` or ``'x' | center(10**9)``. Validation therefore compiles
+# with an overlay of ``_inline_env`` (same syntax, globals and policy) that
+# folds nothing costly: a sandboxed environment never folds the operators it
+# intercepts, and Jinja never calls ``@pass_context`` filters or tests at
+# compile time. The filters and tests keep their names, so compiling accepts
+# and rejects exactly what ``_inline_env`` does. What can still be folded
+# (literals, ``~``, comparisons, ``and``/``or``, subscripts) is linear in the
+# length of the source.
+_validation_env = _inline_env.overlay()
+_validation_env.intercepted_binops = frozenset(_inline_env.binop_table)
+_validation_env.intercepted_unops = frozenset(_inline_env.unop_table)
+_validation_env.filters = _inline_env.filters.copy()
+_validation_env.tests = _inline_env.tests.copy()
+_validation_env.filters.update(dict.fromkeys(_inline_env.filters, _not_folded))
+_validation_env.tests.update(dict.fromkeys(_inline_env.tests, _not_folded))
 
 _LOADER_TAGS: tuple[tuple[type[nodes.Node], str], ...] = (
     (nodes.Include, "include"),
@@ -40,10 +65,10 @@ def validate_template(
 ) -> None:
     """Check that ``source`` is an inline template that can be rendered.
 
-    Validation uses the same environment as
+    Validation uses the same syntax, filters and tests as
     :class:`~giskard.agents.templates.MessageTemplate`, so it accepts exactly
-    the syntax, filters and tests that rendering supports, regardless of the
-    active template policy. Nothing is rendered.
+    what rendering supports, regardless of the active template policy.
+    Nothing is rendered or evaluated, not even constant expressions.
 
     Parameters
     ----------
@@ -76,13 +101,18 @@ def validate_template(
         raise TemplateValidationError(
             "not a valid template: nested too deeply"
         ) from error
+    except (MemoryError, OverflowError) as error:
+        # Nothing is evaluated, but a memory-capped process can still run out.
+        raise TemplateValidationError(
+            "not a valid template: too large to compile"
+        ) from error
 
 
 def _validate(
     source: str, variables: Collection[str], required: Collection[str]
 ) -> None:
     try:
-        ast = _inline_env.parse(source)
+        ast = _validation_env.parse(source)
     except TemplateSyntaxError as error:
         raise TemplateValidationError(
             f"not a valid template: {error.message}", error.lineno
@@ -100,7 +130,7 @@ def _validate(
             )
 
     try:
-        _inline_env.compile(ast)
+        _validation_env.compile(ast)
     except TemplateAssertionError as error:
         raise TemplateValidationError(
             f"not a valid template: {error.message}", error.lineno
@@ -110,13 +140,16 @@ def _validate(
     # conditionals to render time, so compiling alone does not catch them.
     for node in ast.find_all((nodes.Filter, nodes.Test)):
         for kind, name in _callee_names(node):
-            known = _inline_env.filters if kind == "filter" else _inline_env.tests
+            known = (
+                _validation_env.filters if kind == "filter" else _validation_env.tests
+            )
             if name not in known:
                 raise TemplateValidationError(
                     f"not a valid template: No {kind} named {name!r}.", node.lineno
                 )
 
-    # Excludes environment globals (``range``, ``namespace``...).
+    # Excludes environment globals (``range``, ``namespace``...). Compiles
+    # ``ast`` again, with the environment that parsed it.
     used = meta.find_undeclared_variables(ast)
     extra = used - set(variables)
     if extra:
