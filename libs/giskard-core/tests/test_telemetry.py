@@ -378,3 +378,25 @@ def test_late_opt_out_does_not_hang_exit(tmp_path):
     assert payload["send"] is False
     assert payload["disabled"] is True
     assert payload["running"] == [False]
+
+
+def test_opt_out_before_import_does_not_import_posthog(tmp_path):
+    code = (
+        "import sys, giskard.core as c\n"
+        "from giskard.core import telemetry_tag, telemetry_capture, telemetry_run_context, disable_telemetry\n"
+        "telemetry_tag('k', 'v'); telemetry_capture('e')\n"
+        "with telemetry_run_context(): pass\n"
+        "disable_telemetry()\n"
+        "assert c.telemetry.disabled\n"
+        "assert 'posthog' not in sys.modules, 'posthog imported'\n"
+    )
+    env = {**os.environ, "DO_NOT_TRACK": "1", "HOME": str(tmp_path)}
+    result = subprocess.run(
+        [sys.executable, "-I", "-c", code],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert not (tmp_path / ".giskard").exists()
