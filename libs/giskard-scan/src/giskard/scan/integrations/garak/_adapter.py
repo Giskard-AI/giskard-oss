@@ -3,7 +3,6 @@
 import asyncio
 import concurrent.futures
 import logging
-import math
 import time
 from collections import defaultdict
 from collections.abc import Iterable
@@ -23,7 +22,7 @@ from giskard.checks import (
 )
 
 from ...generators.base import DEFAULT_TARGET_MODE, TargetMode
-from .._shared import reject_unexpected_kwargs
+from .._shared import is_valid_score, reject_unexpected_kwargs
 
 if TYPE_CHECKING:
     from garak.attempt import Attempt
@@ -377,19 +376,20 @@ def _detector_details(detector_label: str) -> dict[str, Any]:
 
 
 def _score_to_check(
-    detector_label: str, score: float | None, detector: "Detector"
+    detector_label: str, score: object, detector: "Detector"
 ) -> CheckResult:
     """Map one detector score for one conversation onto a CheckResult."""
     details = _detector_details(detector_label)
     if score is None:
         return CheckResult.skip(message="detector returned no score", details=details)
 
-    if not math.isfinite(score) or not 0.0 <= score <= 1.0:
+    if not is_valid_score(score):
+        details["score"] = score
         return CheckResult.error(
             message="detector returned invalid score", details=details
         )
 
-    metrics = [Metric(name=detector_label, value=score)]
+    metrics = [Metric(name=detector_label, value=float(score))]
     if score > _HIT_THRESHOLD:
         return CheckResult.failure(
             message=detector.hit_desc, details=details, metrics=metrics
