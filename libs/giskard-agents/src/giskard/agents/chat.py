@@ -1,5 +1,5 @@
 from giskard.llm.types import AssistantMessage, ChatMessage, ChatMessageParam
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, Field, TypeAdapter, field_serializer
 
 from .context import RunContext
 from .errors.serializable import Error
@@ -9,10 +9,21 @@ _CHAT_MESSAGE_TYPE_ADAPTER = TypeAdapter(ChatMessage)
 
 class Chat[OutputType: BaseModel](BaseModel):
     messages: list[ChatMessage]
-    output_model: type[OutputType] | None = Field(default=None)
+    output_model: type[OutputType] | None = Field(
+        default=None,
+        description=(
+            "Runtime schema used by ``output``. JSON dumps omit it because a "
+            "class cannot be serialized."
+        ),
+    )
     context: RunContext = Field(default_factory=RunContext)
 
     error: Error | None = None
+
+    @field_serializer("output_model", when_used="json")
+    def _omit_output_model_from_json(self, value: type[OutputType] | None) -> None:
+        """Drop the parse schema from JSON; it is a runtime-only class object."""
+        return None
 
     @property
     def last(self) -> ChatMessage:
