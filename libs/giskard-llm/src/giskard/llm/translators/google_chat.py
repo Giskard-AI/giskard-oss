@@ -234,10 +234,22 @@ class GoogleChatParams(_BaseModel):
         else:
             context = info.context
 
-        return [
-            cast("ChatMessage", cast(object, m.model_dump(context=context)))
-            for m in value
-        ]
+        serialized: list[dict[str, Any]] = []
+        prev_was_tool = False
+        for m in value:
+            dumped = m.model_dump(context=context)
+            is_tool = isinstance(m, ToolMessage)
+            if is_tool and prev_was_tool:
+                # Gemini requires all parallel function_response parts in one user Content turn.
+                serialized[-1] = {
+                    **serialized[-1],
+                    "parts": [*serialized[-1]["parts"], *dumped["parts"]],
+                }
+            else:
+                serialized.append(dumped)
+            prev_was_tool = is_tool
+
+        return serialized
 
     @model_validator(mode="before")
     @classmethod
@@ -330,8 +342,9 @@ class GoogleChatTranslator:
     def part_content_to_giskard(
         part: "Part", num_messages: int, part_index: int
     ) -> CompletionContent | ToolCall:
-        if part.text is not None:
-            return TextContent(text=part.text, thought_signature=part.thought_signature)
+        # Check function_call before text: gateways/adapters may emit an empty text=""
+        # alongside function_call, while standalone text="" (e.g. trailing thought_signature)
+        # still falls through to TextContent.
         if part.function_call is not None:
             fc = part.function_call
             return ToolCall(
@@ -343,6 +356,8 @@ class GoogleChatTranslator:
                 ),
                 thought_signature=part.thought_signature,
             )
+        if part.text is not None:
+            return TextContent(text=part.text, thought_signature=part.thought_signature)
         raise ValueError(f"Unsupported part content type: {part}")
 
     @staticmethod
@@ -350,20 +365,18 @@ class GoogleChatTranslator:
         parts: "Sequence[Part]",
         num_messages: int,
     ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
-        content_and_tool_calls = [
-            GoogleChatTranslator.part_content_to_giskard(part, num_messages, part_index)
-            for part_index, part in enumerate(parts)
-        ]
-        content = [
-            content
-            for content in content_and_tool_calls
-            if not isinstance(content, ToolCall)
-        ]
-        tool_calls = [
-            tool_call
-            for tool_call in content_and_tool_calls
-            if isinstance(tool_call, ToolCall)
-        ]
+        content: list[CompletionContent] = []
+        tool_calls: list[ToolCall] = []
+        for part_index, part in enumerate(parts):
+            converted = GoogleChatTranslator.part_content_to_giskard(
+                part, num_messages, part_index
+            )
+            if isinstance(converted, ToolCall):
+                if part.text:
+                    content.append(TextContent(text=part.text))
+                tool_calls.append(converted)
+            else:
+                content.append(converted)
         return content, tool_calls
 
     @staticmethod
