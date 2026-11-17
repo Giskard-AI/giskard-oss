@@ -56,6 +56,11 @@ class TestValidateJsonpathSyntax:
         with pytest.raises(ValueError, match="path must start with 'trace\\.'"):
             _validate_jsonpath_syntax("tras.last.outputs")
 
+    def test_prefix_needs_its_dot(self):
+        """'traces.' is another root: the prefix is 'trace.', dot included."""
+        with pytest.raises(ValueError, match="path must start with 'trace\\.'"):
+            _validate_jsonpath_syntax("traces.last.outputs")
+
     def test_empty_string_missing_prefix(self):
         with pytest.raises(ValueError, match="path must start with 'trace\\.'"):
             _validate_jsonpath_syntax("")
