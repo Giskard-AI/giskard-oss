@@ -2,14 +2,14 @@
 
 import json
 from datetime import datetime, timezone
-from typing import List
+from typing import Annotated, List
 from uuid import UUID
 
 import pytest
 from giskard import agents
 from giskard.agents.generators import BaseGenerator
 from giskard.agents.tools import Tool, tool
-from pydantic import BaseModel
+from pydantic import AliasChoices, AliasPath, BaseModel, Field
 
 
 def test_tool_decorator():
@@ -295,6 +295,85 @@ async def test_tool_run_coerces_basemodel_input():
     assert result == "Alice"
     assert isinstance(received["person"], Person)
     assert isinstance(received["person"].address, Address)
+
+
+@pytest.mark.parametrize(
+    "field_info, arguments",
+    [
+        pytest.param(
+            Field(alias="location"),
+            {"location": {"street": "1 Elm", "city": "LA"}},
+            id="alias",
+        ),
+        pytest.param(
+            Field(validation_alias="location"),
+            {"location": {"street": "1 Elm", "city": "LA"}},
+            id="validation-alias",
+        ),
+        pytest.param(
+            Field(validation_alias=AliasChoices("location", "ship_to")),
+            {"ship_to": {"street": "1 Elm", "city": "LA"}},
+            id="alias-choices",
+        ),
+        pytest.param(
+            Field(validation_alias=AliasPath("shipping", "address")),
+            {"shipping": {"address": {"street": "1 Elm", "city": "LA"}}},
+            id="alias-path",
+        ),
+    ],
+)
+async def test_tool_run_forwards_aliased_input(field_info, arguments):
+    """Forward validated alias values under the callable's parameter name."""
+    received = []
+
+    @tool(catch=None)
+    def read_address(address: Annotated[Address, field_info]) -> str:
+        """Read a destination city.
+
+        Parameters
+        ----------
+        address : Address
+            Destination address.
+
+        Returns
+        -------
+        str
+            Destination city.
+        """
+        received.append(address)
+        return address.city
+
+    assert await read_address.run(arguments) == "LA"
+    assert received == [Address(street="1 Elm", city="LA")]
+
+
+@pytest.mark.parametrize(
+    "arguments, expected",
+    [
+        pytest.param({"location": "LA", "extra": "ignored"}, "LA", id="supplied"),
+        pytest.param({"extra": "ignored"}, "Paris", id="omitted"),
+    ],
+)
+async def test_tool_run_preserves_aliased_optional_input(arguments, expected):
+    """Use supplied aliases while leaving omitted defaults and extra keys alone."""
+
+    @tool(catch=None)
+    def read_city(city: Annotated[str, Field(alias="location")] = "Paris") -> str:
+        """Read a destination city.
+
+        Parameters
+        ----------
+        city : str
+            Destination city.
+
+        Returns
+        -------
+        str
+            Destination city.
+        """
+        return city
+
+    assert await read_city.run(arguments) == expected
 
 
 async def test_tool_run_coerces_optional_basemodel_input():
