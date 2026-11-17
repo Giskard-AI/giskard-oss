@@ -173,9 +173,10 @@ class AdversarialScenarioGenerator(ScenarioGenerator, WithGeneratorMixin):
                 LLMGenerator(
                     prompt_path="giskard.scan::scenarios/adversarial.j2",
                     max_steps=effective_max_steps,
+                    generator=self.generator,
                 )
             )
-            .check(Conformity(rule=rule))
+            .check(Conformity(rule=rule, generator=self.generator))
             .with_annotations(
                 {
                     "description": context.description,
