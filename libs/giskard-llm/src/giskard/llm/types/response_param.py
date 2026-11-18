@@ -1,6 +1,6 @@
 from typing import Any, Literal, Required, TypedDict
 
-from .reasoning import ReasoningContentParam, ReasoningSummaryParam, ReasoningTextParam
+from .reasoning import ReasoningContentParam
 
 # -- Response Input types -------------------------------------------------------------
 
@@ -54,25 +54,10 @@ class ResponseOutputMessageParam(TypedDict, total=False):
     role: Required[Literal["assistant"]]
 
 
-# Moved to ``.reasoning``; old names kept until ``ResponseReasoningItemParam`` is removed.
-ResponseReasoningSummaryParam = ReasoningSummaryParam
-ResponseReasoningTextParam = ReasoningTextParam
-
-
-class ResponseReasoningItemParam(TypedDict, total=False):
-    type: Required[Literal["reasoning"]]
-    id: Required[str]
-    summary: Required[list[ResponseReasoningSummaryParam]]
-    content: list[ResponseReasoningTextParam]
-    encrypted_content: str | None
-    status: Literal["in_progress", "completed", "incomplete"]
-
-
 ResponseInputItemParam = (
     ResponseFunctionCallOutputParam
     | ResponseFunctionToolCallParam
     | ResponseEasyInputMessageParam
     | ResponseOutputMessageParam
-    | ResponseReasoningItemParam
     | ReasoningContentParam
 )

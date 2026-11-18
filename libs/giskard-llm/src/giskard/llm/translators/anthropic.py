@@ -31,6 +31,7 @@ from ..types import (
 )
 from ..types._base import _BaseModel
 from ..utils import deserialize_arguments
+from ._reasoning import replayable
 from ._unsupported import handle_unsupported_content
 
 if TYPE_CHECKING:
@@ -160,12 +161,9 @@ def _reasoning_block(
 ) -> "ThinkingBlockParam | RedactedThinkingBlockParam | None":
     """Replay block for an Anthropic reasoning part; ``None`` drops the part.
 
-    Only parts originating from Anthropic are replayed. A ``signature`` marks a
-    ``thinking`` block, even with empty text (``display: "omitted"``);
-    ``encrypted_content`` marks ``redacted_thinking``.
+    A ``signature`` marks a ``thinking`` block, even with empty text
+    (``display: "omitted"``); ``encrypted_content`` marks ``redacted_thinking``.
     """
-    if part.provider != _PROVIDER_NAME:
-        return None
     if part.signature:
         return {
             "type": "thinking",
@@ -187,7 +185,8 @@ def serialize_assistant_message(
     if isinstance(message.content, str):
         blocks.append(_text_block(message.content))
     elif message.content is not None:
-        for part in message.content:
+        # Only reasoning originating from Anthropic is replayed (ADR-0003).
+        for part in replayable(message.content, _PROVIDER_NAME):
             if isinstance(part, ReasoningContent):
                 if (block := _reasoning_block(part)) is not None:
                     blocks.append(block)

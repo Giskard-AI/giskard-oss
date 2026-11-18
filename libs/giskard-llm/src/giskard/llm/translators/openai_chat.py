@@ -57,7 +57,7 @@ def serialize_assistant_message(
 
     Chat Completions has no reasoning field, so ``ReasoningContent`` parts are
     removed from ``content`` (an emptied list becomes no ``content``) and the
-    wire-excluded ``reasoning`` / ``reasoning_details`` fields are never sent.
+    wire-excluded ``reasoning`` field is never sent.
     """
     dump: dict[str, Any] = {"mode": info.mode, "context": info.context}
     data: dict[str, Any] = {"role": message.role}

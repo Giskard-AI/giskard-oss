@@ -104,15 +104,23 @@ def test_embedding_response():
 
 def test_assistant_reasoning_never_in_text_or_transcript():
     """Checks and judges read ``text`` / ``transcript``: reasoning must never leak there."""
-    from giskard.llm.types import ReasoningSummaryDetail, ReasoningTextDetail
+    from giskard.llm.types import (
+        ReasoningContent,
+        ReasoningSummary,
+        ReasoningText,
+        TextContent,
+    )
 
     msg = AssistantMessage(
-        content="The answer is 42.",
-        reasoning="SECRET chain of thought",
-        reasoning_details=[
-            ReasoningTextDetail(text="SECRET detail text"),
-            ReasoningSummaryDetail(summary="SECRET summary"),
+        content=[
+            ReasoningContent(
+                content=[ReasoningText(text="SECRET detail text")],
+                summary=[ReasoningSummary(text="SECRET summary")],
+                provider="anthropic",
+            ),
+            TextContent(text="The answer is 42."),
         ],
+        reasoning="SECRET chain of thought",
     )
     assert msg.text == "The answer is 42."
     assert "SECRET" not in msg.transcript
@@ -122,20 +130,49 @@ def test_assistant_reasoning_never_in_text_or_transcript():
     assert "SECRET" not in reasoning_only.transcript
 
 
-def test_assistant_reasoning_content_alias_and_discriminated_details():
-    """``reasoning_content`` is accepted as an alias; details dispatch on ``type``."""
-    from giskard.llm.types import ReasoningEncryptedDetail
-
+def test_assistant_reasoning_content_alias():
+    """``reasoning_content`` (vLLM / DeepSeek) is accepted as an alias of ``reasoning``."""
     msg = AssistantMessage.model_validate(
-        {
-            "role": "assistant",
-            "reasoning_content": "thinking",
-            "reasoning_details": [{"type": "reasoning.encrypted", "data": "x"}],
-        }
+        {"role": "assistant", "reasoning_content": "thinking"}
     )
     assert msg.reasoning == "thinking"
-    assert msg.reasoning_details == [ReasoningEncryptedDetail(data="x")]
     assert msg.model_dump()["reasoning"] == "thinking"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "ReasoningDetail",
+        "ReasoningDetailParam",
+        "ReasoningTextDetail",
+        "ReasoningTextDetailParam",
+        "ReasoningSummaryDetail",
+        "ReasoningSummaryDetailParam",
+        "ReasoningEncryptedDetail",
+        "ReasoningEncryptedDetailParam",
+        "ResponseReasoningItem",
+        "ResponseReasoningItemParam",
+        "ResponseReasoningSummary",
+        "ResponseReasoningSummaryParam",
+        "ResponseReasoningText",
+        "ResponseReasoningTextParam",
+    ],
+)
+def test_old_reasoning_carriers_are_not_exported(name: str):
+    """ADR-0003: ``ReasoningContent`` is the one reasoning type; no second carrier."""
+    import giskard.llm
+    import giskard.llm.types
+
+    assert not hasattr(giskard.llm.types, name)
+    assert not hasattr(giskard.llm, name)
+
+
+def test_assistant_message_has_no_reasoning_details_field():
+    """Reasoning lives in ``content`` parts; there is no OpenRouter-shaped side list."""
+    from giskard.llm.types import AssistantMessageParam
+
+    assert "reasoning_details" not in AssistantMessage.model_fields
+    assert "reasoning_details" not in AssistantMessageParam.__annotations__
 
 
 def test_assistant_null_reasoning_does_not_shadow_reasoning_content():

@@ -10,6 +10,9 @@ Importing this module is safe without litellm; instantiation raises ImportError.
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast, override
 
+# Imported for its side effect: it registers the ``openai/chat`` serializers that
+# ``_serialize_messages`` relies on (e.g. stripping reasoning parts, ADR-0003).
+from giskard.llm.translators import openai_chat as _openai_chat  # noqa: F401
 from giskard.llm.types import AssistantMessage, ChatMessage, Choice, CompletionResponse
 from giskard.llm.utils import sanitize_schema_name
 from pydantic import Field

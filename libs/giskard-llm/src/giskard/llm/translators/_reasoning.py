@@ -3,7 +3,7 @@
 from collections.abc import Iterable
 from typing import TypeVar
 
-from ..types import ReasoningContent, ResponseReasoningItem
+from ..types import ReasoningContent
 
 T = TypeVar("T")
 
@@ -16,11 +16,8 @@ def replayable(items: Iterable[T], provider: str) -> list[T]:
     interchangeable (``openai`` reasoning is dropped on ``azure``). Every other
     item is kept, in order.
     """
-    return [item for item in items if _replays_on(item, provider)]
-
-
-def _replays_on(item: object, provider: str) -> bool:
-    if isinstance(item, ReasoningContent):
-        return item.provider == provider
-    # Legacy untagged item: it has no Originating Provider, so it never replays.
-    return not isinstance(item, ResponseReasoningItem)
+    return [
+        item
+        for item in items
+        if not isinstance(item, ReasoningContent) or item.provider == provider
+    ]

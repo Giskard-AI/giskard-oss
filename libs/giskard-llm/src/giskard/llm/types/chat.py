@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Annotated, Any, ClassVar, Literal, Protocol
+from typing import Any, ClassVar, Literal, Protocol
 
 from pydantic import Field, model_validator
 
@@ -61,44 +61,6 @@ class RefusalContent(_BaseModel):
 
 
 CompletionContent = TextContent | RefusalContent | ReasoningContent
-
-# -- Reasoning details --------------------------------------------------------------
-# De facto OpenAI-compatible chat convention (OpenRouter / vLLM): structured, replayable
-# reasoning that must be passed back unmodified on later assistant turns.
-
-
-class _ReasoningDetailBase(_BaseModel):
-    id: str | None = None
-    format: str | None = "unknown"
-    index: int | None = None
-
-
-class ReasoningTextDetail(_ReasoningDetailBase):
-    """Plaintext reasoning, optionally signed for verbatim replay."""
-
-    type: Literal["reasoning.text"] = "reasoning.text"
-    text: str
-    signature: str | None = None
-
-
-class ReasoningSummaryDetail(_ReasoningDetailBase):
-    """Provider-generated summary of the reasoning."""
-
-    type: Literal["reasoning.summary"] = "reasoning.summary"
-    summary: str
-
-
-class ReasoningEncryptedDetail(_ReasoningDetailBase):
-    """Opaque (encrypted or redacted) reasoning payload."""
-
-    type: Literal["reasoning.encrypted"] = "reasoning.encrypted"
-    data: str
-
-
-ReasoningDetail = Annotated[
-    ReasoningTextDetail | ReasoningSummaryDetail | ReasoningEncryptedDetail,
-    Field(discriminator="type"),
-]
 
 # -- Chat Message types -------------------------------------------------------------
 
@@ -179,11 +141,8 @@ class AssistantMessage(_BaseModel):
     replayed to a provider. Removed in 2.0; read ``ReasoningContent`` parts of
     ``content`` instead.
     """
-    reasoning_details: list[ReasoningDetail] | None = None
 
-    _wire_excluded: ClassVar[frozenset[str]] = frozenset(
-        {"reasoning", "reasoning_details"}
-    )
+    _wire_excluded: ClassVar[frozenset[str]] = frozenset({"reasoning"})
 
     @model_validator(mode="before")
     @classmethod

@@ -17,7 +17,6 @@ from giskard.llm.types import (
     ChatMessage,
     ReasoningContent,
     ReasoningText,
-    ReasoningTextDetail,
     SystemMessage,
     TextContent,
     ToolCall,
@@ -145,7 +144,6 @@ async def test_native_prediction_does_not_send_reasoning(mock_api):
         AssistantMessage(
             content="Hello.",
             reasoning="Greet back.",
-            reasoning_details=[ReasoningTextDetail(text="Greet back.", signature="s")],
         ),
     ]
 

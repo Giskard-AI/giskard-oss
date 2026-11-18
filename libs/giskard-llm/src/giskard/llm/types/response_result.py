@@ -5,7 +5,6 @@ from .reasoning import ReasoningContent
 from .response import (
     ResponseFunctionToolCall,
     ResponseOutputMessage,
-    ResponseReasoningItem,
 )
 from .usage import Usage
 
@@ -13,12 +12,7 @@ from .usage import Usage
 
 
 # Plain assignment (not `type` statement) so isinstance(x, ResponseOutputItem) works at runtime.
-ResponseOutputItem = (
-    ResponseOutputMessage
-    | ResponseFunctionToolCall
-    | ResponseReasoningItem
-    | ReasoningContent
-)
+ResponseOutputItem = ResponseOutputMessage | ResponseFunctionToolCall | ReasoningContent
 
 
 class ResponseResult(_BaseModel):
@@ -46,11 +40,6 @@ class ResponseResult(_BaseModel):
         return [o for o in self.outputs if isinstance(o, ResponseFunctionToolCall)]
 
     @property
-    def reasoning(self) -> list[ReasoningContent | ResponseReasoningItem]:
+    def reasoning(self) -> list[ReasoningContent]:
         """Return all reasoning outputs (never part of ``output_text``)."""
-        # ``ResponseReasoningItem`` is accepted until the translators migrate.
-        return [
-            o
-            for o in self.outputs
-            if isinstance(o, ReasoningContent | ResponseReasoningItem)
-        ]
+        return [o for o in self.outputs if isinstance(o, ReasoningContent)]

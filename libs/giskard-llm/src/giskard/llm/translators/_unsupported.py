@@ -56,7 +56,8 @@ def keep_supported(
     ignore_unsupported_content : bool
         If ``True``, drop unsupported items with a warning instead of raising.
     label_prefix : str
-        Prefix for the reported content type (e.g. ``"reasoning_details:"``).
+        Prefix for the reported content type (e.g. ``"reasoning_details:"`` for
+        items of OpenRouter's raw ``reasoning_details`` wire key).
 
     Returns
     -------

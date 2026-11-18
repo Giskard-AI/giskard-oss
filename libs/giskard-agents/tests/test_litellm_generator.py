@@ -18,7 +18,9 @@ from giskard.agents.generators.litellm_generator import (
 )
 from giskard.llm.types import (
     AssistantMessage,
-    ReasoningTextDetail,
+    ReasoningContent,
+    ReasoningText,
+    TextContent,
     UserMessage,
     UserMessageParam,
 )
@@ -178,24 +180,34 @@ async def test_litellm_generator_sanitizes_response_format_schema_name(
 async def test_litellm_generator_does_not_send_reasoning(
     mock_acompletion: Any,
 ) -> None:
-    """Assistant reasoning fields are not OpenAI message fields and are never sent."""
+    """Reasoning parts and the deprecated ``reasoning`` field are never sent.
+
+    Chat Completions has no reasoning field (ADR-0003), whatever the route.
+    """
     generator = LiteLLMGenerator(model="azure/gpt-4o")
     await generator.complete(
         messages=[
             UserMessage(content="Hi"),
             AssistantMessage(
-                content="Hello.",
-                reasoning="Greet back.",
-                reasoning_details=[
-                    ReasoningTextDetail(text="Greet back.", signature="s")
+                content=[
+                    ReasoningContent(
+                        content=[ReasoningText(text="Greet back.")],
+                        signature="s",
+                        provider="anthropic",
+                    ),
+                    TextContent(text="Hello."),
                 ],
+                reasoning="Greet back.",
             ),
             UserMessage(content="Bye"),
         ]
     )
 
     sent = mock_acompletion.call_args.kwargs["messages"]
-    assert sent[1] == {"role": "assistant", "content": "Hello."}
+    assert sent[1] == {
+        "role": "assistant",
+        "content": [{"type": "text", "text": "Hello."}],
+    }
 
 
 @pytest.mark.parametrize(
