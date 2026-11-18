@@ -408,6 +408,23 @@ def test_from_openai_unknown_reasoning_detail_dropped_with_warning(
     assert "reasoning.future" in caplog.text
 
 
+def test_from_openai_all_reasoning_details_dropped_falls_back_to_reasoning_text():
+    """When every detail is dropped as unsupported, the plain ``reasoning`` string is kept."""
+    raw = _completion_with_message(
+        reasoning="Hmm.",
+        reasoning_details=[{"type": "reasoning.future", "payload": "x"}],
+    )
+    msg = (
+        OpenAIChatTranslator.from_openai(raw, ignore_unsupported_content=True)
+        .choices[0]
+        .message
+    )
+    assert msg.content == [
+        ReasoningContent(content=[ReasoningText(text="Hmm.")], provider="openai"),
+        TextContent(text="42"),
+    ]
+
+
 @pytest.mark.parametrize(
     ("details", "expected_reasoning_tokens"),
     [

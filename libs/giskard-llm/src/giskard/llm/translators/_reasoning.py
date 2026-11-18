@@ -1,14 +1,11 @@
 """Route-gated reasoning replay (ADR-0003)."""
 
 from collections.abc import Iterable
-from typing import TypeVar
 
 from ..types import ReasoningContent
 
-T = TypeVar("T")
 
-
-def replayable(items: Iterable[T], provider: str) -> list[T]:
+def replayable[T](items: Iterable[T], provider: str) -> list[T]:
     """Drop reasoning that did not originate from *provider*.
 
     A ``ReasoningContent`` is kept only when its ``provider`` equals *provider*

@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import Any, Literal, override
 
 import httpx
-from giskard.llm.types import AssistantMessage, ChatMessage, ReasoningContent, Usage
+from giskard.llm.types import AssistantMessage, ChatMessage, Usage, without_reasoning
 from pydantic import BaseModel, Field, field_validator
 
 from .base import BaseSOM, SOMResponse
@@ -39,8 +39,9 @@ def _judged_state(message: ChatMessage) -> dict[str, Any]:
     removed. A ``content`` list left empty is omitted.
     """
     if isinstance(message, AssistantMessage) and isinstance(message.content, list):
-        parts = [p for p in message.content if not isinstance(p, ReasoningContent)]
-        message = message.model_copy(update={"content": parts or None})
+        message = message.model_copy(
+            update={"content": without_reasoning(message.content)}
+        )
     return message.model_dump(
         mode="json",
         exclude_none=True,

@@ -435,10 +435,14 @@ def test_reasoning_item_from_another_route_is_dropped(origin: str | None, route:
 
 
 def test_openai_reasoning_item_without_id_is_rejected():
-    """OpenAI needs the item ``id`` to replay reasoning; it is never invented."""
+    """OpenAI needs the item ``id`` to replay reasoning; it is never invented.
+
+    Rejected as ``BadRequestError`` before serialization, so it never escapes the
+    provider as a pydantic serialization error.
+    """
     from giskard.llm.types import ReasoningContent
 
-    with pytest.raises(ValueError, match="id"):
+    with pytest.raises(BadRequestError, match="id"):
         OpenAIResponseTranslator.to_openai(
             _MODEL,
             [

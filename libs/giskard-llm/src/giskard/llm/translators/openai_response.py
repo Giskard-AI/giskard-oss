@@ -54,10 +54,9 @@ def reasoning_to_openai(
     """Send only the fields OpenAI accepts on input reasoning items.
 
     ``content`` must be null on input, and ``signature`` / ``provider`` are not
-    OpenAI fields.
+    OpenAI fields. A missing ``id`` is rejected earlier, by
+    ``_reject_reasoning_without_id``.
     """
-    if model.id is None:
-        raise ValueError("OpenAI reasoning items need an id to be replayed")
     item: dict[str, Any] = {
         "type": model.type,
         "id": model.id,
@@ -66,6 +65,16 @@ def reasoning_to_openai(
     if model.encrypted_content is not None:
         item["encrypted_content"] = model.encrypted_content
     return item
+
+
+def _reject_reasoning_without_id(
+    items: Sequence[ResponseInputItem], provider: str
+) -> None:
+    """OpenAI needs the item ``id`` to replay reasoning; it is never invented."""
+    if any(isinstance(i, ReasoningContent) and i.id is None for i in items):
+        raise BadRequestError(
+            400, "OpenAI reasoning items need an id to be replayed", provider
+        )
 
 
 def _text_config_from_response_format_dict(
@@ -205,12 +214,14 @@ class OpenAIResponseTranslator:
                 sorted(unknown),
             )
 
+        if not isinstance(input, str):
+            input = replayable(input, provider)
+            _reject_reasoning_without_id(input, provider)
+
         response_params = OpenAIResponseParams.model_validate(
             {
                 "model": model,
-                "input": input
-                if isinstance(input, str)
-                else replayable(input, provider),
+                "input": input,
                 "instructions": instructions,
                 "previous_response_id": previous_id,
                 "tools": tools,

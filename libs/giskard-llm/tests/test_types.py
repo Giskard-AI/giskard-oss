@@ -430,3 +430,57 @@ def test_response_result_accepts_reasoning_content_outputs():
 
     assert result.reasoning == [part]
     assert result.output_text is None
+
+
+def test_serializer_returning_a_copy_gets_the_default_dump():
+    """A provider serializer may return a rewritten copy; it is dumped field by field.
+
+    Every field is kept (none rebuilt by hand) and wire-excluded fields are dropped.
+    """
+    from typing import ClassVar
+
+    from giskard.llm.types._base import _BaseModel
+    from pydantic import SerializationInfo
+
+    class _Model(_BaseModel):
+        kept: str
+        rewritten: str
+        hidden: str | None = None
+
+        _wire_excluded: ClassVar[frozenset[str]] = frozenset({"hidden"})
+
+    @_Model.register_serializer("test/copy")
+    def _rewrite(model: _Model, _info: SerializationInfo) -> _Model:
+        return model.model_copy(update={"rewritten": "new"})
+
+    model = _Model(kept="a", rewritten="old", hidden="secret")
+    assert model.model_dump(context={"provider": "test/copy"}) == {
+        "kept": "a",
+        "rewritten": "new",
+    }
+
+
+def test_without_reasoning_drops_reasoning_parts_in_order():
+    from giskard.llm.types import (
+        ReasoningContent,
+        RefusalContent,
+        TextContent,
+        without_reasoning,
+    )
+
+    parts = [
+        ReasoningContent(encrypted_content="enc", provider="openai"),
+        TextContent(text="a"),
+        RefusalContent(refusal="no"),
+    ]
+    assert without_reasoning(parts) == [
+        TextContent(text="a"),
+        RefusalContent(refusal="no"),
+    ]
+
+
+def test_without_reasoning_empty_result_is_none():
+    from giskard.llm.types import ReasoningContent, without_reasoning
+
+    assert without_reasoning([ReasoningContent(provider="openai")]) is None
+    assert without_reasoning([]) is None

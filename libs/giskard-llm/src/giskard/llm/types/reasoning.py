@@ -1,5 +1,6 @@
 """Reasoning: effort levels and the ``ReasoningContent`` carrier (ADR-0003)."""
 
+from collections.abc import Iterable
 from typing import Annotated, Literal, Required, TypedDict, cast, get_args
 
 from pydantic import BeforeValidator, Field
@@ -93,6 +94,16 @@ class ReasoningContent(_BaseModel):
     signature: str | None = None
     status: ReasoningStatus | None = None
     provider: str | None = None
+
+
+def without_reasoning[T](parts: Iterable[T]) -> list[T] | None:
+    """Drop ``ReasoningContent`` parts, keeping every other part in order.
+
+    For callers that show or send a conversation without its private reasoning.
+    A list left empty becomes ``None``, so it reads as "no content".
+    """
+    kept = [part for part in parts if not isinstance(part, ReasoningContent)]
+    return kept or None
 
 
 class ReasoningSummaryParam(TypedDict, total=False):

@@ -7,8 +7,8 @@ from giskard.llm.types import (
     ChatMessage,
     CompletionResponse,
     NormalizedReasoningEffort,
-    ReasoningContent,
     ToolDef,
+    without_reasoning,
 )
 from giskard.llm.types._base import _BaseModel
 from giskard.llm.utils import sanitize_schema_name
@@ -51,33 +51,18 @@ _REASONING_DETAIL_TYPES = frozenset(
 
 @AssistantMessage.register_serializer(_PROVIDER)
 def serialize_assistant_message(
-    message: AssistantMessage, info: SerializationInfo
-) -> dict[str, Any]:
+    message: AssistantMessage, _info: SerializationInfo
+) -> AssistantMessage:
     """Serialize an assistant turn without reasoning (ADR-0003).
 
-    Chat Completions has no reasoning field, so ``ReasoningContent`` parts are
-    removed from ``content`` (an emptied list becomes no ``content``) and the
-    wire-excluded ``reasoning`` field is never sent.
+    Chat Completions has no reasoning field, so the turn is dumped as a copy
+    whose ``ReasoningContent`` parts are removed from ``content`` (an emptied
+    list becomes no ``content``); the wire-excluded ``reasoning`` field is never
+    sent.
     """
-    dump: dict[str, Any] = {"mode": info.mode, "context": info.context}
-    data: dict[str, Any] = {"role": message.role}
-    content = message.content
-    if content is not None and not isinstance(content, str):
-        parts = [
-            part.model_dump(**dump)
-            for part in content
-            if not isinstance(part, ReasoningContent)
-        ]
-        content = parts or None
-    if content is not None:
-        data["content"] = content
-    if message.refusal is not None:
-        data["refusal"] = message.refusal
-    if message.tool_calls is not None:
-        data["tool_calls"] = [
-            tool_call.model_dump(**dump) for tool_call in message.tool_calls
-        ]
-    return data
+    if message.content is None or isinstance(message.content, str):
+        return message
+    return message.model_copy(update={"content": without_reasoning(message.content)})
 
 
 class OpenAIChatParams(_BaseModel):
@@ -194,7 +179,8 @@ def _move_reasoning_into_content(
             label_prefix="reasoning_details:",
         )
         parts = [_detail_to_part(detail, provider) for detail in kept]
-    elif text:
+    # The plain string still applies when no detail survived (all unsupported).
+    if not parts and text:
         parts = [_reasoning_part(provider, content=[_reasoning_text(text)])]
     if not parts:
         return

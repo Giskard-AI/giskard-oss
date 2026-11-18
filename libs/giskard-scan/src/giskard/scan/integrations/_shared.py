@@ -10,10 +10,10 @@ integrations.
 
 import asyncio
 from collections.abc import Coroutine, Iterable
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from giskard.checks import Interaction, Trace
-from giskard.llm.types import ReasoningContent
+from giskard.llm.types import without_reasoning
 
 
 class RoleContentTurn(Protocol):
@@ -34,8 +34,7 @@ def _without_reasoning(content: Any) -> Any:
     """
     if not isinstance(content, list):
         return content
-    parts = [part for part in content if not isinstance(part, ReasoningContent)]  # pyright: ignore[reportUnknownVariableType]
-    return parts or None
+    return without_reasoning(cast(list[object], content))
 
 
 async def trace_from_role_content_turns(turns: Iterable[RoleContentTurn]) -> Trace:  # pyright: ignore[reportMissingTypeArgument]

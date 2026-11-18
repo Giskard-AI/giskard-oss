@@ -124,10 +124,10 @@ class AssistantMessage(_BaseModel):
     refusal: str | None = None
     tool_calls: Sequence[ToolCall] | None = None
     # Reasoning never contributes to ``text`` / ``transcript``: those are what checks
-    # and judges evaluate, and must only contain the visible answer. It is only replayed
-    # to the provider that produced it: the Anthropic serializer sends signed thinking
-    # back (required for tool loops with thinking on). Every other serializer strips it
-    # through ``_wire_excluded``.
+    # and judges evaluate, and must only contain the visible answer. This field is a
+    # deprecated, derived view of the ``ReasoningContent`` parts and is never replayed
+    # (``_wire_excluded``); replay is driven by those parts, each sent back only to
+    # the provider that produced it (ADR-0003).
     reasoning: str | None = Field(
         default=None,
         deprecated=(
