@@ -39,8 +39,8 @@ Chat Completions defines no reasoning field, so reasoning has its own convention
   - `signature` authenticates visible `content`: Anthropic `thinking.signature`, or the base64 Gemini thought signature.
   - `encrypted_content` replaces content the caller cannot see: OpenAI encrypted reasoning, or Anthropic `redacted_thinking.data`.
 - **Provenance.** `provider` is the giskard provider id the call was routed through (`openai`, `azure`, `azure_ai`, `anthropic`, `google`). A serializer replays reasoning only when the tag matches its provider exactly, and drops it silently otherwise. Account-level or region-level rejections (Anthropic account-bound signatures, Gemini API vs Vertex) surface as the provider's 400. Routes of the same family are not interchangeable either: an `openai` item sent to `azure` or `azure_ai` is dropped, so switching routes mid-conversation loses reasoning. Revisit only if a live test shows `encrypted_content` decrypts across them.
-- **Order.** `content` keeps reasoning and text parts in the order the provider returned them. `tool_calls` is still a sibling list, so order between reasoning and tool calls is not stored. The Anthropic serializer emits `content` parts in stored order, then `tool_calls`. That reproduces the original turn only when every thinking block came before the first tool call. When an Anthropic response has a thinking block after a `tool_use`, the translator reports it through `unsupported` (raises unless `ignore_unsupported_content`). Whether Claude produces that shape with client tools is not yet verified; a live test should try to trigger it.
-- **Type.** `ReasoningContent` replaces the unreleased `ResponseReasoningItem` (renamed, `id` made optional). Any check that an `openai` item has an `id` moves from the model to the OpenAI serializer.
+- **Order.** `content` keeps reasoning and text parts in the order the provider returned them. `tool_calls` is still a sibling list, so order between reasoning and tool calls is not stored. The Anthropic serializer emits `content` parts in stored order, then `tool_calls`. That reproduces the original turn only when every thinking block came before the first tool call. When an Anthropic response has a thinking block after a `tool_use`, the translator reports it through `unsupported` as `thinking_after_tool_use` (raises unless `ignore_unsupported_content`, which drops the block). Whether Claude produces that shape with client tools is not yet verified; a live test should try to trigger it. When consecutive assistant messages are merged into one Anthropic turn, thinking blocks are moved to the front of the merged turn (stable sort), because Anthropic requires a turn to lead with thinking. Reasoning parts inside tool-result content are dropped: Anthropic only accepts thinking in assistant turns.
+- **Type.** `ReasoningContent` replaces the unreleased `ResponseReasoningItem` (renamed, `id` made optional). Any check that an `openai` item has an `id` moves from the model to the OpenAI serializer, which raises `ValueError` on a missing `id`. Because it raises during serialization, it surfaces as a pydantic serialization error, not as `BadRequestError`.
 
 Who replays:
 
@@ -49,7 +49,7 @@ Who replays:
 | Anthropic chat | yes: `thinking` (text + `signature`), `redacted_thinking` (`encrypted_content`) | required for tool loops with thinking |
 | OpenAI / Azure Responses | yes: `id`, `summary`, `encrypted_content` | |
 | Google Responses | yes: thought step `summary` + `signature` | |
-| Google chat | no | thought text is kept out of `content` answers; tool-call signatures live on `ToolCall.thought_signature` (#2965) |
+| Google chat | no | thought parts are stored in `content` (never in `.text`) and skipped on the way out; tool-call signatures live on `ToolCall.thought_signature` (#2965) |
 | OpenAI chat (incl. OpenAI-compatible servers) | no | Chat Completions has no field; reasoning parts are stripped from `content` |
 
 `ReasoningContent` is a superset of every provider's shape, so what goes on the wire is not the public object. Serializer rules:
@@ -62,9 +62,9 @@ Who replays:
 - **Replay reads `content` parts only.** The deprecated `reasoning` string is never a replay source, including when `content` is a plain string.
 - **Answer text skips reasoning by type.** `_extract_text` (and so `.text` / `.transcript`) filters out `ReasoningContent` with an isinstance check. It must not rely on a missing `.text`, which raises, nor give the part a `.text`, which would leak thoughts into answers.
 
-OpenAI-compatible servers return reasoning as `reasoning`, `reasoning_content` (vLLM, DeepSeek) or `reasoning_details` (OpenRouter). `OpenAIChatTranslator` converts all three to `ReasoningContent` tagged with the routed provider id. It ignores OpenRouter's `format`.
+OpenAI-compatible servers return reasoning as `reasoning`, `reasoning_content` (vLLM, DeepSeek) or `reasoning_details` (OpenRouter). `OpenAIChatTranslator` converts all three to `ReasoningContent` tagged with the routed provider id and placed before the answer text. `reasoning_details` maps item by item (`reasoning.text` to `content` + `signature`, `reasoning.summary` to `summary`, `reasoning.encrypted` to `encrypted_content`, keeping `id`); when it is present, the plain `reasoning` string is discarded, since it duplicates the `reasoning.text` items. It ignores OpenRouter's `format` and `index`. The raw keys are removed after conversion, so the public type never carries `reasoning_details`; the OpenRouter wire key is still read on the way in.
 
-`AssistantMessage.reasoning: str` is released (1.0.x) and stays through 1.x as a deprecated convenience: it is filled from the parts' `reasoning_text`, never replayed, and removed in 2.0. Do not add OpenRouter fields (`reasoning_details`, `format` tags) or a second reasoning type to the public types.
+`AssistantMessage.reasoning: str` is released (1.0.x) and stays through 1.x as a deprecated convenience: it is filled from the parts' `reasoning_text` only, never replayed, and removed in 2.0. A message whose reasoning is only `summary` or `encrypted_content` has `reasoning is None`. Do not add OpenRouter fields (`reasoning_details`, `format` tags) or a second reasoning type to the public types.
 
 ## Tool Definition Format
 
@@ -124,5 +124,5 @@ In `giskard-agents`, `GenerationParams` uses `extra="forbid"` and `BaseGenerator
 Public reasoning is `ReasoningContent`, see [Reasoning: one type](#reasoning-one-type-reasoningcontent-adr-0003).
 
 - **Answer isolation**: `ReasoningContent` parts and the deprecated `AssistantMessage.reasoning` never contribute to `.text`, `.transcript`, or `.output_text`. Serializers send reasoning only to its originating provider.
-- **Google thought parts**: `GoogleChatTranslator` turns `Part.thought == True` parts into `ReasoningContent` parts tagged `google`, never `TextContent`.
+- **Google thought parts**: `GoogleChatTranslator` turns every `Part.thought == True` part into a `ReasoningContent` part tagged `google`, never `TextContent`, including thought parts with empty or missing text. A thought signature is base64-encoded into `signature`. Google chat does not replay these parts.
 - **Reasoning tokens**: `Usage.reasoning_tokens: int | None = None` captures reasoning token counts from OpenAI Chat (`completion_tokens_details.reasoning_tokens`), OpenAI Responses (`output_tokens_details.reasoning_tokens`), Anthropic Messages (`output_tokens_details.thinking_tokens`), Google Chat (`usage_metadata.thoughts_token_count`, which remains included in `output_tokens`), and Google Interactions (`usage.total_thought_tokens`).
