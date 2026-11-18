@@ -14,6 +14,12 @@ import pytest
 pytest.importorskip("openai")
 
 from giskard.llm.translators.openai_chat import OpenAIChatTranslator
+from giskard.llm.types import (
+    ReasoningContent,
+    ReasoningSummary,
+    ReasoningText,
+    TextContent,
+)
 from openai.types.chat.chat_completion import ChatCompletion, Choice
 from openai.types.chat.chat_completion_message import ChatCompletionMessage
 from openai.types.chat.chat_completion_message_function_tool_call import (
@@ -241,22 +247,31 @@ def _completion_with_message(**extras: object) -> ChatCompletion:
 
 @pytest.mark.parametrize("field", ["reasoning", "reasoning_content"])
 def test_from_openai_reasoning_plaintext(field: str):
-    """vLLM ``reasoning`` and DeepSeek ``reasoning_content`` both land on ``reasoning``."""
+    """vLLM ``reasoning`` / DeepSeek ``reasoning_content`` become one reasoning part before the answer."""
     raw = _completion_with_message(**{field: "Let me think step by step."})
     msg = OpenAIChatTranslator.from_openai(raw).choices[0].message
+    assert msg.content == [
+        ReasoningContent(
+            content=[ReasoningText(text="Let me think step by step.")],
+            provider="openai",
+        ),
+        TextContent(text="42"),
+    ]
     assert msg.reasoning == "Let me think step by step."
     assert msg.text == "42"
     assert "think step by step" not in msg.transcript
 
 
-def test_from_openai_reasoning_details():
-    """Each OpenRouter ``reasoning_details`` item type parses with its fields preserved."""
-    from giskard.llm.types import (
-        ReasoningEncryptedDetail,
-        ReasoningSummaryDetail,
-        ReasoningTextDetail,
-    )
+def test_from_openai_without_reasoning_keeps_string_content():
+    """No reasoning extras: ``content`` stays the plain string."""
+    raw = _completion_with_message()
+    msg = OpenAIChatTranslator.from_openai(raw).choices[0].message
+    assert msg.content == "42"
+    assert msg.reasoning is None
 
+
+def test_from_openai_reasoning_details():
+    """Each OpenRouter ``reasoning_details`` item becomes one part, ``id`` kept, ``format`` / ``index`` dropped."""
     raw = _completion_with_message(
         reasoning="Thinking...",
         reasoning_details=[
@@ -283,20 +298,78 @@ def test_from_openai_reasoning_details():
         ],
     )
     msg = OpenAIChatTranslator.from_openai(raw).choices[0].message
-    assert msg.reasoning_details == [
-        ReasoningTextDetail(
-            text="Thinking...",
-            signature="sig",
+    assert msg.content == [
+        ReasoningContent(
             id="r1",
-            format="anthropic-claude-v1",
-            index=0,
+            content=[ReasoningText(text="Thinking...")],
+            signature="sig",
+            provider="openai",
         ),
-        ReasoningSummaryDetail(summary="Short summary", format="openai-responses-v1"),
-        ReasoningEncryptedDetail(data="opaque", id="r3", format="google-gemini-v1"),
+        ReasoningContent(
+            summary=[ReasoningSummary(text="Short summary")], provider="openai"
+        ),
+        ReasoningContent(id="r3", encrypted_content="opaque", provider="openai"),
+        TextContent(text="42"),
     ]
+    # The ``reasoning`` string is derived from the parts, not duplicated.
+    assert msg.reasoning == "Thinking..."
     assert msg.text == "42"
     assert "Thinking" not in msg.transcript
     assert "Short summary" not in msg.transcript
+
+
+def test_from_openai_reasoning_with_tool_calls_and_no_content():
+    """A tool-call turn with reasoning and ``content: null`` holds only the reasoning part."""
+    raw = ChatCompletion(
+        id="chatcmpl-reasoning-tools",
+        choices=[
+            Choice(
+                index=0,
+                finish_reason="tool_calls",
+                message=ChatCompletionMessage.model_validate(
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "reasoning": "Call the tool.",
+                        "tool_calls": [
+                            {
+                                "id": "call_1",
+                                "type": "function",
+                                "function": {"name": "mul", "arguments": "{}"},
+                            }
+                        ],
+                    }
+                ),
+            )
+        ],
+        created=0,
+        model=_MODEL,
+        object="chat.completion",
+    )
+    msg = OpenAIChatTranslator.from_openai(raw).choices[0].message
+    assert msg.content == [
+        ReasoningContent(
+            content=[ReasoningText(text="Call the tool.")], provider="openai"
+        )
+    ]
+    assert msg.text is None
+    assert msg.tool_calls is not None and msg.tool_calls[0].id == "call_1"
+
+
+@pytest.mark.parametrize("route", ["azure", "azure_ai"])
+def test_from_openai_reasoning_parts_tagged_with_route(route: str):
+    """Parts carry the route the call went through, not the model family."""
+    raw = _completion_with_message(
+        reasoning="Hmm.",
+        reasoning_details=[{"type": "reasoning.encrypted", "data": "opaque"}],
+    )
+    content = (
+        OpenAIChatTranslator.from_openai(raw, provider=route).choices[0].message.content
+    )
+    assert isinstance(content, list)
+    assert [
+        part.provider for part in content if isinstance(part, ReasoningContent)
+    ] == [route]
 
 
 def test_from_openai_unknown_reasoning_detail_raises():
@@ -328,8 +401,10 @@ def test_from_openai_unknown_reasoning_detail_dropped_with_warning(
             .choices[0]
             .message
         )
-    assert msg.reasoning_details is not None
-    assert [d.type for d in msg.reasoning_details] == ["reasoning.encrypted"]
+    assert msg.content == [
+        ReasoningContent(encrypted_content="opaque", provider="openai"),
+        TextContent(text="42"),
+    ]
     assert "reasoning.future" in caplog.text
 
 
