@@ -18,9 +18,8 @@ from ..types import (
     CompletionContent,
     CompletionResponse,
     FunctionMessage,
-    ReasoningDetail,
-    ReasoningEncryptedDetail,
-    ReasoningTextDetail,
+    ReasoningContent,
+    ReasoningText,
     RefusalContent,
     TextContent,
     ToolCall,
@@ -66,8 +65,6 @@ else:
 
 _PROVIDER = "anthropic/chat"
 _PROVIDER_NAME = "anthropic"
-# ``reasoning_details`` format tag for Anthropic thinking (OpenRouter convention).
-_REASONING_FORMAT = "anthropic-claude-v1"
 _THINKING_BLOCK_TYPES = frozenset({"thinking", "redacted_thinking"})
 _SUPPORTED_REASONING_EFFORTS = frozenset({"low", "medium", "high", "xhigh", "max"})
 logger = logging.getLogger(__name__)
@@ -138,47 +135,64 @@ def _completion_content_to_blocks(
     content: str | Sequence[CompletionContent],
     info: SerializationInfo | None = None,
 ) -> "Sequence[TextBlockParam]":
+    """Text blocks for non-assistant content; reasoning parts are never sent here."""
     if isinstance(content, str):
         return [_text_block(content)]
 
     return [
-        cast(
-            "TextBlockParam",
-            cast(object, c.model_dump(context=info.context if info else None)),
-        )
+        _content_part_to_block(c, info)
         for c in content
+        if not isinstance(c, ReasoningContent)
     ]
 
 
-def _thinking_blocks(
-    details: Sequence[ReasoningDetail] | None,
-) -> "list[ThinkingBlockParam | RedactedThinkingBlockParam]":
-    """Signed Anthropic thinking to replay; unsigned or foreign reasoning is dropped."""
-    blocks: "list[ThinkingBlockParam | RedactedThinkingBlockParam]" = []
-    for detail in details or ():
-        if detail.format != _REASONING_FORMAT:
-            continue
-        if isinstance(detail, ReasoningTextDetail) and detail.signature:
-            blocks.append(
-                {
-                    "type": "thinking",
-                    "thinking": detail.text,
-                    "signature": detail.signature,
-                }
-            )
-        elif isinstance(detail, ReasoningEncryptedDetail):
-            blocks.append({"type": "redacted_thinking", "data": detail.data})
-    return blocks
+def _content_part_to_block(
+    part: TextContent | RefusalContent, info: SerializationInfo | None
+) -> "TextBlockParam":
+    return cast(
+        "TextBlockParam",
+        cast(object, part.model_dump(context=info.context if info else None)),
+    )
+
+
+def _reasoning_block(
+    part: ReasoningContent,
+) -> "ThinkingBlockParam | RedactedThinkingBlockParam | None":
+    """Replay block for an Anthropic reasoning part; ``None`` drops the part.
+
+    Only parts originating from Anthropic are replayed. A ``signature`` marks a
+    ``thinking`` block, even with empty text (``display: "omitted"``);
+    ``encrypted_content`` marks ``redacted_thinking``.
+    """
+    if part.provider != _PROVIDER_NAME:
+        return None
+    if part.signature:
+        return {
+            "type": "thinking",
+            "thinking": "\n".join(t.text for t in part.content or ()),
+            "signature": part.signature,
+        }
+    if part.encrypted_content:
+        return {"type": "redacted_thinking", "data": part.encrypted_content}
+    return None
 
 
 @AssistantMessage.register_serializer(_PROVIDER)
 def serialize_assistant_message(
     message: AssistantMessage, info: SerializationInfo
 ) -> "MessageParam":
-    # Anthropic requires thinking blocks to lead the assistant turn they belong to.
-    blocks: "list[ContentBlockParam]" = [*_thinking_blocks(message.reasoning_details)]
-    if message.content is not None:
-        blocks.extend(_completion_content_to_blocks(message.content, info))
+    # Content parts in stored order, then tool calls (``tool_calls`` is a sibling
+    # list; thinking after a ``tool_use`` is rejected on the way in).
+    blocks: "list[ContentBlockParam]" = []
+    if isinstance(message.content, str):
+        blocks.append(_text_block(message.content))
+    elif message.content is not None:
+        for part in message.content:
+            if isinstance(part, ReasoningContent):
+                if (block := _reasoning_block(part)) is not None:
+                    blocks.append(block)
+            else:
+                blocks.append(_content_part_to_block(part, info))
     if (refusal := message.refusal) is not None:
         blocks.append(_text_block(refusal))
 
@@ -456,27 +470,37 @@ class AnthropicChatTranslator:
     @staticmethod
     def blocks_to_giskard(
         blocks: "Sequence[ContentBlock]", *, ignore_unsupported_content: bool = False
-    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall], list[ReasoningDetail]]:
-        """Split blocks into content, tool calls and reasoning details.
+    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
+        """Split blocks into ordered content parts and tool calls.
 
-        ``thinking`` blocks keep their signature and ``redacted_thinking`` its opaque
-        payload, so they can be replayed verbatim.
+        Each ``thinking`` / ``redacted_thinking`` block becomes one
+        ``ReasoningContent`` part at its position, keeping its signature or opaque
+        payload so it can be replayed verbatim. Thinking after the first
+        ``tool_use`` cannot be stored in order (``tool_calls`` is a sibling list),
+        so it is reported as unsupported.
         """
         content: list[CompletionContent] = []
         tool_calls: list[ToolCall] = []
-        reasoning_details: list[ReasoningDetail] = []
         for block in blocks:
-            if block.type == "thinking":
-                reasoning_details.append(
-                    ReasoningTextDetail(
-                        text=block.thinking,
+            if block.type in _THINKING_BLOCK_TYPES and tool_calls:
+                handle_unsupported_content(
+                    _PROVIDER_NAME,
+                    "thinking_after_tool_use",
+                    ignore_unsupported_content=ignore_unsupported_content,
+                )
+            elif block.type == "thinking":
+                content.append(
+                    ReasoningContent(
+                        content=[ReasoningText(text=block.thinking)],
                         signature=block.signature,
-                        format=_REASONING_FORMAT,
+                        provider=_PROVIDER_NAME,
                     )
                 )
             elif block.type == "redacted_thinking":
-                reasoning_details.append(
-                    ReasoningEncryptedDetail(data=block.data, format=_REASONING_FORMAT)
+                content.append(
+                    ReasoningContent(
+                        encrypted_content=block.data, provider=_PROVIDER_NAME
+                    )
                 )
             else:
                 converted = AnthropicChatTranslator.block_content_to_giskard(
@@ -486,23 +510,15 @@ class AnthropicChatTranslator:
                     tool_calls.append(converted)
                 elif converted is not None:
                     content.append(converted)
-        return content, tool_calls, reasoning_details
+        return content, tool_calls
 
     @staticmethod
     def from_anthropic(
         raw: "Message", *, ignore_unsupported_content: bool = False
     ) -> CompletionResponse:
         """Convert raw SDK response to CompletionResponse."""
-        content, tool_calls, reasoning_details = (
-            AnthropicChatTranslator.blocks_to_giskard(
-                raw.content, ignore_unsupported_content=ignore_unsupported_content
-            )
-        )
-        # Readable thinking only; ``redacted_thinking`` is opaque.
-        reasoning = "\n".join(
-            d.text
-            for d in reasoning_details
-            if isinstance(d, ReasoningTextDetail) and d.text
+        content, tool_calls = AnthropicChatTranslator.blocks_to_giskard(
+            raw.content, ignore_unsupported_content=ignore_unsupported_content
         )
 
         finish_reason = (
@@ -524,8 +540,6 @@ class AnthropicChatTranslator:
             content=content if content else None,
             refusal=refusal_out,
             tool_calls=tool_calls or None,
-            reasoning=reasoning or None,
-            reasoning_details=reasoning_details or None,
         )
 
         usage = None
