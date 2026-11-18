@@ -279,3 +279,117 @@ def test_usage_reasoning_tokens_default_and_serialization(
     assert ("reasoning_tokens" in dump) is expected_in_dump
     if expected_in_dump:
         assert dump["reasoning_tokens"] == expected_value
+
+
+# -- ReasoningContent ----------------------------------------------------------------
+
+
+def test_reasoning_parts_never_reach_text_or_transcript():
+    from giskard.llm.types import ReasoningContent, ReasoningText, TextContent
+
+    msg = AssistantMessage(
+        content=[
+            ReasoningContent(
+                content=[ReasoningText(text="SECRET thought")],
+                signature="sig",
+                provider="anthropic",
+            ),
+            TextContent(text="Paris."),
+        ]
+    )
+    assert msg.text == "Paris."
+    assert msg.transcript == "[assistant]: Paris."
+
+    only_reasoning = AssistantMessage(
+        content=[ReasoningContent(content=[ReasoningText(text="SECRET")])]
+    )
+    assert only_reasoning.text is None
+    assert "SECRET" not in only_reasoning.transcript
+
+
+def test_deprecated_reasoning_is_derived_from_reasoning_parts():
+    from giskard.llm.types import ReasoningContent, ReasoningText, TextContent
+
+    msg = AssistantMessage(
+        content=[
+            ReasoningContent(content=[ReasoningText(text="First.")], signature="s1"),
+            TextContent(text="Answer."),
+            ReasoningContent(content=[ReasoningText(text="Second.")], signature="s2"),
+        ]
+    )
+    with pytest.warns(DeprecationWarning):
+        assert msg.reasoning == "First.\nSecond."
+
+
+def test_deprecated_reasoning_skips_empty_signed_thinking():
+    """``display: "omitted"`` thinking is a part with a signature but no text."""
+    from giskard.llm.types import ReasoningContent, ReasoningText, TextContent
+
+    msg = AssistantMessage(
+        content=[
+            ReasoningContent(
+                content=[ReasoningText(text="")], signature="sig", provider="anthropic"
+            ),
+            TextContent(text="Answer."),
+        ]
+    )
+    with pytest.warns(DeprecationWarning):
+        assert msg.reasoning is None
+    assert msg.content is not None and not isinstance(msg.content, str)
+    assert msg.content[0] == ReasoningContent(
+        content=[ReasoningText(text="")], signature="sig", provider="anthropic"
+    )
+
+
+def test_explicit_reasoning_is_not_overridden_by_parts():
+    from giskard.llm.types import ReasoningContent, ReasoningText
+
+    msg = AssistantMessage(
+        content=[ReasoningContent(content=[ReasoningText(text="from part")])],
+        reasoning="explicit",
+    )
+    with pytest.warns(DeprecationWarning):
+        assert msg.reasoning == "explicit"
+
+
+def test_reasoning_part_json_round_trip_keeps_every_field():
+    from giskard.llm.types import (
+        ReasoningContent,
+        ReasoningSummary,
+        ReasoningText,
+        TextContent,
+    )
+
+    part = ReasoningContent(
+        id="rs_1",
+        summary=[ReasoningSummary(text="summary")],
+        content=[ReasoningText(text="thought")],
+        encrypted_content="blob",
+        signature="sig",
+        status="completed",
+        provider="anthropic",
+    )
+    msg = AssistantMessage(content=[part, TextContent(text="Answer.")])
+
+    restored = AssistantMessage.model_validate_json(msg.model_dump_json())
+
+    assert restored.content == [part, TextContent(text="Answer.")]
+
+
+def test_released_1_0_payload_with_string_content_still_loads():
+    msg = AssistantMessage.model_validate(
+        {"role": "assistant", "content": "Answer.", "reasoning": "thinking"}
+    )
+    assert msg.text == "Answer."
+    with pytest.warns(DeprecationWarning):
+        assert msg.reasoning == "thinking"
+
+
+def test_response_result_accepts_reasoning_content_outputs():
+    from giskard.llm.types import ReasoningContent, ResponseResult
+
+    part = ReasoningContent(id="rs_1", encrypted_content="blob", provider="openai")
+    result = ResponseResult(id="resp_1", outputs=[part])
+
+    assert result.reasoning == [part]
+    assert result.output_text is None

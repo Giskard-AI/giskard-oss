@@ -1,6 +1,8 @@
 from collections.abc import Sequence
 from typing import Any, Literal, Required, TypedDict
 
+from .reasoning import ReasoningContentParam
+
 # -- Chat content types -------------------------------------------------------------
 
 
@@ -14,7 +16,7 @@ class RefusalContentParam(TypedDict, total=False):
     refusal: Required[str]
 
 
-CompletionContentParam = TextContentParam | RefusalContentParam
+CompletionContentParam = TextContentParam | RefusalContentParam | ReasoningContentParam
 
 # -- Reasoning details --------------------------------------------------------------
 

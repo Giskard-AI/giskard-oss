@@ -4,6 +4,7 @@ from typing import Annotated, Any, ClassVar, Literal, Protocol
 from pydantic import Field, model_validator
 
 from ._base import ArgumentDict, _BaseModel
+from .reasoning import ReasoningContent
 
 # -- Utility functions -------------------------------------------------------------
 
@@ -19,13 +20,22 @@ class _TextualizableContentProtocol(Protocol):
 
 def _extract_text(
     content: (
-        str | Sequence[_TextualizableContentProtocol | _TextContentProtocol] | None
+        str
+        | Sequence[
+            _TextualizableContentProtocol | _TextContentProtocol | ReasoningContent
+        ]
+        | None
     ),
 ) -> str | None:
     if isinstance(content, str) or content is None:
         return content
 
-    texts = [c.text for c in content if c.text is not None]
+    # Reasoning is skipped by type: it must never leak into answer text.
+    texts = [
+        c.text
+        for c in content
+        if not isinstance(c, ReasoningContent) and c.text is not None
+    ]
 
     return "\n".join(texts) if texts else None
 
@@ -50,7 +60,7 @@ class RefusalContent(_BaseModel):
         return self.refusal
 
 
-CompletionContent = TextContent | RefusalContent
+CompletionContent = TextContent | RefusalContent | ReasoningContent
 
 # -- Reasoning details --------------------------------------------------------------
 # De facto OpenAI-compatible chat convention (OpenRouter / vLLM): structured, replayable
@@ -156,7 +166,19 @@ class AssistantMessage(_BaseModel):
     # to the provider that produced it: the Anthropic serializer sends signed thinking
     # back (required for tool loops with thinking on). Every other serializer strips it
     # through ``_wire_excluded``.
-    reasoning: str | None = None
+    reasoning: str | None = Field(
+        default=None,
+        deprecated=(
+            "`AssistantMessage.reasoning` is deprecated and will be removed in 2.0; "
+            "read the `ReasoningContent` parts of `content` instead."
+        ),
+    )
+    """Deprecated: plain text of the reasoning parts in ``content``.
+
+    Filled from their ``reasoning_text`` when not given explicitly. Never
+    replayed to a provider. Removed in 2.0; read ``ReasoningContent`` parts of
+    ``content`` instead.
+    """
     reasoning_details: list[ReasoningDetail] | None = None
 
     _wire_excluded: ClassVar[frozenset[str]] = frozenset(
@@ -172,6 +194,25 @@ class AssistantMessage(_BaseModel):
             if (reasoning_content := data.get("reasoning_content")) is not None:
                 return {**data, "reasoning": reasoning_content}
         return data
+
+    @model_validator(mode="after")
+    def _derive_reasoning_from_parts(self) -> "AssistantMessage":
+        # Read through ``__dict__``: the field is deprecated and attribute reads
+        # would warn inside giskard-llm itself (assignment does not warn).
+        if self.__dict__.get("reasoning") is not None or isinstance(
+            self.content, str | None
+        ):
+            return self
+        texts = [
+            text.text
+            for part in self.content
+            if isinstance(part, ReasoningContent)
+            for text in part.content or []
+            if text.text
+        ]
+        if texts:
+            self.reasoning = "\n".join(texts)
+        return self
 
     @property
     def is_refusal(self) -> bool:
