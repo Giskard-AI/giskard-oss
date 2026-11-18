@@ -1,3 +1,4 @@
+import base64
 import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
@@ -18,8 +19,8 @@ from ..types import (
     CompletionContent,
     CompletionResponse,
     FunctionMessage,
-    ReasoningDetail,
-    ReasoningTextDetail,
+    ReasoningContent,
+    ReasoningText,
     RefusalContent,
     TextContent,
     ToolCall,
@@ -52,7 +53,6 @@ if TYPE_CHECKING:
 
 _PROVIDER = "google/chat"
 PROVIDER = "google"
-_REASONING_FORMAT = "google-gemini-v1"
 _SUPPORTED_REASONING_EFFORTS = frozenset({"minimal", "low", "medium", "high"})
 _THINKING_CONFLICT_KEYS = (
     "thinking_level",
@@ -119,9 +119,11 @@ def _assistant_content_to_parts(
 ) -> "Sequence[PartDict]":
     if isinstance(content, str):
         return [_text_content(content)]
+    # Google chat never replays reasoning (thoughts are not sent back).
     return [
         cast("PartDict", cast(object, c.model_dump(context=info.context)))
         for c in content
+        if not isinstance(c, ReasoningContent)
     ]
 
 
@@ -404,7 +406,15 @@ class GoogleChatTranslator:
         ignore_unsupported_content: bool = False,
     ) -> CompletionContent | ToolCall | None:
         if part.thought:
-            return None
+            return ReasoningContent(
+                content=None if part.text is None else [ReasoningText(text=part.text)],
+                signature=(
+                    None
+                    if part.thought_signature is None
+                    else base64.b64encode(part.thought_signature).decode("ascii")
+                ),
+                provider=PROVIDER,
+            )
         if part.text is not None:
             return TextContent(text=part.text, thought_signature=part.thought_signature)
         if part.function_call is not None:
@@ -433,20 +443,10 @@ class GoogleChatTranslator:
         num_messages: int,
         *,
         ignore_unsupported_content: bool = False,
-    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall], list[ReasoningDetail]]:
+    ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
         content: list[CompletionContent] = []
         tool_calls: list[ToolCall] = []
-        reasoning_details: list[ReasoningDetail] = []
         for part_index, part in enumerate(parts):
-            if part.thought:
-                if part.text:
-                    reasoning_details.append(
-                        ReasoningTextDetail(
-                            text=part.text,
-                            format=_REASONING_FORMAT,
-                        )
-                    )
-                continue
             converted = GoogleChatTranslator.part_content_to_giskard(
                 part,
                 num_messages,
@@ -457,7 +457,7 @@ class GoogleChatTranslator:
                 tool_calls.append(converted)
             elif converted is not None:
                 content.append(converted)
-        return content, tool_calls, reasoning_details
+        return content, tool_calls
 
     @staticmethod
     def from_google(
@@ -494,25 +494,16 @@ class GoogleChatTranslator:
             )
 
             if candidate.content and candidate.content.parts:
-                content, tool_calls, reasoning_details = (
-                    GoogleChatTranslator.parts_to_giskard(
-                        candidate.content.parts,
-                        num_messages,
-                        ignore_unsupported_content=ignore_unsupported_content,
-                    )
+                content, tool_calls = GoogleChatTranslator.parts_to_giskard(
+                    candidate.content.parts,
+                    num_messages,
+                    ignore_unsupported_content=ignore_unsupported_content,
                 )
                 if tool_calls:
                     finish_reason = "tool_calls"
             else:
                 content = None
                 tool_calls = None
-                reasoning_details = []
-
-            reasoning = "\n".join(
-                d.text
-                for d in reasoning_details
-                if isinstance(d, ReasoningTextDetail) and d.text
-            )
 
             choices.append(
                 Choice(
@@ -521,8 +512,6 @@ class GoogleChatTranslator:
                         content=content if content else None,
                         refusal=refusal_out,
                         tool_calls=tool_calls if tool_calls else None,
-                        reasoning=reasoning or None,
-                        reasoning_details=reasoning_details or None,
                     ),
                     finish_reason=finish_reason,
                     index=i,
