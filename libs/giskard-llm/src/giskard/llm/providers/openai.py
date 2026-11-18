@@ -271,6 +271,7 @@ class OpenAIProvider:
                 instructions=instructions,
                 previous_id=previous_id,
                 tools=tools_models,
+                provider=self._PROVIDER,
                 **params,
             )
         except ValidationError as e:

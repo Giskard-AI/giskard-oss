@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from giskard.llm.types import (
     NormalizedReasoningEffort,
+    ReasoningContent,
     ResponseInputItem,
     ResponseResult,
     ToolDef,
@@ -15,6 +16,7 @@ from pydantic import BaseModel, Field, SerializationInfo, model_validator
 from ..errors import BadRequestError
 from ..types._serialization import close_object_schemas
 from ..utils import sanitize_schema_name
+from ._reasoning import replayable
 from ._unsupported import keep_supported
 
 if TYPE_CHECKING:
@@ -43,6 +45,27 @@ def tool_def_to_openai(tool: ToolDef, _info: SerializationInfo) -> "ToolParam":
         "parameters": tool.function.parameters,
         "strict": None,
     }
+
+
+@ReasoningContent.register_serializer(_PROVIDER)
+def reasoning_to_openai(
+    model: ReasoningContent, info: SerializationInfo
+) -> dict[str, Any]:
+    """Send only the fields OpenAI accepts on input reasoning items.
+
+    ``content`` must be null on input, and ``signature`` / ``provider`` are not
+    OpenAI fields.
+    """
+    if model.id is None:
+        raise ValueError("OpenAI reasoning items need an id to be replayed")
+    item: dict[str, Any] = {
+        "type": model.type,
+        "id": model.id,
+        "summary": [part.model_dump(context=info.context) for part in model.summary],
+    }
+    if model.encrypted_content is not None:
+        item["encrypted_content"] = model.encrypted_content
+    return item
 
 
 def _text_config_from_response_format_dict(
@@ -170,8 +193,10 @@ class OpenAIResponseTranslator:
         instructions: str | None = None,
         previous_id: str | None = None,
         tools: Sequence[ToolDef] | None = None,
+        provider: str = PROVIDER,
         **params: Any,
     ) -> "ResponseCreateParamsNonStreaming":
+        """Build the request; *provider* is the route, used to gate reasoning replay."""
         unknown = set(params) - KNOWN_RESPONSE_PARAMS
         if unknown:
             logger.warning(
@@ -183,7 +208,9 @@ class OpenAIResponseTranslator:
         response_params = OpenAIResponseParams.model_validate(
             {
                 "model": model,
-                "input": input,
+                "input": input
+                if isinstance(input, str)
+                else replayable(input, provider),
                 "instructions": instructions,
                 "previous_response_id": previous_id,
                 "tools": tools,
@@ -213,6 +240,12 @@ class OpenAIResponseTranslator:
             provider,
             ignore_unsupported_content=ignore_unsupported_content,
         )
+        data["output"] = [
+            ReasoningContent.model_validate({**item, "provider": provider})
+            if item.get("type") == "reasoning"
+            else item
+            for item in data["output"]
+        ]
         if isinstance(usage := data.get("usage"), dict):
             details = usage.get("output_tokens_details")
             if (

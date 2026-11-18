@@ -353,42 +353,119 @@ def test_response_format_chat_json_schema_dict_maps_to_text_format():
     validate_openai_response_params(payload)
 
 
-def test_reasoning_item_round_trips_unchanged():
-    """A returned ``reasoning`` item is sent back verbatim (``id``, ``encrypted_content``)."""
-    from giskard.llm.types import ResponseFunctionCallOutput, ResponseResult
+def _reasoning_turn(reasoning: object) -> list[ResponseInputItem]:
+    from giskard.llm.types import (
+        ResponseFunctionCallOutput,
+        ResponseFunctionToolCall,
+        ResponseResult,
+    )
 
-    reasoning = {
+    result = ResponseResult.model_validate({"id": "resp_1", "output": [reasoning]})
+    return [
+        _message("user", "Weather?"),
+        *result.outputs,
+        ResponseFunctionToolCall(
+            call_id=TOOL_CALL_ID, name="get_weather", arguments={}
+        ),
+        ResponseFunctionCallOutput(call_id=TOOL_CALL_ID, output=TOOL_RESULT_CONTENT),
+    ]
+
+
+_OPENAI_REASONING = {
+    "type": "reasoning",
+    "id": "rs_1",
+    "summary": [{"type": "summary_text", "text": "Plan: call the tool."}],
+    "content": [{"type": "reasoning_text", "text": "Raw thinking"}],
+    "encrypted_content": "enc-blob",
+    "signature": "sig",
+    "status": "completed",
+    "provider": "openai",
+}
+
+
+def test_reasoning_item_round_trips_on_its_route():
+    """An ``openai`` reasoning item, stored as JSON and reloaded, replays on ``openai``.
+
+    Only ``type``, ``id``, ``summary`` and ``encrypted_content`` reach the wire:
+    never ``content``, ``signature`` or ``provider``.
+    """
+    from giskard.llm.types import ResponseResult
+
+    stored = ResponseResult.model_validate(
+        {"id": "resp_1", "output": [_OPENAI_REASONING]}
+    ).model_dump_json()
+    reloaded = json.loads(stored)["outputs"][0]
+
+    payload = OpenAIResponseTranslator.to_openai(
+        _MODEL, _reasoning_turn(reloaded), provider="openai"
+    )
+    assert list(payload.get("input", []))[1] == {
         "type": "reasoning",
         "id": "rs_1",
         "summary": [{"type": "summary_text", "text": "Plan: call the tool."}],
         "encrypted_content": "enc-blob",
     }
-    result = ResponseResult.model_validate(
-        {
-            "id": "resp_1",
-            "output": [
-                reasoning,
-                {
-                    "type": "function_call",
-                    "call_id": TOOL_CALL_ID,
-                    "name": "get_weather",
-                    "arguments": "{}",
-                },
-            ],
-        }
-    )
+    validate_openai_response_params(payload)
+
+
+@pytest.mark.parametrize(
+    ("origin", "route"),
+    [
+        pytest.param("openai", "azure", id="openai-to-azure"),
+        pytest.param("openai", "azure_ai", id="openai-to-azure_ai"),
+        pytest.param("azure", "openai", id="azure-to-openai"),
+        pytest.param("google", "openai", id="google-to-openai"),
+        pytest.param(None, "openai", id="untagged"),
+    ],
+)
+def test_reasoning_item_from_another_route_is_dropped(origin: str | None, route: str):
+    """Reasoning replays only on its exact Originating Provider; ``None`` never matches."""
     payload = OpenAIResponseTranslator.to_openai(
         _MODEL,
-        [
-            _message("user", "Weather?"),
-            *result.outputs,
-            ResponseFunctionCallOutput(
-                call_id=TOOL_CALL_ID, output=TOOL_RESULT_CONTENT
-            ),
-        ],
+        _reasoning_turn({**_OPENAI_REASONING, "provider": origin}),
+        provider=route,
     )
-    assert list(payload.get("input", []))[1] == reasoning
+    items = list(payload.get("input", []))
+    assert [cast(dict[str, Any], cast(object, i)).get("type") for i in items] == [
+        "message",
+        "function_call",
+        "function_call_output",
+    ]
     validate_openai_response_params(payload)
+
+
+def test_openai_reasoning_item_without_id_is_rejected():
+    """OpenAI needs the item ``id`` to replay reasoning; it is never invented."""
+    from giskard.llm.types import ReasoningContent
+
+    with pytest.raises(ValueError, match="id"):
+        OpenAIResponseTranslator.to_openai(
+            _MODEL,
+            [
+                _message("user", "Hi"),
+                ReasoningContent(encrypted_content="enc", provider="openai"),
+            ],
+            provider="openai",
+        )
+
+
+async def test_azure_client_drops_openai_reasoning(monkeypatch: pytest.MonkeyPatch):
+    """``LLMClient.aresponse`` on ``azure`` does not replay ``openai`` reasoning."""
+    monkeypatch.setenv("AZURE_API_KEY", "k")
+    monkeypatch.setenv("AZURE_API_BASE", "https://x.openai.azure.com")
+    client = LLMClient()
+    provider = client._get_provider("azure")
+    sdk_resp = MagicMock()
+    sdk_resp.model_dump.return_value = {"id": "resp_2", "output": [], "model": "m"}
+    create_mock = AsyncMock(return_value=sdk_resp)
+    cast(Any, provider)._client = MagicMock(responses=MagicMock(create=create_mock))
+
+    await client.aresponse(
+        "azure/gpt-5", cast(Any, [{"role": "user", "content": "Hi"}, _OPENAI_REASONING])
+    )
+
+    sent = create_mock.call_args.kwargs["input"]
+    assert [i.get("type") for i in sent] == ["message"]
 
 
 @pytest.mark.parametrize(

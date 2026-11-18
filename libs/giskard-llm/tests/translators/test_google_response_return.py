@@ -163,8 +163,8 @@ def test_from_google_text_then_text_then_function():
 
 
 def test_from_google_thought_step_maps_to_reasoning_item():
-    """``thought`` steps become :class:`ResponseReasoningItem` and stay out of ``output_text``."""
-    from giskard.llm.types import ResponseReasoningItem, ResponseReasoningSummary
+    """``thought`` steps become ``google`` reasoning with their signature; never in ``output_text``."""
+    from giskard.llm.types import ReasoningContent, ReasoningSummary
 
     raw = _interaction(
         [
@@ -180,10 +180,10 @@ def test_from_google_thought_step_maps_to_reasoning_item():
         ]
     )
     out = GoogleResponseTranslator.from_google(raw, _MODEL)
-    assert out.outputs[0] == ResponseReasoningItem(
-        id="thought_int_test_0",
-        summary=[ResponseReasoningSummary(text="Considering the question")],
-        encrypted_content="sig-abc",
+    assert out.outputs[0] == ReasoningContent(
+        summary=[ReasoningSummary(text="Considering the question")],
+        signature="sig-abc",
+        provider="google",
     )
     assert out.reasoning == [out.outputs[0]]
     assert out.output_text == "42"

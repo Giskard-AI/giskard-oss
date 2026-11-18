@@ -227,13 +227,7 @@ def test_from_openai_message_then_function():
 # -- Reasoning / unsupported output items -------------------------------------------
 
 
-def test_from_openai_reasoning_item():
-    """``reasoning`` items parse with every field; they never reach ``output_text``."""
-    from giskard.llm.types import (
-        ResponseReasoningItem,
-        ResponseReasoningSummary,
-        ResponseReasoningText,
-    )
+def _openai_reasoning_item() -> object:
     from openai.types.responses.response_reasoning_item import (
         Content,
         Summary,
@@ -242,7 +236,7 @@ def test_from_openai_reasoning_item():
         ResponseReasoningItem as OpenAIReasoningItem,
     )
 
-    reasoning = OpenAIReasoningItem(
+    return OpenAIReasoningItem(
         id="rs_1",
         type="reasoning",
         summary=[Summary(type="summary_text", text="Summarised thinking")],
@@ -250,6 +244,12 @@ def test_from_openai_reasoning_item():
         encrypted_content="enc",
         status="completed",
     )
+
+
+def test_from_openai_reasoning_item():
+    """``reasoning`` items parse with every field, tagged with the route; never in ``output_text``."""
+    from giskard.llm.types import ReasoningContent, ReasoningSummary, ReasoningText
+
     msg = ResponseOutputMessage(
         id="msg_1",
         type="message",
@@ -257,18 +257,35 @@ def test_from_openai_reasoning_item():
         status="completed",
         content=[ResponseOutputText(type="output_text", text="42", annotations=[])],
     )
-    raw = Response.model_construct(id="resp_r", output=[reasoning, msg], model=_MODEL)
+    raw = Response.model_construct(
+        id="resp_r", output=[_openai_reasoning_item(), msg], model=_MODEL
+    )
     out = OpenAIResponseTranslator.from_openai(raw)
 
-    assert out.outputs[0] == ResponseReasoningItem(
+    assert out.outputs[0] == ReasoningContent(
         id="rs_1",
-        summary=[ResponseReasoningSummary(text="Summarised thinking")],
-        content=[ResponseReasoningText(text="Raw thinking")],
+        summary=[ReasoningSummary(text="Summarised thinking")],
+        content=[ReasoningText(text="Raw thinking")],
         encrypted_content="enc",
         status="completed",
+        provider="openai",
     )
     assert out.reasoning == [out.outputs[0]]
     assert out.output_text == "42"
+
+
+@pytest.mark.parametrize("route", ["azure", "azure_ai"])
+def test_from_openai_reasoning_item_tagged_with_azure_routes(route: str):
+    """Reasoning from an Azure route carries that route, not ``openai``."""
+    from giskard.llm.types import ReasoningContent
+
+    raw = Response.model_construct(
+        id="resp_r", output=[_openai_reasoning_item()], model=_MODEL
+    )
+    out = OpenAIResponseTranslator.from_openai(raw, provider=route)
+
+    assert isinstance(out.outputs[0], ReasoningContent)
+    assert out.outputs[0].provider == route
 
 
 def _web_search_call() -> object:
