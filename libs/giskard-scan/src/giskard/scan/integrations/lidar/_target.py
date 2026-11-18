@@ -77,7 +77,9 @@ class ScanTargetGenerator(BaseGenerator):
         # so with_interaction returns a NEW trace we write back under the same key.
         trace = self._threads.get(thread_id) or Trace.for_target(self._scan_target)
 
-        text = messages[-1].content if messages else ""
+        # ``.text`` joins the text parts and skips reasoning parts, which are
+        # private model state the target must never be prompted with.
+        text = (messages[-1].text or "") if messages else ""
         interaction = Interact(
             inputs=DatasetInputGenerator(prompt=text),
             outputs=self._scan_target,

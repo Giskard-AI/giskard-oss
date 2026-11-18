@@ -15,8 +15,11 @@ from giskard.agents.som import TypeSafeSOM
 from giskard.llm.types import (
     AssistantMessage,
     ChatMessage,
+    ReasoningContent,
+    ReasoningText,
     ReasoningTextDetail,
     SystemMessage,
+    TextContent,
     ToolCall,
     ToolCallFunction,
     ToolMessage,
@@ -150,6 +153,66 @@ async def test_native_prediction_does_not_send_reasoning(mock_api):
 
     body = json.loads(requests[0].content)
     assert body["state"][1] == {"role": "assistant", "content": "Hello."}
+
+
+async def test_native_prediction_does_not_send_reasoning_parts(mock_api):
+    requests = mock_api()
+    messages: list[ChatMessage] = [
+        UserMessage(content="Hi"),
+        AssistantMessage(
+            content=[
+                ReasoningContent(
+                    content=[ReasoningText(text="Greet back.")],
+                    signature="sig",
+                    provider="anthropic",
+                ),
+                TextContent(text="Hello."),
+            ]
+        ),
+    ]
+
+    await TypeSafeSOM(model="jev").predict(messages, QUESTION)
+
+    body = json.loads(requests[0].content)
+    assert body["state"][1] == {
+        "role": "assistant",
+        "content": [{"type": "text", "text": "Hello."}],
+    }
+
+
+async def test_native_prediction_omits_content_made_only_of_reasoning(mock_api):
+    requests = mock_api()
+    messages: list[ChatMessage] = [
+        UserMessage(content="Send 10 EUR to Bob."),
+        AssistantMessage(
+            content=[
+                ReasoningContent(
+                    content=[ReasoningText(text="Call the tool.")],
+                    provider="anthropic",
+                )
+            ],
+            tool_calls=[
+                ToolCall(
+                    id="call_send_money",
+                    function=ToolCallFunction(name="send_money", arguments={}),
+                )
+            ],
+        ),
+    ]
+
+    await TypeSafeSOM(model="jev").predict(messages, QUESTION)
+
+    body = json.loads(requests[0].content)
+    assert body["state"][1] == {
+        "role": "assistant",
+        "tool_calls": [
+            {
+                "id": "call_send_money",
+                "type": "function",
+                "function": {"name": "send_money", "arguments": {}},
+            }
+        ],
+    }
 
 
 @pytest.mark.parametrize("probability", [0, 0.5, 1])

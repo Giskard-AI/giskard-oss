@@ -13,6 +13,7 @@ from collections.abc import Coroutine, Iterable
 from typing import Any, Protocol
 
 from giskard.checks import Interaction, Trace
+from giskard.llm.types import ReasoningContent
 
 
 class RoleContentTurn(Protocol):
@@ -25,6 +26,18 @@ class RoleContentTurn(Protocol):
     def content(self) -> Any: ...
 
 
+def _without_reasoning(content: Any) -> Any:
+    """Drop ``ReasoningContent`` parts from a list of content parts.
+
+    Reasoning is private model state, not part of the conversation shown in the
+    trace. A list left empty becomes ``None``; any other content is unchanged.
+    """
+    if not isinstance(content, list):
+        return content
+    parts = [part for part in content if not isinstance(part, ReasoningContent)]  # pyright: ignore[reportUnknownVariableType]
+    return parts or None
+
+
 async def trace_from_role_content_turns(turns: Iterable[RoleContentTurn]) -> Trace:  # pyright: ignore[reportMissingTypeArgument]
     """Rebuild a display Trace from a scanner's flat list of chat turns.
 
@@ -32,7 +45,8 @@ async def trace_from_role_content_turns(turns: Iterable[RoleContentTurn]) -> Tra
     bridge turn by turn, so no lossless typed Trace was captured. Each ``user``
     turn is paired with the ``assistant`` reply that follows it; ``system``/
     ``tool`` turns carry no input/output pair and are skipped, and a trailing
-    unanswered user turn yields ``outputs=None``.
+    unanswered user turn yields ``outputs=None``. Reasoning parts are dropped
+    from assistant replies.
     """
     interactions: list[Interaction] = []  # pyright: ignore[reportMissingTypeArgument]
     pending_input: Any = None
@@ -42,7 +56,11 @@ async def trace_from_role_content_turns(turns: Iterable[RoleContentTurn]) -> Tra
                 interactions.append(Interaction(inputs=pending_input, outputs=None))
             pending_input = turn.content
         elif turn.role == "assistant" and pending_input is not None:
-            interactions.append(Interaction(inputs=pending_input, outputs=turn.content))
+            interactions.append(
+                Interaction(
+                    inputs=pending_input, outputs=_without_reasoning(turn.content)
+                )
+            )
             pending_input = None
     if pending_input is not None:
         interactions.append(Interaction(inputs=pending_input, outputs=None))
