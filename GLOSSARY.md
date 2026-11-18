@@ -11,12 +11,12 @@ The canonical seven-level setting (`none`, `minimal`, `low`, `medium`, `high`, `
 _Avoid_: `thinking_level`, `thinking_budget`, `effort` (outside provider wire payloads)
 
 **Reasoning Content**:
-Internal model deliberation returned alongside an assistant turn, kept strictly separate from visible answer text so checks and judges never evaluate private thoughts.
-_Avoid_: `thinking` (as a Giskard public field), `chain_of_thought`
+Internal model deliberation returned as an ordered part of an assistant turn, possibly as a summary, signed, or encrypted, and tagged with its Originating Provider. Kept strictly separate from visible answer text so checks and judges never evaluate private thoughts. The same concept on chat history and on the Responses API.
+_Avoid_: `thinking` (as a Giskard public field), `chain_of_thought`, Reasoning Detail, `reasoning_details`, reasoning item
 
-**Reasoning Detail**:
-A structured, provider-tagged reasoning artifact (`reasoning.text`, `reasoning.summary`, or `reasoning.encrypted`) attached to an assistant turn for verifiable replay to the originating provider.
-_Avoid_: raw SDK block dicts
+**Originating Provider**:
+The provider route, as Giskard names it, that a piece of reasoning came back through. It is the route, not the model vendor: Claude reasoning returned through an OpenAI-compatible gateway originates from that gateway's route. Reasoning is replayed only to its originating provider; sent anywhere else, it is silently dropped.
+_Avoid_: `format`, source, vendor, model provider
 
 **Reasoning Tokens**:
 Generated output tokens consumed by internal deliberation, included in billed output tokens and tracked independently of visible answer tokens.
