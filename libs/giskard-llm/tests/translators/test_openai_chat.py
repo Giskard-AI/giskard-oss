@@ -17,10 +17,14 @@ from giskard.llm.types import (
     ChatMessage,
     DeveloperMessage,
     FunctionMessage,
+    ReasoningContent,
     ReasoningEffort,
+    ReasoningText,
     RefusalContent,
     SystemMessage,
     TextContent,
+    ToolCall,
+    ToolCallFunction,
     UserMessage,
 )
 from pydantic import BaseModel
@@ -450,15 +454,18 @@ def test_response_format_map_keeps_value_schema():
 
 
 def test_assistant_reasoning_is_stripped_for_official_api():
-    """``reasoning`` / ``reasoning_details`` are not official Chat Completions fields: never sent."""
-    from giskard.llm.types import ReasoningTextDetail, ToolCall, ToolCallFunction
-
+    """Chat Completions has no reasoning field: reasoning parts never reach the wire."""
     messages: list[ChatMessage] = [
         UserMessage(content="What is 6*7?"),
         AssistantMessage(
-            content=None,
-            reasoning="Multiply.",
-            reasoning_details=[ReasoningTextDetail(text="Multiply.", signature="s")],
+            content=[
+                ReasoningContent(
+                    content=[ReasoningText(text="Multiply.")],
+                    signature="s",
+                    provider="openai",
+                ),
+                TextContent(text="Let me compute."),
+            ],
             tool_calls=[
                 ToolCall(
                     id="call_1",
@@ -469,11 +476,62 @@ def test_assistant_reasoning_is_stripped_for_official_api():
     ]
     payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
     assistant = cast(dict[str, Any], cast(object, list(payload["messages"])[1]))
-    assert "reasoning" not in assistant
-    assert "reasoning_details" not in assistant
-    assert assistant["tool_calls"][0]["id"] == "call_1"
+    assert assistant == {
+        "role": "assistant",
+        "content": [{"type": "text", "text": "Let me compute."}],
+        "tool_calls": [
+            {
+                "type": "function",
+                "id": "call_1",
+                "function": {"name": "mul", "arguments": '{"a": 6, "b": 7}'},
+            }
+        ],
+    }
     # The caller's message is left untouched.
-    assert cast(AssistantMessage, messages[1]).reasoning == "Multiply."
+    assert len(cast(list[Any], cast(AssistantMessage, messages[1]).content)) == 2
+    validate_openai_completion_params(payload)
+
+
+def test_assistant_with_only_reasoning_and_tool_calls_sends_no_content():
+    """Stripping the only (reasoning) part leaves no ``content``, not an empty list."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="What is 6*7?"),
+        AssistantMessage(
+            content=[
+                ReasoningContent(
+                    content=[ReasoningText(text="Multiply.")], provider="openai"
+                )
+            ],
+            tool_calls=[
+                ToolCall(
+                    id="call_1",
+                    function=ToolCallFunction(name="mul", arguments={"a": 6, "b": 7}),
+                )
+            ],
+        ),
+    ]
+    payload = OpenAIChatTranslator.to_openai(_MODEL, messages)
+    assistant = cast(dict[str, Any], cast(object, list(payload["messages"])[1]))
+    assert assistant.get("content") is None
+    assert "reasoning" not in assistant
+    assert assistant["tool_calls"][0]["id"] == "call_1"
+    validate_openai_completion_params(payload)
+
+
+def test_assistant_string_content_and_refusal_unchanged():
+    """Messages without reasoning parts serialize as before."""
+    payload = OpenAIChatTranslator.to_openai(
+        _MODEL,
+        [
+            UserMessage(content="Hi."),
+            AssistantMessage(content="Hello.", refusal="No."),
+        ],
+    )
+    assert list(payload["messages"])[1] == {
+        "role": "assistant",
+        "content": "Hello.",
+        "refusal": "No.",
+    }
     validate_openai_completion_params(payload)
 
 
