@@ -15,11 +15,12 @@ pytest.importorskip("anthropic")
 
 from anthropic.types import Message
 from anthropic.types.content_block import ContentBlock
+from giskard.llm.errors import UnsupportedContentError
 from giskard.llm.translators.anthropic import AnthropicChatTranslator
 from giskard.llm.types import (
     ChatMessage,
-    ReasoningEncryptedDetail,
-    ReasoningTextDetail,
+    ReasoningContent,
+    ReasoningText,
     TextContent,
     ToolMessage,
     UserMessage,
@@ -179,8 +180,18 @@ def test_from_anthropic_refusal_category_only():
     assert msg.is_refusal
 
 
+def _thinking(text: str, signature: str) -> ReasoningContent:
+    return ReasoningContent(
+        content=[ReasoningText(text=text)], signature=signature, provider="anthropic"
+    )
+
+
+def _redacted(data: str) -> ReasoningContent:
+    return ReasoningContent(encrypted_content=data, provider="anthropic")
+
+
 def test_from_anthropic_thinking_then_text():
-    """Thinking blocks map to ``message.reasoning`` and stay out of ``content`` / ``text``."""
+    """A thinking block becomes a signed reasoning part, kept out of ``text``."""
     raw = _message(
         {
             "content": [
@@ -194,20 +205,17 @@ def test_from_anthropic_thinking_then_text():
         }
     )
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
-    assert msg.reasoning == "The capital of France is Paris."
-    assert msg.reasoning_details == [
-        ReasoningTextDetail(
-            text="The capital of France is Paris.",
-            signature="sig_thinking_block",
-            format="anthropic-claude-v1",
-        )
+    assert msg.content == [
+        _thinking("The capital of France is Paris.", "sig_thinking_block"),
+        TextContent(text="Paris is in France."),
     ]
-    assert msg.content == [TextContent(text="Paris is in France.")]
     assert msg.text == "Paris is in France."
+    assert "capital of France is Paris" not in msg.transcript
+    assert msg.reasoning == "The capital of France is Paris."
 
 
 def test_from_anthropic_redacted_thinking_then_text():
-    """``redacted_thinking`` is kept opaque in ``reasoning_details``, not ``reasoning``."""
+    """``redacted_thinking`` becomes a part carrying ``encrypted_content``."""
     raw = _message(
         {
             "content": [
@@ -217,18 +225,64 @@ def test_from_anthropic_redacted_thinking_then_text():
         }
     )
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
-    assert msg.reasoning is None
-    assert msg.reasoning_details == [
-        ReasoningEncryptedDetail(
-            data="opaque-redacted-payload", format="anthropic-claude-v1"
-        )
+    assert msg.content == [
+        _redacted("opaque-redacted-payload"),
+        TextContent(text="Paris is in France."),
     ]
-    assert msg.content == [TextContent(text="Paris is in France.")]
+    assert msg.reasoning is None
     assert msg.text == "Paris is in France."
 
 
+def test_from_anthropic_empty_thinking_keeps_signature():
+    """``display: "omitted"`` yields empty thinking text: still one signed part."""
+    raw = _message(
+        {
+            "content": [
+                {"type": "thinking", "thinking": "", "signature": "sig_omitted"},
+                {"type": "text", "text": "Answer."},
+            ],
+        }
+    )
+    msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    assert msg.content == [_thinking("", "sig_omitted"), TextContent(text="Answer.")]
+    assert msg.reasoning is None
+
+
+def test_from_anthropic_interleaved_thinking_keeps_block_order():
+    """Each block maps to one part, in block order; tool calls go to ``tool_calls``."""
+    raw = _message(
+        {
+            "stop_reason": "tool_use",
+            "content": [
+                {"type": "thinking", "thinking": "First.", "signature": "s1"},
+                {"type": "text", "text": "One."},
+                {"type": "redacted_thinking", "data": "opaque"},
+                {"type": "thinking", "thinking": "Second.", "signature": "s2"},
+                {"type": "text", "text": "Two."},
+                {
+                    "type": "tool_use",
+                    "id": TOOL_CALL_ID,
+                    "name": "get_weather",
+                    "input": {"city": "Paris"},
+                },
+            ],
+        }
+    )
+    msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    assert msg.content == [
+        _thinking("First.", "s1"),
+        TextContent(text="One."),
+        _redacted("opaque"),
+        _thinking("Second.", "s2"),
+        TextContent(text="Two."),
+    ]
+    assert msg.text == "One.\nTwo."
+    assert msg.tool_calls is not None
+    assert [tc.id for tc in msg.tool_calls] == [TOOL_CALL_ID]
+
+
 def test_from_anthropic_thinking_and_tool_use():
-    """Thinking ahead of a tool call maps to ``reasoning`` and still yields the tool call."""
+    """Thinking ahead of a tool call is a part and still yields the tool call."""
     raw = _message(
         {
             "content": [
@@ -250,42 +304,99 @@ def test_from_anthropic_thinking_and_tool_use():
     choice = AnthropicChatTranslator.from_anthropic(raw).choices[0]
     msg = choice.message
     assert choice.finish_reason == "tool_calls"
-    assert msg.reasoning == "I should check the weather."
-    assert msg.content is None
+    assert msg.content == [_thinking("I should check the weather.", "sig_xyz")]
+    assert msg.text is None
     assert msg.tool_calls is not None
     assert msg.tool_calls[0].function.name == "get_weather"
     assert msg.tool_calls[0].function.arguments == {"city": "Paris"}
 
 
-def test_from_anthropic_redacted_thinking_only_is_dropped_not_raised():
-    """A response with only ``redacted_thinking`` does not crash and has no visible output."""
+def test_from_anthropic_redacted_thinking_only():
+    """A response with only ``redacted_thinking`` has no visible output."""
     raw = _message(
         {"content": [{"type": "redacted_thinking", "data": "opaque-encrypted-data"}]}
     )
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    assert msg.content == [_redacted("opaque-encrypted-data")]
+    assert msg.text is None
     assert msg.reasoning is None
-    assert msg.reasoning_details == [
-        ReasoningEncryptedDetail(
-            data="opaque-encrypted-data", format="anthropic-claude-v1"
-        )
-    ]
-    assert msg.content is None
     assert msg.tool_calls is None
 
 
 def test_from_anthropic_text_only_has_no_reasoning():
-    """A text-only response leaves ``message.reasoning`` / ``reasoning_details`` unset."""
+    """A text-only response has no reasoning part and no ``reasoning``."""
     raw = _message({"content": [{"type": "text", "text": "Hello from Claude."}]})
     msg = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    assert msg.content == [TextContent(text="Hello from Claude.")]
     assert msg.reasoning is None
-    assert msg.reasoning_details is None
     assert msg.text == "Hello from Claude."
+
+
+_TOOL_USE_BLOCK: dict[str, object] = {
+    "type": "tool_use",
+    "id": TOOL_CALL_ID,
+    "name": "get_weather",
+    "input": {"city": "Paris"},
+}
+
+
+@pytest.mark.parametrize(
+    "late_block",
+    [
+        pytest.param(
+            {"type": "thinking", "thinking": "After.", "signature": "s2"},
+            id="thinking",
+        ),
+        pytest.param({"type": "redacted_thinking", "data": "late"}, id="redacted"),
+    ],
+)
+def test_from_anthropic_thinking_after_tool_use_raises(late_block: dict[str, object]):
+    """``tool_calls`` is a sibling list, so thinking after a ``tool_use`` cannot be
+    stored in order: it is reported as unsupported rather than reordered."""
+    raw = _message(
+        {
+            "stop_reason": "tool_use",
+            "content": [
+                {"type": "thinking", "thinking": "Before.", "signature": "s1"},
+                _TOOL_USE_BLOCK,
+                late_block,
+            ],
+        }
+    )
+    with pytest.raises(UnsupportedContentError) as exc_info:
+        AnthropicChatTranslator.from_anthropic(raw)
+    assert exc_info.value.content_type == "thinking_after_tool_use"
+    assert exc_info.value.provider == "anthropic"
+
+
+def test_from_anthropic_thinking_after_tool_use_dropped_when_ignored(
+    caplog: pytest.LogCaptureFixture,
+):
+    """With ``ignore_unsupported_content`` the late block is dropped with a warning."""
+    raw = _message(
+        {
+            "stop_reason": "tool_use",
+            "content": [
+                {"type": "thinking", "thinking": "Before.", "signature": "s1"},
+                _TOOL_USE_BLOCK,
+                {"type": "thinking", "thinking": "After.", "signature": "s2"},
+                {"type": "text", "text": "Done."},
+            ],
+        }
+    )
+    with caplog.at_level("WARNING"):
+        msg = (
+            AnthropicChatTranslator.from_anthropic(raw, ignore_unsupported_content=True)
+            .choices[0]
+            .message
+        )
+    assert msg.content == [_thinking("Before.", "s1"), TextContent(text="Done.")]
+    assert msg.tool_calls is not None
+    assert "thinking_after_tool_use" in caplog.text
 
 
 def test_block_content_to_giskard_unknown_type_raises():
     """Unknown content-block types raise UnsupportedContentError."""
-    from giskard.llm.errors import UnsupportedContentError
-
     with pytest.raises(UnsupportedContentError) as exc_info:
         _ = AnthropicChatTranslator.block_content_to_giskard(
             cast(ContentBlock, cast(object, SimpleNamespace(type="compaction")))
@@ -303,8 +414,6 @@ _SERVER_TOOL_USE = {
 
 def test_from_anthropic_unsupported_block_raises():
     """Blocks we cannot represent raise :class:`UnsupportedContentError` by default."""
-    from giskard.llm.errors import UnsupportedContentError
-
     raw = _message({"content": [_SERVER_TOOL_USE, {"type": "text", "text": "Answer."}]})
     with pytest.raises(UnsupportedContentError) as exc_info:
         AnthropicChatTranslator.from_anthropic(raw)
@@ -364,6 +473,31 @@ def test_thinking_tool_turn_passed_back_unchanged_replays_verbatim():
             "input": {"city": "Paris"},
         },
     ]
+    validate_anthropic_message_create(payload)
+
+
+def test_interleaved_thinking_round_trips_in_order():
+    """``[thinking, text, thinking, text, tool_use]`` replays block for block."""
+    blocks: list[dict[str, object]] = [
+        {"type": "thinking", "thinking": "First.", "signature": "s1"},
+        {"type": "text", "text": "One."},
+        {"type": "thinking", "thinking": "", "signature": "s2"},
+        {"type": "text", "text": "Two."},
+        {"type": "redacted_thinking", "data": "opaque"},
+        _TOOL_USE_BLOCK,
+    ]
+    raw = _message({"stop_reason": "tool_use", "content": blocks})
+    assistant = AnthropicChatTranslator.from_anthropic(raw).choices[0].message
+    messages: list[ChatMessage] = [
+        UserMessage(content="What's the weather in Paris?"),
+        assistant,
+        ToolMessage(content=TOOL_RESULT_CONTENT, tool_call_id=TOOL_CALL_ID),
+    ]
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL, messages, tools=[WEATHER_TOOL], thinking={"type": "adaptive"}
+    )
+
+    assert payload["messages"][1]["content"] == blocks
     validate_anthropic_message_create(payload)
 
 

@@ -10,8 +10,14 @@ import re
 
 import pytest
 from giskard.llm import LLMClient
-from giskard.llm.errors import BadRequestError
-from giskard.llm.types import ToolDefParam, ToolMessage, UserMessage
+from giskard.llm.errors import BadRequestError, UnsupportedContentError
+from giskard.llm.types import (
+    ChatMessage,
+    ReasoningContent,
+    ToolDefParam,
+    ToolMessage,
+    UserMessage,
+)
 from pydantic import BaseModel, Field, field_validator
 
 from .helpers import (
@@ -263,9 +269,14 @@ async def test_tool_result_loop_with_thinking(provider: str):
     )
     assistant = resp1.choices[0].message
     assert assistant.tool_calls
+    reasoning = [
+        part for part in assistant.content or [] if isinstance(part, ReasoningContent)
+    ]
     if thinking["type"] == "enabled":
         # Budgeted thinking always emits a block; adaptive may skip it on easy asks.
-        assert assistant.reasoning_details
+        assert reasoning
+    assert all(part.provider == "anthropic" for part in reasoning)
+    assert all(part.signature or part.encrypted_content for part in reasoning)
     tc = assistant.tool_calls[0]
 
     resp2 = await client.acompletion(
@@ -276,6 +287,53 @@ async def test_tool_result_loop_with_thinking(provider: str):
     )
     assert resp2.choices[0].finish_reason == "stop"
     assert resp2.choices[0].message.text
+
+
+@pytest.mark.parametrize("provider", ANTHROPIC_PROVIDER_PARAMS)
+async def test_thinking_after_tool_use_probe(provider: str):
+    """Probe whether Claude emits a thinking block after a ``tool_use`` in one turn.
+
+    ``tool_calls`` is a sibling list, so such a turn cannot be stored in order and
+    the translator reports it as unsupported. Drive a sequential tool loop with
+    thinking on: a hit must surface as ``thinking_after_tool_use``; otherwise the
+    loop finishes normally. The outcome is printed (run with ``-s`` to see it).
+    """
+    client, model = _make_client(provider)
+    thinking = _anthropic_thinking(model)
+    messages: list[ChatMessage] = [
+        UserMessage(
+            content=(
+                "Using the add tool, compute 1+2, then add 3 to the result, then "
+                "add 4 to that result, then add 5 to that result. Make one tool "
+                "call at a time and think between steps."
+            )
+        )
+    ]
+
+    hit = False
+    for _ in range(8):
+        try:
+            resp = await client.acompletion(
+                model, messages, tools=[ADD_TOOL], thinking=thinking
+            )
+        except UnsupportedContentError as exc:
+            assert exc.content_type == "thinking_after_tool_use"
+            assert exc.provider == "anthropic"
+            hit = True
+            break
+        assistant = resp.choices[0].message
+        if not assistant.tool_calls:
+            assert assistant.text
+            break
+        messages.append(assistant)
+        for tc in assistant.tool_calls:
+            a, b = tc.function.arguments["a"], tc.function.arguments["b"]
+            assert isinstance(a, int) and isinstance(b, int)
+            messages.append(ToolMessage(tool_call_id=tc.id, content=str(a + b)))
+    else:
+        pytest.fail("tool loop did not finish")
+
+    print(f"thinking_after_tool_use[{model}]: {hit}")
 
 
 @pytest.mark.parametrize("provider", _PROVIDER_PARAMS)
