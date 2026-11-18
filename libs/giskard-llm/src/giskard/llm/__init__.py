@@ -16,6 +16,12 @@ from .errors import (
 from .providers.base import CompletionProvider, EmbeddingProvider, ResponseProvider
 from .retry import should_retry
 from .routing import LLMClient, acompletion, aembedding, aresponse, configure, reset
+
+# Registers the ``openai/chat`` serializers (e.g. stripping reasoning parts,
+# ADR-0003) for callers that dump messages themselves, such as LiteLLM. Imported
+# here, not from ``types``, which the translator imports (circular). The module
+# only imports the ``openai`` SDK for type checking.
+from .translators import openai_chat as _openai_chat  # noqa: F401
 from .types import (
     ChatMessageParam,
     Choice,

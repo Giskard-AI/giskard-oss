@@ -19,6 +19,8 @@ from giskard.llm.types import (
     ChatMessage,
     DeveloperMessage,
     FunctionMessage,
+    ReasoningContent,
+    ReasoningText,
     RefusalContent,
     SystemMessage,
     TextContent,
@@ -431,6 +433,35 @@ def test_assistant_text_thought_signature_is_replayed():
                 }
             ],
         },
+    ]
+    validate_google_contents(payload["contents"])
+
+
+@pytest.mark.parametrize("provider", ["google", "anthropic", None])
+def test_assistant_reasoning_parts_are_not_replayed(provider: str | None):
+    """Google chat never replays reasoning parts, whatever their provider.
+
+    Thought text stays out of the request; tool-call signatures travel on
+    ``ToolCall.thought_signature`` instead.
+    """
+    messages: list[ChatMessage] = [
+        UserMessage(content="Hi."),
+        AssistantMessage(
+            content=[
+                ReasoningContent(
+                    content=[ReasoningText(text="Private thought.")],
+                    signature="c2ln",
+                    provider=provider,
+                ),
+                TextContent(text="Answer."),
+                ReasoningContent(signature="c2ln", provider=provider),
+            ],
+        ),
+    ]
+    payload = GoogleChatTranslator.to_google(_MODEL, messages)
+    assert payload["contents"] == [
+        {"role": "user", "parts": [{"text": "Hi."}]},
+        {"role": "model", "parts": [{"text": "Answer."}]},
     ]
     validate_google_contents(payload["contents"])
 

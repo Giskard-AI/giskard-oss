@@ -1,12 +1,14 @@
 """Smoke tests for import safety and lazy SDK loading.
 
-- The first three tests run on every install (no skip condition): they only
+- The tests without a skip condition run on every install: they only
   exercise pure-Python code with no optional dependency.
 - The last three use pytest.skipif to guard against the specific SDK being
   present; they verify ProviderNotAvailableError is raised when that SDK is absent.
 """
 
 import importlib.util
+import subprocess
+import sys
 
 import pytest
 
@@ -29,6 +31,31 @@ def test_public_api_is_accessible():
         "ProviderNotAvailableError",
     ]:
         assert hasattr(m, name), f"giskard.llm missing attribute: {name}"
+
+
+def test_package_import_registers_openai_chat_serializer_without_sdk():
+    """``import giskard.llm`` alone strips reasoning on ``openai/chat`` dumps (ADR-0003).
+
+    Callers that dump messages themselves (e.g. a LiteLLM generator) rely on the
+    serializer being registered; the ``openai`` SDK must still not be imported.
+    Runs in a fresh interpreter so other tests' imports cannot mask a regression.
+    """
+    code = """
+import sys
+import giskard.llm
+from giskard.llm.types import AssistantMessage, ReasoningContent, TextContent
+
+message = AssistantMessage(
+    content=[ReasoningContent(provider="openai"), TextContent(text="hi")]
+)
+dump = message.model_dump(context={"provider": "openai/chat"})
+assert dump == {"role": "assistant", "content": [{"type": "text", "text": "hi"}]}, dump
+assert "openai" not in sys.modules, "openai SDK imported eagerly"
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_provider_modules_import_without_raising():

@@ -2,10 +2,10 @@
 
 import os
 from collections.abc import Sequence
-from typing import Literal, override
+from typing import Any, Literal, override
 
 import httpx
-from giskard.llm.types import ChatMessage, Usage
+from giskard.llm.types import AssistantMessage, ChatMessage, Usage, without_reasoning
 from pydantic import BaseModel, Field, field_validator
 
 from .base import BaseSOM, SOMResponse
@@ -29,6 +29,24 @@ class _SystemOneResponse(BaseModel):
     model: str = Field(min_length=1)
     answers: _Answers
     usage: _TokenUsage
+
+
+def _judged_state(message: ChatMessage) -> dict[str, Any]:
+    """Serialize *message* as the conversation the SOM judges.
+
+    Reasoning is private model state, not conversation: wire-excluded fields
+    (e.g. the deprecated ``reasoning``) and ``ReasoningContent`` parts are
+    removed. A ``content`` list left empty is omitted.
+    """
+    if isinstance(message, AssistantMessage) and isinstance(message.content, list):
+        message = message.model_copy(
+            update={"content": without_reasoning(message.content)}
+        )
+    return message.model_dump(
+        mode="json",
+        exclude_none=True,
+        exclude=set(message.wire_excluded_fields()),
+    )
 
 
 @BaseSOM.register("typesafe")
@@ -81,16 +99,7 @@ class TypeSafeSOM(BaseSOM):
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
                     "model": self.model,
-                    "state": [
-                        # Wire-excluded fields (e.g. reasoning) are private model
-                        # state, not part of the conversation the SOM should judge.
-                        message.model_dump(
-                            mode="json",
-                            exclude_none=True,
-                            exclude=set(message.wire_excluded_fields()),
-                        )
-                        for message in messages
-                    ],
+                    "state": [_judged_state(message) for message in messages],
                     "questions": {
                         "decision": {"type": "noul", "instructions": question}
                     },

@@ -40,10 +40,16 @@ class _BaseModel(BaseModel):
             get_serializer(self.__class__, provider) if provider else None
         )
 
+        target = self
         if custom_serializer:
-            return custom_serializer(self, info)
+            result = custom_serializer(self, info)
+            # A serializer returning a rewritten copy of the model gets the default
+            # dump of that copy, so no field has to be rebuilt by hand.
+            if not isinstance(result, self.__class__):
+                return result
+            target = result
 
-        data = handler(self)
+        data = handler(target)
         if provider and self._wire_excluded and isinstance(data, dict):
             for field in self._wire_excluded:
                 data.pop(field, None)

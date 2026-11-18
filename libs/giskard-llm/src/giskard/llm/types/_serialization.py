@@ -20,6 +20,8 @@ def register_serializer[T: BaseModel](model: type[T], provider: str):
 
     The decorated callable must annotate its first parameter with a concrete
     ``BaseModel`` subclass (second parameter is typically ``SerializationInfo``).
+    It returns the wire value, or a rewritten copy of the model, which then gets
+    the default dump (wire-excluded fields dropped).
     """
 
     def decorator(

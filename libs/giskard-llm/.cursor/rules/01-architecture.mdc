@@ -13,7 +13,9 @@ alwaysApply: true
 
 The public API (`acompletion`, `aembedding`, `aresponse`) routes `"provider/model"` strings through a lazy-loading registry to provider implementations. Providers are self-contained modules under `providers/`, each conforming to one or more `Protocol` classes (`CompletionProvider`, `EmbeddingProvider`, `ResponseProvider`) and responsible for: role mapping, message validation, tool conversion, error mapping, and response normalization.
 
-Shared contracts live at the package root: Pydantic v2 response types (OpenAI-shaped), a unified error hierarchy with `status_code` for consumer retry logic, and a `should_retry` helper.
+Shared contracts live at the package root: Pydantic v2 response types, a unified error hierarchy with `status_code` for consumer retry logic, and a `should_retry` helper.
+
+Public inputs and outputs follow the OpenAI API reference, and the input of a method is the same schema as its output. `acompletion` uses Chat Completions messages. `aresponse` uses Responses items. Reasoning, which Chat Completions does not define, is one type on both: `ReasoningContent`, a chat content part and a Responses item, tagged with its originating provider. See `docs/design.md` ("Which API format we follow") and `docs/adr/0003-reasoning-as-content-part.md`.
 
 ## Type Conventions
 
@@ -27,6 +29,7 @@ Input types (messages, tool definitions, tool results) use `TypedDict` — light
 4. **Response normalization.** All providers convert native responses to the shared `types.py` models. Consumers never see provider-specific shapes.
 5. **Provider config via env vars or `**params`.** The public API has no provider-specific kwargs. Configuration flows through environment variables or pass-through params.
 6. **Provider behavior is self-documented.** Each provider class must have a comprehensive docstring covering: env vars, role mapping, error mapping, supported features, and provider-specific kwargs. This is the source of truth for provider behavior.
+7. **One public schema.** Inputs and outputs follow the OpenAI API reference, and they match each other. Chat fields come from the Chat Completions reference, response fields from the Responses reference. Reasoning is always `ReasoningContent`, replayed only to its originating provider. Do not add OpenRouter fields (`reasoning_details`, `format` tags) or a second reasoning type. `AssistantMessage.reasoning: str` is deprecated and kept only for 1.x compatibility.
 
 ## Adding a New Provider
 

@@ -11,8 +11,10 @@ import pytest
 
 pytest.importorskip("google.genai")
 
+import base64
+
 from giskard.llm.translators.google_chat import GoogleChatTranslator
-from giskard.llm.types import ReasoningTextDetail, TextContent
+from giskard.llm.types import ReasoningContent, ReasoningText, TextContent
 from google.genai import types
 
 pytestmark = pytest.mark.google
@@ -426,31 +428,32 @@ def test_from_google_unsupported_part_dropped_with_warning(
     assert "code_execution_result" in caplog.text
 
 
-# -- Thought part isolation ----------------------------------------------------
+# -- Thought parts become ReasoningContent ------------------------------------
+
+
+def _b64(raw: bytes) -> str:
+    return base64.b64encode(raw).decode()
+
+
+def _thought(text: str | None, signature: bytes | None = None) -> ReasoningContent:
+    return ReasoningContent(
+        content=None if text is None else [ReasoningText(text=text)],
+        signature=None if signature is None else _b64(signature),
+        provider="google",
+    )
 
 
 @pytest.mark.parametrize(
-    (
-        "parts",
-        "expected_reasoning",
-        "expected_details",
-        "expected_content",
-        "expected_text",
-    ),
+    ("parts", "expected_content", "expected_text", "expected_reasoning"),
     [
         pytest.param(
             [
                 {"thought": True, "text": "Internal deliberation."},
                 {"text": "Final answer."},
             ],
-            "Internal deliberation.",
-            [
-                ReasoningTextDetail(
-                    format="google-gemini-v1", text="Internal deliberation."
-                )
-            ],
-            [TextContent(text="Final answer.")],
+            [_thought("Internal deliberation."), TextContent(text="Final answer.")],
             "Final answer.",
+            "Internal deliberation.",
             id="single-thought-and-answer",
         ),
         pytest.param(
@@ -460,47 +463,31 @@ def test_from_google_unsupported_part_dropped_with_warning(
                 {"thought": True, "text": "Step 2"},
                 {"text": "Answer."},
             ],
-            "Step 1\nStep 2",
             [
-                ReasoningTextDetail(format="google-gemini-v1", text="Step 1"),
-                ReasoningTextDetail(format="google-gemini-v1", text="Step 2"),
+                _thought("Step 1"),
+                _thought(""),
+                _thought("Step 2"),
+                TextContent(text="Answer."),
             ],
-            [TextContent(text="Answer.")],
             "Answer.",
-            id="multiple-thoughts-joined-skipping-empty",
+            "Step 1\nStep 2",
+            id="one-part-per-thought-including-empty",
         ),
         pytest.param(
             [
                 {"thought": True, "thought_signature": b"sig"},
                 {"text": "Answer."},
             ],
-            None,
-            None,
-            [TextContent(text="Answer.")],
+            [_thought(None, b"sig"), TextContent(text="Answer.")],
             "Answer.",
+            None,
             id="signature-only-thought",
         ),
         pytest.param(
-            [
-                {"thought": True, "text": ""},
-                {"text": "Answer."},
-            ],
-            None,
-            None,
-            [TextContent(text="Answer.")],
-            "Answer.",
-            id="empty-text-thought-only",
-        ),
-        pytest.param(
             [{"thought": True, "text": "Only private thinking."}],
+            [_thought("Only private thinking.")],
+            None,
             "Only private thinking.",
-            [
-                ReasoningTextDetail(
-                    format="google-gemini-v1", text="Only private thinking."
-                )
-            ],
-            None,
-            None,
             id="thought-only-no-visible-content",
         ),
         pytest.param(
@@ -508,30 +495,46 @@ def test_from_google_unsupported_part_dropped_with_warning(
                 {"thought": True, "text": "Signed thought.", "thought_signature": b"s"},
                 {"text": "Answer."},
             ],
-            "Signed thought.",
-            [ReasoningTextDetail(format="google-gemini-v1", text="Signed thought.")],
-            [TextContent(text="Answer.")],
+            [_thought("Signed thought.", b"s"), TextContent(text="Answer.")],
             "Answer.",
+            "Signed thought.",
             id="thought-with-text-and-signature",
         ),
         pytest.param(
+            [
+                {"text": "Before."},
+                {"thought": True, "text": "Mid-answer thought."},
+                {"text": "After."},
+            ],
+            [
+                TextContent(text="Before."),
+                _thought("Mid-answer thought."),
+                TextContent(text="After."),
+            ],
+            "Before.\nAfter.",
+            "Mid-answer thought.",
+            id="thought-keeps-its-position",
+        ),
+        pytest.param(
             [{"thought": False, "text": "Explicitly visible."}],
-            None,
-            None,
             [TextContent(text="Explicitly visible.")],
             "Explicitly visible.",
+            None,
             id="thought-false-remains-visible-content",
         ),
     ],
 )
-def test_from_google_thought_part_isolation(
+def test_from_google_thought_parts_become_reasoning_content(
     parts: list[dict[str, object]],
-    expected_reasoning: str | None,
-    expected_details: list[ReasoningTextDetail] | None,
-    expected_content: list[TextContent] | None,
+    expected_content: list[ReasoningContent | TextContent],
     expected_text: str | None,
+    expected_reasoning: str | None,
 ):
-    """Thought parts route to ``reasoning`` / ``reasoning_details`` and never leak into ``content`` / ``text`` / ``transcript``."""
+    """Each thought part becomes one ``ReasoningContent`` tagged ``google``, in place.
+
+    Thought text never reaches ``text`` / ``transcript``; the deprecated
+    ``reasoning`` string is derived from the parts.
+    """
     raw = _raw(
         {
             "candidates": [
@@ -543,17 +546,18 @@ def test_from_google_thought_part_isolation(
         }
     )
     msg = GoogleChatTranslator.from_google(raw, _MODEL, 1).choices[0].message
-    assert msg.reasoning == expected_reasoning
-    assert msg.reasoning_details == expected_details
     assert msg.content == expected_content
     assert msg.text == expected_text
-    if expected_reasoning is not None:
-        for line in expected_reasoning.splitlines():
-            assert line not in msg.transcript
+    assert msg.__dict__["reasoning"] == expected_reasoning
+    for part in expected_content:
+        if isinstance(part, ReasoningContent):
+            for t in part.content or []:
+                if t.text:
+                    assert t.text not in msg.transcript
 
 
 def test_from_google_thought_part_and_function_call():
-    """Thought ahead of a ``function_call`` routes to ``reasoning`` and preserves the tool call."""
+    """A thought ahead of a ``function_call`` becomes a reasoning part; the tool call is kept."""
     raw = _raw(
         {
             "candidates": [
@@ -577,11 +581,7 @@ def test_from_google_thought_part_and_function_call():
     choice = GoogleChatTranslator.from_google(raw, _MODEL, 1).choices[0]
     msg = choice.message
     assert choice.finish_reason == "tool_calls"
-    assert msg.reasoning == "Need to check weather."
-    assert msg.reasoning_details == [
-        ReasoningTextDetail(format="google-gemini-v1", text="Need to check weather.")
-    ]
-    assert msg.content is None
+    assert msg.content == [_thought("Need to check weather.")]
     assert msg.text is None
     assert msg.tool_calls is not None
     assert msg.tool_calls[0].function.name == "get_weather"

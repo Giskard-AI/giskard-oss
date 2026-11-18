@@ -345,18 +345,18 @@ def test_response_format_pydantic_class_becomes_text_response_format():
     validate_google_interaction_params(payload)
 
 
-def test_reasoning_item_serializes_to_thought_step():
-    """A reasoning item replays as a ``thought`` step (summary + signature)."""
-    from giskard.llm.types import ResponseReasoningItem, ResponseReasoningSummary
+def test_google_reasoning_replays_as_thought_step_with_signature():
+    """A ``google`` reasoning item replays as a ``thought`` step (summary + signature)."""
+    from giskard.llm.types import ReasoningContent, ReasoningSummary
 
     payload = GoogleResponseTranslator.to_google(
         _MODEL,
         [
             _message("user", "Hi"),
-            ResponseReasoningItem(
-                id="thought_int_0",
-                summary=[ResponseReasoningSummary(text="Greeting")],
-                encrypted_content="sig-abc",
+            ReasoningContent(
+                summary=[ReasoningSummary(text="Greeting")],
+                signature="sig-abc",
+                provider="google",
             ),
             ResponseOutputMessage(content=[ResponseOutputText(text="Hello")]),
             _message("user", "Bye"),
@@ -370,16 +370,16 @@ def test_reasoning_item_serializes_to_thought_step():
     validate_google_interaction_params(payload)
 
 
-def test_reasoning_item_without_summary_falls_back_to_content():
+def test_google_reasoning_without_summary_falls_back_to_content():
     """Raw reasoning text is replayed as the summary rather than dropped."""
-    from giskard.llm.types import ResponseReasoningItem, ResponseReasoningText
+    from giskard.llm.types import ReasoningContent, ReasoningText
 
     payload = GoogleResponseTranslator.to_google(
         _MODEL,
         [
             _message("user", "Hi"),
-            ResponseReasoningItem(
-                id="rs_1", content=[ResponseReasoningText(text="Raw thinking")]
+            ReasoningContent(
+                content=[ReasoningText(text="Raw thinking")], provider="google"
             ),
         ],
     )
@@ -387,6 +387,59 @@ def test_reasoning_item_without_summary_falls_back_to_content():
         "type": "thought",
         "summary": [{"type": "text", "text": "Raw thinking"}],
     }
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        pytest.param("openai", id="openai"),
+        pytest.param("anthropic", id="anthropic"),
+        pytest.param(None, id="untagged"),
+    ],
+)
+def test_foreign_reasoning_is_not_sent_to_google(origin: str | None):
+    """Reasoning from another provider is dropped.
+
+    Regression: an OpenAI ``encrypted_content`` blob used to be sent to Google
+    as a thought ``signature``.
+    """
+    from giskard.llm.types import ReasoningContent, ReasoningSummary
+
+    payload = GoogleResponseTranslator.to_google(
+        _MODEL,
+        [
+            _message("user", "Hi"),
+            ReasoningContent(
+                id="rs_1",
+                summary=[ReasoningSummary(text="Plan")],
+                encrypted_content="openai-blob",
+                provider=origin,
+            ),
+            ResponseOutputMessage(content=[ResponseOutputText(text="Hello")]),
+        ],
+    )
+    steps = list(payload["input"])
+    assert [cast(dict[str, Any], cast(object, s))["type"] for s in steps] == [
+        "user_input",
+        "model_output",
+    ]
+    validate_google_interaction_params(payload)
+
+
+def test_google_reasoning_never_sends_encrypted_content():
+    """``encrypted_content`` is not a Google field, even on a ``google`` item."""
+    from giskard.llm.types import ReasoningContent
+
+    payload = GoogleResponseTranslator.to_google(
+        _MODEL,
+        [
+            _message("user", "Hi"),
+            ReasoningContent(
+                signature="sig", encrypted_content="blob", provider="google"
+            ),
+        ],
+    )
+    assert list(payload["input"])[1] == {"type": "thought", "signature": "sig"}
 
 
 @pytest.mark.parametrize(

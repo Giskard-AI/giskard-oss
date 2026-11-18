@@ -14,6 +14,8 @@ from pydantic import (
 )
 
 from ..types import (
+    ReasoningContent,
+    ReasoningSummary,
     ResponseEasyInputMessage,
     ResponseFunctionCallOutput,
     ResponseFunctionToolCall,
@@ -23,14 +25,13 @@ from ..types import (
     ResponseOutputMessage,
     ResponseOutputRefusal,
     ResponseOutputText,
-    ResponseReasoningItem,
-    ResponseReasoningSummary,
     ResponseResult,
     ToolDef,
     Usage,
     normalize_reasoning_effort,
 )
 from ..utils import deserialize_arguments
+from ._reasoning import replayable
 from ._unsupported import handle_unsupported_content
 
 if TYPE_CHECKING:
@@ -181,20 +182,21 @@ def serialize_output_function_call_output(
     }
 
 
-@ResponseReasoningItem.register_serializer(_PROVIDER)
+@ReasoningContent.register_serializer(_PROVIDER)
 def serialize_reasoning_item(
-    model: ResponseReasoningItem, _info: SerializationInfo
+    model: ReasoningContent, _info: SerializationInfo
 ) -> "ThoughtStepParam":
-    # Thought steps only carry a summary: fall back to raw reasoning text when a
-    # (non-Gemini) item has no summary, rather than dropping it.
+    # Thought steps only carry a summary: fall back to raw reasoning text when an
+    # item has no summary, rather than dropping it. ``encrypted_content`` is
+    # never a Google field.
     texts = [part.text for part in model.summary] or [
         part.text for part in model.content or []
     ]
     step: ThoughtStepParam = {"type": "thought"}
     if texts:
         step["summary"] = [_text_content(text) for text in texts]
-    if model.encrypted_content is not None:
-        step["signature"] = model.encrypted_content
+    if model.signature is not None:
+        step["signature"] = model.signature
     return step
 
 
@@ -237,7 +239,10 @@ class GoogleResponseParams(_BaseModel):
         if isinstance(value, str):
             return value
 
-        inputs = [item.model_dump(context=info.context) for item in value]
+        inputs = [
+            item.model_dump(context=info.context)
+            for item in replayable(value, PROVIDER)
+        ]
         return [item for item in inputs if item is not None]
 
     @model_validator(mode="before")
@@ -362,7 +367,7 @@ class GoogleResponseTranslator:
             ignore_unsupported_content=ignore_unsupported_content,
         )
         outputs: list[ResponseOutputItem] = []
-        for step_index, item in enumerate(raw.steps or []):
+        for item in raw.steps or []:
             if item.type == "model_output":
                 for content in item.content or []:
                     if content.type == "text":
@@ -383,18 +388,17 @@ class GoogleResponseTranslator:
                     )
                 )
             elif item.type == "thought":
-                summary: list[ResponseReasoningSummary] = []
+                summary: list[ReasoningSummary] = []
                 for content in item.summary or []:
                     if content.type == "text":
-                        summary.append(ResponseReasoningSummary(text=content.text))
+                        summary.append(ReasoningSummary(text=content.text))
                     else:
                         unsupported(f"thought:{content.type}")
                 outputs.append(
-                    ResponseReasoningItem(
-                        # Thought steps have no id; derive a stable one.
-                        id=f"thought_{raw.id}_{step_index}",
+                    ReasoningContent(
                         summary=summary,
-                        encrypted_content=item.signature,
+                        signature=item.signature,
+                        provider=PROVIDER,
                     )
                 )
             else:

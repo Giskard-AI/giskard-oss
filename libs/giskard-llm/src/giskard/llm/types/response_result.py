@@ -1,10 +1,10 @@
 from pydantic import AliasChoices, Field
 
 from ._base import _BaseModel
+from .reasoning import ReasoningContent
 from .response import (
     ResponseFunctionToolCall,
     ResponseOutputMessage,
-    ResponseReasoningItem,
 )
 from .usage import Usage
 
@@ -12,9 +12,7 @@ from .usage import Usage
 
 
 # Plain assignment (not `type` statement) so isinstance(x, ResponseOutputItem) works at runtime.
-ResponseOutputItem = (
-    ResponseOutputMessage | ResponseFunctionToolCall | ResponseReasoningItem
-)
+ResponseOutputItem = ResponseOutputMessage | ResponseFunctionToolCall | ReasoningContent
 
 
 class ResponseResult(_BaseModel):
@@ -42,6 +40,6 @@ class ResponseResult(_BaseModel):
         return [o for o in self.outputs if isinstance(o, ResponseFunctionToolCall)]
 
     @property
-    def reasoning(self) -> list[ResponseReasoningItem]:
+    def reasoning(self) -> list[ReasoningContent]:
         """Return all reasoning outputs (never part of ``output_text``)."""
-        return [o for o in self.outputs if isinstance(o, ResponseReasoningItem)]
+        return [o for o in self.outputs if isinstance(o, ReasoningContent)]
