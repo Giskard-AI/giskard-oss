@@ -36,6 +36,44 @@ def _validate_multiple_runs(value: int | None) -> int | None:
     return value
 
 
+def _validate_min_pass_rate(value: float | None) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(
+            "min_pass_rate must be a float between 0 (exclusive) and 1 (inclusive)"
+        )
+    if not (0.0 < value <= 1.0):
+        raise ValueError(
+            "min_pass_rate must be between 0 (exclusive) and 1 (inclusive)"
+        )
+    return float(value)
+
+
+def _annotate_advisory[InputType, OutputType, TraceType: Trace[Any, Any]](
+    step: Step[InputType, OutputType, TraceType],
+    step_result: TestCaseResult,
+) -> TestCaseResult:
+    """Stamp each check's ``advisory`` flag onto its ``CheckResult.details``.
+
+    ``TestCaseRunner`` runs every check in a step without short-circuiting, so
+    ``step_result.results`` align positionally with ``step.checks`` (enforced
+    via ``zip(..., strict=True)``). The ``advisory`` flag lets the result
+    rollups (TestCaseResult/ScenarioResult status) treat an advisory-only
+    failure as non-blocking while preserving the real FAIL/ERROR verdict in
+    each ``CheckResult`` for reporting.
+    """
+    if not any(check.advisory for check in step.checks):
+        return step_result
+    annotated = [
+        result.model_copy(
+            update={"details": {**(result.details or {}), "advisory": check.advisory}}
+        )
+        for check, result in zip(step.checks, step_result.results, strict=True)
+    ]
+    return step_result.model_copy(update={"results": annotated})
+
+
 def _build_steps[InputType, OutputType, TraceType: Trace[Any, Any]](
     scenario: Scenario[InputType, OutputType, TraceType],
     target: Target[InputType, OutputType, TraceType] | MISSING,
@@ -237,9 +275,13 @@ class ScenarioRunner:
             step_result = step_result.model_copy(
                 update={"last_interaction_index": last_interaction_index}
             )
+            step_result = _annotate_advisory(step, step_result)
             steps_results.append(step_result)
 
-            # Stop on first failure
+            # Stop on first failure. Advisory checks record their verdict but do
+            # not abort the scenario: a step whose only failures come from
+            # advisory checks reports as passed (see TestCaseResult.status), so
+            # execution continues to the next step.
             if not step_result.passed:
                 break
 
@@ -288,13 +330,21 @@ class ScenarioRunner:
         target: Target[InputType, OutputType, TraceType] | MISSING = MISSING,
         return_exception: bool = False,
         multiple_runs: int | None = None,
+        min_pass_rate: float | None = None,
     ) -> ScenarioResult[TraceType]:
-        """Execute a scenario up to N times, stopping on the first non-passing run.
+        """Execute a scenario up to N times, optionally under a pass-rate threshold.
 
-        Each run is executed independently with a fresh trace. The scenario is
-        run at most ``multiple_runs`` times when every run passes; otherwise
-        execution stops on the first run whose outcome is not PASS (FAIL, ERROR,
-        or SKIP). This is not a "retry until success" strategy.
+        Each run is executed independently with a fresh trace.
+
+        Without ``min_pass_rate``, the scenario is run at most ``multiple_runs``
+        times when every run passes; execution stops on the first run whose
+        outcome is not PASS (FAIL, ERROR, or SKIP). This is not a
+        "retry until success" strategy.
+
+        With ``min_pass_rate``, all ``multiple_runs`` attempts run (no
+        short-circuit) and the scenario passes only if the empirical pass rate
+        (passed runs / total runs) meets the threshold. This enables statistical
+        multi-run testing for non-deterministic targets.
 
         Parameters
         ----------
@@ -307,18 +357,51 @@ class ScenarioRunner:
         multiple_runs : int | None
             Optional cap on full scenario executions. When provided, it overrides
             the scenario-level `multiple_runs` value.
+        min_pass_rate : float | None
+            Optional pass-rate threshold in ``(0, 1]``. When set, every
+            ``multiple_runs`` attempt runs and the scenario passes only if the
+            empirical pass rate reaches this threshold.
 
         Returns
         -------
         ScenarioResult
-            Results from the last run executed, updated with multi-run metadata.
+            Results from the last run executed, updated with multi-run metadata
+            (and the empirical pass rate when ``min_pass_rate`` is used).
         """
 
         configured_runs = (
             _validate_multiple_runs(multiple_runs) or scenario.multiple_runs
         )
+        _validate_min_pass_rate(min_pass_rate)
         start_time = time.perf_counter()
         last_result: ScenarioResult[TraceType] | None = None
+
+        if min_pass_rate is not None:
+            # Statistical mode: run every attempt, never short-circuit.
+            passed_runs = 0
+            for _attempt in range(1, configured_runs + 1):
+                result = await self._run_once(
+                    scenario,
+                    target=target,
+                    return_exception=return_exception,
+                )
+                last_result = result
+                if result.passed:
+                    passed_runs += 1
+            pass_rate = passed_runs / configured_runs
+            end_time = time.perf_counter()
+            # Defensive: configured_runs validation prevents this.
+            if last_result is None:
+                raise RuntimeError("Scenario did not execute any runs")
+            return last_result.model_copy(
+                update={
+                    "duration_ms": int((end_time - start_time) * 1000),
+                    "multiple_runs": configured_runs,
+                    "runs_executed": configured_runs,
+                    "pass_rate": pass_rate,
+                    "min_pass_rate": min_pass_rate,
+                }
+            )
 
         for attempt in range(1, configured_runs + 1):
             result = await self._run_once(
