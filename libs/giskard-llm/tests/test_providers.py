@@ -379,6 +379,75 @@ async def test_sdk_v1_async_anthropic_accepts_httpx2_http_client():
         await http_client.aclose()
 
 
+async def _anthropic_request_body_for(**params: Any) -> dict[str, Any]:
+    """Run ``AnthropicProvider.complete`` against a recording httpx2 transport.
+
+    Returns the JSON body the installed SDK actually puts on the wire.
+    """
+    import httpx2
+
+    seen: dict[str, Any] = {}
+
+    def handler(request: "httpx2.Request") -> "httpx2.Response":
+        seen["body"] = json.loads(request.content)
+        return httpx2.Response(
+            200,
+            json={
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-test",
+                "content": [{"type": "text", "text": "hi"}],
+                "stop_reason": "end_turn",
+                "usage": {"input_tokens": 1, "output_tokens": 1},
+            },
+        )
+
+    http_client = httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+    try:
+        provider = AnthropicProvider(api_key="sk-test", http_client=http_client)
+        await provider.complete(
+            "claude-test", [{"role": "user", "content": "Hello"}], **params
+        )
+    finally:
+        await http_client.aclose()
+    return seen["body"]
+
+
+def _anthropic_sdk_major() -> int:
+    import anthropic
+
+    return int(anthropic.__version__.split(".")[0])
+
+
+async def test_sdk_v1_anthropic_forwards_temperature():
+    """SDK 1.x: ``temperature`` still reaches the API (via ``extra_body``)."""
+    pytest.importorskip("anthropic")
+    pytest.importorskip("httpx2")
+    if _anthropic_sdk_major() >= 2:
+        pytest.skip("anthropic SDK >= 2 no longer accepts temperature")
+
+    body = await _anthropic_request_body_for(temperature=0.2)
+
+    assert body["temperature"] == 0.2
+
+
+async def test_sdk_v2_anthropic_drops_temperature_and_warns(
+    caplog: pytest.LogCaptureFixture,
+):
+    """SDK >= 2: the API rejects ``temperature`` (400), so it is omitted with a warning."""
+    pytest.importorskip("anthropic")
+    pytest.importorskip("httpx2")
+    if _anthropic_sdk_major() < 2:
+        pytest.skip("anthropic SDK 1.x still accepts temperature")
+
+    with caplog.at_level("WARNING", logger="giskard.llm.providers.anthropic"):
+        body = await _anthropic_request_body_for(temperature=0.2)
+
+    assert "temperature" not in body
+    assert "temperature" in caplog.text
+
+
 async def test_sdk_v1_async_anthropic_rejects_httpx_v1_http_client():
     """Unmocked SDK check: v1 raises TypeError for an httpx (v1) AsyncClient."""
     pytest.importorskip("anthropic")

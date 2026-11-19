@@ -44,6 +44,11 @@ Provider-specific kwargs (configure-time):
     - ``http_client``: caller-owned ``httpx2.AsyncClient`` passed to the SDK; not closed by giskard-llm.
       Anthropic SDK v1 requires httpx2 (passing ``httpx.AsyncClient`` raises TypeError).
     - ``default_headers``: extra headers merged into every SDK request
+
+Sampling params:
+    - ``temperature``: forwarded on anthropic SDK 1.x. SDK >= 2 pins an API version
+      that rejects it (HTTP 400, "Extra inputs are not permitted") and has no
+      replacement, so it is omitted with a warning.
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false
@@ -96,6 +101,11 @@ def _import_anthropic() -> Any:
         return anthropic
     except ImportError as exc:
         raise ProviderNotAvailableError(PROVIDER, "anthropic") from exc
+
+
+def _sdk_rejects_temperature(anthropic: Any) -> bool:
+    """SDK >= 2 sends an API version that no longer accepts ``temperature``."""
+    return int(str(anthropic.__version__).split(".", 1)[0]) >= 2
 
 
 class AnthropicProvider:
@@ -165,6 +175,22 @@ class AnthropicProvider:
             )
         except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e
+
+        extra_body = kwargs.get("extra_body")
+        if (
+            extra_body
+            and "temperature" in extra_body
+            and _sdk_rejects_temperature(_import_anthropic())
+        ):
+            logger.warning(
+                "%s provider: dropping temperature; anthropic SDK >= 2 uses an API "
+                "version that rejects it",
+                PROVIDER,
+            )
+            rest = {k: v for k, v in extra_body.items() if k != "temperature"}
+            kwargs = {k: v for k, v in kwargs.items() if k != "extra_body"}
+            if rest:
+                kwargs["extra_body"] = rest
 
         try:
             raw = await self._client.messages.create(**kwargs)

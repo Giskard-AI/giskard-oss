@@ -22,20 +22,24 @@ from ..types import (
 from ..utils import deserialize_arguments
 
 if TYPE_CHECKING:
-    from google.genai._interactions.types import (
+    # Type-checking follows the locked SDK (google-genai 3.x: ``_gaos``). The same
+    # names live in ``google.genai._interactions.types`` on 2.x; these imports are
+    # never executed, so runtime stays compatible with both.
+    from google.genai._gaos.types.interactions import (
+        ContentParam,
         GenerationConfigParam,
         Interaction,
+        InteractionsInputParam,
         ModelOutputStepParam,
         StepParam,
         TextContentParam,
         ToolParam,
         UserInputStepParam,
-        interaction_create_params,
     )
     from httpx import Timeout as httpxTimeout
 
     class InteractionCreateParams(TypedDict, total=False):
-        input: Required[interaction_create_params.Input]
+        input: Required[InteractionsInputParam]
         model: Required[str]
         previous_interaction_id: str
         system_instruction: str
@@ -74,9 +78,10 @@ def _message_step(
     role: Literal["user", "assistant"],
     content: Iterable["TextContentParam"],
 ) -> "UserInputStepParam | ModelOutputStepParam":
+    parts: list["ContentParam"] = list(content)
     if role == "user":
-        return {"content": content, "type": "user_input"}
-    return {"content": content, "type": "model_output"}
+        return {"content": parts, "type": "user_input"}
+    return {"content": parts, "type": "model_output"}
 
 
 @ResponseInputText.register_serializer(_PROVIDER)
@@ -305,7 +310,7 @@ class GoogleResponseTranslator:
             )
 
         return ResponseResult(
-            id=raw.id,
+            id=raw.id or "",
             outputs=outputs,
             model=model,
             usage=usage,
