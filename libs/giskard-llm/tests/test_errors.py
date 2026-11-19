@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from giskard.llm.errors import (
     AuthenticationError,
@@ -41,7 +43,7 @@ def test_subclass_hierarchy():
 def test_provider_not_available_on_missing_sdk(provider_cls, expected_hint):
     """Instantiating a provider when its SDK is missing must raise
     ProviderNotAvailableError with the correct pip install hint."""
-    with pytest.raises(ProviderNotAvailableError, match=expected_hint):
+    with pytest.raises(ProviderNotAvailableError, match=re.escape(expected_hint)):
         provider_cls(api_key="dummy")
 
 
