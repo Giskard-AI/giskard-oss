@@ -97,6 +97,8 @@ logger = logging.getLogger(__name__)
 
 PROVIDER = "google"
 
+_INTERACTIONS_API_VERSION = "v1beta"
+
 
 KNOWN_EMBEDDING_PARAMS = frozenset({"dimensions"})
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature"})
@@ -203,14 +205,17 @@ class GoogleProvider:
             or os.environ.get("GEMINI_API_KEY")
             or os.environ.get("GOOGLE_API_KEY")
         )
-        self._client = genai.Client(
-            api_key=resolved_key,
-            http_options=_build_http_options(
-                http_options=http_options,
-                http_client=http_client,
-                default_headers=default_headers,
-            ),
+        built_options = _build_http_options(
+            http_options=http_options,
+            http_client=http_client,
+            default_headers=default_headers,
         )
+        # google-genai 3.x defaults Interactions to ``v1`` (no instructions, no
+        # function calling); 2.x defaulted to ``v1beta``. Pin it unless the caller chose.
+        self._interactions_api_version: str = (
+            getattr(built_options, "api_version", None) or _INTERACTIONS_API_VERSION
+        )
+        self._client = genai.Client(api_key=resolved_key, http_options=built_options)
 
     def _map_error(self, e: Exception) -> NoReturn:
         """Map a ``google.genai`` SDK exception to the giskard error hierarchy.
@@ -378,7 +383,9 @@ class GoogleProvider:
             raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:
-            raw = await self._client.aio.interactions.create(**kwargs)
+            raw = await self._client.aio.interactions.create(
+                api_version=self._interactions_api_version, **kwargs
+            )
         except Exception as e:  # Broad catch: _map_error checks SDK types first, then applies timeout heuristic, then re-raises.
             self._map_error(e)
 
