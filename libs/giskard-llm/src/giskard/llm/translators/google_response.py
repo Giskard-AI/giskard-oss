@@ -78,6 +78,7 @@ def _message_step(
     role: Literal["user", "assistant"],
     content: Iterable["TextContentParam"],
 ) -> "UserInputStepParam | ModelOutputStepParam":
+    # google-genai 3 types step content as a list; 2.x accepted any iterable.
     parts: list["ContentParam"] = list(content)
     if role == "user":
         return {"content": parts, "type": "user_input"}
@@ -310,6 +311,7 @@ class GoogleResponseTranslator:
             )
 
         return ResponseResult(
+            # Interaction.id is optional on google-genai 3; ResponseResult.id is str.
             id=raw.id or "",
             outputs=outputs,
             model=model,

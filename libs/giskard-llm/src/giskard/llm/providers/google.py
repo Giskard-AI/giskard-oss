@@ -43,13 +43,18 @@ Supported features:
     - Completion: yes
     - Embeddings: yes
     - Structured output (response_format): yes, via ``response_schema``
+    - Interactions (response): yes. Calls pass API version ``v1beta``.
+      google-genai 3.x otherwise defaults this endpoint to ``v1``, which
+      rejects system instructions and function calling. An ``api_version``
+      set on ``http_options`` is used instead.
 
 Provider-specific kwargs:
     - ``safety_settings``: override default safety settings
     - ``http_client``: caller-owned async HTTP client passed through ``HttpOptions``; not closed by giskard-llm
     - ``default_headers``: extra headers passed through ``HttpOptions``
     - ``http_options``: advanced ``google.genai.types.HttpOptions`` override;
-      explicit fields are preserved over convenience kwargs
+      explicit fields are preserved over convenience kwargs. ``api_version``
+      selects the Interactions API version; omitted, calls use ``v1beta``.
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
