@@ -1,6 +1,7 @@
 """NLP metric checks for evaluating text quality properties."""
 
 from importlib import import_module
+from math import isfinite
 from typing import Literal, Self, override
 
 from pydantic import Field, model_validator
@@ -141,6 +142,15 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
                 details={**details, "value": str(text)},
             )
 
+        if not text.strip():
+            return CheckResult.error(
+                message=(
+                    f"Value for key '{self.target_key}' is empty or whitespace-only; "
+                    "readability cannot be scored."
+                ),
+                details={**details, "text": text},
+            )
+
         try:
             score_fn = getattr(textstat, self.metric)
             score = float(score_fn(text))
@@ -150,8 +160,18 @@ class Readability[InputType, OutputType, TraceType: Trace](  # pyright: ignore[r
                 message=f"Failed to compute readability score ({self.metric}): {exc}",
                 details={**details, "error": str(exc)},
             )
-        metrics = [Metric(name=self.metric, value=score)]
         details = {**details, "text": text, "score": score}
+
+        if not isfinite(score):
+            return CheckResult.error(
+                message=(
+                    f"Readability score ({self.metric}) is not a finite number: "
+                    f"{score}."
+                ),
+                details=details,
+            )
+
+        metrics = [Metric(name=self.metric, value=score)]
 
         if self.min_score is not None and score < self.min_score:
             return CheckResult(
