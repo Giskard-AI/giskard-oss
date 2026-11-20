@@ -44,6 +44,14 @@ Provider-specific kwargs (configure-time):
     - ``http_client``: caller-owned ``httpx2.AsyncClient`` passed to the SDK; not closed by giskard-llm.
       Anthropic SDK v1 requires httpx2 (passing ``httpx.AsyncClient`` raises TypeError).
     - ``default_headers``: extra headers merged into every SDK request
+
+Sampling params:
+    - ``temperature``: forwarded via ``extra_body`` (not as a ``messages.create``
+      kwarg; SDK 1 raises ``TypeError`` for that kwarg). SDK 1.x accepts it.
+      SDK >= 2 pins an API version that rejects it (HTTP 400, "Extra inputs are
+      not permitted") and has no replacement parameter. The provider leaves it
+      on the request so that rejection surfaces as ``BadRequestError``. Callers
+      who need temperature pin ``anthropic<2``.
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false

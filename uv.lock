@@ -230,20 +230,21 @@ wheels = [
 
 [[package]]
 name = "anthropic"
-version = "1.2.0"
+version = "2.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "docstring-parser" },
     { name = "httpx2" },
     { name = "jiter" },
+    { name = "opentelemetry-api" },
     { name = "pydantic" },
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/95/1a/b5af41cc1fa14da277ec20ca5554dd2fcbc09b8523ac59b7a97fbb88e452/anthropic-1.2.0.tar.gz", hash = "sha256:12f8eedee7b7fb5685837b1371b7bfae1b281703f62355f4632598ec2fc53b34", size = 1137443, upload-time = "2026-08-27T20:29:12.68Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/75/e6/aabc3c266a0aaf38fa542648585741fce9616ba4cd034ddde74548f790a0/anthropic-2.8.0.tar.gz", hash = "sha256:d34e389ba0544cd64e033eb7475f46cc1ac6f2a388cdcd472b33ad4ac29ef40c", size = 1976933, upload-time = "2026-11-10T16:33:19.38Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/78/3f8b52708b03309e511990700bb8d0ec7a0c9db3d2a1e0d1c3ca417a4604/anthropic-1.2.0-py3-none-any.whl", hash = "sha256:b60642b3e3cd6b8e3e328a2d3f2863ad2b6e743f1037e42cc0143f7df99f63c6", size = 1289535, upload-time = "2026-08-27T20:29:11.01Z" },
+    { url = "https://files.pythonhosted.org/packages/96/8e/f8ef271dcbe3b187879b660c129ee36ef655c7b878f6878460891d9b2a26/anthropic-2.8.0-py3-none-any.whl", hash = "sha256:76ad332e2d500fc54d0112cf100544ad1a7605e71e092b98d9eb664d2b66e283", size = 2456925, upload-time = "2026-11-10T16:33:21.388Z" },
 ]
 
 [[package]]
@@ -1508,11 +1509,11 @@ openai = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=1,<2" },
+    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=1,<3" },
     { name = "giskard-core", editable = "libs/giskard-core" },
     { name = "giskard-llm", extras = ["openai"], marker = "extra == 'azure'", editable = "libs/giskard-llm" },
     { name = "giskard-llm", extras = ["openai", "google", "anthropic"], marker = "extra == 'all'", editable = "libs/giskard-llm" },
-    { name = "google-genai", marker = "extra == 'google'", specifier = ">=2.0,<3" },
+    { name = "google-genai", marker = "extra == 'google'", specifier = ">=2.0,<4" },
     { name = "httpx", specifier = ">=0.28.1,<1" },
     { name = "httpx2", marker = "extra == 'anthropic'", specifier = ">=2.12.0,<3" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.30,<4" },
@@ -1598,15 +1599,15 @@ wheels = [
 
 [[package]]
 name = "google-auth"
-version = "2.55.0"
+version = "2.62.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
     { name = "pyasn1-modules" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/81/1c/70b23fc52b2bb3c70b379f3bd05c4a60ab3a873e30c6bd21c57e0154848a/google_auth-2.55.0.tar.gz", hash = "sha256:fcd3a130f575fa36403d38774af1c64a4fbfbca09215f0589d2372b5119697cb", size = 349379, upload-time = "2026-06-15T22:33:16.466Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4a/d4/87353e950d653d87360176363d51f316e8e368e1ddbb7ba7aa5503c30c3e/google_auth-2.62.2.tar.gz", hash = "sha256:046c61a72d3a847d6df6417a7f0d5cf054e3b82bbcb54fb1e69d47880964049c", size = 404543, upload-time = "2026-11-10T15:50:55.102Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/44/71/c0321dc6d63d99946da45f7c06299b934e4f7f7da5c4f14d101bcb39adf1/google_auth-2.55.0-py3-none-any.whl", hash = "sha256:a17cef9dedf98c4ebae2fb0c48c8f75952c877cbc2efe09f329ef16c2783d88a", size = 252400, upload-time = "2026-06-15T22:33:14.992Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/d4/0f8481baa50f75db3bb19a0df79fe19615e66eccfc3afb0b946dcb8791b3/google_auth-2.62.2-py3-none-any.whl", hash = "sha256:e9bcdb0679b6a4369ac327c5c59f06d92f7b4cd2624e7100294c14632f55a36b", size = 270150, upload-time = "2026-11-10T15:50:53.408Z" },
 ]
 
 [package.optional-dependencies]
@@ -1660,13 +1661,13 @@ wheels = [
 
 [[package]]
 name = "google-genai"
-version = "2.4.0"
+version = "3.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "distro" },
     { name = "google-auth", extra = ["requests"] },
-    { name = "httpx" },
+    { name = "httpx2" },
     { name = "pydantic" },
     { name = "requests" },
     { name = "sniffio" },
@@ -1674,9 +1675,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b6/91/15fff1b7c22dc0b5b44fa348f151379721353d06a3da22dbbe15bf2c4dd9/google_genai-2.4.0.tar.gz", hash = "sha256:3f8d4bd618be2801e805dc698726731a70f34b438ea25a6c92800eef5b1f513e", size = 552025, upload-time = "2026-05-18T00:25:14.556Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/fa/041ef12c71d6e150d8fb99049847388aa0d349d98a7c67614746a7b6ef65/google_genai-3.2.0.tar.gz", hash = "sha256:b848937937b7b72594e75c57f01618ca201275afaedbfd717c004434ebf592f5", size = 826292, upload-time = "2026-11-11T17:49:09.168Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/c8/1b49f6bb69dc7e291ba5d14926937bec4dffcc09ee875822636bd5ef3cf4/google_genai-2.4.0-py3-none-any.whl", hash = "sha256:48df1c44190b05b834fee9cffd360af6d6fd7f68164588e7ebd670fa34f71ee1", size = 818207, upload-time = "2026-05-18T00:25:12.426Z" },
+    { url = "https://files.pythonhosted.org/packages/72/23/28319604be07dfce63a2ed84453fb6528011fe20ed1fc2b14514c88ce285/google_genai-3.2.0-py3-none-any.whl", hash = "sha256:4d7289b050ae2fec5cf1e2b4775f59de1730a9bacd714b4b33a11075f929f0da", size = 1363836, upload-time = "2026-11-11T17:49:07.352Z" },
 ]
 
 [[package]]
