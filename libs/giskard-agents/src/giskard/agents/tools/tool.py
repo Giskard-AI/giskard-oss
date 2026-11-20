@@ -177,9 +177,7 @@ class Tool(BaseModel):
             if self._params_model is not None:
                 validated = self._params_model.model_validate(arguments)
                 arguments = {
-                    name: getattr(validated, name)
-                    for name in self._params_model.model_fields
-                    if name in arguments
+                    name: getattr(validated, name) for name in validated.model_fields_set
                 }
 
             if ctx and self.run_context_param:
