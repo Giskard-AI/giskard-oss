@@ -1,5 +1,6 @@
 """Tests for model string parsing, registry, and LLMClient routing."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -195,6 +196,41 @@ def test_client_reconfigure_clears_cache():
             "test", provider="openai", api_key="sk-2"
         )  # pragma: allowlist secret
         assert "test" not in client._providers
+
+
+def test_client_reuses_provider_within_one_event_loop():
+    client = LLMClient()
+
+    async def get_twice():
+        return client._get_provider("openai"), client._get_provider("openai")
+
+    with patch("giskard.llm.routing._create_provider") as mock_create:
+        mock_create.return_value = MagicMock()
+        p1, p2 = asyncio.run(get_twice())
+
+    assert p1 is p2
+    mock_create.assert_called_once()
+
+
+def test_client_rebuilds_provider_for_new_event_loop():
+    """A provider is not shared across event loops (its HTTP pool is loop-bound)."""
+    client = LLMClient()
+    client.configure(
+        "test", provider="openai", api_key="sk-x"
+    )  # pragma: allowlist secret
+
+    async def get():
+        return client._get_provider("test")
+
+    with patch("giskard.llm.routing._create_provider") as mock_create:
+        provider_a, provider_b = MagicMock(), MagicMock()
+        mock_create.side_effect = [provider_a, provider_b]
+
+        assert asyncio.run(get()) is provider_a
+        assert asyncio.run(get()) is provider_b
+
+    assert mock_create.call_count == 2
+    assert mock_create.call_args_list[1].kwargs == {"api_key": "sk-x"}
 
 
 def test_client_unconfigured_registry_provider():
