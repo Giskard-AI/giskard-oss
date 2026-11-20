@@ -433,20 +433,16 @@ async def test_sdk_v1_anthropic_forwards_temperature():
     assert body["temperature"] == 0.2
 
 
-async def test_sdk_v2_anthropic_drops_temperature_and_warns(
-    caplog: pytest.LogCaptureFixture,
-):
-    """SDK >= 2: the API rejects ``temperature`` (400), so it is omitted with a warning."""
+async def test_sdk_v2_anthropic_forwards_temperature():
+    """SDK >= 2: ``temperature`` stays on the wire so the API can reject it."""
     pytest.importorskip("anthropic")
     pytest.importorskip("httpx2")
     if _anthropic_sdk_major() < 2:
         pytest.skip("anthropic SDK 1.x still accepts temperature")
 
-    with caplog.at_level("WARNING", logger="giskard.llm.providers.anthropic"):
-        body = await _anthropic_request_body_for(temperature=0.2)
+    body = await _anthropic_request_body_for(temperature=0.2)
 
-    assert "temperature" not in body
-    assert "temperature" in caplog.text
+    assert body["temperature"] == 0.2
 
 
 async def _google_interactions_path_for(**provider_kwargs: Any) -> str:

@@ -46,9 +46,12 @@ Provider-specific kwargs (configure-time):
     - ``default_headers``: extra headers merged into every SDK request
 
 Sampling params:
-    - ``temperature``: forwarded on anthropic SDK 1.x. SDK >= 2 pins an API version
-      that rejects it (HTTP 400, "Extra inputs are not permitted") and has no
-      replacement, so it is omitted with a warning.
+    - ``temperature``: forwarded via ``extra_body`` (not as a ``messages.create``
+      kwarg; SDK 1 raises ``TypeError`` for that kwarg). SDK 1.x accepts it.
+      SDK >= 2 pins an API version that rejects it (HTTP 400, "Extra inputs are
+      not permitted") and has no replacement parameter. The provider leaves it
+      on the request so that rejection surfaces as ``BadRequestError``. Callers
+      who need temperature pin ``anthropic<2``.
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportImplicitRelativeImport=false
@@ -101,11 +104,6 @@ def _import_anthropic() -> Any:
         return anthropic
     except ImportError as exc:
         raise ProviderNotAvailableError(PROVIDER, "anthropic") from exc
-
-
-def _sdk_rejects_temperature(anthropic: Any) -> bool:
-    """SDK >= 2 sends an API version that no longer accepts ``temperature``."""
-    return int(str(anthropic.__version__).split(".", 1)[0]) >= 2
 
 
 class AnthropicProvider:
@@ -175,22 +173,6 @@ class AnthropicProvider:
             )
         except ValidationError as e:
             raise BadRequestError(400, str(e), PROVIDER) from e
-
-        extra_body = kwargs.get("extra_body")
-        if (
-            extra_body
-            and _sdk_rejects_temperature(_import_anthropic())
-            and "temperature" in extra_body
-        ):
-            # extra_body is a fresh dict from the translator. Other keys stay.
-            logger.warning(
-                "%s provider: dropping temperature; anthropic SDK >= 2 uses an API "
-                "version that rejects it",
-                PROVIDER,
-            )
-            del extra_body["temperature"]
-            if not extra_body:
-                del kwargs["extra_body"]
 
         try:
             raw = await self._client.messages.create(**kwargs)
