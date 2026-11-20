@@ -12,7 +12,7 @@ from giskard.checks.generators.dataset import (
     schema_cache_key,
     substitute_prompt,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model
 
 from .conftest import LLMTrace, MockGenerator
 
@@ -219,6 +219,36 @@ async def test_template_cached_per_schema_prompt_substituted_each_time():
     assert v1.body == "prompt one"
     assert v2.body == "prompt two"
     assert len(gen.calls) == 1  # one LLM call for the shared schema
+
+
+@pytest.mark.parametrize(
+    "modules", [("workflow.first", "workflow.second"), ("workflow", "workflow")]
+)
+async def test_same_schema_models_keep_their_requested_type(modules):
+    first_type = create_model("Payload", message=(str, ...), __module__=modules[0])
+    second_type = create_model("Payload", message=(str, ...), __module__=modules[1])
+    assert first_type is not second_type
+    assert first_type.model_json_schema() == second_type.model_json_schema()
+    assert first_type.__qualname__ == second_type.__qualname__
+
+    gen = MockGenerator(
+        responses=[_mapping_response({"message": PROMPT_PLACEHOLDER}) for _ in range(2)]
+    )
+    first = DatasetInputGenerator(generator=gen, prompt="first prompt")
+    second = DatasetInputGenerator(generator=gen, prompt="second prompt")
+    first_value = await anext(first(LLMTrace(), input_type=first_type))
+    second_value = await anext(second(LLMTrace(), input_type=second_type))
+
+    assert type(first_value) is first_type
+    assert type(second_value) is second_type
+    assert first_value.model_dump() == {"message": "first prompt"}
+    assert second_value.model_dump() == {"message": "second prompt"}
+    assert len(gen.calls) == 2
+
+    repeated = await anext(second(LLMTrace(), input_type=second_type))
+    assert type(repeated) is second_type
+    assert repeated.model_dump() == {"message": "second prompt"}
+    assert len(gen.calls) == 2
 
 
 async def test_schema_issue_raises():

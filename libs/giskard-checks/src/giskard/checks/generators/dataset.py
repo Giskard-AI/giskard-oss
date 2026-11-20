@@ -98,8 +98,9 @@ def substitute_prompt(message: Any, prompt: str) -> Any:
     return result
 
 
-_TEMPLATE_CACHE: dict[str, "MappingTemplate[Any]"] = {}
-_TEMPLATE_LOCKS: dict[str, asyncio.Lock] = {}
+# Templates contain model instances, so equal schemas still need type isolation.
+_TEMPLATE_CACHE: dict[tuple[type[Any], str], "MappingTemplate[Any]"] = {}
+_TEMPLATE_LOCKS: dict[tuple[type[Any], str], asyncio.Lock] = {}
 
 
 def schema_cache_key(input_type: type, schema: dict[str, Any] | None = None) -> str:
@@ -144,7 +145,7 @@ class DatasetInputGenerator[TraceType: Trace](  # pyright: ignore[reportMissingT
 
     async def _resolve_template(self, input_type: type) -> "MappingTemplate[Any]":
         schema_dict = input_type.model_json_schema()
-        key = schema_cache_key(input_type, schema_dict)
+        key = (input_type, schema_cache_key(input_type, schema_dict))
         cached = _TEMPLATE_CACHE.get(key)
         if cached is not None:
             return cached
