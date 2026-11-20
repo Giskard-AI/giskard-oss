@@ -428,3 +428,103 @@ async def test_tool_run_primitive_types_unchanged(args, expected):
 
     result = await search.run(args)
     assert result == expected
+
+
+# ---------------------------------------------------------------------------
+# Tool.run() serialization errors route through catch (issue #2954)
+# ---------------------------------------------------------------------------
+
+
+class Blob:
+    """Unserializable return value used by the serialization-error tests."""
+
+    def __init__(self, payload: bytes):
+        self.payload = payload
+
+
+@pytest.mark.parametrize(
+    "return_value, type_name",
+    [
+        pytest.param({1, 2, 3}, "set", id="set"),
+        pytest.param(datetime(2026, 11, 16, 15, 0, 0), "datetime", id="datetime"),
+        pytest.param(b"binary", "bytes", id="bytes"),
+        pytest.param({"data": b"blob"}, "bytes", id="nested-bytes"),
+        pytest.param(Blob(b"blob"), "Blob", id="custom-object"),
+    ],
+)
+async def test_tool_run_unserializable_result_goes_through_catch(
+    return_value, type_name
+):
+    """A non-JSON-serializable return is an Error string, not a raise."""
+
+    @tool
+    def stub(x: str):
+        """Return a value.
+
+        Parameters
+        ----------
+        x : str
+            Ignored.
+        """
+        return return_value
+
+    result = await stub.run({"x": "ignored"})
+    assert isinstance(result, str)
+    assert result == f"ERROR: Object of type {type_name} is not JSON serializable"
+
+
+async def test_tool_run_unserializable_result_propagates_with_catch_none():
+    """With catch=None, a serialization failure propagates like any error."""
+
+    @agents.tool(catch=None)
+    def stub(x: str):
+        """Return a set.
+
+        Parameters
+        ----------
+        x : str
+            Ignored.
+        """
+        return {1, 2, 3}
+
+    with pytest.raises(TypeError, match="not JSON serializable"):
+        await stub.run({"x": "ignored"})
+
+
+async def test_tool_run_serialization_error_custom_catch_dict():
+    """A custom catch returning a dict gets it serialized like any result."""
+
+    @tool(catch=lambda error: {"error": str(error)})
+    def stub(x: str):
+        """Return a set.
+
+        Parameters
+        ----------
+        x : str
+            Ignored.
+        """
+        return {1, 2, 3}
+
+    result = await stub.run({"x": "ignored"})
+    assert json.loads(result) == {
+        "error": "Object of type set is not JSON serializable"
+    }
+
+
+async def test_tool_run_serialization_error_custom_catch_unserializable():
+    """If the catch result itself is unserializable, run() still returns str."""
+
+    @tool(catch=lambda error: {1})
+    def stub(x: str):
+        """Return a set.
+
+        Parameters
+        ----------
+        x : str
+            Ignored.
+        """
+        return {2, 3}
+
+    result = await stub.run({"x": "ignored"})
+    assert isinstance(result, str)
+    assert result == "{1}"
