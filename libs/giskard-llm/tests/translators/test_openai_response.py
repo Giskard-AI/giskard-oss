@@ -6,11 +6,16 @@ For **Chat Completions** -> :class:`~giskard.llm.types.CompletionResponse`, see 
 """
 
 import json
-from typing import Literal
+import logging
+from typing import Any, Literal, cast
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from giskard.llm.errors import BadRequestError
+from giskard.llm.routing import LLMClient
 from giskard.llm.translators.openai_response import OpenAIResponseTranslator
 from giskard.llm.types import (
+    ReasoningEffort,
     ResponseEasyInputMessage,
     ResponseInputItem,
 )
@@ -384,3 +389,147 @@ def test_reasoning_item_round_trips_unchanged():
     )
     assert list(payload.get("input", []))[1] == reasoning
     validate_openai_response_params(payload)
+
+
+@pytest.mark.parametrize(
+    ("raw_effort", "expected"),
+    [
+        pytest.param("none", "none", id="none"),
+        pytest.param("minimal", "minimal", id="minimal"),
+        pytest.param("low", "low", id="low"),
+        pytest.param("medium", "medium", id="medium"),
+        pytest.param("high", "high", id="high"),
+        pytest.param("xhigh", "xhigh", id="xhigh"),
+        pytest.param("max", "max", id="max"),
+        pytest.param("HIGH", "high", id="upper-case"),
+        pytest.param("xHiGh", "xhigh", id="mixed-case"),
+    ],
+)
+def test_reasoning_effort_canonical_levels_map_to_reasoning_dict(
+    raw_effort: str, expected: ReasoningEffort, caplog: pytest.LogCaptureFixture
+):
+    """All 7 canonical levels map to ``reasoning={"effort": ...}`` without top-level leak."""
+    with caplog.at_level(
+        logging.WARNING, logger="giskard.llm.translators.openai_response"
+    ):
+        payload = OpenAIResponseTranslator.to_openai(
+            _MODEL, "Hello.", reasoning_effort=raw_effort
+        )
+    assert "reasoning_effort" not in payload
+    assert payload.get("reasoning") == {"effort": expected}
+    assert "reasoning_effort" not in " ".join(r.message for r in caplog.records)
+    validate_openai_response_params(payload)
+
+
+def test_reasoning_effort_none_omitted():
+    """Explicit ``reasoning_effort=None`` omits ``reasoning`` from the payload."""
+    payload = OpenAIResponseTranslator.to_openai(
+        _MODEL, "Hello.", reasoning_effort=None
+    )
+    assert "reasoning" not in payload
+    assert "reasoning_effort" not in payload
+    validate_openai_response_params(payload)
+
+
+def test_reasoning_escape_hatch_merges_without_overwriting_siblings(
+    caplog: pytest.LogCaptureFixture,
+):
+    """``reasoning_effort`` merges into ``reasoning`` preserving sibling keys."""
+    escape = {"summary": "concise", "context": "current_turn"}
+    with caplog.at_level(
+        logging.WARNING, logger="giskard.llm.translators.openai_response"
+    ):
+        payload = OpenAIResponseTranslator.to_openai(
+            _MODEL, "Hello.", reasoning_effort="HIGH", reasoning=escape
+        )
+    assert payload.get("reasoning") == {
+        "summary": "concise",
+        "context": "current_turn",
+        "effort": "high",
+    }
+    assert escape == {"summary": "concise", "context": "current_turn"}
+    assert "reasoning" not in " ".join(r.message for r in caplog.records)
+    validate_openai_response_params(payload)
+
+
+def test_reasoning_escape_hatch_only_passes_through():
+    """Explicit ``reasoning`` without ``reasoning_effort`` is forwarded verbatim."""
+    payload = OpenAIResponseTranslator.to_openai(
+        _MODEL, "Hello.", reasoning={"summary": "detailed"}
+    )
+    assert payload.get("reasoning") == {"summary": "detailed"}
+    validate_openai_response_params(payload)
+
+
+def test_reasoning_effort_and_reasoning_effort_key_conflict_raises():
+    """Providing both ``reasoning_effort`` and ``reasoning['effort']`` raises 400."""
+    with pytest.raises(BadRequestError) as exc_info:
+        OpenAIResponseTranslator.to_openai(
+            _MODEL,
+            "Hello.",
+            reasoning_effort="high",
+            reasoning={"effort": "low", "summary": "concise"},
+        )
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.provider == "openai"
+
+
+@pytest.mark.parametrize(
+    "model_id",
+    [
+        pytest.param("openai/gpt-5", id="openai"),
+        pytest.param("azure/gpt-5", id="azure"),
+        pytest.param("azure_ai/gpt-5", id="azure_ai"),
+    ],
+)
+async def test_client_aresponse_forwards_and_rejects_reasoning_effort(
+    model_id: str, monkeypatch: pytest.MonkeyPatch
+):
+    """``LLMClient.aresponse`` forwards merged reasoning and rejects invalid/conflict before SDK."""
+    if model_id.startswith("azure_ai/"):
+        monkeypatch.setenv("AZURE_AI_API_KEY", "k")
+        monkeypatch.setenv("AZURE_AI_ENDPOINT", "https://x.services.ai.azure.com")
+    elif model_id.startswith("azure/"):
+        monkeypatch.setenv("AZURE_API_KEY", "k")
+        monkeypatch.setenv("AZURE_API_BASE", "https://x.openai.azure.com")
+    else:
+        monkeypatch.setenv("OPENAI_API_KEY", "k")
+
+    client = LLMClient()
+    provider = client._get_provider(model_id.split("/")[0])
+    sdk_resp = MagicMock()
+    sdk_resp.model_dump.return_value = {
+        "id": "resp_1",
+        "output": [
+            {
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": "Ok"}],
+            }
+        ],
+        "model": "gpt-5",
+    }
+    create_mock = AsyncMock(return_value=sdk_resp)
+    cast(Any, provider)._client = MagicMock(responses=MagicMock(create=create_mock))
+
+    await client.aresponse(
+        model_id,
+        "Hi",
+        reasoning_effort="HIGH",
+        reasoning={"summary": "auto"},
+    )
+    assert create_mock.call_args.kwargs["reasoning"] == {
+        "summary": "auto",
+        "effort": "high",
+    }
+
+    bad_cases: tuple[dict[str, Any], ...] = (
+        {"reasoning_effort": "ultra"},
+        {"reasoning_effort": "high", "reasoning": {"effort": "low"}},
+    )
+    for bad_kwargs in bad_cases:
+        create_mock.reset_mock()
+        with pytest.raises(BadRequestError) as exc_info:
+            await client.aresponse(model_id, "Hi", **bad_kwargs)
+        assert exc_info.value.status_code == 400
+        create_mock.assert_not_called()

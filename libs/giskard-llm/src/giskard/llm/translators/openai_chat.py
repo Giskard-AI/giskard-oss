@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 from giskard.llm.types import (
     ChatMessage,
     CompletionResponse,
+    NormalizedReasoningEffort,
     ToolDef,
 )
 from giskard.llm.types._base import _BaseModel
@@ -38,6 +39,7 @@ KNOWN_COMPLETION_PARAMS = frozenset(
         "tools",
         "response_format",
         "metadata",
+        "reasoning_effort",
     }
 )
 _REASONING_DETAIL_TYPES = frozenset(
@@ -54,6 +56,7 @@ class OpenAIChatParams(_BaseModel):
     timeout: float | int | None = None
     metadata: dict[str, str] | None = None
     response_format: dict[str, Any] | None = None
+    reasoning_effort: NormalizedReasoningEffort | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -125,4 +128,11 @@ class OpenAIChatTranslator:
                     ignore_unsupported_content=ignore_unsupported_content,
                     label_prefix="reasoning_details:",
                 )
+        if isinstance(usage := data.get("usage"), dict):
+            details = usage.get("completion_tokens_details")
+            if (
+                isinstance(details, dict)
+                and (reasoning_tokens := details.get("reasoning_tokens")) is not None
+            ):
+                usage["reasoning_tokens"] = reasoning_tokens
         return CompletionResponse.model_validate(data)

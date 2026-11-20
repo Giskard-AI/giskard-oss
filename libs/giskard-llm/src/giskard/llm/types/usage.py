@@ -11,3 +11,4 @@ class Usage(_BaseModel):
         default=0, validation_alias=AliasChoices("completion_tokens", "output_tokens")
     )
     total_tokens: int = 0
+    reasoning_tokens: int | None = None

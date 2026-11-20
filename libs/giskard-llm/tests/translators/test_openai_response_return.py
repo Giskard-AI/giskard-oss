@@ -327,3 +327,50 @@ def test_from_openai_unsupported_output_item_dropped_with_warning(
     assert len(out.outputs) == 1
     assert out.output_text == "Sunny"
     assert "web_search_call" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("output_tokens_details", "expected_reasoning_tokens"),
+    [
+        pytest.param(
+            OutputTokensDetails(reasoning_tokens=30),
+            30,
+            id="reasoning-tokens-present",
+        ),
+        pytest.param(
+            OutputTokensDetails(reasoning_tokens=0),
+            0,
+            id="reasoning-tokens-zero",
+        ),
+        pytest.param(
+            None,
+            None,
+            id="no-output-tokens-details",
+        ),
+    ],
+)
+def test_from_openai_usage_reasoning_tokens(
+    output_tokens_details: OutputTokensDetails | None,
+    expected_reasoning_tokens: int | None,
+):
+    """Maps ``output_tokens_details.reasoning_tokens`` to ``Usage.reasoning_tokens``."""
+    msg = ResponseOutputMessage(
+        id="msg_1",
+        type="message",
+        role="assistant",
+        status="completed",
+        content=[ResponseOutputText(type="output_text", text="42", annotations=[])],
+    )
+    usage = ResponseUsage.model_construct(
+        input_tokens=10,
+        input_tokens_details=InputTokensDetails(cached_tokens=0, cache_write_tokens=0),
+        output_tokens=40,
+        output_tokens_details=output_tokens_details,
+        total_tokens=50,
+    )
+    raw = Response.model_construct(
+        id="resp_usage", output=[msg], model=_MODEL, usage=usage
+    )
+    out = OpenAIResponseTranslator.from_openai(raw)
+    assert out.usage is not None
+    assert out.usage.reasoning_tokens == expected_reasoning_tokens

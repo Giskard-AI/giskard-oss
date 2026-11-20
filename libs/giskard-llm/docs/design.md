@@ -44,3 +44,25 @@ The `name` field is required because Google's Interactions API needs it. OpenAI'
 `ToolCallFunction.arguments` is `ArgumentDict` (`dict[str, object]`). A `BeforeValidator` automatically parses JSON strings on input, so callers may provide either a raw dict or a JSON string — both are stored as a dict. This makes tool arguments safe to inspect and pass to function calls without a separate parsing step.
 
 Translators that need to send arguments back to an API (e.g. Anthropic `tool_use` blocks) use `serialize_arguments()` from `giskard.llm.utils` to convert the dict to a JSON string. The `serialize_arguments` / `deserialize_arguments` helpers both accept `dict | str` for defensive handling.
+
+## Reasoning Effort & Provider Escape Hatches
+
+`acompletion`, `aresponse`, and `giskard-agents` (`GenerationParams`) share a canonical `ReasoningEffort` literal (`"none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"`), case-normalized on input.
+
+Translators enforce a **strict 1:1 mapping** (`BadRequestError(400)` on unsupported levels) and merge `reasoning_effort` cleanly with co-located provider parameters rather than overwriting them:
+
+- **OpenAI / Azure (`complete`)**: passes `reasoning_effort` directly (all 7 levels).
+- **OpenAI / Azure (`respond`)**: merges `effort` into `reasoning` (`all 7` levels).
+- **Anthropic (`complete`)**: merges `effort` into `output_config` alongside `output_config["format"]` from `response_format` (`low`..`max`; rejects `none`, `minimal`), and sets `thinking={"type": "adaptive"}` when `thinking` is omitted.
+- **Google (`complete`)**: merges uppercased `thinking_level` into `config.thinking_config` (`minimal`..`high`; rejects `none`, `xhigh`, `max`).
+- **Google (`respond`)**: merges lowercased `thinking_level` into `generation_config` alongside `temperature` (`minimal`..`high`; rejects `none`, `xhigh`, `max`).
+
+Provider-native escape hatches (`reasoning`, `thinking`, `output_config`, `thinking_config`, `generation_config`) are whitelisted in `KNOWN_*_PARAMS`. Passing both `reasoning_effort` and the conflicting native effort/budget key raises `BadRequestError(400)`.
+
+In `giskard-agents`, `GenerationParams` uses `extra="forbid"` and `BaseGenerator.with_params(**kwargs)` validates updates while preserving `model_fields_set`. Because `GiskardLLMGenerator` and `LiteLLMGenerator` serialize with `exclude_unset=True`, the default `temperature=1.0` is omitted unless explicitly set, avoiding spurious 400s on reasoning models that forbid non-default `temperature`.
+
+## Reasoning Output & Token Accounting
+
+- **Answer isolation**: `AssistantMessage.reasoning`, `AssistantMessage.reasoning_details`, and `ResponseReasoningItem` never contribute to `.text`, `.transcript`, or `.output_text`. Outbound serializers strip reasoning via `_BaseModel._wire_excluded`, except provider-tagged details explicitly required for tool-loop continuity (e.g. signed `anthropic-claude-v1` blocks and `ResponseReasoningItem`).
+- **Google thought parts**: `GoogleChatTranslator` routes `Part.thought == True` parts to `AssistantMessage.reasoning` rather than `TextContent`.
+- **Reasoning tokens**: `Usage.reasoning_tokens: int | None = None` captures reasoning token counts from OpenAI Chat (`completion_tokens_details.reasoning_tokens`), OpenAI Responses (`output_tokens_details.reasoning_tokens`), Anthropic Messages (`output_tokens_details.thinking_tokens`), Google Chat (`usage_metadata.thoughts_token_count`, which remains included in `output_tokens`), and Google Interactions (`usage.total_thought_tokens`).

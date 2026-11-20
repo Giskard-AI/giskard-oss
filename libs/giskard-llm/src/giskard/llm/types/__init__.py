@@ -39,6 +39,11 @@ from .chat_param import (
     UserMessageParam,
 )
 from .embedding import EmbeddingData, EmbeddingResponse, EmbeddingUsage
+from .reasoning import (
+    NormalizedReasoningEffort,
+    ReasoningEffort,
+    normalize_reasoning_effort,
+)
 from .response import (
     FunctionCallOutput,
     ResponseEasyInputMessage,
@@ -98,8 +103,10 @@ __all__ = [
     "FunctionDefParam",
     "FunctionMessage",
     "FunctionMessageParam",
+    "NormalizedReasoningEffort",
     "ReasoningDetail",
     "ReasoningDetailParam",
+    "ReasoningEffort",
     "ReasoningEncryptedDetail",
     "ReasoningEncryptedDetailParam",
     "ReasoningSummaryDetail",
@@ -152,4 +159,5 @@ __all__ = [
     "Usage",
     "UserMessage",
     "UserMessageParam",
+    "normalize_reasoning_effort",
 ]
