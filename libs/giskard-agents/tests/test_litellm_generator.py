@@ -71,6 +71,25 @@ async def test_litellm_generator_forwards_params(mock_acompletion: Any) -> None:
     assert kwargs["max_tokens"] == 50
 
 
+async def test_litellm_generator_forwards_api_base(mock_acompletion: Any) -> None:
+    """An explicitly set api_base is forwarded to the completion call."""
+    api_base = "http://127.0.0.1:1234/v1"
+    generator = LiteLLMGenerator(model="test-model").with_params(api_base=api_base)
+    await generator.complete(messages=_USER_MESSAGE)
+
+    kwargs = mock_acompletion.call_args.kwargs
+    assert kwargs["api_base"] == api_base
+
+
+async def test_litellm_generator_omits_unset_api_base(mock_acompletion: Any) -> None:
+    """An unset api_base is not forwarded to the completion call."""
+    generator = LiteLLMGenerator(model="test-model")
+    await generator.complete(messages=_USER_MESSAGE)
+
+    kwargs = mock_acompletion.call_args.kwargs
+    assert "api_base" not in kwargs
+
+
 async def test_litellm_generator_sanitizes_response_format_schema_name(
     mock_acompletion: Any,
 ) -> None:
