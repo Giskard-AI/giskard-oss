@@ -141,7 +141,7 @@ Find a list of packages below
 
 - HomePage:
 - Author: Anthropic
-- License: MIT License
+- License: Apache Software License
 - Compatible: True
 
 ### anyio
@@ -216,9 +216,9 @@ Find a list of packages below
 
 ### cloudpickle
 
-- HomePage: https://github.com/cloudpipe/cloudpickle
+- HomePage:
 - Author: The cloudpickle developer team
-- License: BSD License
+- License: BSD-3-Clause
 - Compatible: True
 
 ### colorama
