@@ -179,18 +179,18 @@ class AnthropicProvider:
         extra_body = kwargs.get("extra_body")
         if (
             extra_body
-            and "temperature" in extra_body
             and _sdk_rejects_temperature(_import_anthropic())
+            and "temperature" in extra_body
         ):
+            # extra_body is a fresh dict from the translator. Other keys stay.
             logger.warning(
                 "%s provider: dropping temperature; anthropic SDK >= 2 uses an API "
                 "version that rejects it",
                 PROVIDER,
             )
-            rest = {k: v for k, v in extra_body.items() if k != "temperature"}
-            kwargs = {k: v for k, v in kwargs.items() if k != "extra_body"}
-            if rest:
-                kwargs["extra_body"] = rest
+            del extra_body["temperature"]
+            if not extra_body:
+                del kwargs["extra_body"]
 
         try:
             raw = await self._client.messages.create(**kwargs)
