@@ -13,6 +13,9 @@ from giskard.llm.types import (
     ChatMessage,
     DeveloperMessage,
     FunctionMessage,
+    ReasoningEncryptedDetail,
+    ReasoningSummaryDetail,
+    ReasoningTextDetail,
     RefusalContent,
     SystemMessage,
     TextContent,
@@ -39,6 +42,7 @@ from .tool_turn_fixtures import (
 )
 
 _MODEL = "claude-sonnet-4-20250514"
+_FORMAT = "anthropic-claude-v1"
 
 
 def test_single_user_message():
@@ -158,10 +162,19 @@ def test_two_instructions_then_user(instruction_role: Literal["system", "develop
 
 
 def test_user_assistant_user():
-    """Multi-turn chat: user string content vs assistant text blocks; ``reasoning`` is not replayed."""
+    """Multi-turn chat: signed Anthropic thinking is replayed first; the plain
+    ``reasoning`` string is not (it has no signature)."""
     messages: list[ChatMessage] = [
         UserMessage(content="First user."),
-        AssistantMessage(content="Assistant reply.", reasoning="Private reasoning."),
+        AssistantMessage(
+            content="Assistant reply.",
+            reasoning="Private reasoning.",
+            reasoning_details=[
+                ReasoningTextDetail(
+                    text="Private reasoning.", signature="sig_1", format=_FORMAT
+                )
+            ],
+        ),
         UserMessage(content="Second user."),
     ]
     payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
@@ -170,10 +183,146 @@ def test_user_assistant_user():
         {"role": "user", "content": "First user."},
         {
             "role": "assistant",
-            "content": [{"type": "text", "text": "Assistant reply."}],
+            "content": [
+                {
+                    "type": "thinking",
+                    "thinking": "Private reasoning.",
+                    "signature": "sig_1",
+                },
+                {"type": "text", "text": "Assistant reply."},
+            ],
         },
         {"role": "user", "content": "Second user."},
     ]
+    validate_anthropic_message_create(payload)
+
+
+def test_plain_reasoning_without_details_is_not_replayed():
+    """A bare ``reasoning`` string (e.g. from another provider) never reaches Anthropic."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="First user."),
+        AssistantMessage(content="Assistant reply.", reasoning="Private reasoning."),
+        UserMessage(content="Second user."),
+    ]
+    payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
+
+    assert payload["messages"][1] == {
+        "role": "assistant",
+        "content": [{"type": "text", "text": "Assistant reply."}],
+    }
+    validate_anthropic_message_create(payload)
+
+
+def test_signed_and_redacted_thinking_replayed_first_in_order():
+    """Thinking and redacted thinking lead the turn, in order, before text and tool_use."""
+    messages = user_assistant_tool_then_tool_result()
+    assistant = cast(AssistantMessage, messages[1])
+    messages[1] = assistant.model_copy(
+        update={
+            "content": "Checking.",
+            "reasoning_details": [
+                ReasoningTextDetail(text="First.", signature="sig_1", format=_FORMAT),
+                ReasoningEncryptedDetail(data="opaque", format=_FORMAT),
+                # Omitted display: empty text, but the signature must round-trip.
+                ReasoningTextDetail(text="", signature="sig_2", format=_FORMAT),
+            ],
+        }
+    )
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL,
+        messages,
+        tools=[WEATHER_TOOL],
+        thinking={"type": "adaptive"},
+    )
+
+    assert payload["messages"][1] == {
+        "role": "assistant",
+        "content": [
+            {"type": "thinking", "thinking": "First.", "signature": "sig_1"},
+            {"type": "redacted_thinking", "data": "opaque"},
+            {"type": "thinking", "thinking": "", "signature": "sig_2"},
+            {"type": "text", "text": "Checking."},
+            {
+                "type": "tool_use",
+                "id": TOOL_CALL_ID,
+                "name": "get_weather",
+                "input": {"city": "Paris"},
+            },
+        ],
+    }
+    validate_anthropic_message_create(payload)
+
+
+def test_unsigned_and_foreign_reasoning_details_dropped():
+    """Only signed ``anthropic-claude-v1`` details are replayed; the rest is dropped."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="Hi."),
+        AssistantMessage(
+            content="Hello.",
+            reasoning_details=[
+                ReasoningTextDetail(text="Unsigned.", format=_FORMAT),
+                ReasoningTextDetail(text="Foreign.", signature="sig", format="other"),
+                ReasoningEncryptedDetail(data="enc", format="openai-responses-v1"),
+                ReasoningSummaryDetail(summary="Summary.", format=_FORMAT),
+                ReasoningTextDetail(text="Kept.", signature="sig_k", format=_FORMAT),
+            ],
+        ),
+        UserMessage(content="Again."),
+    ]
+    payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
+
+    assert payload["messages"][1]["content"] == [
+        {"type": "thinking", "thinking": "Kept.", "signature": "sig_k"},
+        {"type": "text", "text": "Hello."},
+    ]
+    validate_anthropic_message_create(payload)
+
+
+def test_merged_assistant_turns_keep_thinking_first():
+    """Merging consecutive assistant messages hoists all thinking to the front,
+    keeping the relative order of thinking blocks and of the other blocks."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="Hi."),
+        AssistantMessage(
+            content="Part one.",
+            reasoning_details=[
+                ReasoningTextDetail(text="A.", signature="sig_a", format=_FORMAT)
+            ],
+        ),
+        AssistantMessage(
+            content="Part two.",
+            reasoning_details=[
+                ReasoningEncryptedDetail(data="opaque_b", format=_FORMAT),
+                ReasoningTextDetail(text="C.", signature="sig_c", format=_FORMAT),
+            ],
+        ),
+    ]
+    payload = AnthropicChatTranslator.to_anthropic(_MODEL, messages)
+
+    assert payload["messages"] == [
+        {"role": "user", "content": "Hi."},
+        {
+            "role": "assistant",
+            "content": [
+                {"type": "thinking", "thinking": "A.", "signature": "sig_a"},
+                {"type": "redacted_thinking", "data": "opaque_b"},
+                {"type": "thinking", "thinking": "C.", "signature": "sig_c"},
+                {"type": "text", "text": "Part one."},
+                {"type": "text", "text": "Part two."},
+            ],
+        },
+    ]
+    validate_anthropic_message_create(payload)
+
+
+def test_thinking_param_passed_through_without_warning(caplog):
+    """``thinking`` is a known Anthropic param: forwarded as-is, no unknown-param warning."""
+    with caplog.at_level(logging.WARNING):
+        payload = AnthropicChatTranslator.to_anthropic(
+            _MODEL, [UserMessage(content="Hi.")], thinking={"type": "adaptive"}
+        )
+    assert payload.get("thinking") == {"type": "adaptive"}
+    assert "thinking" not in " ".join(r.message for r in caplog.records)
     validate_anthropic_message_create(payload)
 
 

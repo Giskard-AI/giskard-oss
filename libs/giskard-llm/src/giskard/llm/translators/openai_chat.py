@@ -12,6 +12,7 @@ from giskard.llm.utils import sanitize_schema_name
 from pydantic import BaseModel, model_validator
 
 from ..types._serialization import close_object_schemas
+from ._unsupported import keep_supported
 
 if TYPE_CHECKING:
     from openai.types.chat.chat_completion import ChatCompletion
@@ -38,6 +39,9 @@ KNOWN_COMPLETION_PARAMS = frozenset(
         "response_format",
         "metadata",
     }
+)
+_REASONING_DETAIL_TYPES = frozenset(
+    {"reasoning.text", "reasoning.summary", "reasoning.encrypted"}
 )
 
 
@@ -104,5 +108,21 @@ class OpenAIChatTranslator:
     @staticmethod
     def from_openai(
         raw: "ChatCompletion",
+        *,
+        ignore_unsupported_content: bool = False,
+        provider: str = PROVIDER,
     ) -> "CompletionResponse":
-        return CompletionResponse.model_validate(raw.model_dump())
+        # OpenAI-compatible servers return ``reasoning`` / ``reasoning_content`` /
+        # ``reasoning_details`` as SDK extras, which ``model_dump`` keeps.
+        data = raw.model_dump()
+        for choice in data.get("choices") or []:
+            message = choice.get("message") or {}
+            if details := message.get("reasoning_details"):
+                message["reasoning_details"] = keep_supported(
+                    details,
+                    _REASONING_DETAIL_TYPES,
+                    provider,
+                    ignore_unsupported_content=ignore_unsupported_content,
+                    label_prefix="reasoning_details:",
+                )
+        return CompletionResponse.model_validate(data)

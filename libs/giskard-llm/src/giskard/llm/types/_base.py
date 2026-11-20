@@ -20,6 +20,11 @@ class _BaseModel(BaseModel):
     # Fields kept on the model but never sent to a provider API.
     _wire_excluded: ClassVar[frozenset[str]] = frozenset()
 
+    @classmethod
+    def wire_excluded_fields(cls) -> frozenset[str]:
+        """Fields kept on the model but never sent to a provider (e.g. reasoning)."""
+        return cls._wire_excluded
+
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         kwargs.setdefault("exclude_none", True)
         return super().model_dump(**kwargs)
