@@ -13,7 +13,7 @@ from .base import BaseLLMCheck
 class LLMJudge[InputType, OutputType, TraceType: Trace](  # pyright: ignore[reportMissingTypeArgument]
     BaseLLMCheck[InputType, OutputType, TraceType]
 ):
-    """LLM-based check that evaluates interactions using a custom prompt.
+    r"""LLM-based check that evaluates interactions using a custom prompt.
 
     This check uses a Large Language Model to evaluate interactions based on
     a user-provided prompt. The prompt can be specified either inline as a string
