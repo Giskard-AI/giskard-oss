@@ -251,7 +251,7 @@ def test_user_tool_call_and_result_with_tools():
 
 
 def test_user_two_parallel_tool_calls_and_results_with_tools():
-    """Two ``function_call`` parts on one model turn; two user ``function_response`` turns."""
+    """Two ``function_call`` parts on one model turn; adjacent ``tool`` turns merge to one user."""
     messages = user_two_parallel_tool_calls_two_results()
     payload = GoogleChatTranslator.to_google(_MODEL, messages, tools=PARALLEL_TOOLS)
 
@@ -306,18 +306,13 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
                         "name": "get_weather",
                         "response": {"result": TOOL_RESULT_WEATHER_PARALLEL},
                     }
-                }
-            ],
-        },
-        {
-            "role": "user",
-            "parts": [
+                },
                 {
                     "function_response": {
                         "name": "get_local_time",
                         "response": {"result": TOOL_RESULT_TIME_PARALLEL},
                     }
-                }
+                },
             ],
         },
     ]
@@ -381,6 +376,38 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
                         "name": "get_weather",
                         "response": {"result": TOOL_RESULT_WEATHER_PARALLEL},
                     }
+                },
+                {
+                    "function_response": {
+                        "name": "get_local_time",
+                        "response": {"result": TOOL_RESULT_TIME_PARALLEL},
+                    }
+                },
+            ],
+        },
+    ]
+    validate_google_contents(payload["contents"])
+
+
+def test_tool_result_then_user_message_not_merged():
+    """Only consecutive ``ToolMessage``s merge; following ``UserMessage`` stays separate."""
+    messages = [
+        *user_assistant_tool_then_tool_result(),
+        UserMessage(content="Now summarize."),
+    ]
+    payload = GoogleChatTranslator.to_google(_MODEL, messages, tools=[WEATHER_TOOL])
+
+    assert payload["contents"] == [
+        {"role": "user", "parts": [{"text": "What's the weather in Paris?"}]},
+        {
+            "role": "model",
+            "parts": [
+                {
+                    "function_call": {
+                        "name": "get_weather",
+                        "args": {"city": "Paris"},
+                    },
+                    "thought_signature": _SKIP_THOUGHT_SIGNATURE,
                 }
             ],
         },
@@ -389,12 +416,28 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
             "parts": [
                 {
                     "function_response": {
-                        "name": "get_local_time",
-                        "response": {"result": TOOL_RESULT_TIME_PARALLEL},
+                        "name": "get_weather",
+                        "response": {"result": TOOL_RESULT_CONTENT},
                     }
                 }
             ],
         },
+        {"role": "user", "parts": [{"text": "Now summarize."}]},
+    ]
+    validate_google_contents(payload["contents"])
+
+
+def test_consecutive_user_messages_not_merged():
+    """Regular consecutive ``UserMessage``s remain separate turns."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="First."),
+        UserMessage(content="Second."),
+    ]
+    payload = GoogleChatTranslator.to_google(_MODEL, messages)
+
+    assert payload["contents"] == [
+        {"role": "user", "parts": [{"text": "First."}]},
+        {"role": "user", "parts": [{"text": "Second."}]},
     ]
     validate_google_contents(payload["contents"])
 
