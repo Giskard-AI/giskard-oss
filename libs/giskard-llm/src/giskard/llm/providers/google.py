@@ -43,13 +43,18 @@ Supported features:
     - Completion: yes
     - Embeddings: yes
     - Structured output (response_format): yes, via ``response_schema``
+    - Interactions (response): yes. Calls pass API version ``v1beta``.
+      google-genai 3.x otherwise defaults this endpoint to ``v1``, which
+      rejects system instructions and function calling. An ``api_version``
+      set on ``http_options`` is used instead.
 
 Provider-specific kwargs:
     - ``safety_settings``: override default safety settings
     - ``http_client``: caller-owned async HTTP client passed through ``HttpOptions``; not closed by giskard-llm
     - ``default_headers``: extra headers passed through ``HttpOptions``
     - ``http_options``: advanced ``google.genai.types.HttpOptions`` override;
-      explicit fields are preserved over convenience kwargs
+      explicit fields are preserved over convenience kwargs. ``api_version``
+      selects the Interactions API version; omitted, calls use ``v1beta``.
 """
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
@@ -96,6 +101,8 @@ _RESPONSE_INPUT_ITEMS_TYPE_ADAPTER = TypeAdapter(str | Sequence[ResponseInputIte
 logger = logging.getLogger(__name__)
 
 PROVIDER = "google"
+
+_INTERACTIONS_API_VERSION = "v1beta"
 
 
 KNOWN_EMBEDDING_PARAMS = frozenset({"dimensions"})
@@ -203,14 +210,17 @@ class GoogleProvider:
             or os.environ.get("GEMINI_API_KEY")
             or os.environ.get("GOOGLE_API_KEY")
         )
-        self._client = genai.Client(
-            api_key=resolved_key,
-            http_options=_build_http_options(
-                http_options=http_options,
-                http_client=http_client,
-                default_headers=default_headers,
-            ),
+        built_options = _build_http_options(
+            http_options=http_options,
+            http_client=http_client,
+            default_headers=default_headers,
         )
+        # google-genai 3.x defaults Interactions to ``v1`` (no instructions, no
+        # function calling); 2.x defaulted to ``v1beta``. Pin it unless the caller chose.
+        self._interactions_api_version: str = (
+            getattr(built_options, "api_version", None) or _INTERACTIONS_API_VERSION
+        )
+        self._client = genai.Client(api_key=resolved_key, http_options=built_options)
 
     def _map_error(self, e: Exception) -> NoReturn:
         """Map a ``google.genai`` SDK exception to the giskard error hierarchy.
@@ -378,7 +388,9 @@ class GoogleProvider:
             raise BadRequestError(400, str(e), PROVIDER) from e
 
         try:
-            raw = await self._client.aio.interactions.create(**kwargs)
+            raw = await self._client.aio.interactions.create(
+                api_version=self._interactions_api_version, **kwargs
+            )
         except Exception as e:  # Broad catch: _map_error checks SDK types first, then applies timeout heuristic, then re-raises.
             self._map_error(e)
 

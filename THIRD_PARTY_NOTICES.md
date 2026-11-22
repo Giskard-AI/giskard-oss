@@ -141,7 +141,7 @@ Find a list of packages below
 
 - HomePage:
 - Author: Anthropic
-- License: MIT License
+- License: Apache Software License
 - Compatible: True
 
 ### anyio
