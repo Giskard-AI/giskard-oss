@@ -19,16 +19,18 @@ from giskard.llm.types import (
     ResponseOutputMessage,
     ResponseOutputText,
 )
-from google.genai._interactions.types import (
-    FunctionCallStep,
-    GoogleSearchCallStep,
-    ImageContent,
-    Interaction,
-    ModelOutputStep,
-    TextContent,
-    ThoughtStep,
-    Usage,
-)
+
+from .sdk_payload_validation import google_interaction_types
+
+_types = google_interaction_types()
+FunctionCallStep = _types.FunctionCallStep
+GoogleSearchCallStep = _types.GoogleSearchCallStep
+ImageContent = _types.ImageContent
+Interaction = _types.Interaction
+ModelOutputStep = _types.ModelOutputStep
+TextContent = _types.TextContent
+ThoughtStep = _types.ThoughtStep
+Usage = _types.Usage
 
 pytestmark = pytest.mark.google
 

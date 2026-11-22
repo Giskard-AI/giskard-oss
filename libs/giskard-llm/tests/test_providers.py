@@ -51,6 +51,7 @@ def _make_google_provider(ignore_unsupported_content: bool = False):
     provider = GoogleProvider.__new__(GoogleProvider)
     provider._ignore_unsupported_content = ignore_unsupported_content
     provider._client = MagicMock()
+    provider._interactions_api_version = "v1beta"
     return provider
 
 
@@ -382,6 +383,115 @@ async def test_sdk_v1_async_anthropic_accepts_httpx2_http_client():
     finally:
         # Caller-owned: giskard-llm does not close this; the test must.
         await http_client.aclose()
+
+
+async def _anthropic_request_body_for(**params: Any) -> dict[str, Any]:
+    """Run ``AnthropicProvider.complete`` against a recording httpx2 transport.
+
+    Returns the JSON body the installed SDK actually puts on the wire.
+    """
+    import httpx2
+
+    seen: dict[str, Any] = {}
+
+    def handler(request: "httpx2.Request") -> "httpx2.Response":
+        seen["body"] = json.loads(request.content)
+        return httpx2.Response(
+            200,
+            json={
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-test",
+                "content": [{"type": "text", "text": "hi"}],
+                "stop_reason": "end_turn",
+                "usage": {"input_tokens": 1, "output_tokens": 1},
+            },
+        )
+
+    http_client = httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+    try:
+        provider = AnthropicProvider(api_key="sk-test", http_client=http_client)
+        await provider.complete(
+            "claude-test", [{"role": "user", "content": "Hello"}], **params
+        )
+    finally:
+        await http_client.aclose()
+    return seen["body"]
+
+
+def _anthropic_sdk_major() -> int:
+    import anthropic
+
+    return int(anthropic.__version__.split(".")[0])
+
+
+async def test_sdk_v1_anthropic_forwards_temperature():
+    """SDK 1.x: ``temperature`` still reaches the API (via ``extra_body``)."""
+    pytest.importorskip("anthropic")
+    pytest.importorskip("httpx2")
+    if _anthropic_sdk_major() >= 2:
+        pytest.skip("anthropic SDK >= 2 no longer accepts temperature")
+
+    body = await _anthropic_request_body_for(temperature=0.2)
+
+    assert body["temperature"] == 0.2
+
+
+async def test_sdk_v2_anthropic_forwards_temperature():
+    """SDK >= 2: ``temperature`` stays on the wire so the API can reject it."""
+    pytest.importorskip("anthropic")
+    pytest.importorskip("httpx2")
+    if _anthropic_sdk_major() < 2:
+        pytest.skip("anthropic SDK 1.x still accepts temperature")
+
+    body = await _anthropic_request_body_for(temperature=0.2)
+
+    assert body["temperature"] == 0.2
+
+
+async def _google_interactions_path_for(**provider_kwargs: Any) -> str:
+    """Run ``GoogleProvider.respond`` against a recording transport; return the URL path."""
+    import httpx
+
+    seen: dict[str, str] = {}
+
+    def handler(request: "httpx.Request") -> "httpx.Response":
+        seen["path"] = request.url.path
+        return httpx.Response(
+            200, json={"id": "int_1", "status": "completed", "steps": [], "usage": {}}
+        )
+
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    try:
+        provider = GoogleProvider(
+            api_key="test-key",  # pragma: allowlist secret
+            http_client=http_client,
+            **provider_kwargs,
+        )
+        await provider.respond("gemini-2.5-flash", "Hello")
+    finally:
+        await http_client.aclose()
+    return seen["path"]
+
+
+async def test_google_respond_uses_v1beta_interactions_endpoint():
+    """google-genai 3.x defaults Interactions to ``v1``, which rejects instructions
+    and function calling; 2.x defaulted to ``v1beta``. Always target ``v1beta``."""
+    pytest.importorskip("google.genai")
+
+    path = await _google_interactions_path_for()
+
+    assert path == "/v1beta/interactions"
+
+
+async def test_google_respond_respects_explicit_api_version():
+    """An ``api_version`` set through ``http_options`` is not overridden."""
+    pytest.importorskip("google.genai")
+
+    path = await _google_interactions_path_for(http_options={"api_version": "v1alpha"})
+
+    assert path == "/v1alpha/interactions"
 
 
 async def test_sdk_v1_async_anthropic_rejects_httpx_v1_http_client():
