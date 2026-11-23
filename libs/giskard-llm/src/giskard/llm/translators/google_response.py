@@ -165,6 +165,31 @@ def serialize_output_function_call_output(
     }
 
 
+# Gemini 3 rejects a replayed ``function_call`` that carries no thought signature
+# (400 "Request contains an invalid argument"). The Interactions ``function_call``
+# step has no signature field: the signature lives on the ``thought`` step before
+# it. When no signed thought is replayed (history from another provider, or the
+# thought dropped) a ``thought`` step holding this documented sentinel makes the API
+# skip validation. https://ai.google.dev/gemini-api/docs/thought-signatures
+_SKIP_THOUGHT_SIGNATURE = "skip_thought_signature_validator"
+
+
+def _with_skip_thought_signatures(steps: list[Any]) -> list[Any]:
+    """Put a sentinel ``thought`` step before each function call run lacking one.
+
+    Parallel calls share one signature (the thought before the first call of the
+    run); every sequential round needs its own.
+    """
+    out: list[Any] = []
+    for step in steps:
+        if step.get("type") == "function_call" and (
+            not out or out[-1].get("type") not in ("thought", "function_call")
+        ):
+            out.append({"type": "thought", "signature": _SKIP_THOUGHT_SIGNATURE})
+        out.append(step)
+    return out
+
+
 def _extract_system_instruction(input: str | Sequence[ResponseInputItem]) -> str | None:
     if isinstance(input, str):
         return None
@@ -203,7 +228,9 @@ class GoogleResponseParams(_BaseModel):
             return value
 
         inputs = [item.model_dump(context=info.context) for item in value]
-        return [item for item in inputs if item is not None]
+        return _with_skip_thought_signatures(
+            [item for item in inputs if item is not None]
+        )
 
     @model_validator(mode="before")
     @classmethod
