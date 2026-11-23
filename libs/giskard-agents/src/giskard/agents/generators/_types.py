@@ -4,7 +4,7 @@ Kept in a separate module to break the circular dependency between
 ``base`` (BaseGenerator) and ``middleware`` (CompletionMiddleware).
 """
 
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from giskard.llm.types import NormalizedReasoningEffort
 from pydantic import BaseModel, ConfigDict, Field
@@ -29,7 +29,7 @@ class GenerationParams(BaseModel):
 
     temperature: float = Field(default=1.0)
     max_tokens: int | None = Field(default=None)
-    response_format: type[Any] | None = Field(default=None)
+    response_format: type[BaseModel] | None = Field(default=None)
     tools: list[Tool] = Field(default_factory=list)
     timeout: float | int | None = Field(default=None)
     reasoning_effort: NormalizedReasoningEffort | None = Field(default=None)

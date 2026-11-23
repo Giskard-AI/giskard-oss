@@ -145,10 +145,20 @@ def test_generator_with_params():
     assert new_generator.params.temperature == 0.7
     assert generator.params.temperature == 0.5
 
-    int_generator = new_generator.with_params(response_format=int)
-    assert int_generator.params.response_format is int
+    class Output(BaseModel):
+        value: int
+
+    model_generator = new_generator.with_params(response_format=Output)
+    assert model_generator.params.response_format is Output
     assert new_generator.params.response_format is None
     assert generator.params.response_format is None
+
+
+@pytest.mark.parametrize("bad", [int, dict, str])
+def test_with_params_rejects_non_model_response_format(bad: type):
+    """``response_format`` must be a pydantic model class; fail at the call site, not in a translator."""
+    with pytest.raises(ValidationError):
+        GiskardLLMGenerator(model="test-model").with_params(response_format=bad)
 
 
 def test_generator_with_params_and_rate_limiter():
