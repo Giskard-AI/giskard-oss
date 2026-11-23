@@ -193,6 +193,7 @@ def test_from_google_function_call_captures_thought_signature():
     tool_calls = out.choices[0].message.tool_calls
     assert tool_calls is not None
     assert tool_calls[0].thought_signature == b"real-signature-bytes"
+    assert tool_calls[0].thought_signature_provider == "google"
 
 
 def test_from_google_function_call_without_signature_is_none():
@@ -219,6 +220,7 @@ def test_from_google_function_call_without_signature_is_none():
     tool_calls = out.choices[0].message.tool_calls
     assert tool_calls is not None
     assert tool_calls[0].thought_signature is None
+    assert tool_calls[0].thought_signature_provider is None
 
 
 def test_from_google_text_part_captures_thought_signature():
@@ -244,6 +246,7 @@ def test_from_google_text_part_captures_thought_signature():
         TextContent(
             text="Let me think step by step.",
             thought_signature=b"text-signature-bytes",
+            thought_signature_provider="google",
         )
     ]
 

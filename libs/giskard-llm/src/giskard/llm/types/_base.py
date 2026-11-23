@@ -1,3 +1,5 @@
+import base64
+import binascii
 import json
 from typing import Annotated, Any, ClassVar
 
@@ -68,4 +70,24 @@ def _serialize_json(value: Any, info: FieldSerializationInfo) -> Any:
 
 ArgumentDict = Annotated[
     dict[str, object], BeforeValidator(_coerce_json), PlainSerializer(_serialize_json)
+]
+
+
+def _coerce_b64_bytes(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            return base64.b64decode(value.encode("ascii"), validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError("Invalid base64-encoded bytes") from exc
+    return value
+
+
+def _serialize_b64_bytes(value: bytes) -> str:
+    return base64.b64encode(value).decode("ascii")
+
+
+Base64Bytes = Annotated[
+    bytes,
+    BeforeValidator(_coerce_b64_bytes),
+    PlainSerializer(_serialize_b64_bytes, return_type=str),
 ]
