@@ -59,6 +59,8 @@ Translators enforce a **strict 1:1 mapping** (`BadRequestError(400)` on unsuppor
 
 Provider-native escape hatches (`reasoning`, `thinking`, `output_config`, `thinking_config`, `generation_config`) are whitelisted in `KNOWN_*_PARAMS`. Passing both `reasoning_effort` and the conflicting native effort/budget key raises `BadRequestError(400)`.
 
+`reasoning_effort` only controls how much the model thinks; it never changes what is returned (no implicit rewriting, see ADR 0001). On Gemini (`complete`) the thought text is only returned when requested, so `AssistantMessage.reasoning` stays empty — even though reasoning tokens are spent and reported in `Usage.reasoning_tokens` — unless the caller opts in with the escape hatch, which merges with `reasoning_effort`: `thinking_config={"include_thoughts": True}`.
+
 In `giskard-agents`, `GenerationParams` uses `extra="forbid"` and `BaseGenerator.with_params(**kwargs)` validates updates while preserving `model_fields_set`. Because `GiskardLLMGenerator` and `LiteLLMGenerator` serialize with `exclude_unset=True`, the default `temperature=1.0` is omitted unless explicitly set, avoiding spurious 400s on reasoning models that forbid non-default `temperature`.
 
 ## Reasoning Output & Token Accounting
