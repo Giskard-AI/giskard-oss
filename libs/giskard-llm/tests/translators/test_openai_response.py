@@ -384,3 +384,50 @@ def test_reasoning_item_round_trips_unchanged():
     )
     assert list(payload.get("input", []))[1] == reasoning
     validate_openai_response_params(payload)
+
+
+def test_foreign_reasoning_item_is_dropped_from_input():
+    """Reasoning items produced by another provider are not replayable to OpenAI.
+
+    OpenAI rejects them: the derived id is not an ``rs_`` id (and may exceed 64
+    chars), and ``encrypted_content`` is verified server-side. Native (untagged)
+    items must still round-trip.
+    """
+    from giskard.llm.types import (
+        ResponseFunctionCallOutput,
+        ResponseFunctionToolCall,
+        ResponseReasoningItem,
+    )
+
+    foreign = ResponseReasoningItem(
+        id="thought_" + "x" * 72,
+        encrypted_content="google-signature",
+        format="google-interactions-v1",
+    )
+    native = ResponseReasoningItem(id="rs_1", encrypted_content="enc-blob")
+    payload = OpenAIResponseTranslator.to_openai(
+        _MODEL,
+        [
+            _message("user", "Weather?"),
+            foreign,
+            native,
+            ResponseFunctionToolCall(
+                call_id=TOOL_CALL_ID, name="get_weather", arguments={}
+            ),
+            ResponseFunctionCallOutput(
+                call_id=TOOL_CALL_ID, output=TOOL_RESULT_CONTENT
+            ),
+        ],
+    )
+    input_items = [i for i in payload.get("input", []) if isinstance(i, dict)]
+    reasoning_items = [i for i in input_items if i.get("type") == "reasoning"]
+    assert reasoning_items == [
+        {
+            "type": "reasoning",
+            "id": "rs_1",
+            "summary": [],
+            "encrypted_content": "enc-blob",
+        }
+    ]
+    assert all("format" not in i for i in input_items)
+    validate_openai_response_params(payload)

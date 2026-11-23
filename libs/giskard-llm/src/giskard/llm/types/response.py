@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic import Field
 
@@ -120,7 +120,14 @@ class ResponseReasoningItem(_BaseModel):
 
     Mirrors the OpenAI shape so it round-trips unchanged (``id`` and
     ``encrypted_content`` included). Never contributes to ``output_text``.
+
+    ``format`` tags items that did not come from OpenAI (e.g. ``"google-interactions-v1"``):
+    their ``id`` and ``encrypted_content`` are provider-specific, and OpenAI rejects them
+    on replay. ``None`` means OpenAI-native (or untagged) and is replayed unchanged.
+    It is never sent on the wire.
     """
+
+    _wire_excluded: ClassVar[frozenset[str]] = frozenset({"format"})
 
     type: Literal["reasoning"] = "reasoning"
     id: str
@@ -128,6 +135,7 @@ class ResponseReasoningItem(_BaseModel):
     content: list[ResponseReasoningText] | None = None
     encrypted_content: str | None = None
     status: Literal["in_progress", "completed", "incomplete"] | None = None
+    format: str | None = None
 
 
 ResponseInputItem = (

@@ -5,11 +5,18 @@ from typing import TYPE_CHECKING, Any, cast
 
 from giskard.llm.types import (
     ResponseInputItem,
+    ResponseReasoningItem,
     ResponseResult,
     ToolDef,
 )
 from giskard.llm.types._base import _BaseModel
-from pydantic import BaseModel, Field, SerializationInfo, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    SerializationInfo,
+    field_validator,
+    model_validator,
+)
 
 from ..errors import BadRequestError
 from ..types._serialization import close_object_schemas
@@ -110,6 +117,32 @@ class OpenAIResponseParams(_BaseModel):
     temperature: float | None = None
     max_output_tokens: int | None = Field(default=None, validation_alias="max_tokens")
     text: dict[str, Any] | None = None
+
+    @field_validator("input", mode="after")
+    @classmethod
+    def _drop_foreign_reasoning(
+        cls, value: str | Sequence[ResponseInputItem]
+    ) -> str | Sequence[ResponseInputItem]:
+        """Drop reasoning items another provider produced (tagged via ``format``).
+
+        OpenAI cannot replay them: their ``id`` is not an ``rs_`` id (and can exceed
+        64 chars) and ``encrypted_content`` is verified server-side. Untagged items
+        are OpenAI-native and kept.
+        """
+        if isinstance(value, str):
+            return value
+        kept = [
+            item
+            for item in value
+            if not (isinstance(item, ResponseReasoningItem) and item.format is not None)
+        ]
+        if len(kept) != len(value):
+            logger.debug(
+                "%s provider: dropped %d reasoning item(s) from another provider",
+                PROVIDER,
+                len(value) - len(kept),
+            )
+        return kept
 
     @model_validator(mode="before")
     @classmethod

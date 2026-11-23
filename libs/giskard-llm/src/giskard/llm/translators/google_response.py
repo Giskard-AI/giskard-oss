@@ -59,6 +59,8 @@ else:
 
 _PROVIDER = "google/response"
 PROVIDER = "google"
+# Provenance tag on ResponseReasoningItem.format; keeps other providers from replaying it.
+_REASONING_FORMAT = "google-interactions-v1"
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "timeout", "response_format"})
 
 
@@ -345,6 +347,7 @@ class GoogleResponseTranslator:
                         id=f"thought_{raw.id}_{step_index}",
                         summary=summary,
                         encrypted_content=item.signature,
+                        format=_REASONING_FORMAT,
                     )
                 )
             else:

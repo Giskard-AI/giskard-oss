@@ -186,8 +186,12 @@ def test_from_google_thought_step_maps_to_reasoning_item():
         id="thought_int_test_0",
         summary=[ResponseReasoningSummary(text="Considering the question")],
         encrypted_content="sig-abc",
+        # Provenance tag: lets other providers recognise (and not replay) this item.
+        format="google-interactions-v1",
     )
     assert out.reasoning == [out.outputs[0]]
+    # Equality above cannot catch a missing tag if the field is unknown, so assert it directly.
+    assert getattr(out.outputs[0], "format", None) == "google-interactions-v1"
     assert out.output_text == "42"
 
 
