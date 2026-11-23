@@ -403,8 +403,7 @@ class GoogleChatTranslator:
         *,
         ignore_unsupported_content: bool = False,
     ) -> CompletionContent | ToolCall | None:
-        if part.thought:
-            return None
+        # Thought parts never reach here: ``parts_to_giskard`` routes them to reasoning.
         if part.text is not None:
             return TextContent(text=part.text, thought_signature=part.thought_signature)
         if part.function_call is not None:
