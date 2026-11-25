@@ -1,4 +1,5 @@
 import asyncio
+import json
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from enum import StrEnum
@@ -646,5 +647,5 @@ def _output_instructions(output_model: type[BaseModel]) -> Trusted:
     # Trusted: derived from the developer-declared output model, and must reach
     # the LLM unescaped so the JSON schema stays readable.
     return Trusted(
-        f"Provide your answer in JSON format, respecting this schema:\n{output_model.model_json_schema()}"
+        f"Provide your answer in JSON format, respecting this schema:\n{json.dumps(output_model.model_json_schema())}"
     )

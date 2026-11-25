@@ -311,3 +311,17 @@ async def test_model_refusal_error_carries_refusal_text():
     assert isinstance(err, ModelRefusalError)
     assert err.refusal == refusal_msg
     assert refusal_msg in str(err)
+
+
+def test_output_instructions_schema_is_valid_json():
+    import json
+
+    from giskard.agents.workflow import _output_instructions
+
+    class Model(BaseModel):
+        passed: bool
+        reason: str | None = None
+
+    text = str(_output_instructions(Model))
+    schema = json.loads(text.split("schema:\n", 1)[1])
+    assert schema == Model.model_json_schema()
