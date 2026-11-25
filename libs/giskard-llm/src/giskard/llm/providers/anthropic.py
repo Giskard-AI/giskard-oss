@@ -130,6 +130,9 @@ class AnthropicProvider:
                 timeout=timeout,
                 http_client=http_client,
                 default_headers=default_headers,
+                # Retries belong to giskard (RetryMiddleware + rate limiter); SDK
+                # retries would stack on top of them, unthrottled.
+                max_retries=0,
             )
         )
 
