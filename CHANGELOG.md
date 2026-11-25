@@ -67,6 +67,11 @@ in-place upgrade of the v2 API.
 - `Interact.generate()` now uses the live `inputs`/`outputs` fields after
   `model_copy(update=...)`. GCG scans previously sent the unsuffixed HarmBench
   prompt because the copied Interact kept a stale input provider.
+- Referencing a missing environment variable in provider config
+  (``os.environ/VAR_NAME``) now raises a `ValueError` naming the variable
+  instead of silently resolving to `None` and falling back to the provider's
+  own default API key (e.g. `OPENAI_API_KEY`). Configs that previously
+  "worked" through that fallback now fail loudly at provider resolution.
 
 ### Installation
 

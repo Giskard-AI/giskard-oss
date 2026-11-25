@@ -33,10 +33,20 @@ _PROVIDER_REGISTRY: dict[str, tuple[str, str]] = {
 
 
 def _resolve_value(value: Any) -> Any:
-    """Resolve ``os.environ/VAR_NAME`` strings to env var values."""
+    """Resolve ``os.environ/VAR_NAME`` strings to env var values.
+
+    Raises:
+        ValueError: If a referenced environment variable is not set, so a
+            missing or mistyped variable fails loudly instead of resolving
+            to ``None`` and silently falling back to the provider default.
+    """
     if isinstance(value, str) and value.startswith("os.environ/"):
         var_name = value[len("os.environ/") :]
-        return os.environ.get(var_name)
+        if var_name not in os.environ:
+            raise ValueError(
+                f"Environment variable {var_name!r} referenced in provider config is not set"
+            )
+        return os.environ[var_name]
     return value
 
 

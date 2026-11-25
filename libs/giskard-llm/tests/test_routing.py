@@ -87,7 +87,33 @@ def test_resolve_value_env_var(monkeypatch):
 
 
 def test_resolve_value_env_var_missing():
-    assert _resolve_value("os.environ/NONEXISTENT_VAR_XYZ") is None
+    with pytest.raises(
+        ValueError,
+        match="Environment variable 'NONEXISTENT_VAR_XYZ' referenced in provider config is not set",
+    ):
+        _resolve_value("os.environ/NONEXISTENT_VAR_XYZ")
+
+
+def test_client_configure_missing_env_var_raises(monkeypatch):
+    """A missing env var fails at provider resolution, not at call time.
+
+    Regression test for #2984: previously the missing variable resolved to
+    ``None``, the provider constructor dropped it, and the SDK silently
+    fell back to its own default API key (e.g. ``OPENAI_API_KEY``).
+    """
+    monkeypatch.delenv("NONEXISTENT_VAR_XYZ", raising=False)
+    client = LLMClient()
+    client.configure(
+        "test-openai", provider="openai", api_key="os.environ/NONEXISTENT_VAR_XYZ"
+    )
+
+    with patch("giskard.llm.routing._create_provider") as mock_create:
+        with pytest.raises(
+            ValueError,
+            match="Environment variable 'NONEXISTENT_VAR_XYZ' referenced in provider config is not set",
+        ):
+            client._get_provider("test-openai")
+        mock_create.assert_not_called()
 
 
 # -- _create_provider ----------------------------------------------------------
