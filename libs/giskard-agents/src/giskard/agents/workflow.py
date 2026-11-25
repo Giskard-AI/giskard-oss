@@ -71,6 +71,13 @@ OutputType = TypeVar("OutputType", bound=BaseModel)
 NewOutputType = TypeVar("NewOutputType", bound=BaseModel)
 
 
+#: Default cap on the number of steps a workflow with tools runs when no
+#: explicit ``max_steps`` is given. A model that keeps calling a tool (e.g. an
+#: error-retry loop) would otherwise loop forever, spending a paid model call
+#: per step. Pass ``max_steps=None`` explicitly to opt out of the cap.
+DEFAULT_MAX_STEPS = 25
+
+
 class _StepRunner:
     """Encapsulates per-run state and step execution.
 
@@ -404,13 +411,19 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         return self.model_copy(update={"error_policy": error_policy})
 
     @asynccontextmanager
-    async def steps(self, max_steps: int | None = None) -> AsyncIterator[StepGenerator]:
+    async def steps(
+        self, max_steps: int | None = DEFAULT_MAX_STEPS
+    ) -> AsyncIterator[StepGenerator]:
         """Create an async context for iterating workflow steps.
 
         Parameters
         ----------
-        max_steps : int or None
-            Maximum number of steps to run. If None, runs until completion.
+        max_steps : int or None, default 25
+            Maximum number of steps to run. Defaults to ``DEFAULT_MAX_STEPS``
+            (25) so a model that keeps calling a tool cannot loop forever;
+            the cap only matters when the workflow has tools, since a
+            tool-less workflow stops after its first completion. Pass
+            ``None`` for no limit.
 
         Yields
         ------
@@ -440,13 +453,15 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         )
 
     @logfire.instrument("chat_workflow.run")
-    async def run(self, max_steps: int | None = None) -> Chat[OutputType]:
+    async def run(self, max_steps: int | None = DEFAULT_MAX_STEPS) -> Chat[OutputType]:
         """Runs the workflow.
 
         Parameters
         ----------
-        max_steps : int, optional
-            The number of steps to run. If not provided, the workflow will run until the chat is complete.
+        max_steps : int or None, default 25
+            The number of steps to run. Defaults to ``DEFAULT_MAX_STEPS``
+            (25) so a model that keeps calling a tool cannot loop forever;
+            pass ``None`` for no limit.
 
         Returns
         -------
@@ -498,7 +513,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
 
     @logfire.instrument("chat_workflow.run_many")
     async def run_many(
-        self, n: int, max_steps: int | None = None
+        self, n: int, max_steps: int | None = DEFAULT_MAX_STEPS
     ) -> list[Chat[OutputType]]:
         """Run multiple completions in parallel.
 
@@ -506,8 +521,9 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         ----------
         n : int
             Number of parallel completions to run.
-        max_steps : int, optional
-            The maximum number of steps to run for each completion.
+        max_steps : int or None, default 25
+            The maximum number of steps to run for each completion. Defaults
+            to ``DEFAULT_MAX_STEPS`` (25); pass ``None`` for no limit.
 
         Returns
         -------
@@ -532,7 +548,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
 
     @logfire.instrument("chat_workflow.run_batch")
     async def run_batch(
-        self, inputs: list[dict[str, Any]], max_steps: int | None = None
+        self, inputs: list[dict[str, Any]], max_steps: int | None = DEFAULT_MAX_STEPS
     ) -> list[Chat[OutputType]]:
         """Run a batch of completions with different parameters.
 
@@ -540,8 +556,9 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         ----------
         params_list : list[dict]
             List of parameter dictionaries for each completion.
-        max_steps : int, optional
-            The maximum number of steps to run for each completion.
+        max_steps : int or None, default 25
+            The maximum number of steps to run for each completion. Defaults
+            to ``DEFAULT_MAX_STEPS`` (25); pass ``None`` for no limit.
 
         Returns
         -------
@@ -564,7 +581,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         return chats
 
     async def stream_many(
-        self, n: int, max_steps: int | None = None
+        self, n: int, max_steps: int | None = DEFAULT_MAX_STEPS
     ) -> AsyncIterator[Chat[OutputType]]:
         """Stream multiple completions as they complete.
 
@@ -572,8 +589,9 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         ----------
         n : int
             Number of parallel completions to run.
-        max_steps : int, optional
-            The maximum number of steps to run for each completion.
+        max_steps : int or None, default 25
+            The maximum number of steps to run for each completion. Defaults
+            to ``DEFAULT_MAX_STEPS`` (25); pass ``None`` for no limit.
 
         Yields
         ------
@@ -592,7 +610,7 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
             yield result
 
     async def stream_batch(
-        self, inputs: list[dict[str, Any]], max_steps: int | None = None
+        self, inputs: list[dict[str, Any]], max_steps: int | None = DEFAULT_MAX_STEPS
     ) -> AsyncIterator[Chat[OutputType]]:
         """Stream a batch of completions as they complete.
 
@@ -600,8 +618,9 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         ----------
         inputs : list[dict]
             List of parameter dictionaries for each completion.
-        max_steps : int, optional
-            The maximum number of steps to run for each completion.
+        max_steps : int or None, default 25
+            The maximum number of steps to run for each completion. Defaults
+            to ``DEFAULT_MAX_STEPS`` (25); pass ``None`` for no limit.
 
         Yields
         ------

@@ -61,6 +61,11 @@ in-place upgrade of the v2 API.
 - `giskard-core` (1.0.4) imports `posthog` only when telemetry is enabled.
 - `giskard-agents` (1.0.7) loads its exports lazily, so `giskard.agents.templates`
   imports on its own.
+- `ChatWorkflow.run()` (and `run_many`/`run_batch`/`stream_many`/`stream_batch`
+  /`steps()`) now stops after 25 steps by default instead of looping until the
+  model answers without a tool call. A model that keeps calling a tool (e.g. an
+  error-retry loop) previously ran forever, spending a paid model call per step.
+  Pass `max_steps=None` to opt out of the cap.
 
 ### Fixed
 
