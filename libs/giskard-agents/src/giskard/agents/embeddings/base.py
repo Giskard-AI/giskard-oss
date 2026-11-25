@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
@@ -6,6 +8,8 @@ from typing import ClassVar
 import numpy as np
 from giskard.core import Discriminated, discriminated_base
 from pydantic import BaseModel, ConfigDict, Field
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_environ_or_default(env_var: str, default: int) -> int:
@@ -20,6 +24,9 @@ DEFAULT_MAX_BATCH_SIZE = _parse_environ_or_default(
 )
 DEFAULT_MAX_TOTAL_CHARS = _parse_environ_or_default(
     "GISKARD_AGENTS_DEFAULT_MAX_TOTAL_CHARS", 20000
+)
+DEFAULT_MAX_CONCURRENT_EMBEDDING_BATCHES = _parse_environ_or_default(
+    "GISKARD_AGENTS_DEFAULT_MAX_CONCURRENT_EMBEDDING_BATCHES", 4
 )
 
 
@@ -56,11 +63,44 @@ class BaseEmbeddingModel(Discriminated, ABC):
         params: EmbeddingParams | None = None,
         max_batch_size: int | None = None,
         max_total_chars: int | None = None,
+        max_concurrency: int | None = None,
     ) -> list[np.ndarray]:
-        embedding_batches = []
-        for batch in self.batched_embeddings(texts, max_batch_size, max_total_chars):
-            embedding_batches.extend(await self._embed(batch, params))
-        return embedding_batches
+        """Embed texts, sending the batches concurrently.
+
+        Parameters
+        ----------
+        texts : list[str]
+            Texts to embed, in order.
+        params : EmbeddingParams, optional
+            Embedding parameters passed to the underlying model.
+        max_batch_size : int, optional
+            Maximum number of texts per embedding request.
+        max_total_chars : int, optional
+            Maximum total number of characters per embedding request.
+            Texts longer than this are truncated (see
+            :meth:`batched_embeddings`).
+        max_concurrency : int, optional
+            Maximum number of embedding requests in flight at once.
+            Defaults to ``DEFAULT_MAX_CONCURRENT_EMBEDDING_BATCHES``.
+
+        Returns
+        -------
+        list[np.ndarray]
+            One embedding per input text, in input order.
+        """
+        if max_concurrency is None:
+            max_concurrency = DEFAULT_MAX_CONCURRENT_EMBEDDING_BATCHES
+        batches = list(self.batched_embeddings(texts, max_batch_size, max_total_chars))
+        semaphore = asyncio.Semaphore(max(1, max_concurrency))
+
+        async def embed_batch(batch: list[str]) -> list[np.ndarray]:
+            async with semaphore:
+                return await self._embed(batch, params)
+
+        # asyncio.gather preserves order, so the flattened result lines up
+        # with the input texts even though batches run concurrently.
+        results = await asyncio.gather(*(embed_batch(batch) for batch in batches))
+        return [embedding for batch in results for embedding in batch]
 
     def batched_embeddings(
         self,
@@ -72,6 +112,11 @@ class BaseEmbeddingModel(Discriminated, ABC):
 
         This is modeled after the OpenAI API which sets limits both on batch size
         and total number of input tokens.
+
+        A text longer than ``max_total_chars`` is truncated to its first
+        ``max_total_chars`` characters so the embedding request does not fail;
+        a warning is logged once the batches are exhausted, reporting how many
+        texts were truncated.
         """
         if max_batch_size is None:
             max_batch_size = DEFAULT_MAX_BATCH_SIZE
@@ -79,6 +124,7 @@ class BaseEmbeddingModel(Discriminated, ABC):
             max_total_chars = DEFAULT_MAX_TOTAL_CHARS
 
         current_batch = []
+        truncated_count = 0
 
         for text in texts:
             # If adding text item would exceed limits, yield current batch
@@ -88,6 +134,8 @@ class BaseEmbeddingModel(Discriminated, ABC):
                 if current_batch:
                     yield current_batch
                 # Prevent a single too long document to make embeddings fail
+                if len(text) > max_total_chars:
+                    truncated_count += 1
                 current_batch = [text[:max_total_chars]]
             else:
                 current_batch.append(text)
@@ -95,3 +143,11 @@ class BaseEmbeddingModel(Discriminated, ABC):
         # Yield remaining items if present
         if current_batch:
             yield current_batch
+
+        if truncated_count:
+            logger.warning(
+                "Truncated %d text(s) to %d characters each while batching "
+                "embeddings; content beyond the limit was not embedded.",
+                truncated_count,
+                max_total_chars,
+            )

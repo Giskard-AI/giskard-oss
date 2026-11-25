@@ -67,9 +67,9 @@ class KnowledgeBase(WithEmbeddingMixin):
     async def ensure_embeddings(self) -> None:
         """Ensure every document has embeddings from the same model.
 
-        If any document is missing embeddings, all embeddings are recomputed in
-        one batch. This avoids mixing vectors that may have been produced by
-        different embedding models.
+        If any document is missing embeddings, all embeddings are recomputed
+        in concurrent batches. This avoids mixing vectors that may have been
+        produced by different embedding models.
         """
         if all(doc.embeddings is not None for doc in self.documents):
             return
