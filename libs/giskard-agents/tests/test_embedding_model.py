@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import patch
 
 import numpy as np
@@ -110,6 +111,41 @@ def test_batched_embeddings_truncate_long_text() -> None:
     assert len(batches) == 2
     assert len(batches[0][0]) == 10  # Truncated to 10 chars
     assert batches[1] == ["short"]
+
+
+def test_batched_embeddings_warns_when_truncating(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Truncating over-long texts must be reported, not silent."""
+    model = LitellmEmbeddingModel()
+    texts = ["a" * 50, "short", "b" * 30]
+
+    with caplog.at_level(logging.WARNING, logger="giskard.agents.embeddings.base"):
+        batches = list(
+            model.batched_embeddings(texts, max_batch_size=10, max_total_chars=10)
+        )
+
+    assert [len(t) for batch in batches for t in batch] == [10, 5, 10]
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    message = warnings[0].getMessage()
+    assert "2 of 3" in message
+    assert "10" in message
+
+
+def test_batched_embeddings_does_not_warn_without_truncation(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    model = LitellmEmbeddingModel()
+
+    with caplog.at_level(logging.WARNING, logger="giskard.agents.embeddings.base"):
+        list(
+            model.batched_embeddings(
+                ["short", "text"], max_batch_size=10, max_total_chars=10
+            )
+        )
+
+    assert not caplog.records
 
 
 def test_batched_embeddings_custom_limits() -> None:
