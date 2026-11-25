@@ -410,3 +410,64 @@ async def test_run_does_not_deadlock_when_probes_exceed_thread_pool(
     )
 
     assert len(result.results) == 40
+
+
+def test_run_returns_promptly_when_cancelled_while_probes_are_running(
+    monkeypatch: pytest.MonkeyPatch, target
+) -> None:
+    """Cancelling a scan must not wait on workers that are blocked on the loop.
+
+    Workers block on ``run_coroutine_threadsafe(...).result()``; if the executor
+    is shut down with ``wait=True`` on the loop thread during cancellation, the
+    loop can never serve them and the process hangs. The scan runs on its own
+    loop in a daemon thread so a regression fails the test instead of hanging it.
+    """
+    import asyncio
+    import threading
+
+    from giskard.scan.integrations.garak import _adapter
+
+    class _SlowProbe:
+        tags: list[str] = []
+
+        def __init__(self, name: str, loop_getter) -> None:
+            self.probename = name
+            self._loop_getter = loop_getter
+
+        def probe(self, generator: object) -> list[Attempt]:
+            async def _slow_target() -> None:
+                await asyncio.sleep(0.3)
+
+            asyncio.run_coroutine_threadsafe(
+                _slow_target(), self._loop_getter()
+            ).result()
+            return [_attempt(self.probename)]
+
+    monkeypatch.setattr(
+        _adapter, "_resolve_probes", lambda probes_arg: (probes_arg or [], [])
+    )
+    monkeypatch.setattr(
+        _adapter,
+        "_resolve_detectors",
+        lambda probe, loop, *_: ([("fake.Detector", _FakeDetector(score=0.1))], []),
+    )
+
+    outcome: list[str] = []
+
+    async def _scan() -> None:
+        loop = asyncio.get_running_loop()
+        probes = [_SlowProbe(f"p{i}", lambda: loop) for i in range(2)]
+        try:
+            await asyncio.wait_for(
+                _adapter.GarakScanAdapter().run(target=target, probes=probes),
+                timeout=0.1,
+            )
+        except TimeoutError:
+            outcome.append("timed out")
+
+    runner = threading.Thread(target=lambda: asyncio.run(_scan()), daemon=True)
+    runner.start()
+    runner.join(timeout=5)
+
+    assert not runner.is_alive(), "cancelling the scan hung the event loop"
+    assert outcome == ["timed out"]

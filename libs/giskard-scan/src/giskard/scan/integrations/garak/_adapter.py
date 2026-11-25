@@ -575,17 +575,20 @@ class GarakScanAdapter:
         # threads) lets probe workers fill it and deadlock — all blocked on the loop
         # while the loop waits for a free thread. The pool is capped because a default
         # run resolves ~90 probes: one thread each would mean 90 OS threads all driving
-        # the target at once. The TaskGroup joins every probe before __exit__ shuts the
-        # executor down.
+        # the target at once. On the normal path the TaskGroup joins every probe, so
+        # shutdown has nothing left to wait for. On cancellation (timeout, Ctrl-C) it
+        # must not wait: workers are blocked on this very loop, so a blocking
+        # shutdown here would hang the process.
         max_workers = min(len(probes), _MAX_PROBE_WORKERS) or 1
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=max_workers
-        ) as probe_executor:
+        probe_executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        try:
             async with asyncio.TaskGroup() as task_group:
                 tasks = [
                     task_group.create_task(_run_on_executor(probe_executor, probe))
                     for probe in probes
                 ]
+        finally:
+            probe_executor.shutdown(wait=False, cancel_futures=True)
 
         # Results are only available once the TaskGroup has exited and every
         # task has completed; reading task.result() inside the block would hit
