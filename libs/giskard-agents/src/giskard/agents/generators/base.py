@@ -192,9 +192,16 @@ class BaseGenerator(Discriminated, ABC):
         list[CompletionResponse]
             A list of model's responses.
         """
-        completion_requests = [self.complete(m, params, metadata) for m in messages]
-        responses = await asyncio.gather(*completion_requests)
-        return responses
+        # A TaskGroup cancels the remaining completions as soon as one of them raises.
+        try:
+            async with asyncio.TaskGroup() as task_group:
+                tasks = [
+                    task_group.create_task(self.complete(m, params, metadata))
+                    for m in messages
+                ]
+        except* Exception as exc_group:
+            raise exc_group.exceptions[0]
+        return [task.result() for task in tasks]
 
     def chat(
         self,

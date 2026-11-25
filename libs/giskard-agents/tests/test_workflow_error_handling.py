@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Sequence
 from typing import Any, override
 
@@ -369,3 +370,56 @@ async def test_stream_batch_skips_error():
     assert len(results[0].messages) == 2
     assert results[0].last.role == "assistant"
     assert results[0].last.content == "Test response 1"
+
+
+class FirstCallFailsGenerator(agents.generators.BaseGenerator):
+    """Fails on the first call; every later call blocks until cancelled."""
+
+    _num_calls: int = PrivateAttr(default=0)
+    _cancelled: int = PrivateAttr(default=0)
+
+    @override
+    async def _call_model(
+        self,
+        messages: Sequence[ChatMessage],
+        params: agents.generators.GenerationParams,
+        metadata: dict[str, Any] | None = None,
+    ) -> CompletionResponse:
+        self._num_calls += 1
+        if self._num_calls == 1:
+            # Let the other runs start before failing.
+            await asyncio.sleep(0.01)
+            raise ValueError("Test error")
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self._cancelled += 1
+            raise
+        raise AssertionError("unreachable")
+
+
+async def test_run_many_cancels_other_runs_on_error():
+    generator = FirstCallFailsGenerator()
+    workflow = agents.ChatWorkflow(generator=generator)
+
+    with pytest.raises(WorkflowError):
+        _ = await asyncio.wait_for(
+            workflow.chat("Hello!", role="user").run_many(n=3), timeout=5
+        )
+
+    assert generator._num_calls == 3
+    assert generator._cancelled == 2
+
+
+async def test_run_batch_cancels_other_runs_on_error():
+    generator = FirstCallFailsGenerator()
+    workflow = agents.ChatWorkflow(generator=generator)
+
+    with pytest.raises(WorkflowError):
+        _ = await asyncio.wait_for(
+            workflow.chat("Hello!", role="user").run_batch(inputs=[{}, {}, {}]),
+            timeout=5,
+        )
+
+    assert generator._num_calls == 3
+    assert generator._cancelled == 2

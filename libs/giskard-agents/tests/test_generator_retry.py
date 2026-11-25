@@ -205,6 +205,38 @@ async def test_retries_works_with_batch_complete():
     assert generator._call_model_mock.call_count == 3
 
 
+async def test_batch_complete_cancels_other_completions_on_error():
+    generator = _make_generator(max_attempts=1)
+    cancelled: list[int] = []
+
+    async def complete(
+        messages: Sequence[ChatMessage], params: GenerationParams
+    ) -> CompletionResponse:
+        if generator._call_model_mock.call_count == 1:
+            # Let the other completions start before failing.
+            await asyncio.sleep(0.01)
+            raise ValueError("Test error")
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.append(1)
+            raise
+        raise AssertionError("unreachable")
+
+    generator._call_model_mock.side_effect = complete
+
+    with pytest.raises(ValueError, match="Test error"):
+        _ = await asyncio.wait_for(
+            generator.batch_complete(
+                messages=[[UserMessage(content="Test message")] for _ in range(3)]
+            ),
+            timeout=5,
+        )
+
+    assert generator._call_model_mock.call_count == 3
+    assert len(cancelled) == 2
+
+
 async def test_retries_with_max_delay():
     """Test that max_delay caps the exponential backoff."""
     generator = _make_generator(max_attempts=5, base_delay=1.0, max_delay=3.0)
