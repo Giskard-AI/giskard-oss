@@ -3,6 +3,7 @@
 import pytest
 from giskard.checks.core.extraction import (
     JSONPathStr,
+    _parse_jsonpath,
     _validate_jsonpath_syntax,
     resolve,
 )
@@ -196,3 +197,37 @@ class TestResolveDescendants:
     def test_child_expression_without_wildcard_still_returns_a_bare_scalar(self):
         trace = self._trace({})
         assert resolve(trace, "trace.last.outputs") == "a0"
+
+
+class TestResolveCachesParsedExpression:
+    """Regression test for #2985: resolve() must not re-parse on every call.
+
+    Parsing a JSONPath costs ~2.4 ms, which dominated every check run. The
+    parsed expression is cached, so repeated resolve() calls for the same key
+    must reuse it.
+    """
+
+    @staticmethod
+    def _trace() -> Trace[str, str]:
+        return Trace[str, str](interactions=[Interaction(inputs="hi", outputs="hello")])
+
+    def test_repeated_resolve_calls_hit_the_parse_cache(self):
+        trace = self._trace()
+        _parse_jsonpath.cache_clear()
+        assert resolve(trace, "trace.last.outputs") == "hello"
+        assert resolve(trace, "trace.last.outputs") == "hello"
+        info = _parse_jsonpath.cache_info()
+        assert info.misses == 1
+        assert info.hits == 1
+
+    def test_distinct_keys_are_parsed_independently(self):
+        trace = self._trace()
+        _parse_jsonpath.cache_clear()
+        assert resolve(trace, "trace.last.outputs") == "hello"
+        assert resolve(trace, "trace.last.inputs") == "hi"
+        assert _parse_jsonpath.cache_info().misses == 2
+
+    def test_cached_expression_is_reused_not_reparsed(self):
+        first = _parse_jsonpath("trace.last.outputs")
+        second = _parse_jsonpath("trace.last.outputs")
+        assert first is second
