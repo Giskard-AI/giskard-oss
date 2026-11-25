@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from unittest.mock import patch
 
 import numpy as np
@@ -155,6 +157,107 @@ async def test_embed_with_multiple_batches() -> None:
         assert mock_aembedding.call_count == 3
         assert len(embeddings) == 5
         assert all(isinstance(e, np.ndarray) for e in embeddings)
+
+
+async def test_embed_runs_batches_concurrently() -> None:
+    """Test that embed() sends batches concurrently, in input order."""
+    model = LitellmEmbeddingModel(model="test-model")
+    state = {"in_flight": 0, "max_in_flight": 0}
+
+    async def mock_aembedding_side_effect(
+        **kwargs: dict[str, object],
+    ) -> EmbeddingResponse:
+        state["in_flight"] += 1
+        state["max_in_flight"] = max(state["max_in_flight"], state["in_flight"])
+        await asyncio.sleep(0.05)
+        state["in_flight"] -= 1
+        input_list = kwargs.get("input", [])
+        assert isinstance(input_list, list)
+        # Encode each text's index in its embedding so order is checkable.
+        return _make_embedding_response([[float(text[1:])] for text in input_list])
+
+    with patch(
+        "giskard.agents.embeddings.litellm_embedding_model.aembedding",
+        side_effect=mock_aembedding_side_effect,
+    ):
+        texts = [f"t{i}" for i in range(10)]
+        embeddings = await model.embed(texts, max_batch_size=2, max_total_chars=100)
+
+    # 5 batches must overlap instead of running one after another.
+    assert state["max_in_flight"] > 1
+    # Results stay in input order despite concurrent execution.
+    assert [float(e[0]) for e in embeddings] == [float(i) for i in range(10)]
+
+
+async def test_embed_max_concurrency_one_is_sequential() -> None:
+    """Test that max_concurrency=1 restores sequential batching."""
+    model = LitellmEmbeddingModel(model="test-model")
+    state = {"in_flight": 0, "max_in_flight": 0}
+
+    async def mock_aembedding_side_effect(
+        **kwargs: dict[str, object],
+    ) -> EmbeddingResponse:
+        state["in_flight"] += 1
+        state["max_in_flight"] = max(state["max_in_flight"], state["in_flight"])
+        await asyncio.sleep(0.01)
+        state["in_flight"] -= 1
+        input_list = kwargs.get("input", [])
+        batch_size = len(input_list) if isinstance(input_list, list) else 0
+        return _make_embedding_response([[0.1] for _ in range(batch_size)])
+
+    with patch(
+        "giskard.agents.embeddings.litellm_embedding_model.aembedding",
+        side_effect=mock_aembedding_side_effect,
+    ):
+        texts = ["text1", "text2", "text3", "text4"]
+        embeddings = await model.embed(
+            texts, max_batch_size=2, max_total_chars=100, max_concurrency=1
+        )
+
+    assert state["max_in_flight"] == 1
+    assert len(embeddings) == 4
+
+
+def test_batched_embeddings_warns_on_truncation(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that truncating a long text logs a warning with the count."""
+    model = LitellmEmbeddingModel()
+    long_text = "a" * 50
+
+    with caplog.at_level(logging.WARNING, logger="giskard.agents.embeddings.base"):
+        batches = list(
+            model.batched_embeddings(
+                [long_text, long_text, "short"], max_batch_size=2, max_total_chars=10
+            )
+        )
+
+    assert len(batches[0][0]) == 10  # Still truncated to 10 chars
+    warnings = [
+        record for record in caplog.records if record.levelno == logging.WARNING
+    ]
+    assert len(warnings) == 1
+    assert "Truncated 2 text(s)" in warnings[0].getMessage()
+    assert "10 characters" in warnings[0].getMessage()
+
+
+def test_batched_embeddings_no_warning_without_truncation(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that no warning is logged when nothing is truncated."""
+    model = LitellmEmbeddingModel()
+
+    with caplog.at_level(logging.WARNING, logger="giskard.agents.embeddings.base"):
+        batches = list(
+            model.batched_embeddings(
+                ["short", "tiny"], max_batch_size=2, max_total_chars=100
+            )
+        )
+
+    assert batches == [["short", "tiny"]]
+    assert not [
+        record for record in caplog.records if record.levelno == logging.WARNING
+    ]
 
 
 def test_embedding_model_serialization() -> None:
