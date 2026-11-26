@@ -340,3 +340,94 @@ def test_from_google_refusal_uses_finish_message_when_present():
     out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
     assert out.choices[0].finish_reason == "refusal"
     assert out.choices[0].message.refusal == "Blocked for safety."
+
+
+def test_from_google_function_call_with_empty_text_on_same_part():
+    """An empty ``text=""`` alongside ``function_call`` on one ``Part`` must not drop the tool call."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": "",
+                                "function_call": {
+                                    "name": "get_weather",
+                                    "args": {"city": "Paris"},
+                                },
+                                "thought_signature": b"sig",
+                            }
+                        ]
+                    }
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    ch = out.choices[0]
+    assert ch.finish_reason == "tool_calls"
+    assert ch.message.content is None
+    assert ch.message.tool_calls is not None
+    assert len(ch.message.tool_calls) == 1
+    assert ch.message.tool_calls[0].function.name == "get_weather"
+    assert ch.message.tool_calls[0].function.arguments == {"city": "Paris"}
+    assert ch.message.tool_calls[0].thought_signature == b"sig"
+
+
+def test_from_google_empty_text_part_with_thought_signature_preserved():
+    """An empty trailing ``text=""`` part carrying ``thought_signature`` is still preserved."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": "",
+                                "thought_signature": b"sig",
+                            }
+                        ]
+                    }
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    ch = out.choices[0]
+    assert ch.finish_reason == "stop"
+    assert ch.message.tool_calls is None
+    assert ch.message.content == [
+        TextContent(text="", thought_signature=b"sig"),
+    ]
+
+
+def test_from_google_non_empty_text_and_function_call_on_same_part():
+    """If a single ``Part`` has both non-empty ``text`` and ``function_call``, keep both."""
+    raw = _raw(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": "I will check.",
+                                "function_call": {
+                                    "name": "get_weather",
+                                    "args": {"city": "Paris"},
+                                },
+                            }
+                        ]
+                    }
+                }
+            ],
+        }
+    )
+    out = GoogleChatTranslator.from_google(raw, _MODEL, 1)
+    ch = out.choices[0]
+    assert ch.finish_reason == "tool_calls"
+    assert ch.message.content == [TextContent(text="I will check.")]
+    assert ch.message.tool_calls is not None
+    assert len(ch.message.tool_calls) == 1
+    assert ch.message.tool_calls[0].function.name == "get_weather"
+    assert ch.message.tool_calls[0].function.arguments == {"city": "Paris"}
