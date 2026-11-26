@@ -361,7 +361,7 @@ async def test_full_chain_llm_generator_produces_user_message_for_base_model_tar
     assert len(mock_gen.calls) == 2
     for call in mock_gen.calls:
         assert (
-            str(LLMGeneratorOutput[UserMessage].model_json_schema())
+            json.dumps(LLMGeneratorOutput[UserMessage].model_json_schema())
             in call[0].transcript
         )
 
@@ -398,7 +398,7 @@ async def test_full_chain_llm_generator_raises_on_schema_issue():
 
     assert len(mock_gen.calls) == 1
     assert (
-        str(LLMGeneratorOutput[_NoStringLikeField].model_json_schema())
+        json.dumps(LLMGeneratorOutput[_NoStringLikeField].model_json_schema())
         in mock_gen.calls[0][0].transcript
     )
 
@@ -440,7 +440,7 @@ async def test_full_chain_llm_generator_does_not_render_template_when_as_templat
     first_message_content = mock_gen.calls[0][0].transcript
     assert "{{ _instr_output }}" in first_message_content
     assert (
-        str(LLMGeneratorOutput[UserMessage].model_json_schema())
+        json.dumps(LLMGeneratorOutput[UserMessage].model_json_schema())
         not in first_message_content
     )
 
