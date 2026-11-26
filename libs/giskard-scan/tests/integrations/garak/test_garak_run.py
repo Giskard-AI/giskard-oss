@@ -7,6 +7,7 @@ gathering after the group exits, and the SuiteResult assembly.
 """
 
 import math
+from typing import Any
 
 import pytest
 
@@ -42,10 +43,10 @@ class _FakeDetector:
     hit_desc = "hit"
     pass_desc = "pass"
 
-    def __init__(self, score: float | None) -> None:
+    def __init__(self, score: Any) -> None:
         self._score = score
 
-    def detect(self, attempt: Attempt) -> list[float | None]:
+    def detect(self, attempt: Attempt) -> list[Any]:
         # One score per conversation in the attempt.
         return [self._score for _ in attempt.conversations]
 
@@ -167,11 +168,20 @@ async def test_run_failure_score_marks_check_failed(
 
 @pytest.mark.parametrize(
     "score",
-    [math.nan, -1.0, 2.0, math.inf],
-    ids=["nan", "below_range", "above_range", "inf"],
+    [math.nan, -1.0, 2.0, math.inf, -math.inf, True, False, "invalid"],
+    ids=[
+        "nan",
+        "below_range",
+        "above_range",
+        "inf",
+        "neg_inf",
+        "bool_true",
+        "bool_false",
+        "str_score",
+    ],
 )
 async def test_run_invalid_detector_score_marks_check_errored(
-    monkeypatch: pytest.MonkeyPatch, target, score: float
+    monkeypatch: pytest.MonkeyPatch, target, score: Any
 ) -> None:
     adapter_cls = _patch_resolvers(
         monkeypatch,
@@ -183,9 +193,11 @@ async def test_run_invalid_detector_score_marks_check_errored(
 
     check = result.results[0].steps[0].results[0]
     assert check.errored
+    assert check.message == "detector returned invalid score"
     assert not check.passed
     assert not check.failed
     assert check.details["check_name"] == "fake.Detector"
+    assert check.metrics == []
 
 
 async def test_run_none_detector_score_marks_check_skipped(

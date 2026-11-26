@@ -24,7 +24,11 @@ from giskard.checks import (
 )
 
 from ...generators.base import DEFAULT_TARGET_MODE
-from .._shared import reject_unexpected_kwargs, trace_from_role_content_turns
+from .._shared import (
+    is_valid_score,
+    reject_unexpected_kwargs,
+    trace_from_role_content_turns,
+)
 from ._bridge import ScanTargetCallback
 from ._selection import SkipMarker
 
@@ -159,6 +163,7 @@ async def _testcase_to_scenario(
         "input": getattr(test_case, "input", None),
         "actual_output": getattr(test_case, "actual_output", None),
         "reason": getattr(test_case, "reason", None),
+        "score": getattr(test_case, "score", None),
         "simulation_cost": getattr(test_case, "simulation_cost", None),
         "evaluation_cost": getattr(test_case, "evaluation_cost", None),
         "token_cost": getattr(test_case, "token_cost", None),
@@ -169,8 +174,6 @@ async def _testcase_to_scenario(
         details["tools_called"] = test_case.tools_called
 
     score = getattr(test_case, "score", None)
-    metrics = [Metric(name=check_name, value=score)] if score is not None else []
-
     error = getattr(test_case, "error", None)
     reason = getattr(test_case, "reason", None) or ""
     if error is not None:
@@ -181,11 +184,23 @@ async def _testcase_to_scenario(
         check = CheckResult.skip(
             message=reason or "deepteam returned no score", details=details
         )
-    elif score >= _HIT_THRESHOLD:
-        # Polarity flip: a high score means the model resisted -> scan success.
-        check = CheckResult.success(message=reason, details=details, metrics=metrics)
+    elif not is_valid_score(score):
+        error_msg = f"deepteam returned invalid score: {score!r}"
+        check = CheckResult.error(
+            message=f"{reason} ({error_msg})" if reason else error_msg,
+            details=details,
+        )
     else:
-        check = CheckResult.failure(message=reason, details=details, metrics=metrics)
+        metrics = [Metric(name=check_name, value=float(score))]
+        if score >= _HIT_THRESHOLD:
+            # Polarity flip: a high score means the model resisted -> scan success.
+            check = CheckResult.success(
+                message=reason, details=details, metrics=metrics
+            )
+        else:
+            check = CheckResult.failure(
+                message=reason, details=details, metrics=metrics
+            )
 
     tags = [t for t in (vulnerability, attack_method, risk_category) if t]
     return ScenarioResult(
