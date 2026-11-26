@@ -63,7 +63,11 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     if provider_filter is not None:
         allowed, tp_disp = provider_filter
         for item in items:
-            present = {name for name in _PROVIDER_PACKAGES if name in item.keywords}
+            present = {
+                name
+                for name in _PROVIDER_PACKAGES
+                if item.get_closest_marker(name) is not None
+            }
             if present and present.isdisjoint(allowed):
                 item.add_marker(
                     pytest.mark.skip(
@@ -77,7 +81,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     installed_cache: dict[str, bool] = {}
     for item in items:
         for mark_name, package in _PROVIDER_PACKAGES.items():
-            if mark_name in item.keywords:
+            if item.get_closest_marker(mark_name) is not None:
                 if package not in installed_cache:
                     installed_cache[package] = _is_installed(package)
                 if not installed_cache[package]:
