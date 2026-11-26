@@ -464,6 +464,142 @@ def test_tool_call_thought_signature_is_replayed():
     validate_google_contents(payload["contents"])
 
 
+def test_thought_signature_replays_after_json_round_trip():
+    """Signatures captured from Gemini survive JSON serialization and replay verbatim."""
+    from google.genai.types import GenerateContentResponse
+
+    raw_sig_text = b"\x80\xff\x01text-sig"
+    raw_sig_tool = b"\x81\xfe\x02tool-sig"
+    raw = GenerateContentResponse.model_validate(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "role": "model",
+                        "parts": [
+                            {
+                                "text": "Checking weather.",
+                                "thought_signature": raw_sig_text,
+                            },
+                            {
+                                "function_call": {
+                                    "name": "get_weather",
+                                    "args": {"city": "Paris"},
+                                },
+                                "thought_signature": raw_sig_tool,
+                            },
+                        ],
+                    },
+                    "finish_reason": "STOP",
+                }
+            ]
+        }
+    )
+
+    resp = GoogleChatTranslator.from_google(raw, _MODEL, num_messages=1)
+    persisted = resp.choices[0].message.model_dump_json()
+    reloaded = AssistantMessage.model_validate_json(persisted)
+
+    payload = GoogleChatTranslator.to_google(
+        _MODEL,
+        [UserMessage(content="Weather?"), reloaded],
+        tools=[WEATHER_TOOL],
+    )
+    assert payload["contents"][1] == {
+        "role": "model",
+        "parts": [
+            {"text": "Checking weather.", "thought_signature": raw_sig_text},
+            {
+                "function_call": {"name": "get_weather", "args": {"city": "Paris"}},
+                "thought_signature": raw_sig_tool,
+            },
+        ],
+    }
+    validate_google_contents(payload["contents"])
+
+
+def test_thought_signature_not_replayed_for_different_provider():
+    """Signatures tagged with another originating provider (e.g. vertex) are not replayed to google."""
+    messages: list[ChatMessage] = [
+        UserMessage(content="Weather?"),
+        AssistantMessage(
+            content=[
+                TextContent(
+                    text="Checking weather.",
+                    thought_signature=b"vertex-text-sig",
+                    thought_signature_provider="vertex",
+                )
+            ],
+            tool_calls=[
+                ToolCall(
+                    id="call_weather_1",
+                    function=ToolCallFunction(
+                        name="get_weather",
+                        arguments={"city": "Paris"},
+                    ),
+                    thought_signature=b"vertex-tool-sig",
+                    thought_signature_provider="vertex",
+                )
+            ],
+        ),
+    ]
+
+    payload = GoogleChatTranslator.to_google(_MODEL, messages, tools=[WEATHER_TOOL])
+    assert payload["contents"][1] == {
+        "role": "model",
+        "parts": [
+            {"text": "Checking weather."},
+            {
+                "function_call": {"name": "get_weather", "args": {"city": "Paris"}},
+                "thought_signature": _SKIP_THOUGHT_SIGNATURE,
+            },
+        ],
+    }
+    validate_google_contents(payload["contents"])
+
+
+def test_thought_signature_excluded_from_non_google_wire_payloads():
+    """Non-Google translators exclude thought_signature and its provider tag on the wire."""
+    from giskard.llm.translators.anthropic import AnthropicChatTranslator
+    from giskard.llm.translators.openai_chat import OpenAIChatTranslator
+
+    assistant = AssistantMessage(
+        content=[
+            TextContent(
+                text="Checking weather.",
+                thought_signature=b"\x80\xffsig",
+                thought_signature_provider="google",
+            )
+        ],
+        tool_calls=[
+            ToolCall(
+                id="call_weather_1",
+                function=ToolCallFunction(
+                    name="get_weather",
+                    arguments={"city": "Paris"},
+                ),
+                thought_signature=b"\x80\xfftool-sig",
+                thought_signature_provider="google",
+            )
+        ],
+    )
+    messages: list[ChatMessage] = [UserMessage(content="Weather?"), assistant]
+
+    openai_payload = OpenAIChatTranslator.to_openai("gpt-4o-mini", messages)
+    openai_assistant = openai_payload["messages"][1]
+    assert "thought_signature" not in openai_assistant["content"][0]
+    assert "thought_signature_provider" not in openai_assistant["content"][0]
+    assert "thought_signature" not in openai_assistant["tool_calls"][0]
+    assert "thought_signature_provider" not in openai_assistant["tool_calls"][0]
+
+    anthropic_payload = AnthropicChatTranslator.to_anthropic(
+        "claude-sonnet-4-5", messages, max_tokens=100
+    )
+    for block in anthropic_payload["messages"][1]["content"]:
+        assert "thought_signature" not in block
+        assert "thought_signature_provider" not in block
+
+
 def test_function_message_raises():
     """FunctionMessage is not supported by the Google translator."""
     messages: list[ChatMessage] = [

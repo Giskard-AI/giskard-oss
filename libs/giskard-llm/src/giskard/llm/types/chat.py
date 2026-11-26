@@ -3,7 +3,7 @@ from typing import ClassVar, Literal, Protocol
 
 from pydantic import Field
 
-from ._base import ArgumentDict, _BaseModel
+from ._base import ArgumentDict, Base64Bytes, _BaseModel
 
 # -- Utility functions -------------------------------------------------------------
 
@@ -36,9 +36,14 @@ def _extract_text(
 class TextContent(_BaseModel):
     type: Literal["text"] = "text"
     text: str
-    thought_signature: bytes | None = Field(
-        default=None, exclude=True, repr=False
+    thought_signature: Base64Bytes | None = Field(
+        default=None, repr=False
     )  # Gemini-specific
+    thought_signature_provider: str | None = Field(default=None, repr=False)
+
+    _wire_excluded: ClassVar[frozenset[str]] = frozenset(
+        {"thought_signature", "thought_signature_provider"}
+    )
 
 
 class RefusalContent(_BaseModel):
@@ -64,9 +69,14 @@ class ToolCall(_BaseModel):
     type: Literal["function"] = "function"
     id: str
     function: ToolCallFunction
-    thought_signature: bytes | None = Field(
-        default=None, exclude=True, repr=False
+    thought_signature: Base64Bytes | None = Field(
+        default=None, repr=False
     )  # Gemini-specific
+    thought_signature_provider: str | None = Field(default=None, repr=False)
+
+    _wire_excluded: ClassVar[frozenset[str]] = frozenset(
+        {"thought_signature", "thought_signature_provider"}
+    )
 
 
 class SystemMessage(_BaseModel):

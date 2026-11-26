@@ -76,13 +76,33 @@ def _text_content(text: str) -> "PartDict":
     return {"text": text}
 
 
+def _replayable_thought_signature(
+    signature: bytes | None,
+    sig_provider: str | None,
+    info: SerializationInfo,
+) -> bytes | None:
+    if signature is None:
+        return None
+    target_provider = (
+        info.context.get("thought_signature_provider", PROVIDER)
+        if isinstance(info.context, dict)
+        else PROVIDER
+    )
+    if sig_provider is not None and sig_provider != target_provider:
+        return None
+    return signature
+
+
 @TextContent.register_serializer(_PROVIDER)
 def serialize_text_content(
     content: TextContent, _info: SerializationInfo
 ) -> "PartDict":
     part = _text_content(content.text)
-    if content.thought_signature is not None:
-        part["thought_signature"] = content.thought_signature
+    signature = _replayable_thought_signature(
+        content.thought_signature, content.thought_signature_provider, _info
+    )
+    if signature is not None:
+        part["thought_signature"] = signature
     return part
 
 
@@ -106,12 +126,15 @@ def _assistant_content_to_parts(
 
 @ToolCall.register_serializer(_PROVIDER)
 def serialize_tool_call(tool_call: ToolCall, info: SerializationInfo) -> "PartDict":
+    signature = _replayable_thought_signature(
+        tool_call.thought_signature, tool_call.thought_signature_provider, info
+    )
     return {
         "function_call": {
             "name": tool_call.function.name,
             "args": tool_call.function.arguments,
         },
-        "thought_signature": tool_call.thought_signature or _SKIP_THOUGHT_SIGNATURE,
+        "thought_signature": signature or _SKIP_THOUGHT_SIGNATURE,
     }
 
 
@@ -297,6 +320,7 @@ class GoogleChatTranslator:
         messages: Sequence[ChatMessage],
         *,
         tools: Sequence[ToolDef] | None = None,
+        provider: str = PROVIDER,
         **params: Any,
     ) -> "GenerateContentParams":
         unknown = set(params) - KNOWN_COMPLETION_PARAMS
@@ -323,15 +347,32 @@ class GoogleChatTranslator:
 
         return cast(
             "GenerateContentParams",
-            cast(object, google_params.model_dump(context={"provider": _PROVIDER})),
+            cast(
+                object,
+                google_params.model_dump(
+                    context={
+                        "provider": _PROVIDER,
+                        "thought_signature_provider": provider,
+                    }
+                ),
+            ),
         )
 
     @staticmethod
     def part_content_to_giskard(
-        part: "Part", num_messages: int, part_index: int
+        part: "Part",
+        num_messages: int,
+        part_index: int,
+        *,
+        provider: str = PROVIDER,
     ) -> CompletionContent | ToolCall:
+        sig_provider = provider if part.thought_signature is not None else None
         if part.text is not None:
-            return TextContent(text=part.text, thought_signature=part.thought_signature)
+            return TextContent(
+                text=part.text,
+                thought_signature=part.thought_signature,
+                thought_signature_provider=sig_provider,
+            )
         if part.function_call is not None:
             fc = part.function_call
             return ToolCall(
@@ -342,6 +383,7 @@ class GoogleChatTranslator:
                     arguments=fc.args or {},
                 ),
                 thought_signature=part.thought_signature,
+                thought_signature_provider=sig_provider,
             )
         raise ValueError(f"Unsupported part content type: {part}")
 
@@ -349,9 +391,13 @@ class GoogleChatTranslator:
     def parts_to_giskard(
         parts: "Sequence[Part]",
         num_messages: int,
+        *,
+        provider: str = PROVIDER,
     ) -> tuple[Sequence[CompletionContent], Sequence[ToolCall]]:
         content_and_tool_calls = [
-            GoogleChatTranslator.part_content_to_giskard(part, num_messages, part_index)
+            GoogleChatTranslator.part_content_to_giskard(
+                part, num_messages, part_index, provider=provider
+            )
             for part_index, part in enumerate(parts)
         ]
         content = [
@@ -368,7 +414,11 @@ class GoogleChatTranslator:
 
     @staticmethod
     def from_google(
-        raw: "GenerateContentResponse", model: str, num_messages: int
+        raw: "GenerateContentResponse",
+        model: str,
+        num_messages: int,
+        *,
+        provider: str = PROVIDER,
     ) -> CompletionResponse:
         choices: list[Choice] = []
         if not raw.candidates:
@@ -400,6 +450,7 @@ class GoogleChatTranslator:
                 content, tool_calls = GoogleChatTranslator.parts_to_giskard(
                     candidate.content.parts,
                     num_messages,
+                    provider=provider,
                 )
                 if tool_calls:
                     finish_reason = "tool_calls"
