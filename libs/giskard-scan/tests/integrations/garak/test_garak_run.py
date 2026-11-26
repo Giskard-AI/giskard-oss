@@ -7,6 +7,7 @@ gathering after the group exits, and the SuiteResult assembly.
 """
 
 import math
+from typing import Any
 
 import pytest
 
@@ -410,3 +411,121 @@ async def test_run_does_not_deadlock_when_probes_exceed_thread_pool(
     )
 
     assert len(result.results) == 40
+
+
+def test_run_returns_promptly_and_stops_probes_when_cancelled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cancelling a scan must not hang, and must stop probes already running.
+
+    Workers block on ``run_coroutine_threadsafe(...).result()``; if the executor
+    is shut down with ``wait=True`` on the loop thread during cancellation, the
+    loop can never serve them and the process hangs. A thread already running a
+    probe can't be interrupted, so it must also stop at its next target call
+    instead of driving the target to completion. The scan runs on its own loop in
+    a daemon thread so a regression fails the test instead of hanging it.
+    """
+    import asyncio
+    import threading
+
+    from giskard.scan.integrations.garak import _adapter
+
+    target_calls: list[str] = []
+
+    first_call_started = asyncio.Event()
+
+    async def slow_target(inputs: str) -> str:
+        target_calls.append(inputs)
+        first_call_started.set()
+        await asyncio.sleep(0.3)
+        return "ok"
+
+    class _TwoPromptProbe:
+        tags: list[str] = []
+
+        def __init__(self, name: str) -> None:
+            self.probename = name
+
+        def probe(self, generator: Any) -> list[Attempt]:
+            for text in ("first", "second"):
+                generator._call_model(
+                    Conversation(turns=[Turn(role="user", content=Message(text=text))])
+                )
+            return [_attempt(self.probename)]
+
+    monkeypatch.setattr(
+        _adapter, "_resolve_probes", lambda probes_arg: (probes_arg or [], [])
+    )
+    monkeypatch.setattr(
+        _adapter,
+        "_resolve_detectors",
+        lambda probe, loop, *_: ([("fake.Detector", _FakeDetector(score=0.1))], []),
+    )
+
+    outcome: list[str] = []
+
+    async def _scan() -> None:
+        scan = asyncio.create_task(
+            _adapter.GarakScanAdapter().run(
+                target=slow_target, probes=[_TwoPromptProbe("p0")]
+            )
+        )
+        # Cancel only once the worker is inside its first target call, so the test
+        # doesn't depend on how fast the worker thread starts.
+        await first_call_started.wait()
+        scan.cancel()
+        try:
+            await scan
+        except asyncio.CancelledError:
+            outcome.append("cancelled")
+        # Keep the loop alive past the in-flight call (0.3s) so a leaked worker
+        # could reach its second prompt.
+        await asyncio.sleep(0.6)
+
+    runner = threading.Thread(target=lambda: asyncio.run(_scan()), daemon=True)
+    runner.start()
+    runner.join(timeout=5)
+
+    assert not runner.is_alive(), "cancelling the scan hung the event loop"
+    assert outcome == ["cancelled"]
+    assert target_calls == ["first"], "cancelled probe kept calling the target"
+
+
+def test_run_probe_does_not_score_attempts_when_cancelled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Scoring may call an LLM judge, so a cancelled scan must not start it."""
+    import threading
+
+    from giskard.scan.integrations.garak import _adapter
+
+    scored: list[object] = []
+    monkeypatch.setattr(_adapter, "_resolve_detectors", lambda *_: ([], []))
+    monkeypatch.setattr(
+        _adapter.GarakScanAdapter,
+        "_evaluate_attempt",
+        lambda self, *args: scored.append(args) or [],
+    )
+
+    class _Probe:
+        probename = "p0"
+        tags: list[str] = []
+
+        def probe(self, generator: Any) -> list[Attempt]:
+            return [_attempt(self.probename)]
+
+    async def target(inputs: str) -> str:
+        return "ok"
+
+    cancelled = threading.Event()
+    cancelled.set()
+
+    with pytest.raises(RuntimeError, match="scan cancelled"):
+        _adapter.GarakScanAdapter()._run_probe(
+            _Probe(),  # pyright: ignore[reportArgumentType]
+            target,
+            None,  # pyright: ignore[reportArgumentType]
+            None,  # pyright: ignore[reportArgumentType]
+            cancelled,
+        )
+    assert scored == []

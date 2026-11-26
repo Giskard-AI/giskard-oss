@@ -4,6 +4,7 @@ import asyncio
 import concurrent.futures
 import logging
 import math
+import threading
 import time
 from collections import defaultdict
 from collections.abc import Iterable
@@ -473,15 +474,19 @@ class GarakScanAdapter:
         target: Target[InputType, OutputType, TraceType],
         loop: asyncio.AbstractEventLoop,
         detector_cache: "_DetectorCache",
+        cancelled: threading.Event,
     ) -> list[ScenarioResult[TraceType]]:
         from ._generator import TargetGenerator
 
-        generator = TargetGenerator(target=target, loop=loop)
+        generator = TargetGenerator(target=target, loop=loop, cancelled=cancelled)
         detectors, skipped_detectors = _resolve_detectors(probe, loop, detector_cache)
 
         attempts = probe.probe(generator)
         scenario_results = []
         for attempt_idx, attempt in enumerate(attempts):
+            # Scoring can call an LLM judge, which TargetGenerator's check doesn't cover.
+            if cancelled.is_set():
+                raise RuntimeError("scan cancelled")
             test_case_results = self._evaluate_attempt(
                 attempt, detectors, skipped_detectors
             )
@@ -514,9 +519,10 @@ class GarakScanAdapter:
         target: Target[InputType, OutputType, TraceType],
         loop: asyncio.AbstractEventLoop,
         detector_cache: "_DetectorCache",
+        cancelled: threading.Event,
     ) -> list[ScenarioResult[TraceType]]:
         try:
-            return self._run_probe(probe, target, loop, detector_cache)
+            return self._run_probe(probe, target, loop, detector_cache, cancelled)
         except Exception as exc:  # noqa: BLE001 — one bad probe must not abort the scan
             logger.warning("Probe %s raised: %s", probe.probename, exc)
             # Emit an errored scenario so a crashing probe still surfaces as a
@@ -556,6 +562,10 @@ class GarakScanAdapter:
         for probe in probes:
             _resolve_detectors(probe, loop, detector_cache)
 
+        # Set when the scan is torn down. Running probe threads can't be interrupted,
+        # so TargetGenerator checks this before each target call and stops the probe.
+        cancelled = threading.Event()
+
         async def _run_on_executor(
             executor: concurrent.futures.ThreadPoolExecutor, probe: "Probe"
         ) -> list[ScenarioResult[TraceType]]:
@@ -566,6 +576,7 @@ class GarakScanAdapter:
                 target,
                 loop,
                 detector_cache,
+                cancelled,
             )
 
         # A dedicated pool: each probe worker blocks on the scan loop via
@@ -575,17 +586,22 @@ class GarakScanAdapter:
         # threads) lets probe workers fill it and deadlock — all blocked on the loop
         # while the loop waits for a free thread. The pool is capped because a default
         # run resolves ~90 probes: one thread each would mean 90 OS threads all driving
-        # the target at once. The TaskGroup joins every probe before __exit__ shuts the
-        # executor down.
+        # the target at once. On the normal path the TaskGroup joins every probe, so
+        # shutdown has nothing left to wait for. On cancellation (timeout, Ctrl-C) it
+        # must not wait: workers are blocked on this very loop, so a blocking
+        # shutdown here would hang the process. Workers already running are told to
+        # stop at their next target call via ``cancelled``.
         max_workers = min(len(probes), _MAX_PROBE_WORKERS) or 1
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=max_workers
-        ) as probe_executor:
+        probe_executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        try:
             async with asyncio.TaskGroup() as task_group:
                 tasks = [
                     task_group.create_task(_run_on_executor(probe_executor, probe))
                     for probe in probes
                 ]
+        finally:
+            cancelled.set()
+            probe_executor.shutdown(wait=False, cancel_futures=True)
 
         # Results are only available once the TaskGroup has exited and every
         # task has completed; reading task.result() inside the block would hit
