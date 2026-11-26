@@ -20,9 +20,14 @@ For **generateContent** -> :class:`~giskard.llm.types.CompletionResponse`, see `
 from typing import Literal
 
 import pytest
-from giskard.llm.translators.google_response import GoogleResponseTranslator
+from giskard.llm.translators.google_response import (
+    GoogleResponseTranslator,
+    _with_skip_thought_signatures,
+)
 from giskard.llm.types import (
     ResponseEasyInputMessage,
+    ResponseFunctionCallOutput,
+    ResponseFunctionToolCall,
     ResponseInputItem,
     ResponseOutputMessage,
     ResponseOutputRefusal,
@@ -111,6 +116,16 @@ def _model_function_call_turn(
         "name": name,
         "arguments": arguments,
     }
+
+
+# Gemini 3 rejects a replayed ``function_call`` that has no thought signature
+# (400 "Request contains an invalid argument"). The Interactions ``function_call``
+# step has no signature field; the signature lives on the preceding ``thought``
+# step, so the translator emits this sentinel thought when none is replayed.
+_SKIP_THOUGHT = {
+    "type": "thought",
+    "signature": "skip_thought_signature_validator",
+}
 
 
 def _user_function_result_turn(
@@ -217,6 +232,7 @@ def test_user_tool_call_and_result_with_tools():
     ]
     assert payload.get("input") == [
         _msg_step("user_input", "What's the weather in Paris?"),
+        _SKIP_THOUGHT,
         _model_function_call_turn(TOOL_CALL_ID, "get_weather", {"city": "Paris"}),
         _user_function_result_turn(TOOL_CALL_ID, "get_weather", TOOL_RESULT_CONTENT),
     ]
@@ -234,6 +250,7 @@ def test_user_two_parallel_tool_calls_and_results_with_tools():
     ]
     assert payload.get("input") == [
         _msg_step("user_input", PARALLEL_USER_PROMPT),
+        _SKIP_THOUGHT,
         _model_function_call_turn(
             TOOL_CALL_ID_WEATHER_PARALLEL,
             "get_weather",
@@ -270,6 +287,7 @@ def test_user_assistant_text_two_parallel_tool_calls_and_results_with_tools():
     assert payload.get("input") == [
         _msg_step("user_input", PARALLEL_USER_PROMPT),
         _msg_step("model_output", ASSISTANT_TEXT_WITH_PARALLEL_TOOLS),
+        _SKIP_THOUGHT,
         _model_function_call_turn(
             TOOL_CALL_ID_WEATHER_PARALLEL,
             "get_weather",
@@ -338,3 +356,73 @@ def test_response_format_pydantic_class_becomes_text_response_format():
         "schema": Answer.model_json_schema(),
     }
     validate_google_interaction_params(payload)
+
+
+def test_sequential_tool_rounds_each_get_a_skip_thought():
+    """Gemini 3 needs a signature on every sequential round, not just the first."""
+    items: list[ResponseInputItem] = [
+        ResponseEasyInputMessage(role="user", content="Weather then time?"),
+        ResponseFunctionToolCall(
+            name="get_weather", call_id="call_1", arguments={"city": "Paris"}
+        ),
+        ResponseFunctionCallOutput(name="get_weather", call_id="call_1", output="ok"),
+        ResponseFunctionToolCall(
+            name="get_local_time", call_id="call_2", arguments={"timezone": "UTC"}
+        ),
+        ResponseFunctionCallOutput(
+            name="get_local_time", call_id="call_2", output="noon"
+        ),
+    ]
+    payload = GoogleResponseTranslator.to_google(_MODEL, items, tools=PARALLEL_TOOLS)
+
+    assert payload["input"] == [
+        _msg_step("user_input", "Weather then time?"),
+        _SKIP_THOUGHT,
+        _model_function_call_turn("call_1", "get_weather", {"city": "Paris"}),
+        _user_function_result_turn("call_1", "get_weather", "ok"),
+        _SKIP_THOUGHT,
+        _model_function_call_turn("call_2", "get_local_time", {"timezone": "UTC"}),
+        _user_function_result_turn("call_2", "get_local_time", "noon"),
+    ]
+    validate_google_interaction_params(payload)
+
+
+def test_replayed_thought_signature_is_not_overridden():
+    """A real (replayed) thought step must stay as-is: no sentinel is added after it."""
+    call = _model_function_call_turn("call_1", "get_weather", {"city": "Paris"})
+    real_thought = {"type": "thought", "signature": "real-signature"}
+
+    assert _with_skip_thought_signatures([real_thought, call]) == [real_thought, call]
+    # Parallel calls: only the first call of a run is preceded by a thought.
+    assert _with_skip_thought_signatures([real_thought, call, call]) == [
+        real_thought,
+        call,
+        call,
+    ]
+
+
+def test_steps_without_function_call_are_unchanged():
+    items: list[ResponseInputItem] = [
+        ResponseEasyInputMessage(role="user", content="Hi"),
+        ResponseOutputMessage(role="assistant", content="Hello"),
+    ]
+    payload = GoogleResponseTranslator.to_google(_MODEL, items)
+
+    assert payload["input"] == [
+        _msg_step("user_input", "Hi"),
+        _msg_step("model_output", "Hello"),
+    ]
+
+
+def test_stateful_function_result_only_input_is_unchanged():
+    """With ``previous_id`` the server already holds the signed call: nothing to add."""
+    items: list[ResponseInputItem] = [
+        ResponseFunctionCallOutput(name="get_weather", call_id="call_1", output="ok"),
+    ]
+    payload = GoogleResponseTranslator.to_google(
+        _MODEL, items, previous_id="interaction-1", tools=[WEATHER_TOOL]
+    )
+
+    assert payload["input"] == [
+        _user_function_result_turn("call_1", "get_weather", "ok")
+    ]
