@@ -1,3 +1,4 @@
+import logging
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
@@ -6,6 +7,8 @@ from typing import ClassVar
 import numpy as np
 from giskard.core import Discriminated, discriminated_base
 from pydantic import BaseModel, ConfigDict, Field
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_environ_or_default(env_var: str, default: int) -> int:
@@ -79,6 +82,7 @@ class BaseEmbeddingModel(Discriminated, ABC):
             max_total_chars = DEFAULT_MAX_TOTAL_CHARS
 
         current_batch = []
+        truncated_count = 0
 
         for text in texts:
             # If adding text item would exceed limits, yield current batch
@@ -88,6 +92,8 @@ class BaseEmbeddingModel(Discriminated, ABC):
                 if current_batch:
                     yield current_batch
                 # Prevent a single too long document to make embeddings fail
+                if len(text) > max_total_chars:
+                    truncated_count += 1
                 current_batch = [text[:max_total_chars]]
             else:
                 current_batch.append(text)
@@ -95,3 +101,12 @@ class BaseEmbeddingModel(Discriminated, ABC):
         # Yield remaining items if present
         if current_batch:
             yield current_batch
+
+        if truncated_count:
+            logger.warning(
+                "Truncated %d of %d texts to the %d-character embedding limit; "
+                "content beyond the limit is not embedded.",
+                truncated_count,
+                len(texts),
+                max_total_chars,
+            )
