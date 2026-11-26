@@ -346,9 +346,15 @@ class AnthropicChatTranslator:
             dict[str, Any],
             cast(
                 object,
-                anthropic_params.model_dump(context={"provider": _PROVIDER}),
+                anthropic_params.model_dump(
+                    context={"provider": _PROVIDER}, exclude={"timeout"}
+                ),
             ),
         )
+        # Forward the Timeout object itself: httpx2 >= 2.13 makes it a dataclass,
+        # which model_dump would turn into a dict that httpx2 then mis-parses.
+        if anthropic_params.timeout is not None:
+            payload["timeout"] = anthropic_params.timeout
         # SDK v1 dropped sampling kwargs on messages.create (TypeError). Keep the
         # public temperature API by forwarding it through extra_body.
         temperature = payload.pop("temperature", None)
