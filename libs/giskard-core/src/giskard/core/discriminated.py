@@ -191,7 +191,7 @@ class Discriminated(BaseModel):
             return handler(source)
 
         def validate_discriminated(value: Any) -> Any:
-            if isinstance(value, Discriminated):
+            if isinstance(value, origin):
                 return value
             elif not isinstance(value, dict):
                 raise ValueError(f"Value {value} is not a dictionary")
