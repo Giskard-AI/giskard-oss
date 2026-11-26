@@ -281,3 +281,47 @@ def test_to_junit_xml_escapes_characters_illegal_in_xml(tmp_path: Path) -> None:
     assert failure is not None
     assert failure.attrib["message"] == "got #x1B[31mred#x1B[0m#xD800"
     assert "#x1B[31mred" in (failure.text or "")
+
+
+def test_to_junit_xml_surfaces_step_execution_error_details() -> None:
+    """A step execution error must reach the JUnit error node, not just properties."""
+    from giskard.checks import TestCaseResult
+    from giskard.checks.core.result import TestCaseError
+
+    suite_result = SuiteResult(
+        results=[
+            ScenarioResult(
+                scenario_name="scenario_step_error",
+                steps=[
+                    TestCaseResult(
+                        results=[],
+                        duration_ms=10,
+                        error=TestCaseError(
+                            message="inputs could not be generated: boom",
+                            exception_type="InteractionGenerationError",
+                            traceback="Traceback (most recent call last):\n  boom",
+                            phase="input_generation",
+                        ),
+                    )
+                ],
+                duration_ms=10,
+                final_trace=Trace(),
+            )
+        ],
+        duration_ms=10,
+        suite=Suite(name="test"),
+    )
+
+    root = ET.fromstring(to_junit_xml(suite_result))
+    error = root.find("testcase/error")
+
+    assert error is not None
+    assert error.attrib["type"] == "InteractionGenerationError"
+    assert error.attrib["message"] == (
+        "InteractionGenerationError during input_generation: "
+        "inputs could not be generated: boom"
+    )
+    text = error.text or ""
+    assert "step_1" in text
+    assert "inputs could not be generated: boom" in text
+    assert "Traceback (most recent call last)" in text

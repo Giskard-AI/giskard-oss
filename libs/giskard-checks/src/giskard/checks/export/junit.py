@@ -8,7 +8,7 @@ from xml.etree import ElementTree as ET
 
 from rich.console import Console
 
-from ..core.result import CheckResult, ScenarioResult, SuiteResult
+from ..core.result import CheckResult, ScenarioResult, SuiteResult, TestCaseError
 
 # Characters XML 1.0 does not allow, even escaped (e.g. ANSI escape codes in
 # model output). Left in place they make the whole report unparseable, so they
@@ -81,14 +81,29 @@ def _matching_checks(
     return matches
 
 
+def _step_errors(scenario: ScenarioResult[Any]) -> list[tuple[int, TestCaseError]]:
+    """Return (step_index, error) pairs for steps that failed to execute."""
+    return [
+        (step_index, step.error)
+        for step_index, step in enumerate(scenario.steps, start=1)
+        if step.error is not None
+    ]
+
+
 def _build_detail_text(
     scenario: ScenarioResult[Any],
     matches: list[tuple[int, int, CheckResult]],
+    step_errors: list[tuple[int, TestCaseError]] | None = None,
 ) -> str:
     lines = [
         f"scenario={scenario.scenario_name}",
         "See testcase properties for final_trace and step payloads.",
     ]
+
+    for step_index, error in step_errors or []:
+        lines.append(f"[ERROR] step_{step_index}: {error.summary()}")
+        if error.traceback:
+            lines.append(error.traceback.rstrip())
 
     for step_index, check_index, check in matches:
         label = _check_label(check, f"check_{check_index}")
@@ -132,18 +147,32 @@ def _append_properties(testcase_el: ET.Element, scenario: ScenarioResult[Any]) -
 def _append_status_node(testcase_el: ET.Element, scenario: ScenarioResult[Any]) -> None:
     if scenario.errored:
         matches = _matching_checks(scenario, errored=True)
+        step_errors = _step_errors(scenario)
         first = matches[0][2] if matches else None
-        node = ET.SubElement(
-            testcase_el,
-            "error",
-            {
-                "type": _check_label(first, "error") if first else "error",
-                "message": first.message
-                if first and first.message
-                else "Scenario errored.",
-            },
-        )
-        node.text = _build_detail_text(scenario, matches)
+        if step_errors:
+            # A step that never ran has no check result to describe it; carry the
+            # execution error itself into the JUnit node instead of a generic label.
+            _, first_error = step_errors[0]
+            node = ET.SubElement(
+                testcase_el,
+                "error",
+                {
+                    "type": first_error.exception_type,
+                    "message": first_error.summary(),
+                },
+            )
+        else:
+            node = ET.SubElement(
+                testcase_el,
+                "error",
+                {
+                    "type": _check_label(first, "error") if first else "error",
+                    "message": first.message
+                    if first and first.message
+                    else "Scenario errored.",
+                },
+            )
+        node.text = _build_detail_text(scenario, matches, step_errors)
         return
 
     if scenario.failed:
