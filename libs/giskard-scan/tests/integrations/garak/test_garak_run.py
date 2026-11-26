@@ -7,6 +7,7 @@ gathering after the group exits, and the SuiteResult assembly.
 """
 
 import math
+from typing import Any
 
 import pytest
 
@@ -412,35 +413,41 @@ async def test_run_does_not_deadlock_when_probes_exceed_thread_pool(
     assert len(result.results) == 40
 
 
-def test_run_returns_promptly_when_cancelled_while_probes_are_running(
-    monkeypatch: pytest.MonkeyPatch, target
+def test_run_returns_promptly_and_stops_probes_when_cancelled(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Cancelling a scan must not wait on workers that are blocked on the loop.
+    """Cancelling a scan must not hang, and must stop probes already running.
 
     Workers block on ``run_coroutine_threadsafe(...).result()``; if the executor
     is shut down with ``wait=True`` on the loop thread during cancellation, the
-    loop can never serve them and the process hangs. The scan runs on its own
-    loop in a daemon thread so a regression fails the test instead of hanging it.
+    loop can never serve them and the process hangs. A thread already running a
+    probe can't be interrupted, so it must also stop at its next target call
+    instead of driving the target to completion. The scan runs on its own loop in
+    a daemon thread so a regression fails the test instead of hanging it.
     """
     import asyncio
     import threading
 
     from giskard.scan.integrations.garak import _adapter
 
-    class _SlowProbe:
+    target_calls: list[str] = []
+
+    async def slow_target(inputs: str) -> str:
+        target_calls.append(inputs)
+        await asyncio.sleep(0.3)
+        return "ok"
+
+    class _TwoPromptProbe:
         tags: list[str] = []
 
-        def __init__(self, name: str, loop_getter) -> None:
+        def __init__(self, name: str) -> None:
             self.probename = name
-            self._loop_getter = loop_getter
 
-        def probe(self, generator: object) -> list[Attempt]:
-            async def _slow_target() -> None:
-                await asyncio.sleep(0.3)
-
-            asyncio.run_coroutine_threadsafe(
-                _slow_target(), self._loop_getter()
-            ).result()
+        def probe(self, generator: Any) -> list[Attempt]:
+            for text in ("first", "second"):
+                generator._call_model(
+                    Conversation(turns=[Turn(role="user", content=Message(text=text))])
+                )
             return [_attempt(self.probename)]
 
     monkeypatch.setattr(
@@ -455,15 +462,18 @@ def test_run_returns_promptly_when_cancelled_while_probes_are_running(
     outcome: list[str] = []
 
     async def _scan() -> None:
-        loop = asyncio.get_running_loop()
-        probes = [_SlowProbe(f"p{i}", lambda: loop) for i in range(2)]
         try:
             await asyncio.wait_for(
-                _adapter.GarakScanAdapter().run(target=target, probes=probes),
+                _adapter.GarakScanAdapter().run(
+                    target=slow_target, probes=[_TwoPromptProbe("p0")]
+                ),
                 timeout=0.1,
             )
         except TimeoutError:
             outcome.append("timed out")
+        # Keep the loop alive past the in-flight call (0.3s) so a leaked worker
+        # could reach its second prompt.
+        await asyncio.sleep(0.6)
 
     runner = threading.Thread(target=lambda: asyncio.run(_scan()), daemon=True)
     runner.start()
@@ -471,3 +481,4 @@ def test_run_returns_promptly_when_cancelled_while_probes_are_running(
 
     assert not runner.is_alive(), "cancelling the scan hung the event loop"
     assert outcome == ["timed out"]
+    assert target_calls == ["first"], "cancelled probe kept calling the target"

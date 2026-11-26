@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import uuid
 from typing import override
 
@@ -25,17 +26,20 @@ class TargetGenerator[InputType, OutputType, TraceType: Trace](  # pyright: igno
     target: Target[InputType, OutputType, TraceType]
     internal_cache: dict[str, TraceType]
     _loop: asyncio.AbstractEventLoop | None
+    _cancelled: threading.Event
 
     def __init__(
         self,
         target: Target[InputType, OutputType, TraceType],
         *,
         loop: asyncio.AbstractEventLoop | None = None,
+        cancelled: threading.Event | None = None,
     ):
         super().__init__(name="target-generator")
         self.target = target
         self.internal_cache = dict()
         self._loop = loop
+        self._cancelled = cancelled or threading.Event()
         # Cache one empty trace: Trace.for_target inspects the target's type hints
         # (get_type_hints), which we don't want to repeat on every turn. Trace is
         # frozen, so a single empty instance is safe to share as the default —
@@ -53,6 +57,11 @@ class TargetGenerator[InputType, OutputType, TraceType: Trace](  # pyright: igno
     def _call_model(  # pyright: ignore[reportGeneralTypeIssues]
         self, prompt: Conversation, generations_this_call: int = 1
     ) -> list[Message | None]:
+        # Probe threads can't be interrupted; this is where a cancelled scan's
+        # still-running probes stop instead of driving the target to completion.
+        if self._cancelled.is_set():
+            raise RuntimeError("scan cancelled")
+
         conv_uuid = _conv_uuid(prompt) or str(uuid.uuid4())
         trace = self.internal_cache.pop(conv_uuid, self._empty_trace)
 
