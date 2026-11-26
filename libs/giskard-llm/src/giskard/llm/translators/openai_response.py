@@ -5,15 +5,23 @@ from typing import TYPE_CHECKING, Any, cast
 
 from giskard.llm.types import (
     ResponseInputItem,
+    ResponseReasoningItem,
     ResponseResult,
     ToolDef,
 )
 from giskard.llm.types._base import _BaseModel
-from pydantic import BaseModel, Field, SerializationInfo, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    SerializationInfo,
+    field_validator,
+    model_validator,
+)
 
 from ..errors import BadRequestError
 from ..types._serialization import close_object_schemas
 from ..utils import sanitize_schema_name
+from ._unsupported import keep_supported
 
 if TYPE_CHECKING:
     from openai.types.responses.response import Response
@@ -23,6 +31,7 @@ if TYPE_CHECKING:
     from openai.types.responses.tool_param import ToolParam
 
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "max_tokens", "response_format"})
+_SUPPORTED_OUTPUT_TYPES = frozenset({"message", "function_call", "reasoning"})
 
 logger = logging.getLogger(__name__)
 PROVIDER = "openai"
@@ -109,6 +118,32 @@ class OpenAIResponseParams(_BaseModel):
     max_output_tokens: int | None = Field(default=None, validation_alias="max_tokens")
     text: dict[str, Any] | None = None
 
+    @field_validator("input", mode="after")
+    @classmethod
+    def _drop_foreign_reasoning(
+        cls, value: str | Sequence[ResponseInputItem]
+    ) -> str | Sequence[ResponseInputItem]:
+        """Drop reasoning items another provider produced (tagged via ``format``).
+
+        OpenAI cannot replay them: their ``id`` is not an ``rs_`` id (and can exceed
+        64 chars) and ``encrypted_content`` is verified server-side. Untagged items
+        are OpenAI-native and kept.
+        """
+        if isinstance(value, str):
+            return value
+        kept = [
+            item
+            for item in value
+            if not (isinstance(item, ResponseReasoningItem) and item.format is not None)
+        ]
+        if len(kept) != len(value):
+            logger.debug(
+                "%s provider: dropped %d reasoning item(s) from another provider",
+                PROVIDER,
+                len(value) - len(kept),
+            )
+        return kept
+
     @model_validator(mode="before")
     @classmethod
     def _coerce_response_format(cls, v: Any) -> Any:
@@ -175,5 +210,17 @@ class OpenAIResponseTranslator:
         )
 
     @staticmethod
-    def from_openai(raw: "Response") -> ResponseResult:
-        return ResponseResult.model_validate(raw.model_dump())
+    def from_openai(
+        raw: "Response",
+        *,
+        ignore_unsupported_content: bool = False,
+        provider: str = PROVIDER,
+    ) -> ResponseResult:
+        data = raw.model_dump()
+        data["output"] = keep_supported(
+            data.get("output") or [],
+            _SUPPORTED_OUTPUT_TYPES,
+            provider,
+            ignore_unsupported_content=ignore_unsupported_content,
+        )
+        return ResponseResult.model_validate(data)

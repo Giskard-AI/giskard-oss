@@ -24,9 +24,12 @@ from .sdk_payload_validation import google_interaction_types
 
 _types = google_interaction_types()
 FunctionCallStep = _types.FunctionCallStep
+GoogleSearchCallStep = _types.GoogleSearchCallStep
+ImageContent = _types.ImageContent
 Interaction = _types.Interaction
 ModelOutputStep = _types.ModelOutputStep
 TextContent = _types.TextContent
+ThoughtStep = _types.ThoughtStep
 Usage = _types.Usage
 
 pytestmark = pytest.mark.google
@@ -156,3 +159,87 @@ def test_from_google_text_then_text_then_function():
     assert isinstance(out.outputs[2], ResponseFunctionToolCall)
     assert out.outputs[2].name == "f"
     assert out.output_text == "A\nB"
+
+
+# -- Thought steps / unsupported content ------------------------------------------
+
+
+def test_from_google_thought_step_maps_to_reasoning_item():
+    """``thought`` steps become :class:`ResponseReasoningItem` and stay out of ``output_text``."""
+    from giskard.llm.types import ResponseReasoningItem, ResponseReasoningSummary
+
+    raw = _interaction(
+        [
+            ThoughtStep(
+                type="thought",
+                signature="sig-abc",
+                summary=[TextContent(type="text", text="Considering the question")],
+            ),
+            ModelOutputStep(
+                type="model_output",
+                content=[TextContent(type="text", text="42")],
+            ),
+        ]
+    )
+    out = GoogleResponseTranslator.from_google(raw, _MODEL)
+    assert out.outputs[0] == ResponseReasoningItem(
+        id="thought_int_test_0",
+        summary=[ResponseReasoningSummary(text="Considering the question")],
+        encrypted_content="sig-abc",
+        # Provenance tag: lets other providers recognise (and not replay) this item.
+        format="google-interactions-v1",
+    )
+    assert out.reasoning == [out.outputs[0]]
+    # Equality above cannot catch a missing tag if the field is unknown, so assert it directly.
+    assert getattr(out.outputs[0], "format", None) == "google-interactions-v1"
+    assert out.output_text == "42"
+
+
+def _image() -> ImageContent:
+    return ImageContent(type="image", data="aGVsbG8=", mime_type="image/png")
+
+
+def _unsupported_cases() -> list[object]:
+    return [
+        pytest.param(
+            GoogleSearchCallStep.model_construct(type="google_search_call", id="gs_1"),
+            "google_search_call",
+            id="step",
+        ),
+        pytest.param(
+            ModelOutputStep(type="model_output", content=[_image()]),
+            "model_output:image",
+            id="model-output-content",
+        ),
+        pytest.param(
+            ThoughtStep(type="thought", summary=[_image()]),
+            "thought:image",
+            id="thought-summary-content",
+        ),
+    ]
+
+
+@pytest.mark.parametrize(("step", "content_type"), _unsupported_cases())
+def test_from_google_unsupported_content_raises(step: object, content_type: str):
+    """Steps and content parts we do not model raise instead of being silently dropped."""
+    from giskard.llm.errors import UnsupportedContentError
+
+    with pytest.raises(UnsupportedContentError) as exc_info:
+        GoogleResponseTranslator.from_google(_interaction([step]), _MODEL)
+    assert exc_info.value.content_type == content_type
+
+
+@pytest.mark.parametrize(("step", "content_type"), _unsupported_cases())
+def test_from_google_unsupported_content_dropped_with_warning(
+    step: object, content_type: str, caplog: pytest.LogCaptureFixture
+):
+    """With ``ignore_unsupported_content`` the content is dropped and a warning logged."""
+    text = ModelOutputStep(
+        type="model_output", content=[TextContent(type="text", text="kept")]
+    )
+    with caplog.at_level("WARNING"):
+        out = GoogleResponseTranslator.from_google(
+            _interaction([step, text]), _MODEL, ignore_unsupported_content=True
+        )
+    assert out.output_text == "kept"
+    assert content_type in caplog.text

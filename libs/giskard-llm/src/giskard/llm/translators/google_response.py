@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Iterable, Sequence
+from functools import partial
 from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict, cast
 
 from giskard.llm.types._base import _BaseModel
@@ -15,11 +16,14 @@ from ..types import (
     ResponseOutputMessage,
     ResponseOutputRefusal,
     ResponseOutputText,
+    ResponseReasoningItem,
+    ResponseReasoningSummary,
     ResponseResult,
     ToolDef,
     Usage,
 )
 from ..utils import deserialize_arguments
+from ._unsupported import handle_unsupported_content
 
 if TYPE_CHECKING:
     # Type-checking follows the locked SDK (google-genai 3.x: ``_gaos``). The same
@@ -33,6 +37,7 @@ if TYPE_CHECKING:
         ModelOutputStepParam,
         StepParam,
         TextContentParam,
+        ThoughtStepParam,
         ToolParam,
         UserInputStepParam,
     )
@@ -54,6 +59,8 @@ else:
 
 _PROVIDER = "google/response"
 PROVIDER = "google"
+# Provenance tag on ResponseReasoningItem.format; keeps other providers from replaying it.
+_REASONING_FORMAT = "google-interactions-v1"
 KNOWN_RESPONSE_PARAMS = frozenset({"temperature", "timeout", "response_format"})
 
 
@@ -163,6 +170,23 @@ def serialize_output_function_call_output(
         "name": model.name,
         "result": model.output,
     }
+
+
+@ResponseReasoningItem.register_serializer(_PROVIDER)
+def serialize_reasoning_item(
+    model: ResponseReasoningItem, _info: SerializationInfo
+) -> "ThoughtStepParam":
+    # Thought steps only carry a summary: fall back to raw reasoning text when a
+    # (non-Gemini) item has no summary, rather than dropping it.
+    texts = [part.text for part in model.summary] or [
+        part.text for part in model.content or []
+    ]
+    step: ThoughtStepParam = {"type": "thought"}
+    if texts:
+        step["summary"] = [_text_content(text) for text in texts]
+    if model.encrypted_content is not None:
+        step["signature"] = model.encrypted_content
+    return step
 
 
 def _extract_system_instruction(input: str | Sequence[ResponseInputItem]) -> str | None:
@@ -281,9 +305,16 @@ class GoogleResponseTranslator:
         )
 
     @staticmethod
-    def from_google(raw: "Interaction", model: str) -> ResponseResult:
+    def from_google(
+        raw: "Interaction", model: str, *, ignore_unsupported_content: bool = False
+    ) -> ResponseResult:
+        unsupported = partial(
+            handle_unsupported_content,
+            PROVIDER,
+            ignore_unsupported_content=ignore_unsupported_content,
+        )
         outputs: list[ResponseOutputItem] = []
-        for item in raw.steps or []:
+        for step_index, item in enumerate(raw.steps or []):
             if item.type == "model_output":
                 for content in item.content or []:
                     if content.type == "text":
@@ -293,6 +324,8 @@ class GoogleResponseTranslator:
                                 role="assistant",
                             )
                         )
+                    else:
+                        unsupported(f"model_output:{content.type}")
             elif item.type == "function_call":
                 outputs.append(
                     ResponseFunctionToolCall(
@@ -301,6 +334,24 @@ class GoogleResponseTranslator:
                         arguments=item.arguments,
                     )
                 )
+            elif item.type == "thought":
+                summary: list[ResponseReasoningSummary] = []
+                for content in item.summary or []:
+                    if content.type == "text":
+                        summary.append(ResponseReasoningSummary(text=content.text))
+                    else:
+                        unsupported(f"thought:{content.type}")
+                outputs.append(
+                    ResponseReasoningItem(
+                        # Thought steps have no id; derive a stable one.
+                        id=f"thought_{raw.id}_{step_index}",
+                        summary=summary,
+                        encrypted_content=item.signature,
+                        format=_REASONING_FORMAT,
+                    )
+                )
+            else:
+                unsupported(item.type)
 
         usage = None
         if raw.usage:
