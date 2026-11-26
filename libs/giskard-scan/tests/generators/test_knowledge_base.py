@@ -1,10 +1,14 @@
+from collections.abc import Sequence
+from typing import Any, override
 from unittest.mock import AsyncMock
 
 import numpy as np
 import pytest
-from giskard.checks.core import Interact
+from giskard.agents import BaseGenerator, GenerationParams
+from giskard.checks.core import Interact, LLMChatJudge
 from giskard.checks.generators import LLMGenerator
 from giskard.checks.judges import Conformity, Contradiction
+from giskard.llm.types import ChatMessage, CompletionResponse
 from giskard.scan.generators.base import ScenarioContext
 from giskard.scan.generators.knowledge_base import (
     DEFAULT_KNOWLEDGE_BASE_CONTEXT_DOCUMENTS,
@@ -22,6 +26,17 @@ from giskard.scan.generators.knowledge_base.hallucination import (
 )
 from giskard.scan.utils.knowledge_base import Document, KnowledgeBase
 from pydantic import ValidationError
+
+
+class _StubGenerator(BaseGenerator):
+    @override
+    async def _call_model(
+        self,
+        messages: Sequence[ChatMessage],
+        params: GenerationParams,
+        metadata: dict[str, Any] | None = None,
+    ) -> CompletionResponse:
+        raise NotImplementedError
 
 
 def _knowledge_base() -> KnowledgeBase:
@@ -356,12 +371,66 @@ async def test_out_of_scope_generator_builds_conformity_scenario(
         == "giskard.scan::scenarios/knowledge_base_out_of_scope.j2"
     )
     assert interaction.inputs.max_steps == 2
+    assert interaction.inputs.generator is None
     assert interaction.metadata["absent_topic"] == "GammaCare bundle"
     check = scenario.steps[0].checks[0]
     assert isinstance(check, Conformity)
+    assert check.judge is None
+    assert check.generator is None
     assert "GammaCare bundle" in check.rule
     assert "Fail only if the agent directly confirms" in check.rule
     assert "Any other response should pass" in check.rule
+
+
+async def test_out_of_scope_generator_forwards_custom_generator(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    custom_generator = _StubGenerator()
+    generator = OutOfScopeScenarioGenerator(
+        context_documents=2,
+        max_turns=2,
+        generator=custom_generator,
+    )
+    candidate = OutOfScopeCandidate(
+        topic="GammaCare bundle",
+        reason="It resembles the alpha products but is not present.",
+    )
+    validation = OutOfScopeValidation(
+        is_absent=True,
+        reason="Nearest documents mention alpha and beta only.",
+    )
+    monkeypatch.setattr(
+        generator,
+        "_generate_absent_candidate",
+        AsyncMock(return_value=candidate),
+    )
+    monkeypatch.setattr(
+        generator,
+        "_validate_absence",
+        AsyncMock(return_value=validation),
+    )
+    monkeypatch.setattr(
+        KnowledgeBase,
+        "closest_documents_to_text",
+        AsyncMock(return_value=list(_knowledge_base().documents[:2])),
+    )
+
+    scenarios = await generator.generate_scenario(
+        _scenario_context(),
+        max_scenarios=1,
+        rng=np.random.default_rng(1),
+    )
+    scenario = scenarios[0]
+
+    interaction = scenario.steps[0].interacts[0]
+    assert isinstance(interaction, Interact)
+    assert isinstance(interaction.inputs, LLMGenerator)
+    assert interaction.inputs.generator is custom_generator
+    check = scenario.steps[0].checks[0]
+    assert isinstance(check, Conformity)
+    assert isinstance(check.judge, LLMChatJudge)
+    assert check.judge.generator is custom_generator
+    assert check.generator is custom_generator
 
 
 async def test_out_of_scope_generator_rejects_direct_text_matches(

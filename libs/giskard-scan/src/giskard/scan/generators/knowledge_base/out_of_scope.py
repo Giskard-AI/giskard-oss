@@ -206,7 +206,11 @@ class OutOfScopeScenarioGenerator(KnowledgeBaseScenarioGenerator, WithGeneratorM
         return (
             Scenario(f"{self.scenario_name_prefix} - Document {seed_index}")
             .interact(
-                LLMGenerator(prompt_path=self.prompt_path, max_steps=max_turns),
+                LLMGenerator(
+                    prompt_path=self.prompt_path,
+                    max_steps=max_turns,
+                    generator=self.generator,
+                ),
                 metadata={
                     "context": validation_context,
                     "absent_topic": candidate.topic,
@@ -222,7 +226,8 @@ class OutOfScopeScenarioGenerator(KnowledgeBaseScenarioGenerator, WithGeneratorM
                             "including refusals, uncertainty, clarification questions,",
                             "redirects, or imperfectly phrased non-answers.",
                         )
-                    )
+                    ),
+                    generator=self.generator,
                 )
             )
             .with_annotations(
