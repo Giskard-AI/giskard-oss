@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Annotated, Any, override
 
 from jsonpath_ng import (
@@ -25,6 +26,19 @@ class _JSONPathStrMarker:
 
 
 _REQUIRED_JSONPATH_PREFIX = "trace."
+
+
+@lru_cache(maxsize=256)
+def _parse_jsonpath(key: str) -> JSONPath:
+    """Parse a JSONPath expression, caching the result.
+
+    Parsing takes ~2.4 ms per call, which dominated every ``resolve()`` call.
+    The returned expression is immutable in practice: ``resolve()`` only calls
+    ``.find()`` on it and ``_is_list_expression()`` only reads its attributes,
+    so sharing one parsed expression across calls is safe.
+    """
+
+    return parse(key)
 
 
 def _validate_jsonpath_syntax(v: str) -> str:
@@ -86,7 +100,7 @@ def _is_list_expression(expression: JSONPath) -> bool:
 
 
 def resolve[TraceType: Trace](trace: TraceType, key: str) -> Any:  # pyright: ignore[reportMissingTypeArgument]
-    expression: JSONPath = parse(key)
+    expression: JSONPath = _parse_jsonpath(key)
     matches: list[DatumInContext] = expression.find({"trace": trace.model_dump()})
 
     if len(matches) > 1 or _is_list_expression(expression):
