@@ -27,6 +27,7 @@ Tool call format:
 Error mapping:
     - ``anthropic.RateLimitError`` -> ``RateLimitError``
     - ``anthropic.AuthenticationError`` -> ``AuthenticationError``
+    - ``anthropic.PermissionDeniedError`` -> ``AuthenticationError``
     - ``anthropic.BadRequestError`` -> ``BadRequestError``
     - ``anthropic.APITimeoutError`` -> ``LLMTimeoutError``
     - ``anthropic.InternalServerError`` -> ``ServerError``
@@ -62,15 +63,7 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 from pydantic import TypeAdapter, ValidationError
 
-from ..errors import (
-    AuthenticationError,
-    BadRequestError,
-    LLMError,
-    LLMTimeoutError,
-    ProviderNotAvailableError,
-    RateLimitError,
-    ServerError,
-)
+from ..errors import BadRequestError, ProviderNotAvailableError
 from ..translators.anthropic import AnthropicChatTranslator
 from ..types import (
     ChatMessage,
@@ -80,6 +73,7 @@ from ..types import (
     ToolDefParam,
 )
 from ..utils import compact
+from ._error_mapping import map_httpx_sdk_error
 
 if TYPE_CHECKING:
     from httpx2 import AsyncClient
@@ -135,24 +129,7 @@ class AnthropicProvider:
 
     def _map_error(self, e: Exception) -> NoReturn:
         """Map an ``anthropic.*`` SDK exception to the giskard error hierarchy."""
-        anthropic = _import_anthropic()
-        if isinstance(e, anthropic.RateLimitError):
-            raise RateLimitError(429, str(e), PROVIDER) from e
-        if isinstance(e, anthropic.AuthenticationError):
-            raise AuthenticationError(e.status_code, str(e), PROVIDER) from e
-        if isinstance(e, anthropic.BadRequestError):
-            raise BadRequestError(e.status_code, str(e), PROVIDER) from e
-        if isinstance(e, anthropic.APITimeoutError):
-            raise LLMTimeoutError(408, str(e), PROVIDER) from e
-        if isinstance(e, anthropic.InternalServerError):
-            raise ServerError(e.status_code, str(e), PROVIDER) from e
-        if isinstance(e, anthropic.APIStatusError):
-            raise LLMError(e.status_code, str(e), PROVIDER) from e
-        if isinstance(e, anthropic.APIError):
-            raise LLMError(
-                getattr(e, "status_code", None) or 500, str(e), PROVIDER
-            ) from e
-        raise
+        map_httpx_sdk_error(e, _import_anthropic(), PROVIDER)
 
     async def complete(
         self,

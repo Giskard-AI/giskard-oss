@@ -97,6 +97,37 @@ def test_should_disable_false_cases(content, _clean_opt_out_env):
     assert telemetry_mod._should_disable() is False
 
 
+def test_dotenv_flags_cached_across_repeated_checks(_clean_opt_out_env):
+    """Repeated opt-out checks must not re-read ``.env`` (issue #2989).
+
+    The first call parses the file once; later calls reuse the cached flags
+    while the file is unchanged.
+    """
+    (_clean_opt_out_env / ".env").write_text(
+        "GISKARD_TELEMETRY_DISABLED=1\n", encoding="utf-8"
+    )
+    opens: list[str] = []
+
+    def _audit(event: str, args: tuple[object, ...]) -> None:
+        if event == "open" and str(args[0]).endswith(".env"):
+            opens.append(str(args[0]))
+
+    sys.addaudithook(_audit)
+    for _ in range(15):
+        assert telemetry_mod._should_disable() is True
+    assert len(opens) == 1
+
+
+def test_dotenv_cache_invalidated_when_env_file_changes(_clean_opt_out_env):
+    """A ``.env`` written after import must still be honored (issue #2989)."""
+    (_clean_opt_out_env / ".env").write_text("DO_NOT_TRACK=0\n", encoding="utf-8")
+    assert telemetry_mod._should_disable() is False
+    (_clean_opt_out_env / ".env").write_text(
+        "GISKARD_TELEMETRY_DISABLED=1\n", encoding="utf-8"
+    )
+    assert telemetry_mod._should_disable() is True
+
+
 @pytest.mark.parametrize("env_value", ["false", ""])
 def test_process_env_wins_over_dotenv(env_value, _clean_opt_out_env, monkeypatch):
     (_clean_opt_out_env / ".env").write_text(
