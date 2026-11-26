@@ -1,5 +1,8 @@
 """Runtime and environment configuration for giskard-checks."""
 
+import os
+from pathlib import Path
+
 from giskard.agents import (
     BaseEmbeddingModel,
     BaseGenerator,
@@ -14,6 +17,8 @@ from .core.judge import BaseJudge, JudgeInput, LLMChatJudge
 _default_generator: BaseGenerator | None = None
 _default_judge: BaseJudge | None = None
 _default_embedding_model: BaseEmbeddingModel | None = None
+
+_SETTINGS_ENV_PREFIX = "GISKARD_CHECKS_"
 
 DEFAULT_MODEL = "openai/gpt-4o-mini"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
@@ -73,9 +78,62 @@ class GiskardChecksSettings(BaseSettings):
         return parsed if parsed >= 0 else None
 
 
+def _settings_cache_key() -> tuple[
+    tuple[tuple[str, str], ...], tuple[int, int] | None, object
+]:
+    """Fingerprint of everything ``GiskardChecksSettings`` reads.
+
+    The ``GISKARD_CHECKS_*`` environment variables plus the ``.env`` file
+    (fingerprint, not contents) and the configured ``env_file`` itself, so a
+    test that disables the ``.env`` lookup does not get a stale object.
+    """
+    env_values = tuple(
+        sorted(
+            (name, value)
+            for name, value in os.environ.items()
+            if name.startswith(_SETTINGS_ENV_PREFIX)
+        )
+    )
+    try:
+        stat = Path(".env").stat()
+        dotenv_fingerprint: tuple[int, int] | None = (
+            stat.st_mtime_ns,
+            stat.st_size,
+        )
+    except OSError:
+        dotenv_fingerprint = None
+    return (
+        env_values,
+        dotenv_fingerprint,
+        GiskardChecksSettings.model_config.get("env_file"),
+    )
+
+
+# Cached settings object, rebuilt only when its inputs change (see above).
+_settings_cache: GiskardChecksSettings | None = None
+_cached_settings_key: (
+    tuple[tuple[tuple[str, str], ...], tuple[int, int] | None, object] | None
+) = None
+# Default generator built from the cached settings; rebuilt when the
+# settings object changes (i.e. when its inputs changed).
+_default_generator_from_settings: BaseGenerator | None = None
+_default_generator_settings: GiskardChecksSettings | None = None
+
+
 def get_settings() -> GiskardChecksSettings:
-    """Return settings loaded from the environment."""
-    return GiskardChecksSettings()
+    """Return settings loaded from the environment.
+
+    The settings object is cached while its inputs are unchanged, so
+    repeated calls do not re-read the environment and ``.env``. Any change
+    to those inputs builds a fresh object, so runtime environment changes
+    and ``.env`` edits keep working.
+    """
+    global _settings_cache, _cached_settings_key
+    key = _settings_cache_key()
+    if _settings_cache is None or key != _cached_settings_key:
+        _settings_cache = GiskardChecksSettings()
+        _cached_settings_key = key
+    return _settings_cache
 
 
 def set_default_generator(generator: BaseGenerator | str) -> None:
@@ -121,7 +179,15 @@ def get_default_generator() -> BaseGenerator:
     """
     if _default_generator is not None:
         return _default_generator
-    return Generator(model=get_settings().default_model)
+    global _default_generator_from_settings, _default_generator_settings
+    settings = get_settings()
+    if (
+        _default_generator_from_settings is None
+        or _default_generator_settings is not settings
+    ):
+        _default_generator_from_settings = Generator(model=settings.default_model)
+        _default_generator_settings = settings
+    return _default_generator_from_settings
 
 
 def set_default_judge(

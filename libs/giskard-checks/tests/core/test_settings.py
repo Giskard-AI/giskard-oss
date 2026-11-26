@@ -321,3 +321,35 @@ def test_settings_max_reported_failures_validation(monkeypatch: pytest.MonkeyPat
 def test_settings_disable_rich_pretty(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("GISKARD_CHECKS_DISABLE_RICH_PRETTY", "true")
     assert get_settings().disable_rich_pretty is True
+
+
+def test_get_settings_cached_when_inputs_unchanged(monkeypatch: pytest.MonkeyPatch):
+    """Repeated ``get_settings()`` calls reuse one object (issue #2989)."""
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "google/gemini-3.5-flash")
+
+    first = get_settings()
+    second = get_settings()
+
+    assert second is first
+    assert second.default_model == "google/gemini-3.5-flash"
+
+
+def test_get_settings_rebuilt_when_env_changes(monkeypatch: pytest.MonkeyPatch):
+    """An environment change invalidates the cached settings (issue #2989)."""
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "google/gemini-3.5-flash")
+    first = get_settings()
+
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "openai/gpt-4o-mini")
+    second = get_settings()
+
+    assert second is not first
+    assert second.default_model == "openai/gpt-4o-mini"
+
+
+def test_get_default_generator_cached_when_settings_unchanged(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The default generator is built once per settings (issue #2989)."""
+    monkeypatch.setenv("GISKARD_CHECKS_DEFAULT_MODEL", "google/gemini-3.5-flash")
+
+    assert get_default_generator() is get_default_generator()

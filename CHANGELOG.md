@@ -61,12 +61,20 @@ in-place upgrade of the v2 API.
 - `giskard-core` (1.0.4) imports `posthog` only when telemetry is enabled.
 - `giskard-agents` (1.0.7) loads its exports lazily, so `giskard.agents.templates`
   imports on its own.
+- Telemetry opt-out flags and `giskard.checks` settings are cached while
+  their inputs are unchanged, so scenario runs no longer re-read `.env` on
+  every telemetry call or settings lookup. A `.env` edited after import and
+  runtime environment changes are still picked up.
 
 ### Fixed
 
 - `Interact.generate()` now uses the live `inputs`/`outputs` fields after
   `model_copy(update=...)`. GCG scans previously sent the unsuffixed HarmBench
   prompt because the copied Interact kept a stale input provider.
+- OpenAI and Anthropic `PermissionDeniedError` (403) now maps to
+  `AuthenticationError` instead of generic `LLMError`, matching the
+  documented 401/403 coverage. The duplicated `_map_error` implementations
+  are merged into one shared helper.
 
 ### Installation
 

@@ -27,21 +27,41 @@ _DISABLE_GEOIP_ENV_VARS = [
 _OPT_OUT_ENV_KEYS = frozenset((*_DISABLING_ENV_VARS, *_DISABLE_GEOIP_ENV_VARS))
 
 
+_dotenv_flags_cache: dict[str, str] | None = None
+_dotenv_flags_cache_key: tuple[str, int, int] | None = None
+
+
 def _dotenv_flags() -> dict[str, str]:
     """Opt-out flags from a cwd ``.env``, the file giskard.checks settings already read.
 
     Minimal dotenv rules: ``export`` prefixes and unquoted `` # comment`` tails
     are dropped; ``errors="replace"`` so a non-UTF-8 file cannot abort import.
+
+    The parsed flags are cached, keyed on the file fingerprint (cwd, mtime,
+    size), so the repeated ``_apply_env_opt_out`` calls of a scenario run do
+    not re-read the file. A ``.env`` written or edited after import is still
+    picked up because the fingerprint changes; process environment variables
+    are checked before this cache in ``_flag_is_true`` and always win.
     """
+    global _dotenv_flags_cache, _dotenv_flags_cache_key
+    try:
+        stat = Path(".env").stat()
+    except OSError:
+        return {}
+    key = (os.getcwd(), stat.st_mtime_ns, stat.st_size)
+    if _dotenv_flags_cache is not None and key == _dotenv_flags_cache_key:
+        return _dotenv_flags_cache
     try:
         text = Path(".env").read_text(encoding="utf-8", errors="replace")
     except OSError:
         return {}
     flags: dict[str, str] = {}
     for line in text.lstrip("\ufeff").splitlines():
-        key, sep, value = line.strip().removeprefix("export ").partition("=")
-        if sep and key.strip() in _OPT_OUT_ENV_KEYS:
-            flags[key.strip()] = re.sub(r"\s+#.*", "", value).strip()
+        name, sep, value = line.strip().removeprefix("export ").partition("=")
+        if sep and name.strip() in _OPT_OUT_ENV_KEYS:
+            flags[name.strip()] = re.sub(r"\s+#.*", "", value).strip()
+    _dotenv_flags_cache = flags
+    _dotenv_flags_cache_key = key
     return flags
 
 

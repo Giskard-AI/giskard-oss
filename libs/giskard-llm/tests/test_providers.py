@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from giskard.llm.errors import (
+    AuthenticationError,
     BadRequestError,
     LLMError,
     LLMTimeoutError,
@@ -765,6 +766,79 @@ def test_google_interactions_connection_error_is_not_a_timeout():
         provider._map_error(_make_httpx_sdk_exc(ix.APIConnectionError))
 
     assert not isinstance(excinfo.value, LLMTimeoutError)
+
+
+def _make_httpx_sdk_exc_with_status(cls: type, status: int) -> Exception:
+    """Like ``_make_httpx_sdk_exc`` but with a chosen HTTP status code."""
+    import inspect
+
+    import httpx
+
+    request = httpx.Request("GET", "https://test")
+    response = httpx.Response(status, request=request)
+
+    available = {
+        "message": "test",
+        "request": request,
+        "response": response,
+        "body": None,
+    }
+
+    params = inspect.signature(cls.__init__).parameters
+    kwargs: dict[str, object] = {
+        name: value for name, value in available.items() if name in params
+    }
+    return cls(**kwargs)
+
+
+@pytest.mark.openai
+def test_openai_permission_denied_maps_to_authentication_error():
+    """A 403 ``PermissionDeniedError`` must map to ``AuthenticationError``.
+
+    The docs promise ``AuthenticationError`` covers 401/403, but
+    ``PermissionDeniedError`` is not an ``AuthenticationError`` subclass, so
+    without the explicit branch it fell through to generic ``LLMError`` and
+    ``except AuthenticationError`` missed it.
+    """
+    import openai
+
+    provider = _make_openai_provider()
+
+    with pytest.raises(AuthenticationError) as excinfo:
+        provider._map_error(
+            _make_httpx_sdk_exc_with_status(openai.PermissionDeniedError, 403)
+        )
+
+    assert excinfo.value.status_code == 403
+
+
+@pytest.mark.anthropic
+def test_anthropic_permission_denied_maps_to_authentication_error():
+    """A 403 ``PermissionDeniedError`` must map to ``AuthenticationError``."""
+    import anthropic
+
+    provider = _make_anthropic_provider()
+
+    with pytest.raises(AuthenticationError) as excinfo:
+        provider._map_error(
+            _make_httpx_sdk_exc_with_status(anthropic.PermissionDeniedError, 403)
+        )
+
+    assert excinfo.value.status_code == 403
+
+
+@pytest.mark.google
+def test_google_client_error_403_maps_to_authentication_error():
+    """A 403 ``ClientError`` maps to ``AuthenticationError`` (control: the
+    Google mapping already handled 403 before this change)."""
+    from google.genai import errors as genai_errors
+
+    provider = _make_google_provider()
+
+    with pytest.raises(AuthenticationError) as excinfo:
+        provider._map_error(genai_errors.ClientError(403, "forbidden"))
+
+    assert excinfo.value.status_code == 403
 
 
 # -- OpenAI message validation ------------------------------------------------

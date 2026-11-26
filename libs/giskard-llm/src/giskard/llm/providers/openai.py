@@ -21,6 +21,7 @@ Tool call format:
 Error mapping:
     - ``openai.RateLimitError`` -> ``RateLimitError``
     - ``openai.AuthenticationError`` -> ``AuthenticationError``
+    - ``openai.PermissionDeniedError`` -> ``AuthenticationError``
     - ``openai.BadRequestError`` -> ``BadRequestError``
     - ``openai.APITimeoutError`` -> ``LLMTimeoutError``
     - ``openai.InternalServerError`` -> ``ServerError``
@@ -52,15 +53,7 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 from pydantic import TypeAdapter, ValidationError
 
-from ..errors import (
-    AuthenticationError,
-    BadRequestError,
-    LLMError,
-    LLMTimeoutError,
-    ProviderNotAvailableError,
-    RateLimitError,
-    ServerError,
-)
+from ..errors import BadRequestError, ProviderNotAvailableError
 from ..translators.openai_chat import OpenAIChatTranslator
 from ..translators.openai_response import OpenAIResponseTranslator
 from ..types import (
@@ -77,6 +70,7 @@ from ..types import (
     ToolDefParam,
 )
 from ..utils import compact
+from ._error_mapping import map_httpx_sdk_error
 
 if TYPE_CHECKING:
     from httpx import AsyncClient
@@ -131,22 +125,7 @@ class OpenAIProvider:
 
     def _map_error(self, e: Exception) -> NoReturn:
         """Map an ``openai.*`` SDK exception to the giskard error hierarchy."""
-        openai = _import_openai()
-        if isinstance(e, openai.RateLimitError):
-            raise RateLimitError(429, str(e), self._PROVIDER) from e
-        if isinstance(e, openai.AuthenticationError):
-            raise AuthenticationError(e.status_code, str(e), self._PROVIDER) from e
-        if isinstance(e, openai.BadRequestError):
-            raise BadRequestError(e.status_code, str(e), self._PROVIDER) from e
-        if isinstance(e, openai.APITimeoutError):
-            raise LLMTimeoutError(408, str(e), self._PROVIDER) from e
-        if isinstance(e, openai.InternalServerError):
-            raise ServerError(e.status_code, str(e), self._PROVIDER) from e
-        if isinstance(e, openai.APIError):
-            raise LLMError(
-                getattr(e, "status_code", None) or 500, str(e), self._PROVIDER
-            ) from e
-        raise
+        map_httpx_sdk_error(e, _import_openai(), self._PROVIDER)
 
     async def complete(
         self,
