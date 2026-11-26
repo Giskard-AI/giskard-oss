@@ -364,6 +364,88 @@ def test_anthropic_provider_forwards_transport_config():
     assert kwargs["default_headers"] == default_headers
 
 
+# -- SDK retries must stay off (giskard owns the retry policy) -----------------
+
+
+def test_providers_disable_sdk_retries(monkeypatch):
+    """Every provider that builds an SDK client must pass ``max_retries=0``."""
+    for var in ("AZURE_API_BASE", "AZURE_AI_ENDPOINT"):
+        monkeypatch.setenv(var, "https://azure.test")
+
+    with patch("giskard.llm.providers.openai._import_openai") as mock_openai:
+        sdk = MagicMock()
+        mock_openai.return_value = sdk
+        OpenAIProvider(api_key="k")
+        assert sdk.AsyncOpenAI.call_args.kwargs["max_retries"] == 0
+
+    with patch("giskard.llm.providers.anthropic._import_anthropic") as mock_anthropic:
+        sdk = MagicMock()
+        mock_anthropic.return_value = sdk
+        AnthropicProvider(api_key="k")
+        assert sdk.AsyncAnthropic.call_args.kwargs["max_retries"] == 0
+
+    with patch("openai.AsyncAzureOpenAI") as mock_azure:
+        AzureOpenAIProvider(api_key="k")
+        assert mock_azure.call_args.kwargs["max_retries"] == 0
+
+    with patch("openai.AsyncAzureOpenAI") as mock_azure_ai:
+        AzureAIProvider(api_key="k")
+        assert mock_azure_ai.call_args.kwargs["max_retries"] == 0
+
+
+@pytest.mark.parametrize("status", [429, 500])
+@pytest.mark.parametrize("provider_cls", [OpenAIProvider, AzureOpenAIProvider])
+async def test_openai_sdk_makes_one_http_call_per_transient_error(provider_cls, status):
+    """One failing request must hit the wire once, not 1 + SDK retries."""
+    pytest.importorskip("openai")
+    import httpx
+
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(status, json={"error": {"message": "boom"}})
+
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    try:
+        kwargs: dict[str, Any] = {"api_key": "sk-test", "http_client": http_client}
+        if provider_cls is AzureOpenAIProvider:
+            kwargs["base_url"] = "https://azure.test"
+        provider = provider_cls(**kwargs)
+        with pytest.raises(LLMError):
+            await provider.complete("gpt-4o", [{"role": "user", "content": "Hi"}])
+    finally:
+        await http_client.aclose()
+
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("status", [429, 500])
+async def test_anthropic_sdk_makes_one_http_call_per_transient_error(status):
+    """One failing request must hit the wire once, not 1 + SDK retries."""
+    pytest.importorskip("anthropic")
+    pytest.importorskip("httpx2")
+    import httpx2
+
+    calls: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls.append(request)
+        return httpx2.Response(
+            status, json={"type": "error", "error": {"type": "x", "message": "boom"}}
+        )
+
+    http_client = httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+    try:
+        provider = AnthropicProvider(api_key="sk-test", http_client=http_client)
+        with pytest.raises(LLMError):
+            await provider.complete("claude-test", [{"role": "user", "content": "Hi"}])
+    finally:
+        await http_client.aclose()
+
+    assert len(calls) == 1
+
+
 async def test_sdk_v1_async_anthropic_accepts_httpx2_http_client():
     """Unmocked SDK check: v1 requires httpx2.AsyncClient for http_client."""
     pytest.importorskip("anthropic")
