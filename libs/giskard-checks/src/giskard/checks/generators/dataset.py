@@ -65,7 +65,8 @@ def _replace(value: Any, prompt: str) -> tuple[Any, bool]:
         for name in type(value).model_fields:
             data[name], hit = _replace(getattr(value, name), prompt)
             replaced |= hit
-        return type(value).model_validate(data), replaced
+        # ``data`` is keyed by field name, not alias.
+        return type(value).model_validate(data, by_name=True), replaced
     if isinstance(value, Mapping):
         replaced = False
         out: dict[Any, Any] = {}
