@@ -235,7 +235,10 @@ deptry-each-lib = $(foreach lib,$(LIBS),uv run --directory libs/$(lib) deptry sr
 check-deps: ## Check for unused/missing/misplaced dependencies with deptry (per library)
 	$(deptry-each-lib)
 
-check: lint check-format check-compat typecheck security check-deps check-licenses check-notices check-extra-pins ## Run all checks
+secrets: ## Check for unbaselined secrets with detect-secrets
+	uv tool run pre-commit run detect-secrets --all-files
+
+check: lint check-format check-compat typecheck security secrets check-deps check-licenses check-notices check-extra-pins ## Run all checks
 
 clean: ## Clean up build artifacts and caches
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
