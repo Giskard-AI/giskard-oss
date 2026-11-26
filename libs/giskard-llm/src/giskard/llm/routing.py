@@ -1,5 +1,6 @@
 """Route ``provider/model`` strings to the correct provider instance."""
 
+import asyncio
 import importlib
 import os
 from collections.abc import Sequence
@@ -63,6 +64,14 @@ def _parse_model_string(model: str) -> tuple[str, str]:
     return provider, model_name
 
 
+def _running_loop() -> asyncio.AbstractEventLoop | None:
+    """Return the running event loop, or ``None`` when called outside one."""
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        return None
+
+
 def _create_provider(provider_type: str, **kwargs: Any) -> Provider:
     """Instantiate a provider by type name using the registry."""
     if provider_type not in _PROVIDER_REGISTRY:
@@ -80,12 +89,16 @@ class LLMClient:
     """Entry point for configuring and calling LLM providers.
 
     Stores config from ``configure()`` calls. Provider instances are
-    created lazily on first use and cached on this client instance.
+    created lazily on first use and cached on this client instance, per
+    event loop: provider SDK clients hold HTTP connection pools bound to the
+    loop that first used them, so a call from a new loop (for example a
+    second ``asyncio.run()``) gets a fresh provider.
     """
 
     def __init__(self) -> None:
         self._configs: dict[str, dict[str, Any]] = {}
         self._providers: dict[str, Provider] = {}
+        self._provider_loops: dict[str, asyncio.AbstractEventLoop | None] = {}
 
     def configure(self, name: str, provider: str | None = None, **kwargs: Any) -> None:
         """Register a named provider configuration.
@@ -101,6 +114,7 @@ class LLMClient:
         provider_type = (provider or name).strip()
         self._configs[name] = {"provider": provider_type, **kwargs}
         self._providers.pop(name, None)
+        self._provider_loops.pop(name, None)
 
     def configure_from_dict(self, config: dict[str, dict[str, Any]]) -> None:
         """Bulk-register providers from a dict (e.g. loaded from YAML)."""
@@ -108,7 +122,8 @@ class LLMClient:
             self.configure(name, **kwargs)
 
     def _get_provider(self, name: str) -> Provider:
-        if name in self._providers:
+        loop = _running_loop()
+        if name in self._providers and self._provider_loops.get(name) is loop:
             return self._providers[name]
 
         if name in self._configs:
@@ -116,18 +131,17 @@ class LLMClient:
             provider_type = cfg.pop("provider")
             resolved = {k: _resolve_value(v) for k, v in cfg.items()}
             provider = _create_provider(provider_type, **resolved)
-            self._providers[name] = provider
-            return provider
-
-        if name in _PROVIDER_REGISTRY:
+        elif name in _PROVIDER_REGISTRY:
             provider = _create_provider(name)
-            self._providers[name] = provider
-            return provider
+        else:
+            raise ValueError(
+                f"Provider '{name}' is not configured and not in the registry. "
+                f"Call client.configure('{name}', ...) first."
+            )
 
-        raise ValueError(
-            f"Provider '{name}' is not configured and not in the registry. "
-            f"Call client.configure('{name}', ...) first."
-        )
+        self._providers[name] = provider
+        self._provider_loops[name] = loop
+        return provider
 
     def _resolve(self, model: str, protocol: type, operation: str) -> tuple[Any, str]:
         """Parse model string, look up the provider, and check capability."""
@@ -194,6 +208,7 @@ def configure(name: str, provider: str | None = None, **kwargs: Any) -> None:
 def reset() -> None:
     """Clear all cached providers on the default client (useful in tests)."""
     _default_client._providers.clear()
+    _default_client._provider_loops.clear()
     _default_client._configs.clear()
 
 
