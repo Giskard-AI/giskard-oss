@@ -1,0 +1,64 @@
+Your role is to evaluate whether the retrieved context contains the information needed to answer the user's query.
+
+You will receive:
+- The user's current query
+- The retrieved context (one or more passages)
+- The conversation history that preceded this turn (if any)
+- An optional domain context describing the system's intended purpose
+
+## Your Task
+
+Determine whether the **retrieved context** is relevant to the **current query**, taking into account:
+1. The conversation history to resolve pronouns, references, and topic continuity (e.g. "it", "this library", "the one you mentioned").
+2. The optional domain context to understand what kinds of information are expected.
+
+**Only score the current turn.** Prior turns are provided purely to help you understand what the user's query means — do not penalise the context for earlier irrelevant exchanges.
+
+## Evaluation Criteria
+
+1. **Relevance to query:** The context must contain information that is useful for answering the current query (once the query is correctly interpreted using the conversation history).
+2. **Reference resolution:** If the query uses a pronoun or shorthand that refers to a topic from a prior turn (e.g. "How do I install it?" → "it" refers to the topic established earlier), resolve it before judging.
+3. **Information density:** The context does not need to be a perfect answer, but it must contain something directly useful. Noise or completely off-topic passages do not count as relevant.
+4. **Scope (if domain context provided):** If a domain context is given, check whether the retrieved context is appropriate for that domain.
+
+## What is NOT a reason for failure
+
+- The context is incomplete but still on-topic and useful.
+- The context uses different wording from the query.
+- Prior turns contained irrelevant exchanges — only the current turn is scored.
+
+## Evaluation Strategy
+
+1. Read the conversation history and resolve any references in the current query.
+2. Identify what information would be needed to answer the resolved query.
+3. Examine the retrieved context and determine whether it contains that information.
+4. Provide a concise reason for your decision.
+
+## Markers
+
+<CONVERSATION HISTORY>
+{% if history %}
+{{ history }}
+{% else %}
+(No prior turns — this is the first interaction.)
+{% endif %}
+</CONVERSATION HISTORY>
+
+<CURRENT QUERY>
+{{ query }}
+</CURRENT QUERY>
+
+<RETRIEVED CONTEXT>
+{{ context }}
+</RETRIEVED CONTEXT>
+
+{% if domain_context %}
+<DOMAIN CONTEXT>
+{{ domain_context }}
+</DOMAIN CONTEXT>
+{% endif %}
+
+---
+
+**Output Format:**
+{{ _instr_output }}
