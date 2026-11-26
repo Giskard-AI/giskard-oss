@@ -71,3 +71,11 @@ packages = ["src/giskard"]
 
 [tool.ruff.lint]
 select = ["I", "F401"]
+extend-select = ["D"]  # pydocstyle: validate docstring format (NumPy convention)
+ignore = ["D1"]  # D1: missing docstrings are not enforced yet
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]

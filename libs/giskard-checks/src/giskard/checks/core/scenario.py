@@ -153,7 +153,7 @@ class Scenario[InputType, OutputType, TraceType: Trace](BaseModel):  # pyright: 
         /,
         **kwargs: Any,
     ) -> None:
-        """Initialize a scenario. Name can be passed positionally: Scenario(\"my_name\")."""
+        """Initialize a scenario. Name can be passed positionally: Scenario("my_name")."""
         if name is not None:
             kwargs["name"] = name
         super().__init__(**kwargs)

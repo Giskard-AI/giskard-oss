@@ -65,32 +65,43 @@ async def third_party_scan[InputType, OutputType, TraceType: Trace](  # pyright:
     Requires the scanner's optional extra: ``pip install giskard-scan[garak]``
     or ``pip install giskard-scan[deepteam]``.
 
-    Args:
-        target: Agent or provider target to evaluate.
-        tool: Scanner to use, ``"garak"`` or ``"deepteam"``.
-        description: Natural-language description of the agent under test.
-            Deepteam uses it as ``red_team``'s ``target_purpose``; garak has no
-            target-profile concept and ignores it.
-        languages: BCP-47 language codes the agent handles. Reserved for
-            scanners that support language filtering; ignored by garak and
-            deepteam.
-        **kwargs: Tool-specific options. For garak: ``probes`` (``None`` runs a
-            curated default set, ``"all"`` runs every active probe, or pass an
-            explicit name list) and ``target_mode`` (defaults to
-            :data:`~giskard.scan.generators.base.DEFAULT_TARGET_MODE`;
-            ``"multiturn"`` keeps garak's iterative probes). For deepteam:
-            ``vulnerabilities`` / ``attacks`` (name lists; ``None`` runs a
-            curated default set), ``attacks_per_vulnerability_type`` (default
-            ``1``), and ``target_mode`` (same shared default) which drops
-            multi-turn attacks when set to ``"singleturn"``.
+    Parameters
+    ----------
+    target : Target
+        Agent or provider target to evaluate.
+    tool : {"garak", "lidar", "deepteam"}
+        Scanner to use, ``"garak"`` or ``"deepteam"``.
+    description : str
+        Natural-language description of the agent under test. Deepteam uses it
+        as ``red_team``'s ``target_purpose``; garak has no target-profile
+        concept and ignores it.
+    languages : list[str] | None, optional
+        BCP-47 language codes the agent handles. Reserved for scanners that
+        support language filtering; ignored by garak and deepteam.
+    **kwargs : Any
+        Tool-specific options. For garak: ``probes`` (``None`` runs a curated
+        default set, ``"all"`` runs every active probe, or pass an explicit
+        name list) and ``target_mode`` (defaults to
+        :data:`~giskard.scan.generators.base.DEFAULT_TARGET_MODE`;
+        ``"multiturn"`` keeps garak's iterative probes). For deepteam:
+        ``vulnerabilities`` / ``attacks`` (name lists; ``None`` runs a curated
+        default set), ``attacks_per_vulnerability_type`` (default ``1``), and
+        ``target_mode`` (same shared default) which drops multi-turn attacks
+        when set to ``"singleturn"``.
 
-    Returns:
+    Returns
+    -------
+    SuiteResult
         The completed suite result.
 
-    Raises:
-        ImportError: The selected scanner's optional extra is not installed.
-        ValueError: ``tool`` is unknown.
-        TypeError: A keyword argument is not valid for the selected tool.
+    Raises
+    ------
+    ImportError
+        The selected scanner's optional extra is not installed.
+    ValueError
+        ``tool`` is unknown.
+    TypeError
+        A keyword argument is not valid for the selected tool.
     """
     if tool == "garak":
         from .garak import GarakScanAdapter

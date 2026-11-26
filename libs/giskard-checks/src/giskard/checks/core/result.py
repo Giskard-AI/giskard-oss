@@ -706,7 +706,6 @@ class SuiteResult(BaseResult, frozen=True):
         GroupedSuiteResult
             Wrapper holding this result, the key, and per-group stats.
         """
-
         buckets: defaultdict[str | None, dict[str, int]] = defaultdict(
             lambda: {"passed": 0, "failed": 0, "errored": 0, "skipped": 0}
         )
