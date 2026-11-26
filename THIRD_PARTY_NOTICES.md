@@ -433,9 +433,9 @@ Find a list of packages below
 
 ### jsonpath-ng
 
-- HomePage: https://github.com/h2non/jsonpath-ng
-- Author: Tomas Aparicio
-- License: Apache Software License
+- HomePage:
+- Author: Kurt McKee
+- License: Apache-2.0
 - Compatible: True
 
 ### jsonschema

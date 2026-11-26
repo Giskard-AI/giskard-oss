@@ -25,7 +25,7 @@ Requires Python >= 3.12.
 **Dependencies:**
 - `pydantic>=2.12` - Core data validation and serialization
 - `giskard-agents>=1.0.0a1` - LLM integration, workflows, and bundled prompt templates
-- `jsonpath-ng>=1.7.0` - JSONPath expressions for data extraction
+- `jsonpath-ng>=1.16.0` - JSONPath expressions for data extraction
 
 Quickstart
 ----------

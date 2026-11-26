@@ -11,6 +11,7 @@ from jsonpath_ng import (
     Union,
     Where,
     WhereNot,
+    Wildcard,
     parse,
 )
 from jsonpath_ng.exceptions import JsonPathLexerError, JsonPathParserError
@@ -76,7 +77,7 @@ def _is_list_expression(expression: JSONPath) -> bool:
     if isinstance(expression, Where | WhereNot):
         return _is_list_expression(expression.left)
 
-    if isinstance(expression, Slice | Union | Intersect):
+    if isinstance(expression, Slice | Wildcard | Union | Intersect):
         return True
 
     if isinstance(expression, Fields):
