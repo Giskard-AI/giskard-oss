@@ -519,10 +519,16 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
         WorkflowError
             If the workflow fails and the error policy is RAISE (default).
         """
-        results = await asyncio.gather(
-            *[self.run(max_steps=max_steps) for _ in range(n)],
-            return_exceptions=False,
-        )
+        # A TaskGroup cancels the remaining runs as soon as one of them raises.
+        try:
+            async with asyncio.TaskGroup() as task_group:
+                tasks = [
+                    task_group.create_task(self.run(max_steps=max_steps))
+                    for _ in range(n)
+                ]
+        except* Exception as exc_group:
+            raise exc_group.exceptions[0]
+        results = [task.result() for task in tasks]
 
         # If the error mode is SKIP, we return only the successful chats.
         if self.error_policy == ErrorPolicy.SKIP:
@@ -553,10 +559,16 @@ class ChatWorkflow(BaseModel, Generic[OutputType]):
             for params in inputs
         ]
 
-        chats = await asyncio.gather(
-            *[workflow.run(max_steps=max_steps) for workflow in workflows],
-            return_exceptions=False,
-        )
+        # A TaskGroup cancels the remaining runs as soon as one of them raises.
+        try:
+            async with asyncio.TaskGroup() as task_group:
+                tasks = [
+                    task_group.create_task(workflow.run(max_steps=max_steps))
+                    for workflow in workflows
+                ]
+        except* Exception as exc_group:
+            raise exc_group.exceptions[0]
+        chats = [task.result() for task in tasks]
 
         if self.error_policy == ErrorPolicy.SKIP:
             chats = [chat for chat in chats if not chat.failed]
