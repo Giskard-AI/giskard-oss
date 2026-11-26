@@ -432,8 +432,11 @@ def test_run_returns_promptly_and_stops_probes_when_cancelled(
 
     target_calls: list[str] = []
 
+    first_call_started = asyncio.Event()
+
     async def slow_target(inputs: str) -> str:
         target_calls.append(inputs)
+        first_call_started.set()
         await asyncio.sleep(0.3)
         return "ok"
 
@@ -462,15 +465,19 @@ def test_run_returns_promptly_and_stops_probes_when_cancelled(
     outcome: list[str] = []
 
     async def _scan() -> None:
-        try:
-            await asyncio.wait_for(
-                _adapter.GarakScanAdapter().run(
-                    target=slow_target, probes=[_TwoPromptProbe("p0")]
-                ),
-                timeout=0.1,
+        scan = asyncio.create_task(
+            _adapter.GarakScanAdapter().run(
+                target=slow_target, probes=[_TwoPromptProbe("p0")]
             )
-        except TimeoutError:
-            outcome.append("timed out")
+        )
+        # Cancel only once the worker is inside its first target call, so the test
+        # doesn't depend on how fast the worker thread starts.
+        await first_call_started.wait()
+        scan.cancel()
+        try:
+            await scan
+        except asyncio.CancelledError:
+            outcome.append("cancelled")
         # Keep the loop alive past the in-flight call (0.3s) so a leaked worker
         # could reach its second prompt.
         await asyncio.sleep(0.6)
@@ -480,5 +487,45 @@ def test_run_returns_promptly_and_stops_probes_when_cancelled(
     runner.join(timeout=5)
 
     assert not runner.is_alive(), "cancelling the scan hung the event loop"
-    assert outcome == ["timed out"]
+    assert outcome == ["cancelled"]
     assert target_calls == ["first"], "cancelled probe kept calling the target"
+
+
+def test_run_probe_does_not_score_attempts_when_cancelled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Scoring may call an LLM judge, so a cancelled scan must not start it."""
+    import threading
+
+    from giskard.scan.integrations.garak import _adapter
+
+    scored: list[object] = []
+    monkeypatch.setattr(_adapter, "_resolve_detectors", lambda *_: ([], []))
+    monkeypatch.setattr(
+        _adapter.GarakScanAdapter,
+        "_evaluate_attempt",
+        lambda self, *args: scored.append(args) or [],
+    )
+
+    class _Probe:
+        probename = "p0"
+        tags: list[str] = []
+
+        def probe(self, generator: Any) -> list[Attempt]:
+            return [_attempt(self.probename)]
+
+    async def target(inputs: str) -> str:
+        return "ok"
+
+    cancelled = threading.Event()
+    cancelled.set()
+
+    with pytest.raises(RuntimeError, match="scan cancelled"):
+        _adapter.GarakScanAdapter()._run_probe(
+            _Probe(),  # pyright: ignore[reportArgumentType]
+            target,
+            None,  # pyright: ignore[reportArgumentType]
+            None,  # pyright: ignore[reportArgumentType]
+            cancelled,
+        )
+    assert scored == []

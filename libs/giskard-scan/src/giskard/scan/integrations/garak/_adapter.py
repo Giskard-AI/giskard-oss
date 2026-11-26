@@ -484,6 +484,9 @@ class GarakScanAdapter:
         attempts = probe.probe(generator)
         scenario_results = []
         for attempt_idx, attempt in enumerate(attempts):
+            # Scoring can call an LLM judge, which TargetGenerator's check doesn't cover.
+            if cancelled.is_set():
+                raise RuntimeError("scan cancelled")
             test_case_results = self._evaluate_attempt(
                 attempt, detectors, skipped_detectors
             )
