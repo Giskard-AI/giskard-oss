@@ -530,3 +530,82 @@ async def test_invalid_api_key(provider: str):
         await client.acompletion(
             f"{alias}/{model_name}", [{"role": "user", "content": "Hi"}]
         )
+
+
+# -- Reasoning effort scenarios ------------------------------------------------
+
+_REASONING_MODELS = {
+    "openai": os.getenv("TEST_OPENAI_MODEL", "openai/gpt-5.4-nano"),
+    "bare": os.getenv("TEST_BARE_MODEL", "gpt-5.4-nano"),
+    "google": os.getenv("TEST_GOOGLE_MODEL", "google/gemini-3.5-flash"),
+    "gemini": os.getenv("TEST_GEMINI_MODEL", "gemini/gemini-3.5-flash"),
+    # Claude 4.5 rejects adaptive thinking; 5.5 supports output_config.effort + adaptive.
+    "anthropic": os.getenv(
+        "TEST_ANTHROPIC_REASONING_MODEL", "anthropic/claude-haiku-5-5"
+    ),
+}
+
+_REASONING_PROVIDER_PARAMS = [
+    pytest.param(provider, marks=_PROVIDER_MARKS[provider], id=provider)
+    for provider in _REASONING_MODELS
+]
+
+_REASONING_TOOL_LOOP_PARAMS = [
+    pytest.param(provider, marks=_PROVIDER_MARKS[provider], id=provider)
+    for provider in ("google", "gemini", "anthropic")
+]
+
+
+def _make_reasoning_client(provider: str) -> tuple[LLMClient, str]:
+    """Create a configured LLMClient for reasoning-capable test models."""
+    client = LLMClient()
+    if provider == "bare":
+        return client, _REASONING_MODELS["bare"]
+    alias = f"test-reasoning-{provider}"
+    client.configure(alias, **_CONFIGURE_PARAMS[provider])
+    _, model_name = _REASONING_MODELS[provider].split("/", 1)
+    return client, f"{alias}/{model_name}"
+
+
+@pytest.mark.parametrize("provider", _REASONING_PROVIDER_PARAMS)
+async def test_reasoning_effort(provider: str):
+    """Canonical reasoning_effort='low' succeeds without leaking thoughts into text."""
+    client, model = _make_reasoning_client(provider)
+    resp = await client.acompletion(
+        model,
+        [{"role": "user", "content": "What is 17 + 25? Reply with the number only."}],
+        reasoning_effort="low",
+    )
+    msg = resp.choices[0].message
+    assert msg.role == "assistant"
+    assert msg.text
+    assert isinstance(msg.text, str)
+    assert len(msg.text.strip()) > 0
+    if msg.reasoning is not None:
+        assert isinstance(msg.reasoning, str)
+    assert resp.usage is not None
+    if resp.usage.reasoning_tokens is not None:
+        assert resp.usage.reasoning_tokens >= 0
+
+
+@pytest.mark.parametrize("provider", _REASONING_TOOL_LOOP_PARAMS)
+async def test_tool_result_loop_with_reasoning_effort(provider: str):
+    """Tool loop with reasoning_effort='low' replays thinking/thought signatures cleanly."""
+    client, model = _make_reasoning_client(provider)
+    question = UserMessage(content="What is 2+2? Use the add tool.")
+
+    resp1 = await client.acompletion(
+        model, [question], tools=[ADD_TOOL], reasoning_effort="low"
+    )
+    assistant = resp1.choices[0].message
+    assert assistant.tool_calls
+    tc = assistant.tool_calls[0]
+
+    resp2 = await client.acompletion(
+        model,
+        [question, assistant, ToolMessage(tool_call_id=tc.id, content="4")],
+        tools=[ADD_TOOL],
+        reasoning_effort="low",
+    )
+    assert resp2.choices[0].finish_reason == "stop"
+    assert resp2.choices[0].message.text

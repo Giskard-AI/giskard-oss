@@ -4,7 +4,10 @@ Kept in a separate module to break the circular dependency between
 ``base`` (BaseGenerator) and ``middleware`` (CompletionMiddleware).
 """
 
-from pydantic import BaseModel, Field
+from typing import ClassVar
+
+from giskard.llm.types import NormalizedReasoningEffort
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..tools import Tool
 
@@ -18,13 +21,18 @@ class GenerationParams(BaseModel):
         List of tools available to the model.
     timeout : float | int | None, optional
         Maximum time in seconds to wait for the completion request.
+    reasoning_effort : NormalizedReasoningEffort | None, optional
+        Canonical reasoning effort level (``none``..``max``), case-normalized.
     """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
     temperature: float = Field(default=1.0)
     max_tokens: int | None = Field(default=None)
     response_format: type[BaseModel] | None = Field(default=None)
     tools: list[Tool] = Field(default_factory=list)
     timeout: float | int | None = Field(default=None)
+    reasoning_effort: NormalizedReasoningEffort | None = Field(default=None)
 
     def merge(self, overrides: "GenerationParams | None") -> "GenerationParams":
         """Return a copy with *overrides*' explicitly-set fields applied on top.

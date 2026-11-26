@@ -329,3 +329,76 @@ async def test_respond_empty_input(provider: str):
     client, model = _make_client(provider)
     with pytest.raises(LLMError):
         await client.aresponse(model, [])
+
+
+# -- Reasoning effort scenarios ------------------------------------------------
+
+_RESPONSE_REASONING_MODELS = {
+    "openai": os.getenv("TEST_OPENAI_MODEL", "openai/gpt-5.4-nano"),
+    # Gemini 2.5 rejects thinking_level; Gemini 3.5 supports minimal/low/medium/high.
+    "google": os.getenv("TEST_GOOGLE_REASONING_MODEL", "google/gemini-3.5-flash"),
+}
+
+_RESPONSE_REASONING_PARAMS = [
+    pytest.param(provider, marks=_PROVIDER_MARKS[provider], id=provider)
+    for provider in _RESPONSE_REASONING_MODELS
+]
+
+
+def _make_response_reasoning_client(provider: str) -> tuple[LLMClient, str]:
+    """Create a configured LLMClient for reasoning-capable Response API models."""
+    client = LLMClient()
+    alias = f"test-reasoning-{provider}"
+    client.configure(alias, **_CONFIGURE_PARAMS[provider])
+    _, model_name = _RESPONSE_REASONING_MODELS[provider].split("/", 1)
+    return client, f"{alias}/{model_name}"
+
+
+@pytest.mark.parametrize("provider", _RESPONSE_REASONING_PARAMS)
+async def test_respond_reasoning_effort(provider: str):
+    """Response API accepts canonical reasoning_effort='low'."""
+    client, model = _make_response_reasoning_client(provider)
+    resp = await client.aresponse(
+        model,
+        "What is 17 + 25? Reply with the number only.",
+        reasoning_effort="low",
+    )
+    assert resp.id
+    assert resp.output_text is not None
+    assert len(resp.output_text.strip()) > 0
+    assert resp.usage is not None
+    if resp.usage.reasoning_tokens is not None:
+        assert resp.usage.reasoning_tokens >= 0
+
+
+@pytest.mark.parametrize("provider", _RESPONSE_REASONING_PARAMS)
+async def test_respond_stateful_tool_result_with_reasoning_effort(provider: str):
+    """Stateful Response API tool loop succeeds with reasoning_effort='low'."""
+    client, model = _make_response_reasoning_client(provider)
+    resp1 = await client.aresponse(
+        model,
+        "What is 3+4? Use the add tool.",
+        tools=[_ADD_TOOL],
+        reasoning_effort="low",
+    )
+    assert resp1.id
+    fc_outputs = resp1.function_calls
+    assert len(fc_outputs) > 0
+
+    fc = fc_outputs[0]
+    resp2 = await client.aresponse(
+        model,
+        [
+            {
+                "type": "function_call_output",
+                "call_id": fc.call_id or "call_0",
+                "name": fc.name,
+                "output": "7",
+            },
+        ],
+        previous_id=resp1.id,
+        reasoning_effort="low",
+    )
+    assert resp2.id
+    assert resp2.output_text is not None
+    assert len(resp2.output_text.strip()) > 0

@@ -243,3 +243,34 @@ def test_from_google_unsupported_content_dropped_with_warning(
         )
     assert out.output_text == "kept"
     assert content_type in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("total_thought_tokens", "expected_reasoning_tokens"),
+    [
+        pytest.param(10, 10, id="thought-tokens-present"),
+        pytest.param(0, 0, id="thought-tokens-zero"),
+        pytest.param(None, None, id="thought-tokens-omitted"),
+    ],
+)
+def test_from_google_usage_reasoning_tokens(
+    total_thought_tokens: int | None, expected_reasoning_tokens: int | None
+):
+    """Maps ``usage.total_thought_tokens`` to ``Usage.reasoning_tokens``."""
+    raw = _interaction(
+        [
+            ModelOutputStep(
+                type="model_output",
+                content=[TextContent(type="text", text="Answer.")],
+            )
+        ],
+        usage=Usage(
+            total_input_tokens=3,
+            total_output_tokens=14,
+            total_thought_tokens=total_thought_tokens,
+            total_tokens=17,
+        ),
+    )
+    out = GoogleResponseTranslator.from_google(raw, _MODEL)
+    assert out.usage is not None
+    assert out.usage.reasoning_tokens == expected_reasoning_tokens

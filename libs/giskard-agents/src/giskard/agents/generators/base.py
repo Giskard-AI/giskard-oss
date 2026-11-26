@@ -261,6 +261,8 @@ class BaseGenerator(Discriminated, ABC):
         Self
             A new generator with the given parameters.
         """
-        generator = self.model_copy()
-        generator.params = generator.params.model_copy(update=kwargs)
-        return generator
+        current = {
+            field: getattr(self.params, field) for field in self.params.model_fields_set
+        }
+        params = GenerationParams.model_validate({**current, **kwargs})
+        return self.model_copy(update={"params": params})

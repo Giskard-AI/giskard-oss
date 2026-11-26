@@ -18,7 +18,7 @@ from typing import Callable
 
 import pytest
 from giskard import agents
-from giskard.agents.generators.base import BaseGenerator
+from giskard.agents.generators.base import BaseGenerator, GenerationParams
 from giskard.agents.generators.giskard_llm_generator import GiskardLLMGenerator
 from giskard.llm.types import SystemMessage, UserMessage
 
@@ -118,3 +118,20 @@ async def test_backends_coexist_in_same_process() -> None:
     assert litellm_response.choices[0].message.text is not None
     assert "1" in giskard_response.choices[0].message.text
     assert "2" in litellm_response.choices[0].message.text
+
+
+@pytest.mark.google
+@pytest.mark.giskard_llm
+async def test_giskard_llm_reasoning_effort() -> None:
+    """``GiskardLLMGenerator`` forwards ``GenerationParams.reasoning_effort`` live."""
+    generator = GiskardLLMGenerator(
+        model=os.getenv("TEST_MODEL", "google/gemini-3.5-flash"),
+        params=GenerationParams(reasoning_effort="low"),
+    )
+    response = await generator.complete(
+        messages=[UserMessage(content="What is 17 + 25? Reply with the number only.")]
+    )
+
+    assert response.choices[0].message.role == "assistant"
+    assert response.choices[0].message.text is not None
+    assert len(response.choices[0].message.text.strip()) > 0
