@@ -97,6 +97,12 @@ class TestResolveDotWildcard:
         )
         assert resolve(trace, "trace.last.metadata.*") == ["v1"]
 
+    def test_bracket_wildcard_with_single_match_returns_a_list_not_a_bare_scalar(self):
+        trace = Trace[str, str](
+            interactions=[Interaction(inputs="hi", outputs="hello")]
+        )
+        assert resolve(trace, "trace.interactions[*].outputs") == ["hello"]
+
     def test_wildcard_with_multiple_matches_returns_a_list(self):
         trace = Trace[str, str](
             interactions=[
