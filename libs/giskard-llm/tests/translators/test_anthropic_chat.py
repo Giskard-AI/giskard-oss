@@ -4,6 +4,7 @@ Request shape: https://docs.anthropic.com/en/api/messages
 """
 
 import logging
+from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 import pytest
@@ -464,6 +465,20 @@ def test_httpx2_timeout_passes_through():
     httpx2 = pytest.importorskip("httpx2")
 
     original = httpx2.Timeout(5.0, connect=2.0)
+    payload = AnthropicChatTranslator.to_anthropic(
+        _MODEL, [UserMessage(content="Hello.")], timeout=original
+    )
+    assert payload.get("timeout") is original
+
+
+def test_dataclass_timeout_not_dumped_to_dict():
+    """A dataclass Timeout (as in httpx2 >= 2.13) is forwarded, not turned into a dict."""
+
+    @dataclass
+    class Timeout:
+        connect: float
+
+    original = Timeout(connect=2.0)
     payload = AnthropicChatTranslator.to_anthropic(
         _MODEL, [UserMessage(content="Hello.")], timeout=original
     )
