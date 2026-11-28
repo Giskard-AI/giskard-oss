@@ -7,6 +7,7 @@ from giskard.checks import (
     Check,
     CheckStatus,
     Interaction,
+    Not,
     SemanticSimilarity,
     Trace,
 )
@@ -670,7 +671,7 @@ async def test_list_valued_key_is_rejected_instead_of_embedding_its_repr():
 
     result = await check.run(trace)
 
-    assert not result.passed
+    assert result.errored
     assert "must be a single value" in (result.message or "")
     assert "reference text" in (result.message or "")
     assert "list" in (result.message or "")
@@ -704,7 +705,7 @@ async def test_dict_valued_actual_answer_key_is_rejected():
 
     result = await check.run(trace)
 
-    assert not result.passed
+    assert result.errored
     assert "must be a single value" in (result.message or "")
     assert "actual answer" in (result.message or "")
     assert "dict" in (result.message or "")
@@ -729,3 +730,28 @@ async def test_scalar_key_still_stringifies():
 
     assert result.passed
     assert embedded == [["42", "42"]]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outputs", [{"answer": "Diversify."}, ["Diversify", "advice"]])
+async def test_not_does_not_pass_for_rejected_collection_output(outputs):
+    """A rejected collection is no verdict, so ``Not`` must not turn it into a pass."""
+    embedded: list[list[str]] = []
+    trace = Trace[str, object](
+        interactions=[Interaction(inputs="q", outputs=outputs)],
+    )
+
+    def make_check() -> SemanticSimilarity:
+        return SemanticSimilarity(
+            reference_text="You should buy this stock now.",
+            threshold=0.8,
+            embedding_model=_recording_embedding_model(embedded),
+        )
+
+    inner = await make_check().run(trace)
+    outer = await Not(check=make_check()).run(trace)
+
+    assert inner.errored
+    assert outer.errored
+    assert not outer.passed
+    assert embedded == [], "nothing should have been sent to the embedding model"
