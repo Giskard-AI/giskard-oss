@@ -155,14 +155,14 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                 },
             )
 
-        if failure := self._failure_if_collection(
+        if error := self._error_if_collection(
             "reference text", self.reference_text_key, reference
         ):
-            return failure
-        if failure := self._failure_if_collection(
+            return error
+        if error := self._error_if_collection(
             "actual answer", self.target_key, actual_answer
         ):
-            return failure
+            return error
 
         actual_answer = str(actual_answer)
         reference = str(reference)
@@ -193,17 +193,21 @@ class SemanticSimilarity[InputType, OutputType, TraceType: Trace](  # pyright: i
                 },
             )
 
-    def _failure_if_collection(
+    def _error_if_collection(
         self, label: str, key: str, value: object
     ) -> CheckResult | None:
-        """Fail when a keypath resolved to a collection instead of one scalar.
+        """Error when a keypath resolved to a collection instead of one scalar.
+
+        The value is rejected before any similarity is computed, so no verdict is
+        reached: this is an error rather than a failure, which keeps wrappers such
+        as ``Not`` from turning the rejection into a pass.
 
         Wildcard / multi-match paths become lists; ``str(list)`` would embed
         Python repr text nobody wrote. Non-collection scalars still stringify.
         """
         if not isinstance(value, (list, tuple, set, dict)):
             return None
-        return CheckResult.failure(
+        return CheckResult.error(
             message=(
                 f"Value for {label} key '{key}' must be a single value, but "
                 f"found {type(value).__name__}. Use a key that resolves to "
